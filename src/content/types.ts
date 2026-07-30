@@ -1,7 +1,11 @@
 import type { Locale } from '@/i18n/routing';
 
-/** A string that exists in both locales. Demo content is authored bilingually. */
-export type Localized = { en: string; ru: string };
+/**
+ * A content string. The portal is English-only; the wrapper stays so demo content
+ * keeps a single shape and a second language can be reintroduced by widening this
+ * type rather than rewriting every content module.
+ */
+export type Localized = { en: string };
 
 /** Locale-independent values (tickers, prices, dates) may be plain strings. */
 export type MaybeLocalized = Localized | string;

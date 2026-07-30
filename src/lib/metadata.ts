@@ -45,7 +45,7 @@ export function pageMetadata(options: {
       description,
       url: SITE_URL + getPathname({ href, locale }),
       siteName: 'TradingNew',
-      locale: locale === 'ru' ? 'ru_RU' : 'en_US',
+      locale: 'en_US',
       type: 'website',
     },
   };

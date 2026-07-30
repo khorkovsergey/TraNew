@@ -80,22 +80,6 @@
   flex-shrink: 0;
 }
 
-.globeButton {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--tn-text);
-  padding: 8px clamp(4px, 0.8vw, 10px);
-  border-radius: var(--tn-radius-pill-sm);
-  transition: background var(--tn-transition-fast);
-}
-
-.globeButton:hover {
-  background: #f0f3f8;
-}
-
 .loginButton {
   padding: 10px clamp(4px, 0.8vw, 10px);
   font-size: 13.5px;
@@ -199,61 +183,3 @@
   margin-top: 2px;
 }
 
-/* ---- Language / region panel ---- */
-
-.langPanel {
-  right: clamp(12px, 2.5vw, 36px);
-  padding: 22px 24px;
-  width: 280px;
-}
-
-.langSegments {
-  display: flex;
-  gap: 8px;
-}
-
-.langSegment {
-  flex: 1;
-  background: var(--tn-surface);
-  color: var(--tn-text);
-  border: 1px solid var(--tn-border-input);
-  border-radius: 12px;
-  padding: 9px 0;
-  font-size: 13.5px;
-  font-weight: 700;
-  transition: background var(--tn-transition-fast), color var(--tn-transition-fast);
-}
-
-.langSegmentActive {
-  background: var(--tn-text);
-  color: #fff;
-}
-
-.regionRows {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 18px;
-}
-
-.regionRow {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13.5px;
-}
-
-.regionKey {
-  color: var(--tn-text-muted);
-}
-
-.regionValue {
-  font-weight: 600;
-}
-
-.langNote {
-  font-size: 11.5px;
-  color: var(--tn-text-faint);
-  margin-top: 16px;
-  line-height: 1.5;
-}

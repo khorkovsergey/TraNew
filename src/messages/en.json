@@ -40,8 +40,7 @@
     },
     "login": "Log in",
     "openApp": "Open TradingNew",
-    "openMenu": "Open {menu} menu",
-    "languageRegion": "Language and region"
+    "openMenu": "Open {menu} menu"
   },
   "menu": {
     "market": {
@@ -117,18 +116,6 @@
       "learningEvents": "Learning and events",
       "learningEventsSub": "Programmes and live sessions",
       "merchandise": "Merchandise"
-    },
-    "globe": {
-      "interfaceLanguage": "Interface language",
-      "region": "Region",
-      "marketDataRegion": "Market data region",
-      "currency": "Currency",
-      "timezone": "Timezone",
-      "regionValue": "Cyprus",
-      "marketDataValue": "Global",
-      "currencyValue": "EUR",
-      "timezoneValue": "Europe/Nicosia",
-      "note": "Interface language and region settings are independent — changing one never changes the other."
     }
   },
   "login": {
@@ -585,42 +572,150 @@
   },
   "screens": {
     "placeholderNote": "High-fidelity build of this screen is in progress.",
-    "market": { "title": "Market", "subtitle": "Indices, stocks, crypto, forex and commodities in one overview." },
-    "marketBrief": { "title": "Today's market brief", "subtitle": "What moved, why it moved, and what to watch next — with the source and time behind every line." },
-    "news": { "title": "News", "subtitle": "Market, economy and company news, each labelled by type and followed by why it matters." },
-    "ideas": { "title": "Ideas hub", "subtitle": "Trading ideas published by the community, with an honest status on every idea since publication." },
-    "explore": { "title": "Explore investment opportunities", "subtitle": "Research markets, compare assets and discover ideas on your own." },
-    "symbol": { "title": "Symbol research overview", "subtitle": "Why it moves today, technical context, news and events for a single asset." },
-    "research": { "title": "Research workspace", "subtitle": "A structured answer to your question, with sources and suggested next actions." },
-    "supercharts": { "title": "Supercharts", "subtitle": "Professional charting in Simple, Standard and Pro views of one product." },
-    "portfolio": { "title": "Portfolio", "subtitle": "See how market events affect what you own — starting with a sample portfolio, no account required." },
-    "economy": { "title": "Economy", "subtitle": "Calendars, macro maps, yield curves, inflation and rates." },
-    "community": { "title": "Community", "subtitle": "Contests, ideas and indicators created by traders." },
-    "brokers": { "title": "Research first. Choose a broker when you are ready.", "subtitle": "Compare brokers on the terms that matter, without leaving your research." },
-    "academy": { "title": "Learn investing step by step", "subtitle": "A personal learning path built from five short questions. No payment required." },
-    "academySetup": { "title": "Personalize your learning path", "subtitle": "Five questions, about two minutes. No account required yet." },
-    "academyPath": { "title": "Your learning path is ready", "subtitle": "Five stages, from the basics to practising without risk." },
-    "academyDashboard": { "title": "Your learning dashboard", "subtitle": "Continue where you left off and keep track of what you have covered." },
-    "academyLesson": { "title": "Lesson", "subtitle": "Explanation, a real market example, an interactive check and hands-on practice." },
-    "academyDone": { "title": "You're ready to research investments on your own", "subtitle": "Here's what you've covered — and where to go next." },
-    "strategy": { "title": "Build my investment strategy", "subtitle": "Seven questions produce a personalized research plan — not a regulated investment recommendation." },
-    "marketplace": { "title": "Go beyond your plan", "subtitle": "Experts, tools and data, learning and events, and exclusive products." },
-    "experts": { "title": "Find the right expert for your next financial decision", "subtitle": "Start from the task you need help with — we'll structure the rest." },
-    "expertsIntake": { "title": "Tell us what you need", "subtitle": "Seven questions so experts see a clear brief instead of a blank request." },
-    "expertsMatches": { "title": "Your best matches", "subtitle": "Matched against your goal, jurisdiction, preferred language and consultation format." },
-    "expertsCompare": { "title": "Compare experts", "subtitle": "Side by side on the terms that matter for your specific task." },
-    "expertProfile": { "title": "Expert profile", "subtitle": "Credentials, consultation options, reviews from completed consultations and disclosures." },
-    "expertSharing": { "title": "Choose what to share", "subtitle": "Everything is off by default. You'll see exactly what the expert will and will not receive." },
-    "expertBooking": { "title": "Book your consultation", "subtitle": "Hold a slot, review the order, give each consent separately, then pay." },
-    "consultation": { "title": "Your consultation", "subtitle": "Slot, shared context, messages and documents in one place." },
-    "consultationSummary": { "title": "Consultation summary", "subtitle": "AI-drafted and confirmed by your expert — research directions, not instructions to buy." },
-    "tool": { "title": "Tool", "subtitle": "Part of the TradingNew research toolkit." },
-    "start": { "title": "Continue your research in TradingNew", "subtitle": "Pick up where you left off. You'll be asked to create an account only to save something." },
-    "why": { "title": "Why investors use TradingNew", "subtitle": "The numbers behind the platform." },
-    "trust": { "title": "Trust Center", "subtitle": "Where our data comes from, how we label it, and what we will never claim." },
-    "howWeExplain": { "title": "How TradingNew explains the market", "subtitle": "Every explanation carries its type, its source and the time it was updated." },
-    "guidance": { "title": "Personal guidance", "subtitle": "Tools and insights tailored to your goals — never a recommendation to buy or sell." },
-    "tools": { "title": "Professional tools", "subtitle": "Powerful charts, screeners and analysis in one place." }
+    "market": {
+      "title": "Market",
+      "subtitle": "Indices, stocks, crypto, forex and commodities in one overview."
+    },
+    "marketBrief": {
+      "title": "Today's market brief",
+      "subtitle": "What moved, why it moved, and what to watch next — with the source and time behind every line."
+    },
+    "news": {
+      "title": "News",
+      "subtitle": "Market, economy and company news, each labelled by type and followed by why it matters."
+    },
+    "ideas": {
+      "title": "Ideas hub",
+      "subtitle": "Trading ideas published by the community, with an honest status on every idea since publication."
+    },
+    "explore": {
+      "title": "Explore investment opportunities",
+      "subtitle": "Research markets, compare assets and discover ideas on your own."
+    },
+    "symbol": {
+      "title": "Symbol research overview",
+      "subtitle": "Why it moves today, technical context, news and events for a single asset."
+    },
+    "research": {
+      "title": "Research workspace",
+      "subtitle": "A structured answer to your question, with sources and suggested next actions."
+    },
+    "supercharts": {
+      "title": "Supercharts",
+      "subtitle": "Professional charting in Simple, Standard and Pro views of one product."
+    },
+    "portfolio": {
+      "title": "Portfolio",
+      "subtitle": "See how market events affect what you own — starting with a sample portfolio, no account required."
+    },
+    "economy": {
+      "title": "Economy",
+      "subtitle": "Calendars, macro maps, yield curves, inflation and rates."
+    },
+    "community": {
+      "title": "Community",
+      "subtitle": "Contests, ideas and indicators created by traders."
+    },
+    "brokers": {
+      "title": "Research first. Choose a broker when you are ready.",
+      "subtitle": "Compare brokers on the terms that matter, without leaving your research."
+    },
+    "academy": {
+      "title": "Learn investing step by step",
+      "subtitle": "A personal learning path built from five short questions. No payment required."
+    },
+    "academySetup": {
+      "title": "Personalize your learning path",
+      "subtitle": "Five questions, about two minutes. No account required yet."
+    },
+    "academyPath": {
+      "title": "Your learning path is ready",
+      "subtitle": "Five stages, from the basics to practising without risk."
+    },
+    "academyDashboard": {
+      "title": "Your learning dashboard",
+      "subtitle": "Continue where you left off and keep track of what you have covered."
+    },
+    "academyLesson": {
+      "title": "Lesson",
+      "subtitle": "Explanation, a real market example, an interactive check and hands-on practice."
+    },
+    "academyDone": {
+      "title": "You're ready to research investments on your own",
+      "subtitle": "Here's what you've covered — and where to go next."
+    },
+    "strategy": {
+      "title": "Build my investment strategy",
+      "subtitle": "Seven questions produce a personalized research plan — not a regulated investment recommendation."
+    },
+    "marketplace": {
+      "title": "Go beyond your plan",
+      "subtitle": "Experts, tools and data, learning and events, and exclusive products."
+    },
+    "experts": {
+      "title": "Find the right expert for your next financial decision",
+      "subtitle": "Start from the task you need help with — we'll structure the rest."
+    },
+    "expertsIntake": {
+      "title": "Tell us what you need",
+      "subtitle": "Seven questions so experts see a clear brief instead of a blank request."
+    },
+    "expertsMatches": {
+      "title": "Your best matches",
+      "subtitle": "Matched against your goal, jurisdiction, preferred language and consultation format."
+    },
+    "expertsCompare": {
+      "title": "Compare experts",
+      "subtitle": "Side by side on the terms that matter for your specific task."
+    },
+    "expertProfile": {
+      "title": "Expert profile",
+      "subtitle": "Credentials, consultation options, reviews from completed consultations and disclosures."
+    },
+    "expertSharing": {
+      "title": "Choose what to share",
+      "subtitle": "Everything is off by default. You'll see exactly what the expert will and will not receive."
+    },
+    "expertBooking": {
+      "title": "Book your consultation",
+      "subtitle": "Hold a slot, review the order, give each consent separately, then pay."
+    },
+    "consultation": {
+      "title": "Your consultation",
+      "subtitle": "Slot, shared context, messages and documents in one place."
+    },
+    "consultationSummary": {
+      "title": "Consultation summary",
+      "subtitle": "AI-drafted and confirmed by your expert — research directions, not instructions to buy."
+    },
+    "tool": {
+      "title": "Tool",
+      "subtitle": "Part of the TradingNew research toolkit."
+    },
+    "start": {
+      "title": "Continue your research in TradingNew",
+      "subtitle": "Pick up where you left off. You'll be asked to create an account only to save something."
+    },
+    "why": {
+      "title": "Why investors use TradingNew",
+      "subtitle": "The numbers behind the platform."
+    },
+    "trust": {
+      "title": "Trust Center",
+      "subtitle": "Where our data comes from, how we label it, and what we will never claim."
+    },
+    "howWeExplain": {
+      "title": "How TradingNew explains the market",
+      "subtitle": "Every explanation carries its type, its source and the time it was updated."
+    },
+    "guidance": {
+      "title": "Personal guidance",
+      "subtitle": "Tools and insights tailored to your goals — never a recommendation to buy or sell."
+    },
+    "tools": {
+      "title": "Professional tools",
+      "subtitle": "Powerful charts, screeners and analysis in one place."
+    }
   },
   "home": {
     "badge": "Join 100M+ investors and traders who use TradingNew to make better decisions.",
