@@ -115,35 +115,35 @@ export function WealthScreen() {
   return (
     <>
       <div className={styles.head}>
-        <div>
+        <div className={styles.headLeft}>
           <h1 className={styles.h1}>My Wealth</h1>
           <div className={styles.headChips}>
             <span className={styles.privateChip}>Private — visible only to you</span>
-            <span className={styles.privateChip}>Profile: Partial</span>
+            <span className={styles.profileChip}>Profile: Partial</span>
           </div>
         </div>
-      </div>
 
-      <div className={styles.quickActions}>
-        <button
-          className={styles.primary}
-          onClick={() => {
-            setAddStage('what');
-            setSaved(false);
-            setTab('add');
-          }}
-        >
-          Add to My Wealth
-        </button>
-        <button className={styles.ghost} onClick={() => setTab('scenarios')}>
-          Run scenario
-        </button>
-        <Link
-          className={`${styles.ghost} ${styles.ghostAi}`}
-          href={{ pathname: '/research', query: { q: 'Review my capital structure' } }}
-        >
-          Ask Copilot
-        </Link>
+        <div className={styles.quickActions}>
+          <button
+            className={styles.primary}
+            onClick={() => {
+              setAddStage('what');
+              setSaved(false);
+              setTab('add');
+            }}
+          >
+            Add to My Wealth
+          </button>
+          <button className={styles.ghost} onClick={() => setTab('scenarios')}>
+            Run scenario
+          </button>
+          <Link
+            className={`${styles.ghost} ${styles.ghostAi}`}
+            href={{ pathname: '/research', query: { q: 'Review my capital structure' } }}
+          >
+            Ask Copilot
+          </Link>
+        </div>
       </div>
 
       <div className={styles.layout}>

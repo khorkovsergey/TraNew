@@ -956,7 +956,7 @@
   color: var(--tn-orange-star);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 860px) {
   .cardGrid,
   .previewGrid,
   .profileGrid,

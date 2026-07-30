@@ -36,7 +36,7 @@ export const SNAPSHOT = [
 ];
 
 export const SNAPSHOT_CONFIDENCE =
-  'Market prices updated today · Property valuation 9 months old · Confidence: Medium';
+  'Market prices updated today 09:45 UTC · Property valuation 9 months old · Overall confidence: Medium';
 
 export const STRUCTURE_VIEWS = [
   { id: 'type', label: 'Asset type' },

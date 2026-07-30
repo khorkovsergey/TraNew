@@ -17,31 +17,48 @@
   color: var(--tn-blue);
 }
 
+/* Title, status chips and quick actions share one row, as in the mockup. */
 .head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
 }
 
+.headLeft {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+/* Sized so the title, status chips and quick actions stay on one row at ~900px. */
 .h1 {
-  font-size: clamp(28px, 4.5vw, 38px);
+  font-size: 30px;
   font-weight: 800;
-  letter-spacing: -1px;
+  letter-spacing: -0.9px;
   margin: 0;
 }
 
 .headChips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  align-items: center;
+  gap: 10px;
 }
 
 .privateChip {
-  background: var(--tn-chip-bg);
   color: var(--tn-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* "Profile: Partial" is amber in the mockup — it is a prompt to complete, not a label. */
+.profileChip {
+  background: var(--tn-amber-tint);
+  color: var(--tn-amber-text);
   border-radius: 12px;
   padding: 5px 12px;
   font-size: 12px;
@@ -52,16 +69,16 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 18px;
 }
 
 .primary {
   background: var(--tn-blue);
   color: #fff;
   border-radius: 22px;
-  padding: 11px 20px;
+  padding: 11px 17px;
   font-size: 13.5px;
   font-weight: 700;
+  white-space: nowrap;
   transition: background var(--tn-transition-fast);
 }
 
@@ -73,9 +90,10 @@
   background: var(--tn-surface);
   border: 1px solid var(--tn-border-control);
   border-radius: 22px;
-  padding: 10px 18px;
+  padding: 10px 16px;
   font-size: 13.5px;
   font-weight: 700;
+  white-space: nowrap;
   transition: box-shadow var(--tn-transition-fast);
 }
 
@@ -170,9 +188,9 @@
 }
 
 .snapKey {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 0.6px;
   color: var(--tn-text-faint);
 }
 
@@ -859,7 +877,7 @@
   font-size: 13.5px;
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 860px) {
   .layout {
     grid-template-columns: 1fr;
   }
