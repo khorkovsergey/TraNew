@@ -237,6 +237,32 @@ export const dataAccessLog = pgTable(
   ]
 );
 
+/* ---------------------------------------------------- Email preview outbox */
+
+/**
+ * Where messages go when no mail provider is configured.
+ *
+ * This exists so the real verification and reset flows can be exercised without a
+ * sending domain: the token is genuine, single-use and time-limited — only the
+ * delivery is simulated. Rows are readable solely through the key-protected preview
+ * page, and the table is inert once EMAIL_TRANSPORT is set to a real provider.
+ */
+export const emailOutbox = pgTable(
+  'email_outbox',
+  {
+    id: text('id').primaryKey(),
+    recipient: text('recipient').notNull(),
+    subject: text('subject').notNull(),
+    body: text('body').notNull(),
+    /** Extracted so the preview page can offer it as a link. */
+    actionUrl: text('action_url'),
+    createdAt: timestamp('created_at')
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  (table) => [index('email_outbox_created_idx').on(table.createdAt)]
+);
+
 /* --------------------------------------------------------------- Consents */
 
 /**

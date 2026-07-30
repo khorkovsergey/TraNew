@@ -1,33 +1,54 @@
 import 'server-only';
+import { randomUUID } from 'node:crypto';
 import { Resend } from 'resend';
+import { db, schema } from '@/db';
+import { emailTransport } from './stubMode';
 
 /**
- * Transactional email. Without RESEND_API_KEY the links are written to the server
- * log instead of being sent — usable for local work, and loud enough that nobody
- * mistakes it for a working mail setup in production.
+ * Transactional email.
+ *
+ * Three transports, chosen by configuration rather than by a branch in each caller:
+ * a real provider when RESEND_API_KEY exists, a database-backed preview mailbox
+ * when EMAIL_TRANSPORT=preview, and the server log otherwise. The message content
+ * and the tokens inside it are identical in all three — only delivery differs.
  */
 
 const FROM = process.env.EMAIL_FROM ?? 'TradingNew <noreply@tradingnew.space>';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
+/** Pulls the action link out of the body so the preview page can offer it. */
+function extractUrl(text: string): string | null {
+  const match = text.match(/https?:\/\/\S+/);
+  return match ? match[0] : null;
+}
+
 async function send(to: string, subject: string, text: string) {
-  if (!resend) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error(
-        `[email] RESEND_API_KEY missing — "${subject}" for ${to} was NOT sent. Configure it before onboarding users.`
-      );
-    } else {
-      console.info(`[email] ${subject} -> ${to}\n${text}`);
+  const transport = emailTransport();
+
+  if (transport === 'resend' && resend) {
+    const { error } = await resend.emails.send({ from: FROM, to, subject, text });
+    if (error) {
+      // Surfaced rather than swallowed: a silent failure here locks people out.
+      throw new Error(`Failed to send "${subject}": ${error.message}`);
     }
     return;
   }
 
-  const { error } = await resend.emails.send({ from: FROM, to, subject, text });
-  if (error) {
-    // Surfaced rather than swallowed: a silent failure here locks people out.
-    throw new Error(`Failed to send "${subject}": ${error.message}`);
+  if (transport === 'preview') {
+    await db.insert(schema.emailOutbox).values({
+      id: randomUUID(),
+      recipient: to,
+      subject,
+      body: text,
+      actionUrl: extractUrl(text),
+    });
+    return;
   }
+
+  console.warn(
+    `[email] No transport configured — "${subject}" for ${to} was NOT delivered.\n${text}`
+  );
 }
 
 export async function sendVerificationEmail(to: string, url: string) {
@@ -65,7 +86,7 @@ export async function sendNewDeviceNotice(to: string, device: string, when: stri
     [
       `A new device signed in to your account: ${device} at ${when}.`,
       '',
-      'If this was you, nothing to do. If not, open Settings → Security and log out from all devices, then change your password.',
+      'If this was you, nothing to do. If not, open Settings → Security, log out from all devices, then change your password.',
     ].join('\n')
   );
 }

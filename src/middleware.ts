@@ -51,6 +51,11 @@ export default function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Skip API routes, Next internals and anything with a file extension.
-  matcher: '/((?!api|_next|_vercel|.*\\..*).*)',
+  /*
+   * Skip API routes, Next internals, anything with a file extension, and /dev.
+   * The /dev pages are deliberately outside the localised tree — sending them
+   * through the i18n rewrite would redirect them to a locale path that has no
+   * route, which is how the preview mailbox first came back as a 307.
+   */
+  matcher: '/((?!api|dev|_next|_vercel|.*\\..*).*)',
 };

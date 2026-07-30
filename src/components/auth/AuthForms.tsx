@@ -5,24 +5,42 @@ import { Link } from '@/i18n/navigation';
 import { authClient } from '@/lib/authClient';
 import styles from './Auth.module.css';
 
-/** Only shown when the corresponding OAuth credentials are configured server-side. */
-function SocialButtons({ providers }: { providers: string[] }) {
+export type SocialProvider = { id: 'google' | 'apple'; simulated: boolean };
+
+/**
+ * Shown only for providers the server can actually complete. A simulated provider
+ * says so on the button — nobody should discover it is a stub after clicking.
+ */
+function SocialButtons({ providers }: { providers: SocialProvider[] }) {
   if (providers.length === 0) return null;
 
   return (
-    <div className={styles.socialRow}>
-      {providers.map((provider) => (
-        <button
-          key={provider}
-          className={styles.social}
-          onClick={() =>
-            authClient.signIn.social({ provider: provider as 'google' | 'apple', callbackURL: '/en/account' })
-          }
-        >
-          Continue with {provider === 'google' ? 'Google' : 'Apple'}
-        </button>
-      ))}
-    </div>
+    <>
+      <div className={styles.socialRow}>
+        {providers.map((provider) => (
+          <button
+            key={provider.id}
+            className={styles.social}
+            onClick={() => {
+              if (provider.simulated) {
+                window.location.href = `/api/auth-stub/${provider.id}`;
+                return;
+              }
+              authClient.signIn.social({ provider: provider.id, callbackURL: '/en/account' });
+            }}
+          >
+            Continue with {provider.id === 'google' ? 'Google' : 'Apple'}
+            {provider.simulated ? ' (demo)' : ''}
+          </button>
+        ))}
+      </div>
+      {providers.some((provider) => provider.simulated) && (
+        <div className={styles.hint}>
+          Demo sign-in opens a shared example account. It does not connect to a real Google or
+          Apple identity.
+        </div>
+      )}
+    </>
   );
 }
 
@@ -35,7 +53,7 @@ function strength(password: string): 0 | 1 | 2 | 3 {
   return score as 0 | 1 | 2 | 3;
 }
 
-export function SignInForm({ providers, next }: { providers: string[]; next?: string }) {
+export function SignInForm({ providers, next }: { providers: SocialProvider[]; next?: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +134,7 @@ export function SignInForm({ providers, next }: { providers: string[]; next?: st
   );
 }
 
-export function SignUpForm({ providers }: { providers: string[] }) {
+export function SignUpForm({ providers }: { providers: SocialProvider[] }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
