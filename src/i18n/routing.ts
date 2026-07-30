@@ -32,6 +32,8 @@ export const routing = defineRouting({
 
     // Economy & community
     '/economy': '/economy',
+    '/economy/countries/[id]': '/economy/countries/[id]',
+    '/economy/indicators/[slug]': '/economy/indicators/[slug]',
     '/community': '/community',
     '/brokers': '/brokers',
 
@@ -58,6 +60,17 @@ export const routing = defineRouting({
     '/marketplace/experts/[id]/booking': '/marketplace/experts/[id]/booking',
     '/marketplace/consultations/[id]': '/marketplace/consultations/[id]',
     '/marketplace/consultations/[id]/summary': '/marketplace/consultations/[id]/summary',
+
+    // My TradingNew — the signed-in account area.
+    '/account': '/account',
+    '/account/workspace': '/account/workspace',
+    '/account/copilot': '/account/copilot',
+    '/account/activity': '/account/activity',
+    '/account/academy': '/account/academy',
+    '/account/purchases': '/account/purchases',
+    '/account/settings': '/account/settings',
+    '/account/wealth': '/account/wealth',
+    '/account/wealth/assets/[id]': '/account/wealth/assets/[id]',
 
     // Generic catalogue tool page — screeners, calendars, asset classes, compare.
     '/tool/[slug]': '/tool/[slug]',

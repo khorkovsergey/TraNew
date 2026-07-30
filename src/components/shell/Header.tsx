@@ -51,7 +51,9 @@ export function Header() {
         <Link
           key={index}
           className={styles.menuItem}
-          href={{ pathname: entry.href, params: entry.params } as never}
+          href={
+            { pathname: entry.href, params: entry.params, query: entry.query } as never
+          }
           onClick={closeAll}
         >
           {body}

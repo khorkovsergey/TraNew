@@ -82,15 +82,22 @@
     },
     "economy": {
       "sectionTitle": "Economy",
+      "overview": "Overview",
+      "overviewSub": "What is moving the economy now",
+      "countries": "Countries & Regions",
+      "countriesSub": "Eight economies, side by side",
+      "indicators": "Indicators",
+      "indicatorsSub": "By theme, with essentials first",
       "calendar": "Economic calendar",
       "calendarSub": "Releases by date and impact",
+      "news": "News & Insights",
+      "newsSub": "Clustered, with facts split from interpretation",
+      "toolsTitle": "Macro tools",
       "macroMaps": "Macro maps",
-      "macroMapsSub": "Growth, inflation, employment",
+      "countryCompare": "Country compare",
       "yieldCurves": "Yield curves",
-      "yieldCurvesSub": "Rates across maturities",
-      "inflation": "Inflation and rates",
-      "inflationSub": "Explained in the research workspace",
-      "economyNews": "Economy news"
+      "indicatorCompare": "Indicator compare",
+      "scenarioExplorer": "Scenario explorer"
     },
     "community": {
       "contestsTitle": "Trading contests",

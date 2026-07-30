@@ -8,7 +8,12 @@ export type MenuEntry = {
   labelKey: string;
   subKey?: string;
 } & (
-  | { kind: 'route'; href: AppPathname; params?: Record<string, string> }
+  | {
+      kind: 'route';
+      href: AppPathname;
+      params?: Record<string, string>;
+      query?: Record<string, string>;
+    }
   | { kind: 'auth' }
   | { kind: 'focusSearch' }
 );
@@ -112,23 +117,50 @@ export const MENUS: Record<Exclude<NavKey, 'home'>, MenuGroup[]> = {
       titleKey: 'economy.sectionTitle',
       items: [
         {
-          labelKey: 'economy.calendar',
-          subKey: 'economy.calendarSub',
-          ...tool('economic-calendar'),
-        },
-        { labelKey: 'economy.macroMaps', subKey: 'economy.macroMapsSub', ...tool('macro-maps') },
-        {
-          labelKey: 'economy.yieldCurves',
-          subKey: 'economy.yieldCurvesSub',
-          ...tool('yield-curves'),
-        },
-        {
-          labelKey: 'economy.inflation',
-          subKey: 'economy.inflationSub',
+          labelKey: 'economy.overview',
+          subKey: 'economy.overviewSub',
           kind: 'route',
           href: '/economy',
         },
-        { labelKey: 'economy.economyNews', kind: 'route', href: '/news' },
+        {
+          labelKey: 'economy.countries',
+          subKey: 'economy.countriesSub',
+          kind: 'route',
+          href: '/economy',
+          query: { tab: 'countries' },
+        },
+        {
+          labelKey: 'economy.indicators',
+          subKey: 'economy.indicatorsSub',
+          kind: 'route',
+          href: '/economy',
+          query: { tab: 'indicators' },
+        },
+        {
+          labelKey: 'economy.calendar',
+          subKey: 'economy.calendarSub',
+          kind: 'route',
+          href: '/economy',
+          query: { tab: 'calendar' },
+        },
+        {
+          labelKey: 'economy.news',
+          subKey: 'economy.newsSub',
+          kind: 'route',
+          href: '/economy',
+          query: { tab: 'news' },
+        },
+      ],
+    },
+    {
+      // Tools, not sections — kept visually separate so the section list stays readable.
+      titleKey: 'economy.toolsTitle',
+      items: [
+        { labelKey: 'economy.macroMaps', ...tool('macro-maps') },
+        { labelKey: 'economy.countryCompare', ...tool('country-compare') },
+        { labelKey: 'economy.yieldCurves', ...tool('yield-curves') },
+        { labelKey: 'economy.indicatorCompare', ...tool('indicator-compare') },
+        { labelKey: 'economy.scenarioExplorer', ...tool('scenario-explorer') },
       ],
     },
   ],

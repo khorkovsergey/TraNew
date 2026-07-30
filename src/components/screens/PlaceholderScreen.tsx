@@ -8,16 +8,26 @@ import styles from './PlaceholderScreen.module.css';
  * Stand-in for screens whose high-fidelity build is still queued. It follows the
  * handoff's "Tool page" pattern: heading, contextual next steps, hatched preview
  * block — so an unfinished route never looks like a broken one.
+ *
+ * Pass `screenKey` to pull copy from the `screens` messages namespace, or pass
+ * `title`/`subtitle` directly for screens that have no entry there yet.
  */
 export async function PlaceholderScreen({
   screenKey,
+  title,
+  subtitle,
   nextSteps = [],
 }: {
-  screenKey: string;
+  screenKey?: string;
+  title?: string;
+  subtitle?: string;
   nextSteps?: Array<{ labelKey: string; href: StaticPathname }>;
 }) {
   const t = await getTranslations('screens');
   const tCommon = await getTranslations('common');
+
+  const heading = title ?? (screenKey ? t(`${screenKey}.title`) : '');
+  const lead = subtitle ?? (screenKey ? t(`${screenKey}.subtitle`) : '');
 
   return (
     <div className={styles.wrap}>
@@ -25,8 +35,8 @@ export async function PlaceholderScreen({
         {tCommon('backHome')}
       </Link>
 
-      <h1 className={styles.title}>{t(`${screenKey}.title`)}</h1>
-      <p className={styles.subtitle}>{t(`${screenKey}.subtitle`)}</p>
+      <h1 className={styles.title}>{heading}</h1>
+      <p className={styles.subtitle}>{lead}</p>
 
       {nextSteps.length > 0 && (
         <div className={styles.nextSteps}>
