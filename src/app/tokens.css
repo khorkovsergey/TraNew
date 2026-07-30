@@ -1,0 +1,77 @@
+/**
+ * TradingNew design tokens — transcribed from design_handoff_tradingnew_portal/README.md.
+ * Values here are final (high-fidelity handoff); change them only alongside the design.
+ */
+
+:root {
+  /* ---- Text ---- */
+  --tn-text: #131722;
+  --tn-text-secondary: #5a6376;
+  --tn-text-muted: #8a93a6;
+  --tn-text-faint: #9aa3b5;
+  --tn-text-nav: #3a4254;
+
+  /* ---- Surfaces ---- */
+  --tn-bg: #fbfcfe;
+  --tn-surface: #ffffff;
+  --tn-chip-bg: #f2f4f9;
+  --tn-hero-bg: linear-gradient(180deg, #eef1fb 0%, #fbfcfe 640px);
+
+  /* ---- Borders ---- */
+  --tn-border-card: #eceff4;
+  --tn-border-control: #e6eaf2;
+  --tn-border-input: #e2e6ee;
+
+  /* ---- Accents ---- */
+  --tn-blue: #2962ff;
+  --tn-blue-hover: #1848d6;
+  --tn-blue-tint: #e8edfd;
+
+  --tn-purple: #7c4dff;
+  --tn-purple-hover: #6a3de8;
+  --tn-purple-tint: #efe9fd;
+  --tn-purple-tint-soft: #f6f2fe;
+
+  --tn-green: #1aa966;
+  --tn-green-hover: #159056;
+  --tn-green-tint: #e3f6ec;
+
+  --tn-orange: #f4741f;
+  --tn-orange-star: #f4a71f;
+  --tn-orange-tint: #fdeee3;
+  --tn-amber-tint: #fdf3e3;
+  --tn-amber-text: #b07708;
+
+  --tn-red: #e0492f;
+
+  --tn-gradient-headline: linear-gradient(90deg, #8b5cf6, #2962ff);
+  --tn-gradient-logo: linear-gradient(135deg, #2962ff, #8b5cf6);
+
+  /* ---- Radii ---- */
+  --tn-radius-card: 18px;
+  --tn-radius-showcase: 26px;
+  --tn-radius-pill: 24px;
+  --tn-radius-pill-sm: 20px;
+  --tn-radius-chip: 16px;
+  --tn-radius-chip-sm: 13px;
+  --tn-radius-option: 14px;
+  --tn-radius-logo: 9px;
+  --tn-radius-search: 36px;
+
+  /* ---- Shadows ---- */
+  --tn-shadow-card-hover: 0 10px 30px rgba(19, 23, 34, 0.09);
+  --tn-shadow-dropdown: 0 18px 50px rgba(19, 23, 34, 0.14);
+  --tn-shadow-modal: 0 24px 70px rgba(19, 23, 34, 0.25);
+  --tn-shadow-search: 0 6px 24px rgba(41, 98, 255, 0.09);
+  --tn-overlay: rgba(19, 23, 34, 0.4);
+
+  /* ---- Motion ---- */
+  --tn-transition-hover: 0.18s ease;
+  --tn-transition-fast: 0.15s ease;
+  --tn-transition-slow: 0.3s ease;
+
+  /* ---- Layout ---- */
+  --tn-page-max: 1160px;
+  --tn-page-pad: clamp(12px, 2.5vw, 36px);
+  --tn-header-h: 69px;
+}

@@ -1,0 +1,103 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--tn-overlay);
+}
+
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 65;
+  background: var(--tn-surface);
+  border-radius: 22px;
+  box-shadow: var(--tn-shadow-modal);
+  padding: 34px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.reassurance {
+  font-size: 13px;
+  color: var(--tn-text-muted);
+  margin-top: 6px;
+}
+
+.field {
+  width: 100%;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  margin-top: 10px;
+  background: var(--tn-surface);
+}
+
+.field:first-of-type {
+  margin-top: 18px;
+}
+
+.field::placeholder {
+  color: var(--tn-text-faint);
+}
+
+.primary {
+  width: 100%;
+  background: var(--tn-blue);
+  color: #fff;
+  border-radius: 12px;
+  padding: 13px 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  margin-top: 14px;
+  transition: background var(--tn-transition-fast);
+}
+
+.primary:hover {
+  background: var(--tn-blue-hover);
+}
+
+.socialRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.social {
+  flex: 1;
+  background: var(--tn-surface);
+  border: 1px solid var(--tn-border-input);
+  border-radius: 12px;
+  padding: 11px 0;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background var(--tn-transition-fast);
+}
+
+.social:hover {
+  background: #f4f6fa;
+}
+
+.links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+.links a {
+  color: var(--tn-blue);
+}
+
+.links a:hover {
+  text-decoration: underline;
+}
