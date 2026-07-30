@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint"
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "check": "npm run typecheck && npm run lint && npm run check:i18n"
   },
   "dependencies": {
     "next": "^16.2.12",
