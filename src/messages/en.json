@@ -142,6 +142,49 @@
     "create": "Create account",
     "reassurance": "You'll return exactly where you left off."
   },
+  "symbol": {
+    "today": "today",
+    "whyTitle": "Why it moves today",
+    "whyProvenance": "Based on market data and 6 news sources · Updated 09:42 UTC",
+    "techTitle": "Technical context",
+    "techProvenance": "Signals describe price behaviour — they are not recommendations.",
+    "newsTitle": "Relevant news",
+    "eventTitle": "Upcoming event",
+    "factsTitle": "Essential facts",
+    "relatedTitle": "Related assets",
+    "nextTitle": "Next research steps",
+    "actions": {
+      "openChart": "Open chart",
+      "compare": "Compare",
+      "watchlist": "Add to watchlist",
+      "alert": "Create alert",
+      "copilot": "Ask Copilot"
+    },
+    "next": {
+      "competitors": "View competitors",
+      "sector": "View sector",
+      "etfs": "View related ETFs",
+      "events": "View upcoming events"
+    }
+  },
+  "workspace": {
+    "eyebrow": "RESEARCH WORKSPACE",
+    "directAnswer": "Direct answer",
+    "answer": "Based on current market data, this move is driven by three factors: shifting expectations around interest rates, sector momentum after this week's earnings, and positioning ahead of Thursday's economic releases. The effect is strongest in rate-sensitive assets, while defensives are broadly flat.",
+    "sources": "Sources: Reuters 09:12 · Bloomberg 08:47 · TradingNew market data · Updated 2 min ago",
+    "supportingData": "Supporting data",
+    "relevantChart": "Relevant chart",
+    "openInCharts": "Open in Supercharts →",
+    "suggestedActions": "Suggested next actions",
+    "emptyQuestion": "Ask a question from the search on the home page.",
+    "actions": {
+      "brief": "Read today's market brief",
+      "news": "See related news",
+      "charts": "Open professional charts",
+      "ideas": "Browse related ideas",
+      "expert": "Talk to an expert"
+    }
+  },
   "screens": {
     "placeholderNote": "High-fidelity build of this screen is in progress.",
     "market": { "title": "Market", "subtitle": "Indices, stocks, crypto, forex and commodities in one overview." },

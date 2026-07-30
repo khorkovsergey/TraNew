@@ -1,0 +1,45 @@
+.label {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+.small {
+  font-size: 11.5px;
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+
+.aiExplanation {
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple);
+}
+
+.technicalSignal {
+  background: var(--tn-blue-tint);
+  color: var(--tn-blue);
+}
+
+.marketData,
+.fact {
+  background: var(--tn-green-tint);
+  color: var(--tn-green);
+}
+
+.analysis {
+  background: var(--tn-blue-tint);
+  color: var(--tn-blue);
+}
+
+.communityOpinion {
+  background: var(--tn-amber-tint);
+  color: var(--tn-amber-text);
+}
+
+.sponsored {
+  background: var(--tn-chip-bg);
+  color: var(--tn-text-muted);
+}
