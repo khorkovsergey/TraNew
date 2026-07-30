@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { NOTIFICATIONS, NOTIFICATION_NOTE, USER } from '@/content/account';
+import { NOTIFICATIONS, NOTIFICATION_NOTE } from '@/content/account';
 import { Link } from '@/i18n/navigation';
 import type { StaticPathname } from '@/i18n/routing';
+import { authClient } from '@/lib/authClient';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { useLoginModal } from './LoginModalProvider';
 import styles from './AuthedActions.module.css';
@@ -23,9 +24,22 @@ const MENU: Array<{ label: string; href: StaticPathname | null; danger?: boolean
 
 export function AuthedActions() {
   const { signOut } = useLoginModal();
+  const { data: session } = authClient.useSession();
   const [notifOpen, setNotifOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [read, setRead] = useState(false);
+
+  // Identity comes from the server session, never from a local constant.
+  const user = session?.user;
+  const displayName = user?.name?.trim() || user?.email?.split('@')[0] || 'Account';
+  const email = user?.email ?? '';
+  const initial = displayName.charAt(0).toUpperCase();
+  // `plan` is a custom field on the user record; the client session type does not
+  // carry it, so it is read defensively rather than assumed.
+  const rawPlan = (user as unknown as { plan?: unknown } | undefined)?.plan;
+  const plan = typeof rawPlan === 'string' ? rawPlan : 'free';
+  const planLabel =
+    plan === 'ai_private' ? 'AI Private' : plan === 'premium' ? 'Premium' : 'Free plan';
 
   const closeAll = () => {
     setNotifOpen(false);
@@ -65,7 +79,7 @@ export function AuthedActions() {
           setAvatarOpen((value) => !value);
         }}
       >
-        {USER.initial}
+        {initial}
       </button>
 
       {(notifOpen || avatarOpen) && <div className={styles.scrim} onClick={closeAll} />}
@@ -98,11 +112,11 @@ export function AuthedActions() {
       {avatarOpen && (
         <div className={styles.avatarPanel}>
           <div className={styles.avatarHead}>
-            <span className={styles.avatarLarge}>{USER.initial}</span>
+            <span className={styles.avatarLarge}>{initial}</span>
             <span>
-              <span className={styles.avatarName}>{USER.shortName}</span>
+              <span className={styles.avatarName}>{displayName}</span>
               <span className={styles.avatarMeta}>
-                {USER.email} · {USER.plan}
+                {email} · {planLabel}
               </span>
             </span>
           </div>

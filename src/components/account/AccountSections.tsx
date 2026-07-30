@@ -614,11 +614,19 @@ export function AccountPurchases() {
 
 /* ---------------------------------------------------------------- Settings */
 
-export function AccountSettings() {
+export function AccountSettings({ plan = 'free' }: { plan?: 'free' | 'premium' | 'ai_private' }) {
   const [tab, setTab] = useState<(typeof SETTINGS_TABS)[number]['id']>('profile');
   const [toggles, setToggles] = useState<Record<string, boolean>>({});
 
-  const rows = getSettingsRows(tab);
+  const rows = getSettingsRows(tab).map((row) =>
+    // The plan comes from the server session, not from the mock fixture.
+    row.kind === 'value' && row.k === 'Current plan'
+      ? {
+          ...row,
+          v: plan === 'ai_private' ? 'AI Private' : plan === 'premium' ? 'Premium' : 'Free',
+        }
+      : row
+  );
   const note = getSettingsNote(tab);
 
   return (

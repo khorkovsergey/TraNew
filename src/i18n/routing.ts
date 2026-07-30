@@ -61,6 +61,12 @@ export const routing = defineRouting({
     '/marketplace/consultations/[id]': '/marketplace/consultations/[id]',
     '/marketplace/consultations/[id]/summary': '/marketplace/consultations/[id]/summary',
 
+    // Authentication
+    '/sign-in': '/sign-in',
+    '/sign-up': '/sign-up',
+    '/forgot-password': '/forgot-password',
+    '/reset-password': '/reset-password',
+
     // My TradingNew — the signed-in account area.
     '/account': '/account',
     '/account/workspace': '/account/workspace',

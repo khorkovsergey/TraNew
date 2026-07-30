@@ -2,20 +2,18 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
+import { authClient } from '@/lib/authClient';
 import styles from './Modal.module.css';
 
 type LoginModalContextValue = {
-  /** Opens the login modal. Call this from any "save"-shaped action for anonymous users. */
+  /** Opens the sign-in prompt. Call this from any "save"-shaped action. */
   openLogin: () => void;
   closeLogin: () => void;
   isOpen: boolean;
-  /**
-   * Simulated session. The prototype has no real authentication — completing the
-   * login modal flips this so the authed header, account area and Wealth Hub can be
-   * exercised. Nothing sensitive is stored.
-   */
+  /** True once a real server session exists. Never set by the client alone. */
   authed: boolean;
-  signOut: () => void;
+  signOut: () => Promise<void>;
 };
 
 const LoginModalContext = createContext<LoginModalContextValue | null>(null);
@@ -28,18 +26,25 @@ export function useLoginModal() {
   return value;
 }
 
+/**
+ * The prompt shown when an anonymous visitor tries to save something.
+ *
+ * It no longer accepts credentials: sign-in happens on its own page against the
+ * server. A modal that took a password would have to post it from wherever it was
+ * opened, and would tempt exactly the kind of shortcut this rewrite removes.
+ */
 export function LoginModalProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [authed, setAuthed] = useState(false);
   const t = useTranslations('login');
+  const { data: session } = authClient.useSession();
 
   const openLogin = useCallback(() => setIsOpen(true), []);
   const closeLogin = useCallback(() => setIsOpen(false), []);
-  const signIn = useCallback(() => {
-    setAuthed(true);
-    setIsOpen(false);
+
+  const signOut = useCallback(async () => {
+    await authClient.signOut();
+    window.location.href = '/en';
   }, []);
-  const signOut = useCallback(() => setAuthed(false), []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -51,8 +56,8 @@ export function LoginModalProvider({ children }: { children: React.ReactNode }) 
   }, [isOpen, closeLogin]);
 
   const value = useMemo(
-    () => ({ openLogin, closeLogin, isOpen, authed, signOut }),
-    [openLogin, closeLogin, isOpen, authed, signOut]
+    () => ({ openLogin, closeLogin, isOpen, authed: Boolean(session?.user), signOut }),
+    [openLogin, closeLogin, isOpen, session, signOut]
   );
 
   return (
@@ -62,20 +67,25 @@ export function LoginModalProvider({ children }: { children: React.ReactNode }) 
         <>
           <div className={styles.overlay} onClick={closeLogin} />
           <div className={styles.dialog} role="dialog" aria-modal="true" aria-label={t('title')}>
-            <div className={styles.title}>{t('title')}</div>
-            <div className={styles.reassurance}>{t('reassurance')}</div>
-            <input className={styles.field} placeholder={t('email')} type="email" />
-            <input className={styles.field} placeholder={t('password')} type="password" />
-            <button className={styles.primary} onClick={signIn}>
-              {t('continue')}
-            </button>
-            <div className={styles.socialRow}>
-              <button className={styles.social}>{t('google')}</button>
-              <button className={styles.social}>{t('apple')}</button>
+            <div className={styles.title}>Save this to your account</div>
+            <div className={styles.reassurance}>
+              Watchlists, alerts, learning progress and your wealth record are stored against your
+              account. {t('reassurance')}
             </div>
+
+            <Link className={styles.primary} href="/sign-in" style={{ display: 'block', textAlign: 'center' }}>
+              {t('title')}
+            </Link>
+            <Link
+              className={styles.social}
+              href="/sign-up"
+              style={{ display: 'block', textAlign: 'center', width: '100%', marginTop: 10 }}
+            >
+              {t('create')}
+            </Link>
+
             <div className={styles.links}>
-              <a href="#">{t('forgot')}</a>
-              <a href="#">{t('create')}</a>
+              <button onClick={closeLogin}>Not now</button>
             </div>
           </div>
         </>
