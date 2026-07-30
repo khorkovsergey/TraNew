@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { NextResponse, type NextRequest } from 'next/server';
 import { db, schema } from '@/db';
 import { auth } from '@/lib/auth';
+import { SITE_URL } from '@/lib/metadata';
 import { isStubOAuthEnabled, isStubProvider, STUB_ACCOUNTS } from '@/lib/stubMode';
 
 /**
@@ -23,7 +24,7 @@ function demoPassword(email: string): string {
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   context: { params: Promise<{ provider: string }> }
 ) {
   if (!isStubOAuthEnabled()) {
@@ -52,8 +53,12 @@ export async function GET(
     asResponse: true,
   });
 
-  // Hand back the session cookie, then send the browser into the account.
-  const redirect = NextResponse.redirect(new URL('/en/account', request.url));
+  /*
+   * The destination is built from the configured public origin, not from
+   * request.url: behind Railway's proxy the incoming URL is the container's own
+   * localhost:8080, which would send the browser somewhere that does not exist.
+   */
+  const redirect = NextResponse.redirect(new URL('/en/account', SITE_URL));
   for (const cookie of response.headers.getSetCookie()) {
     redirect.headers.append('set-cookie', cookie);
   }
