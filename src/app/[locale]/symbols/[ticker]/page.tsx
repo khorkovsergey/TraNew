@@ -75,7 +75,7 @@ export default async function SymbolPage({ params }: Props) {
         </div>
       </div>
 
-      <SymbolActions ticker={symbol.ticker} name={name} />
+      <SymbolActions ticker={symbol.ticker} name={name} price={symbol.price} />
 
       <div className={styles.grid}>
         <div className={styles.column}>

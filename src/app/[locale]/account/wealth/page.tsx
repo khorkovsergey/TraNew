@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
-import { PlaceholderScreen } from '@/components/screens/PlaceholderScreen';
+import { notFound } from 'next/navigation';
+import { WealthScreen } from '@/components/wealth/WealthScreen';
+import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { pageMetadata } from '@/lib/metadata';
+import styles from '@/components/wealth/Wealth.module.css';
 
 type Props = { params: Promise<{ locale: Locale }> };
 
@@ -12,19 +16,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return pageMetadata({
     href: '/account/wealth',
     locale,
-    title: "My Wealth",
-    description: "A private model of your capital: assets, liabilities, goals and scenarios.",
+    title: 'My Wealth',
+    description:
+      'A private model of your capital: what you own, what you owe, what it means and what you could do about it.',
   });
 }
 
-export default async function Page({ params }: Props) {
+export default async function WealthPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
+  // With the flag off the hub does not exist as a route at all — the account still
+  // renders in full and its menu entry reads "Soon".
+  if (!FEATURE_FLAGS.wealthHubEnabled) notFound();
+
   return (
-    <PlaceholderScreen
-      title={"My Wealth"}
-      subtitle={"A private model of your capital: assets, liabilities, goals and scenarios."}
-    />
+    <div className={styles.wrap}>
+      <Link className={styles.backHome} href="/account">
+        ← My TradingNew
+      </Link>
+
+      <WealthScreen />
+    </div>
   );
 }
