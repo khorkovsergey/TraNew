@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
-import { PlaceholderScreen } from '@/components/screens/PlaceholderScreen';
+import { AccountLayout } from '@/components/account/AccountLayout';
+import { AccountWorkspace } from '@/components/account/AccountSections';
 import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
 
@@ -13,7 +14,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     href: '/account/workspace',
     locale,
     title: "My Workspace",
-    description: "Collections, saved items, saved views, research and alerts.",
+    description: "Collections, saved items, saved views, research, reports and alerts.",
   });
 }
 
@@ -22,9 +23,8 @@ export default async function Page({ params }: Props) {
   setRequestLocale(locale);
 
   return (
-    <PlaceholderScreen
-      title={"My Workspace"}
-      subtitle={"Collections, saved items, saved views, research and alerts."}
-    />
+    <AccountLayout>
+      <AccountWorkspace />
+    </AccountLayout>
   );
 }

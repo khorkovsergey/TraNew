@@ -9,6 +9,13 @@ type LoginModalContextValue = {
   openLogin: () => void;
   closeLogin: () => void;
   isOpen: boolean;
+  /**
+   * Simulated session. The prototype has no real authentication — completing the
+   * login modal flips this so the authed header, account area and Wealth Hub can be
+   * exercised. Nothing sensitive is stored.
+   */
+  authed: boolean;
+  signOut: () => void;
 };
 
 const LoginModalContext = createContext<LoginModalContextValue | null>(null);
@@ -23,10 +30,16 @@ export function useLoginModal() {
 
 export function LoginModalProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [authed, setAuthed] = useState(false);
   const t = useTranslations('login');
 
   const openLogin = useCallback(() => setIsOpen(true), []);
   const closeLogin = useCallback(() => setIsOpen(false), []);
+  const signIn = useCallback(() => {
+    setAuthed(true);
+    setIsOpen(false);
+  }, []);
+  const signOut = useCallback(() => setAuthed(false), []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -38,8 +51,8 @@ export function LoginModalProvider({ children }: { children: React.ReactNode }) 
   }, [isOpen, closeLogin]);
 
   const value = useMemo(
-    () => ({ openLogin, closeLogin, isOpen }),
-    [openLogin, closeLogin, isOpen]
+    () => ({ openLogin, closeLogin, isOpen, authed, signOut }),
+    [openLogin, closeLogin, isOpen, authed, signOut]
   );
 
   return (
@@ -53,7 +66,7 @@ export function LoginModalProvider({ children }: { children: React.ReactNode }) 
             <div className={styles.reassurance}>{t('reassurance')}</div>
             <input className={styles.field} placeholder={t('email')} type="email" />
             <input className={styles.field} placeholder={t('password')} type="password" />
-            <button className={styles.primary} onClick={closeLogin}>
+            <button className={styles.primary} onClick={signIn}>
               {t('continue')}
             </button>
             <div className={styles.socialRow}>

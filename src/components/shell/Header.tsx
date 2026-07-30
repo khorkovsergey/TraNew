@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
 import { requestSearchFocus } from '@/lib/searchFocus';
+import { AuthedActions } from './AuthedActions';
 import { useLoginModal } from './LoginModalProvider';
 import { MENUS, NAV_ACTIVE_PREFIXES, type MenuEntry, type NavKey } from './menu';
 import styles from './Header.module.css';
@@ -14,7 +15,7 @@ export function Header() {
   const t = useTranslations('header');
   const tMenu = useTranslations('menu');
   const pathname = usePathname();
-  const { openLogin } = useLoginModal();
+  const { openLogin, authed } = useLoginModal();
 
   const [openMenu, setOpenMenu] = useState<NavKey | null>(null);
 
@@ -129,13 +130,20 @@ export function Header() {
         </nav>
 
         <div className={styles.actions}>
-          <button className={styles.loginButton} onClick={openLogin}>
-            {t('login')}
-          </button>
+          {/* Signed in, the two anonymous CTAs give way to notifications and the avatar. */}
+          {authed ? (
+            <AuthedActions />
+          ) : (
+            <>
+              <button className={styles.loginButton} onClick={openLogin}>
+                {t('login')}
+              </button>
 
-          <Link className={styles.openButton} href="/start" onClick={closeAll}>
-            {t('openApp')}
-          </Link>
+              <Link className={styles.openButton} href="/start" onClick={closeAll}>
+                {t('openApp')}
+              </Link>
+            </>
+          )}
         </div>
       </header>
 

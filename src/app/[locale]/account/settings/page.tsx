@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
-import { PlaceholderScreen } from '@/components/screens/PlaceholderScreen';
+import { AccountLayout } from '@/components/account/AccountLayout';
+import { AccountSettings } from '@/components/account/AccountSections';
 import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
 
@@ -13,7 +14,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     href: '/account/settings',
     locale,
     title: "Settings & Billing",
-    description: "Profile, preferences, notifications, subscription, security and privacy.",
+    description: "Profile, preferences, notifications, subscription, billing, integrations, security and privacy.",
   });
 }
 
@@ -22,9 +23,8 @@ export default async function Page({ params }: Props) {
   setRequestLocale(locale);
 
   return (
-    <PlaceholderScreen
-      title={"Settings & Billing"}
-      subtitle={"Profile, preferences, notifications, subscription, security and privacy."}
-    />
+    <AccountLayout>
+      <AccountSettings />
+    </AccountLayout>
   );
 }
