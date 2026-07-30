@@ -142,6 +142,130 @@
     "create": "Create account",
     "reassurance": "You'll return exactly where you left off."
   },
+  "news": {
+    "whyItMatters": "Why it matters:",
+    "openChart": "Open chart",
+    "askCopilot": "Ask Copilot"
+  },
+  "ideas": {
+    "statusActive": "Active",
+    "statusInvalidated": "Invalidated",
+    "since": "Since publication:",
+    "discloses": "Author discloses a position",
+    "horizon": "Horizon"
+  },
+  "brief": {
+    "snapshot": "Snapshot taken {time}",
+    "movesTitle": "Top market moves — and why",
+    "eventsTitle": "Major events this week",
+    "watchTitle": "What to watch next"
+  },
+  "explore": {
+    "todayTitle": "Today",
+    "byClassTitle": "Explore by asset class",
+    "byGoalTitle": "Explore by goal",
+    "toolsTitle": "Research tools",
+    "tools": {
+      "screeners": "Screeners",
+      "heatmaps": "Heatmaps",
+      "calendars": "Calendars",
+      "compare": "Compare",
+      "charts": "Supercharts",
+      "alerts": "Alerts",
+      "watchlists": "Watchlists",
+      "portfolio": "Portfolio",
+      "brokers": "Brokers",
+      "copilot": "Research workspace"
+    }
+  },
+  "charts": {
+    "modeSimple": "Simple",
+    "modeStandard": "Standard",
+    "modePro": "Pro",
+    "openFull": "Open full professional layout",
+    "toolsTitle": "Pro tools",
+    "tools": {
+      "indicators": "Indicators",
+      "drawing": "Drawing tools",
+      "replay": "Replay",
+      "multi": "Multi-chart",
+      "volume": "Volume profile",
+      "tester": "Strategy tester"
+    },
+    "actions": {
+      "explain": "Explain this move",
+      "copilot": "Ask Copilot",
+      "news": "Related news",
+      "events": "Important events",
+      "compare": "Compare",
+      "watchlist": "Add to watchlist",
+      "alert": "Create alert",
+      "screener": "Open screener"
+    }
+  },
+  "portfolio": {
+    "onboardingTitle": "See how market events affect what you own",
+    "addManual": "Add holdings manually",
+    "addManualText": "Enter positions one by one. Saved to your account.",
+    "import": "Import from a broker",
+    "importText": "Connect a supported broker and sync automatically.",
+    "upload": "Upload a statement",
+    "uploadText": "We read the positions from a PDF or CSV statement.",
+    "sample": "Start with a sample portfolio",
+    "sampleText": "See the whole experience first. No account required.",
+    "sampleValue": "Sample portfolio value",
+    "ytd": "YTD",
+    "allocation": "Allocation",
+    "eventsTitle": "Events affecting your holdings",
+    "riskTitle": "Concentration and risk",
+    "riskText": "Two positions account for 61% of the portfolio. A single earnings miss would move the total materially.",
+    "bannerTitle": "Create an account to save this portfolio",
+    "bannerText": "The sample disappears when you close the tab.",
+    "bannerCta": "Create account"
+  },
+  "info": {
+    "whyStats": {
+      "users": "investors and traders",
+      "markets": "global markets",
+      "exchanges": "exchanges",
+      "setup": "to set up your first watchlist",
+      "presets": "experience presets",
+      "cost": "to start researching"
+    },
+    "trust": {
+      "sourcesTitle": "Where data comes from",
+      "sourcesText": "Exchange feeds and licensed data vendors, each named on the screen where it appears.",
+      "labelsTitle": "How we label content",
+      "labelsText": "Every block carries its type: market data, AI explanation, technical signal, community opinion or sponsored.",
+      "aiTitle": "What AI does and does not do",
+      "aiText": "AI explains and structures. It never recommends an instrument, and its output is always labelled.",
+      "signalsTitle": "Signals are not recommendations",
+      "signalsText": "Technical readings describe price behaviour. They are not instructions to buy or sell.",
+      "sponsoredTitle": "Sponsored content",
+      "sponsoredText": "Paid placements are marked as sponsored wherever they appear, including inside news lists.",
+      "neverTitle": "What we will never claim",
+      "neverText": "No guaranteed returns, no \"you should buy\", no performance promises of any kind."
+    }
+  },
+  "start": {
+    "rows": {
+      "research": "Research an asset",
+      "brief": "Read today's market brief",
+      "learn": "Learn investing step by step",
+      "strategy": "Build a research plan",
+      "charts": "Open professional charts"
+    },
+    "note": "You'll be asked to create an account only to save something — a watchlist, an alert, your progress or a portfolio."
+  },
+  "brokers": {
+    "filters": {
+      "regulated": "Regulated in the EU",
+      "lowFees": "Low fees",
+      "fractional": "Fractional shares",
+      "isa": "Tax-efficient accounts"
+    },
+    "compareNote": "Broker listings are informational. TradingNew does not execute trades and earns no commission on your orders."
+  },
   "marketplace": {
     "breadcrumb": "Marketplace → Expert Services",
     "hub": {

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { PlaceholderScreen } from '@/components/screens/PlaceholderScreen';
+import { LinkHub } from '@/components/content/LinkHub';
 import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
 
@@ -18,9 +18,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
+const ROWS = [
+  { labelKey: 'strategy.title', href: '/strategy' as const },
+  { labelKey: 'academy.title', href: '/academy' as const },
+  { labelKey: 'experts.title', href: '/marketplace/experts' as const },
+  { labelKey: 'portfolio.title', href: '/portfolio' as const },
+];
+
 export default async function Page({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  return <PlaceholderScreen screenKey="guidance" />;
+  return <LinkHub screenKey="guidance" rows={ROWS} />;
 }
