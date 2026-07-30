@@ -142,6 +142,112 @@
     "create": "Create account",
     "reassurance": "You'll return exactly where you left off."
   },
+  "academy": {
+    "breadcrumb": {
+      "intro": "Introduction",
+      "plan": "Learning plan",
+      "lesson": "First lesson"
+    },
+    "landing": {
+      "sub": "Build your knowledge using real market examples and TradingNew tools.",
+      "note": "No experience required. Start free and learn at your own pace.",
+      "chipTime": "About 2 minutes to personalize",
+      "chipFree": "No payment required",
+      "start": "Start learning",
+      "browse": "Browse all courses",
+      "skip": "I already know the basics"
+    },
+    "setup": {
+      "stepOf": "Question {step} of {total}",
+      "next": "Next",
+      "back": "Back",
+      "create": "Create my learning path",
+      "noAccount": "No account required yet.",
+      "chooseOne": "Select an option to continue",
+      "maxReached": "You can choose up to {max}."
+    },
+    "path": {
+      "profileTitle": "Your profile",
+      "edit": "Edit preferences",
+      "level": "Starting level",
+      "goal": "Main goal",
+      "format": "Preferred format",
+      "pace": "Pace",
+      "estimate": "Estimated path",
+      "lessonCount": "{count} short lessons",
+      "startFirst": "Start my first lesson",
+      "preview": "Preview the full path",
+      "hidePreview": "Hide the full path"
+    },
+    "dashboard": {
+      "welcome": "Welcome back",
+      "saved": "Saved on this device",
+      "continueTitle": "Continue where you left off",
+      "progress": "{minutes} minutes · {percent}% complete",
+      "continueCta": "Continue lesson",
+      "yourPath": "Your path",
+      "inProgress": "In progress",
+      "upNext": "Up next",
+      "complete": "1 of 5 complete",
+      "nextActionTitle": "Your next useful action",
+      "nextActionText": "Add one company you know to a practice watchlist.",
+      "nextActionCta": "Try it now",
+      "counterWatchlist": "Practice watchlist",
+      "counterQuestions": "Questions asked",
+      "counterTerms": "Saved terms"
+    },
+    "lesson": {
+      "objective": "LEARNING OBJECTIVE",
+      "progress": "{minutes} minutes · {percent}%",
+      "ask": "Ask a question",
+      "askClose": "← Back to lesson",
+      "nextLesson": "Next lesson",
+      "practiseAgain": "Practise again",
+      "saveLater": "Save and continue later"
+    },
+    "save": {
+      "title": "Save your learning progress",
+      "text": "Create a free account to continue on any device and keep your learning path, practice watchlist and completed lessons.",
+      "saveCta": "Save my progress",
+      "guestCta": "Continue as guest",
+      "note": "Guest progress is saved on this device. Clearing browser data may remove it."
+    },
+    "practice": {
+      "banner": "Practice task: find today's price change and add this asset to your practice watchlist.",
+      "modeLabel": "View",
+      "modeBeginner": "Beginner",
+      "modeStandard": "Standard",
+      "modePro": "Pro",
+      "modeSaved": "Your choice is saved",
+      "whatIs": "What is this asset?",
+      "whatChanged": "What changed today — and why",
+      "facts": "Essential facts",
+      "risks": "Main risks",
+      "event": "Upcoming event",
+      "chart": "Simple chart",
+      "addWatchlist": "Add to practice watchlist",
+      "added": "✓ Added",
+      "more": "More about this asset"
+    },
+    "done": {
+      "coveredTitle": "What you've covered",
+      "covered1": "Why people invest and what inflation does to savings",
+      "covered2": "What a stock, a bond and an ETF actually are",
+      "covered3": "How to read a symbol page and find why a price moved",
+      "covered4": "How to tell market data from opinion and from AI explanation",
+      "covered5": "What risk and time horizon mean for your choices",
+      "covered6": "How to build a practice watchlist",
+      "covered7": "Where to research before making any decision",
+      "nextTitle": "Where to go next",
+      "cardStrategyTitle": "Build my investment strategy",
+      "cardStrategyText": "Turn what you learned into a personal research plan.",
+      "cardExploreTitle": "Explore opportunities",
+      "cardExploreText": "Research markets and compare assets on your own.",
+      "cardLearnTitle": "Continue learning",
+      "cardLearnText": "Move on to the next stage of your path.",
+      "expertLink": "Talk to an expert"
+    }
+  },
   "symbol": {
     "today": "today",
     "whyTitle": "Why it moves today",

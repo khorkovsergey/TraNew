@@ -42,6 +42,10 @@ export const routing = defineRouting({
     '/academy/path': { en: '/academy/path', ru: '/akademiya/plan' },
     '/academy/dashboard': { en: '/academy/dashboard', ru: '/akademiya/kabinet' },
     '/academy/lesson/[slug]': { en: '/academy/lesson/[slug]', ru: '/akademiya/urok/[slug]' },
+    '/academy/practice/[ticker]': {
+      en: '/academy/practice/[ticker]',
+      ru: '/akademiya/praktika/[ticker]',
+    },
     '/academy/done': { en: '/academy/done', ru: '/akademiya/itog' },
 
     // Strategy

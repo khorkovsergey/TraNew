@@ -24,6 +24,63 @@ export type SymbolData = {
 };
 
 /**
+ * Plain-language copy for Beginner Mode, where an asset is explained before it is
+ * priced and its risks are stated up front rather than buried.
+ */
+export const SIMPLE_VIEW: Record<Ticker, { what: Localized; risks: Localized }> = {
+  TSLA: {
+    what: {
+      en: 'Tesla is a company that designs and sells electric vehicles and energy products. Buying its stock means owning a small share of the business.',
+      ru: 'Tesla — компания, которая разрабатывает и продаёт электромобили и энергетические продукты. Купить её акцию значит получить небольшую долю в бизнесе.',
+    },
+    risks: {
+      en: 'High price volatility; results depend on deliveries, margins and competition in electric vehicles. You can lose part of your investment.',
+      ru: 'Высокая волатильность цены; результаты зависят от поставок, маржи и конкуренции на рынке электромобилей. Вы можете потерять часть вложений.',
+    },
+  },
+  SPX: {
+    what: {
+      en: 'The S&P 500 is an index that tracks 500 large US companies at once. You cannot buy an index directly — funds that follow it give you exposure to all of them together.',
+      ru: 'S&P 500 — индекс, который отслеживает сразу 500 крупных американских компаний. Индекс нельзя купить напрямую: доступ к нему дают фонды, которые за ним следуют.',
+    },
+    risks: {
+      en: 'Falls when the broad US market falls; concentrated in the largest companies. Diversification reduces single-company risk but not market risk.',
+      ru: 'Падает вместе с широким рынком США; сильно концентрирован в крупнейших компаниях. Диверсификация снижает риск отдельной компании, но не рыночный риск.',
+    },
+  },
+  BTC: {
+    what: {
+      en: 'Bitcoin is a digital asset that runs on a public network without a central issuer. Its price is set entirely by what buyers and sellers agree on.',
+      ru: 'Bitcoin — цифровой актив, работающий в публичной сети без центрального эмитента. Его цену полностью определяет то, о чём договариваются покупатели и продавцы.',
+    },
+    risks: {
+      en: 'Very high volatility, no cash flow behind it, and regulation differs by country. Losses can be large and fast.',
+      ru: 'Очень высокая волатильность, отсутствие денежного потока и разное регулирование в разных странах. Потери могут быть большими и быстрыми.',
+    },
+  },
+  GOLD: {
+    what: {
+      en: 'Gold is a physical commodity traded worldwide and often held as a store of value. It pays no interest or dividend — the return comes only from the price.',
+      ru: 'Золото — физический товар, торгуемый по всему миру и часто используемый как средство сохранения стоимости. Оно не приносит процентов или дивидендов — доход даёт только цена.',
+    },
+    risks: {
+      en: 'Price can stagnate for years and is sensitive to real interest rates and the dollar. It produces no income while you hold it.',
+      ru: 'Цена может стоять на месте годами и чувствительна к реальным ставкам и курсу доллара. Пока вы держите золото, оно не приносит дохода.',
+    },
+  },
+  NVDA: {
+    what: {
+      en: 'NVIDIA designs the chips that power graphics and artificial-intelligence computing. Buying its stock means owning a small share of that business.',
+      ru: 'NVIDIA разрабатывает чипы, на которых работают графика и вычисления для искусственного интеллекта. Купить её акцию значит получить небольшую долю в этом бизнесе.',
+    },
+    risks: {
+      en: 'Valuation depends on continued AI infrastructure spending; a slowdown among a few large customers would hit results hard.',
+      ru: 'Оценка зависит от продолжения расходов на AI-инфраструктуру; замедление у нескольких крупных клиентов сильно ударит по результатам.',
+    },
+  },
+};
+
+/**
  * Demo market data from the design prototype. Figures are illustrative and frozen —
  * they exist to show the shape of the screen, not to be traded on.
  */
