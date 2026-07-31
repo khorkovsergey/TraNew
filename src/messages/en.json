@@ -139,7 +139,7 @@
   "news": {
     "whyItMatters": "Why it matters:",
     "openChart": "Open chart",
-    "askCopilot": "Ask Copilot"
+    "askVoyager": "Ask Voyager"
   },
   "ideas": {
     "statusActive": "Active",
@@ -169,7 +169,7 @@
       "watchlists": "Watchlists",
       "portfolio": "Portfolio",
       "brokers": "Brokers",
-      "copilot": "Research workspace"
+      "voyager": "Research workspace"
     }
   },
   "charts": {
@@ -188,7 +188,7 @@
     },
     "actions": {
       "explain": "Explain this move",
-      "copilot": "Ask Copilot",
+      "voyager": "Ask Voyager",
       "news": "Related news",
       "events": "Important events",
       "compare": "Compare",
@@ -550,7 +550,7 @@
       "compare": "Compare",
       "watchlist": "Add to watchlist",
       "alert": "Create alert",
-      "copilot": "Ask Copilot"
+      "voyager": "Ask Voyager"
     },
     "next": {
       "competitors": "View competitors",

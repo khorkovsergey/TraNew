@@ -1,0 +1,334 @@
+import 'server-only';
+import Anthropic from '@anthropic-ai/sdk';
+import { scriptedAnswer } from './scenarios';
+import {
+  VOYAGER_ACTIONS,
+  type VoyagerAction,
+  type VoyagerActionId,
+  type VoyagerAnswer,
+  type VoyagerContentType,
+  type VoyagerContext,
+  type VoyagerSource,
+  type VoyagerTier,
+} from './types';
+
+/**
+ * The model orchestrator.
+ *
+ * Three constraints shape this file:
+ *
+ * - **The model never writes a link.** It picks an action id from a list this
+ *   request allows, and the widget resolves that to a route. A model that could
+ *   emit its own URL could send someone anywhere, including off the site.
+ * - **The allowed list is narrowed per request**, so a Basic visitor's answer
+ *   cannot offer to open a wealth screen they have no access to. Entitlement is
+ *   enforced by what the model can choose from, not by asking it nicely.
+ * - **A failed call falls back to the scripted layer**, marked `simulated`. A
+ *   widget that goes silent or throws teaches people not to rely on it; an honest
+ *   general answer is a better failure.
+ *
+ * The upgrade card is added by the policy layer afterwards. Whether to sell
+ * someone a plan is not a decision to hand to a language model mid-sentence.
+ */
+
+const MODEL = 'claude-opus-5';
+
+/**
+ * Interactive widget: the answer is short, and latency is visible to the person
+ * waiting. `medium` is the starting point rather than a conclusion — worth
+ * re-testing against real questions before settling.
+ */
+const EFFORT = 'medium';
+
+const client = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
+
+export function isModelConfigured(): boolean {
+  return client !== null;
+}
+
+const CONTENT_TYPES: VoyagerContentType[] = [
+  'AI explanation',
+  'AI analysis',
+  'AI summary',
+  'AI structured',
+  'Academy context',
+];
+
+/**
+ * The stable half of the system prompt.
+ *
+ * Kept byte-identical across requests so it can be cached: the per-request part
+ * (tier, page, sources) goes in a second block after the cache breakpoint.
+ */
+const RULES = `You are Voyager, the assistant built into the TradingNew investment research platform.
+
+You explain, analyse, navigate and help people act. You are talking to someone who is researching investments — often a beginner. Your job is to leave them better informed and more capable of deciding for themselves.
+
+## How you talk about markets
+
+Write probabilistically. Markets are uncertain and you must never imply otherwise.
+
+- Good: "may indicate", "tends to", "reporting points to", "this does not confirm"
+- Never: "will rise", "is guaranteed to", "you should buy", "you need to sell", "this is a safe bet"
+
+Never give personalised investment advice, never tell someone what to buy or sell, and never predict a price. You may describe what happened, what typically drives that kind of move, what the risks are, and what someone might look at next. If a question asks you to predict or to recommend a trade, answer the useful part — the mechanics, the risks, what to watch — and say plainly that the decision is theirs.
+
+Describe signals as behaviour, not instruction: "RSI approaching overbought describes momentum, not a recommendation."
+
+## Honesty about what you know
+
+The sources line must reflect what you actually used. If you are reasoning from general knowledge rather than the page context, say so and set confidence to low. Never invent a figure, a timestamp, a headline or a news source. If a specific number would be needed to answer well and you do not have it, say which number is missing.
+
+Set confidence honestly: high when the answer is definitional or procedural, medium when you are interpreting market behaviour, low when you are generalising without the specific data.
+
+## Answer shape
+
+Keep the main text to two or three sentences. Put observations in bullets — at most four, each one line. Prefer being useful to being complete.
+
+Choose the content type label honestly:
+- "AI explanation" — explaining a concept, an event, or a move
+- "AI analysis" — interpreting data, including the person's own context
+- "AI summary" — condensing news or a document
+- "AI structured" — producing a structured artefact such as a brief or a checklist
+- "Academy context" — anything on a lesson page
+
+## Academy rule
+
+On a lesson page you may re-explain the material differently, give another example, or check understanding with a question of your own. You must not give the answer to the lesson's quiz, even if asked directly — say that the answer is theirs to find and offer another explanation instead.
+
+## Actions
+
+Offer two to four actions. Choose them from the allowed list given below and use the exact id. Write a short label in the person's language of the question. Put the most useful one first — it renders as the primary button. If nothing in the list fits, use "none" with a label that continues the conversation.
+
+Never offer an action that executes a financial transaction; nothing in the list does, and you must not describe an action as placing an order.
+
+## Follow-ups
+
+Suggest exactly three short follow-up questions the person might ask next, phrased as they would type them.`;
+
+const ANSWER_SCHEMA = {
+  type: 'object',
+  properties: {
+    contentType: { type: 'string', enum: CONTENT_TYPES },
+    text: { type: 'string' },
+    bullets: { type: 'array', items: { type: 'string' } },
+    sources: { type: 'string' },
+    confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+    actions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          label: { type: 'string' },
+          action: { type: 'string', enum: Object.keys(VOYAGER_ACTIONS) },
+        },
+        required: ['label', 'action'],
+        additionalProperties: false,
+      },
+    },
+    followUps: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['contentType', 'text', 'bullets', 'sources', 'confidence', 'actions', 'followUps'],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Which actions this request may offer.
+ *
+ * Narrowing here is the enforcement point: an answer physically cannot contain a
+ * wealth action for someone whose tier or consent does not reach the wealth
+ * record, because the model was never shown that option.
+ */
+function allowedActions(context: VoyagerContext, tier: VoyagerTier): VoyagerActionId[] {
+  const common: VoyagerActionId[] = [
+    'open_symbol',
+    'open_chart',
+    'open_news',
+    'open_economy',
+    'open_indicator',
+    'open_academy',
+    'open_experts',
+    'open_experts_intake',
+    'open_strategy',
+    'open_explore',
+    'open_screener',
+    // Offered at every tier: an anonymous visitor lands on the sign-in prompt,
+    // which is the intended path. This list exists to stop the model inventing a
+    // destination, not to re-implement route protection the server already does.
+    'create_alert',
+    'open_watchlist',
+    'none',
+  ];
+
+  if (tier === 'private') {
+    common.push('open_wealth', 'open_wealth_assets', 'open_wealth_scenarios', 'open_wealth_insights');
+  }
+
+  // On a lesson page, keep the person in the lesson rather than routing them away.
+  if (context.screen === 'academy') {
+    return ['open_academy', 'open_explore', 'none'];
+  }
+
+  return common;
+}
+
+function requestBrief(
+  context: VoyagerContext,
+  tier: VoyagerTier,
+  sources: VoyagerSource[],
+  actions: VoyagerActionId[]
+): string {
+  const factLines = context.facts
+    ? Object.entries(context.facts).map(([key, value]) => `- ${key}: ${value}`)
+    : [];
+
+  const tierNote = {
+    basic:
+      'Voyager Basic — an anonymous visitor. You know the page and public market data. You do not know who they are, what they hold, or what they have asked before. Do not imply otherwise.',
+    personal:
+      'Voyager Personal — signed in. You may use their stated interests and watchlist where the sources below allow it. You do not have their portfolio.',
+    private:
+      'Voyager Private — signed in with the full context tier. Where the sources below include the wealth record, you may reason with their own figures and say so.',
+  }[tier];
+
+  return [
+    `## This request`,
+    ``,
+    `Tier: ${tierNote}`,
+    ``,
+    `Page: ${context.screen} — ${context.subject}`,
+    ...(factLines.length ? [``, `Known about what is on screen:`, ...factLines] : []),
+    ``,
+    `Context sources available to you (anything not listed here you do not have; the person switched the rest off):`,
+    ...sources.map((source) => `- ${source.label}`),
+    ...(sources.length === 0 ? ['- none — the person switched every source off; answer generally and say so'] : []),
+    ``,
+    `Allowed action ids for this answer:`,
+    ...actions.map((id) => `- ${id}: ${VOYAGER_ACTIONS[id]}`),
+  ].join('\n');
+}
+
+/** Keeps a model response inside the contract even if it drifts from the schema. */
+function coerce(raw: unknown, allowed: VoyagerActionId[]): VoyagerAnswer | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const value = raw as Record<string, unknown>;
+
+  if (typeof value.text !== 'string' || value.text.trim() === '') return null;
+
+  const contentType = CONTENT_TYPES.includes(value.contentType as VoyagerContentType)
+    ? (value.contentType as VoyagerContentType)
+    : 'AI explanation';
+
+  const confidence =
+    value.confidence === 'low' || value.confidence === 'high' ? value.confidence : 'medium';
+
+  const strings = (input: unknown): string[] =>
+    Array.isArray(input) ? input.filter((x): x is string => typeof x === 'string') : [];
+
+  const actions: VoyagerAction[] = (Array.isArray(value.actions) ? value.actions : [])
+    .map((entry): VoyagerAction | null => {
+      if (typeof entry !== 'object' || entry === null) return null;
+      const item = entry as Record<string, unknown>;
+      const id = item.action;
+      if (typeof item.label !== 'string' || typeof id !== 'string') return null;
+      // Dropped rather than remapped: an action outside the allowlist is one this
+      // person is not entitled to, and quietly substituting another would be worse.
+      if (!allowed.includes(id as VoyagerActionId)) return null;
+      return { label: item.label, action: id as VoyagerActionId };
+    })
+    .filter((entry): entry is VoyagerAction => entry !== null)
+    .slice(0, 4);
+
+  if (actions.length > 0) actions[0].primary = true;
+
+  return {
+    contentType,
+    text: value.text,
+    bullets: strings(value.bullets).slice(0, 4),
+    sources: typeof value.sources === 'string' ? value.sources : 'General knowledge',
+    confidence,
+    actions,
+    followUps: strings(value.followUps).slice(0, 3),
+  };
+}
+
+/**
+ * Applies the allowlist to any answer, whichever layer produced it.
+ *
+ * The scripted layer goes through this too, so the guarantee holds uniformly: no
+ * answer from any source can offer an action this request does not permit.
+ */
+function withAllowedActions(answer: VoyagerAnswer, allowed: VoyagerActionId[]): VoyagerAnswer {
+  const actions = answer.actions
+    .filter((action) => allowed.includes(action.action))
+    .slice(0, 4)
+    .map((action, index) => ({ ...action, primary: index === 0 }));
+
+  return { ...answer, actions };
+}
+
+export async function askVoyager(options: {
+  question: string;
+  context: VoyagerContext;
+  tier: VoyagerTier;
+  sources: VoyagerSource[];
+  history: { role: 'user' | 'assistant'; text: string }[];
+}): Promise<VoyagerAnswer> {
+  const { question, context, tier, sources, history } = options;
+  const allowed = allowedActions(context, tier);
+  const scripted = () => withAllowedActions(scriptedAnswer(question, context, tier), allowed);
+
+  if (!client) {
+    return scripted();
+  }
+
+  try {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 8000,
+      system: [
+        // Stable across every request, so it caches; the volatile brief follows it.
+        { type: 'text', text: RULES, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: requestBrief(context, tier, sources, allowed) },
+      ],
+      output_config: {
+        effort: EFFORT,
+        format: { type: 'json_schema', schema: ANSWER_SCHEMA },
+      },
+      messages: [
+        ...history.slice(-8).map((turn) => ({
+          role: turn.role,
+          content: turn.text,
+        })),
+        { role: 'user' as const, content: question },
+      ],
+    });
+
+    if (response.stop_reason === 'refusal') {
+      return {
+        contentType: 'AI explanation',
+        text: 'I can’t help with that one. If you rephrase it as a question about how something works or what the risks are, I can take another look.',
+        bullets: [],
+        sources: 'Declined by safety policy',
+        confidence: 'high',
+        actions: [],
+        followUps: [],
+      };
+    }
+
+    const block = response.content.find((entry) => entry.type === 'text');
+    if (!block || block.type !== 'text') {
+      return scripted();
+    }
+
+    const coerced = coerce(JSON.parse(block.text), allowed);
+    return coerced ?? scripted();
+  } catch (error) {
+    // Surfaced in the server log rather than to the person: the scripted answer
+    // below is honest about being general, and an error toast is not more useful.
+    console.error('[voyager] model call failed, falling back to scripted answer', error);
+    return scripted();
+  }
+}

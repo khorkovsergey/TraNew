@@ -16,7 +16,7 @@ const PRO_TOOLS = ['indicators', 'drawing', 'replay', 'multi', 'volume', 'tester
 
 const ACTIONS: Array<{ key: string; href: StaticPathname; ai?: boolean }> = [
   { key: 'explain', href: '/research', ai: true },
-  { key: 'copilot', href: '/research', ai: true },
+  { key: 'voyager', href: '/research', ai: true },
   { key: 'news', href: '/news' },
   { key: 'events', href: '/market/brief' },
   { key: 'compare', href: '/explore' },

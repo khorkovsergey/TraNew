@@ -56,6 +56,10 @@ const nextConfig: NextConfig = {
       { source: '/community/experts', destination: '/en/marketplace/experts', permanent: true },
       { source: '/capital/experts', destination: '/en/marketplace/experts', permanent: true },
 
+      // The assistant was renamed Copilot → Voyager; the old account URL is live.
+      { source: '/en/account/copilot', destination: '/en/account/voyager', permanent: true },
+      { source: '/account/copilot', destination: '/en/account/voyager', permanent: true },
+
       ...RUSSIAN_SLUG_REDIRECTS.map(([source, destination]) => ({
         source,
         destination,

@@ -48,7 +48,7 @@ export function SymbolActions({
         className={`${styles.action} ${styles.actionAi}`}
         href={{ pathname: '/research', query: { q: `What is happening with ${ticker} today?` } }}
       >
-        {t('copilot')}
+        {t('voyager')}
       </Link>
 
       {/* Contextual doorway into the Wealth Hub, right where the holding is looked at. */}

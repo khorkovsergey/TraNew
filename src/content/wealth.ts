@@ -255,7 +255,7 @@ export type AssetDetail = {
   liquidity: Array<[string, string]>;
   risks: string[];
   options: string[];
-  copilotContext: string[];
+  voyagerContext: string[];
   questions: string[];
 };
 
@@ -306,7 +306,7 @@ export const ASSET_DETAILS: Record<string, AssetDetail> = {
       'Tenant / vacancy risk',
     ],
     options: ['Keep', 'Sell', 'Rent (active)', 'Refinance', 'Use as collateral', 'Renovate'],
-    copilotContext: [
+    voyagerContext: [
       'Limassol apartment',
       'Linked mortgage',
       'Your income goal for 2030',
@@ -362,7 +362,7 @@ export const ASSET_DETAILS: Record<string, AssetDetail> = {
       'Sector concentration (with NVDA exposure)',
     ],
     options: ['Keep', 'Sell part', 'Sell all', 'Hedge', 'Set alert', 'Move to another goal'],
-    copilotContext: [
+    voyagerContext: [
       'Tesla position',
       'Your growth goal',
       'Concentration profile',
@@ -530,7 +530,7 @@ export const DATA_SOURCES = [
   },
   {
     name: 'Manual sources',
-    sub: '3 assets entered manually or via Copilot',
+    sub: '3 assets entered manually or via Voyager',
     status: 'Active',
     tone: 'info' as const,
   },
@@ -549,16 +549,16 @@ export const ADD_WHAT = [
 
 export const ADD_HOW = [
   { id: 'manual', title: 'Add manually', sub: 'A short form — details can come later' },
-  { id: 'copilot', title: 'Link an existing platform asset', sub: 'From your watchlists and charts' },
+  { id: 'voyager', title: 'Link an existing platform asset', sub: 'From your watchlists and charts' },
   { id: 'auth', title: 'Connect an account', sub: 'Broker, bank or wallet' },
-  { id: 'auth', title: 'Upload a statement', sub: 'PDF or CSV — Copilot extracts the data' },
-  { id: 'copilot', title: 'Use Copilot', sub: 'Describe it in your own words' },
+  { id: 'auth', title: 'Upload a statement', sub: 'PDF or CSV — Voyager extracts the data' },
+  { id: 'voyager', title: 'Use Voyager', sub: 'Describe it in your own words' },
 ];
 
-export const ADD_COPILOT_EXAMPLE =
+export const ADD_VOYAGER_EXAMPLE =
   'I own an apartment in Limassol, bought in 2023 for 480 thousand, now worth about 600. There is a mortgage of 170 thousand left at 4.2 percent.';
 
-export const ADD_COPILOT_RECOGNIZED = [
+export const ADD_VOYAGER_RECOGNIZED = [
   ['Asset', 'Property — Limassol apartment'],
   ['Purchase', '2023 · €480,000'],
   ['Current value', '€600,000 (estimated)'],
@@ -566,7 +566,7 @@ export const ADD_COPILOT_RECOGNIZED = [
 ];
 
 /** The chat is an input method, not the record. Nothing is stored until confirmed. */
-export const ADD_COPILOT_NOTE = 'Creates two linked records: one asset and one liability.';
+export const ADD_VOYAGER_NOTE = 'Creates two linked records: one asset and one liability.';
 
 export const ADD_SAVED_TOAST =
   '✓ Saved to your Wealth Record — previous version kept, source and date recorded, analytics recalculated.';

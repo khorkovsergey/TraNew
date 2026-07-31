@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { useLoginModal } from '@/components/shell/LoginModalProvider';
 import { Icon } from '@/components/ui/Icon';
 import {
-  ADD_COPILOT_EXAMPLE,
-  ADD_COPILOT_NOTE,
-  ADD_COPILOT_RECOGNIZED,
+  ADD_VOYAGER_EXAMPLE,
+  ADD_VOYAGER_NOTE,
+  ADD_VOYAGER_RECOGNIZED,
   ADD_HOW,
   ADD_SAVED_TOAST,
   ADD_WHAT,
@@ -82,7 +82,7 @@ export function WealthScreen() {
   const [view, setView] = useState<StructureView>('type');
   const [scenarioType, setScenarioType] = useState<string | null>(null);
   const [scenarioAsset, setScenarioAsset] = useState('apt');
-  const [addStage, setAddStage] = useState<'what' | 'how' | 'manual' | 'copilot'>('what');
+  const [addStage, setAddStage] = useState<'what' | 'how' | 'manual' | 'voyager'>('what');
   const [saved, setSaved] = useState(false);
   const [question, setQuestion] = useState('');
 
@@ -102,7 +102,7 @@ export function WealthScreen() {
     scenarioType === 'Sell' ? `Sell|${scenarioAsset}` : scenarioType ? `${scenarioType}|*` : null;
   const scenario = scenarioKey ? SCENARIOS[scenarioKey] : null;
 
-  const askCopilot = () => {
+  const askVoyager = () => {
     if (!question.trim()) return;
     router.push({ pathname: '/research', query: { q: question } });
   };
@@ -141,7 +141,7 @@ export function WealthScreen() {
             className={`${styles.ghost} ${styles.ghostAi}`}
             href={{ pathname: '/research', query: { q: 'Review my capital structure' } }}
           >
-            Ask Copilot
+            Ask Voyager
           </Link>
         </div>
       </div>
@@ -286,18 +286,18 @@ export function WealthScreen() {
 
               <section className={styles.card}>
                 <h2 className={styles.cardTitle}>Ask anything about your wealth</h2>
-                <div className={styles.copilotField}>
+                <div className={styles.voyagerField}>
                   <input
-                    className={styles.copilotInput}
+                    className={styles.voyagerInput}
                     value={question}
                     onChange={(event) => setQuestion(event.target.value)}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter') askCopilot();
+                      if (event.key === 'Enter') askVoyager();
                     }}
                     placeholder="What happens to my liquidity if I sell the apartment?"
-                    aria-label="Ask Copilot about your wealth"
+                    aria-label="Ask Voyager about your wealth"
                   />
-                  <button className={styles.copilotSubmit} onClick={askCopilot} aria-label="Ask">
+                  <button className={styles.voyagerSubmit} onClick={askVoyager} aria-label="Ask">
                     <Icon name="arrowRight" size={18} strokeWidth={2.2} />
                   </button>
                 </div>
@@ -532,8 +532,8 @@ export function WealthScreen() {
             <h2 className={styles.sectionTitle}>Privacy</h2>
             <div className={styles.chips}>
               <button className={styles.chip}>Export my data</button>
-              <Link className={styles.chip} href="/account/copilot">
-                Manage Copilot permissions
+              <Link className={styles.chip} href="/account/voyager">
+                Manage Voyager permissions
               </Link>
               <Link
                 className={styles.chip}
@@ -582,7 +582,7 @@ export function WealthScreen() {
                       key={item.title}
                       onClick={() => {
                         if (item.id === 'auth') openLogin();
-                        else setAddStage(item.id as 'manual' | 'copilot');
+                        else setAddStage(item.id as 'manual' | 'voyager');
                       }}
                     >
                       <div className={styles.addTitle}>{item.title}</div>
@@ -613,25 +613,25 @@ export function WealthScreen() {
               </>
             )}
 
-            {addStage === 'copilot' && (
+            {addStage === 'voyager' && (
               <>
                 <h2 className={styles.sectionTitle} style={{ marginTop: 0 }}>
                   Describe it in your own words
                 </h2>
-                <div className={styles.example}>“{ADD_COPILOT_EXAMPLE}”</div>
+                <div className={styles.example}>“{ADD_VOYAGER_EXAMPLE}”</div>
 
-                {/* Copilot proposes; the record only changes after an explicit confirm. */}
+                {/* Voyager proposes; the record only changes after an explicit confirm. */}
                 <div className={styles.recognized}>
-                  <div className={styles.recognizedTitle}>Copilot recognized — please confirm</div>
+                  <div className={styles.recognizedTitle}>Voyager recognized — please confirm</div>
                   <div style={{ marginTop: 12 }}>
-                    {ADD_COPILOT_RECOGNIZED.map(([k, v]) => (
+                    {ADD_VOYAGER_RECOGNIZED.map(([k, v]) => (
                       <div className={styles.kv} key={k}>
                         <span className={styles.kvKey}>{k}</span>
                         <span className={styles.kvValue}>{v}</span>
                       </div>
                     ))}
                   </div>
-                  <div className={styles.note}>{ADD_COPILOT_NOTE}</div>
+                  <div className={styles.note}>{ADD_VOYAGER_NOTE}</div>
                   <div className={styles.quickActions}>
                     <button className={styles.primary} onClick={() => setSaved(true)}>
                       Confirm

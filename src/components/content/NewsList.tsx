@@ -71,7 +71,7 @@ export function NewsList() {
                   query: { q: pick(item.title, locale) },
                 }}
               >
-                {t('askCopilot')}
+                {t('askVoyager')}
               </Link>
             </div>
           </article>

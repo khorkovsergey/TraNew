@@ -8,6 +8,8 @@ import { Link } from '@/i18n/navigation';
 import { routing, type Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
 import styles from '@/components/economy/Economy.module.css';
+import { VoyagerPageContext } from '@/components/voyager/VoyagerProvider';
+import { buildContext } from '@/lib/voyager/context';
 
 type Props = { params: Promise<{ locale: Locale; slug: string }> };
 
@@ -62,6 +64,7 @@ export default async function IndicatorPage({ params }: Props) {
 
   return (
     <div className={styles.wrap}>
+      <VoyagerPageContext context={buildContext('indicator', INDICATOR.name)} />
       <Link className={styles.backHome} href="/economy">
         ← Economy
       </Link>

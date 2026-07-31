@@ -159,11 +159,11 @@ export function AssetDetail({ asset }: { asset: AssetDetailData }) {
           )}
         </div>
 
-        {/* Nothing is fed to Copilot silently: the context is listed and switchable. */}
+        {/* Nothing is fed to Voyager silently: the context is listed and switchable. */}
         <aside className={styles.contextPanel}>
-          <div className={styles.contextTitle}>Copilot is using:</div>
+          <div className={styles.contextTitle}>Voyager is using:</div>
           <div style={{ marginTop: 10 }}>
-            {asset.copilotContext.map((item, index) => {
+            {asset.voyagerContext.map((item, index) => {
               const on = !contextOff[index];
               return (
                 <button

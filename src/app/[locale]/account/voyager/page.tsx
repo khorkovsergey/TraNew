@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 import { AccountLayout } from '@/components/account/AccountLayout';
-import { AccountCopilot } from '@/components/account/AccountSections';
+import { AccountVoyager } from '@/components/account/AccountSections';
 import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
 import { requireUser } from '@/lib/session';
@@ -12,9 +12,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
 
   return pageMetadata({
-    href: '/account/copilot',
+    href: '/account/voyager',
     locale,
-    title: "Copilot",
+    title: "Voyager",
     description: "Conversations, saved insights, editable memory, permissions and usage.",
   });
 }
@@ -28,7 +28,7 @@ export default async function Page({ params }: Props) {
 
   return (
     <AccountLayout>
-      <AccountCopilot />
+      <AccountVoyager />
     </AccountLayout>
   );
 }

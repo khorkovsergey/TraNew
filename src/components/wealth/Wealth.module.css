@@ -408,9 +408,9 @@
   color: #b0430e;
 }
 
-/* ---- Copilot field ---- */
+/* ---- Voyager field ---- */
 
-.copilotField {
+.voyagerField {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -421,7 +421,7 @@
   margin-top: 18px;
 }
 
-.copilotInput {
+.voyagerInput {
   flex: 1;
   min-width: 0;
   border: none;
@@ -431,7 +431,7 @@
   padding: 10px 4px;
 }
 
-.copilotSubmit {
+.voyagerSubmit {
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -444,7 +444,7 @@
   transition: background var(--tn-transition-fast);
 }
 
-.copilotSubmit:hover {
+.voyagerSubmit:hover {
   background: var(--tn-purple-hover);
 }
 
@@ -634,7 +634,7 @@
   color: var(--tn-blue);
 }
 
-/* ---- Copilot context panel ---- */
+/* ---- Voyager context panel ---- */
 
 .contextPanel {
   background: var(--tn-purple-tint-soft);

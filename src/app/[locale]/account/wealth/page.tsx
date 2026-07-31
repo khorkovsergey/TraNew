@@ -9,6 +9,8 @@ import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { pageMetadata } from '@/lib/metadata';
 import { requireUser } from '@/lib/session';
 import styles from '@/components/wealth/Wealth.module.css';
+import { VoyagerPageContext } from '@/components/voyager/VoyagerProvider';
+import { buildContext } from '@/lib/voyager/context';
 
 type Props = { params: Promise<{ locale: Locale }> };
 
@@ -38,6 +40,7 @@ export default async function WealthPage({ params }: Props) {
 
   return (
     <div className={styles.wrap}>
+      <VoyagerPageContext context={buildContext('wealth')} />
       <Link className={styles.backHome} href="/account">
         ← My TradingNew
       </Link>

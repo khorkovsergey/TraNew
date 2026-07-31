@@ -22,8 +22,8 @@ export type AuditResource =
   | 'consent'
   | 'session';
 
-/** Who performed it — a person, Copilot acting on their behalf, or an expert snapshot. */
-export type AuditActor = 'user' | 'copilot' | 'expert_snapshot' | 'system';
+/** Who performed it — a person, Voyager acting on their behalf, or an expert snapshot. */
+export type AuditActor = 'user' | 'voyager' | 'expert_snapshot' | 'system';
 
 export async function recordAccess(options: {
   userId: string;

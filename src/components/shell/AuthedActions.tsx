@@ -13,7 +13,7 @@ import styles from './AuthedActions.module.css';
 const MENU: Array<{ label: string; href: StaticPathname | null; danger?: boolean }> = [
   { label: 'My TradingNew', href: '/account' },
   { label: 'My Workspace', href: '/account/workspace' },
-  { label: 'Copilot', href: '/account/copilot' },
+  { label: 'Voyager', href: '/account/voyager' },
   { label: 'Wealth Hub', href: '/account/wealth' },
   { label: 'Purchases', href: '/account/purchases' },
   { label: 'View Public Profile', href: '/account/settings' },

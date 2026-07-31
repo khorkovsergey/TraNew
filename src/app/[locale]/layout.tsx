@@ -6,6 +6,8 @@ import { notFound } from 'next/navigation';
 import { Header } from '@/components/shell/Header';
 import { LoginModalProvider } from '@/components/shell/LoginModalProvider';
 import { StubBanner } from '@/components/shell/StubBanner';
+import { VoyagerProvider } from '@/components/voyager/VoyagerProvider';
+import { VoyagerWidget } from '@/components/voyager/VoyagerWidget';
 import { routing } from '@/i18n/routing';
 import { SITE_URL } from '@/lib/metadata';
 import '../globals.css';
@@ -67,14 +69,19 @@ export default async function LocaleLayout(props: {
       <body>
         <NextIntlClientProvider>
           <LoginModalProvider>
-            <a className="tn-skip-link" href="#main">
-              {t('skipToContent')}
-            </a>
-            <div className="tn-app">
-              <StubBanner />
-              <Header />
-              <main id="main">{props.children}</main>
-            </div>
+            {/* Voyager sits at layout level so it survives navigation; each page
+                announces its own context through VoyagerPageContext. */}
+            <VoyagerProvider>
+              <a className="tn-skip-link" href="#main">
+                {t('skipToContent')}
+              </a>
+              <div className="tn-app">
+                <StubBanner />
+                <Header />
+                <main id="main">{props.children}</main>
+              </div>
+              <VoyagerWidget />
+            </VoyagerProvider>
           </LoginModalProvider>
         </NextIntlClientProvider>
       </body>

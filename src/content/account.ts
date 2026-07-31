@@ -22,7 +22,7 @@ export const USER: User = {
 export const ACCOUNT_TABS = [
   { id: 'overview', label: 'Overview', href: '/account' },
   { id: 'workspace', label: 'My Workspace', href: '/account/workspace' },
-  { id: 'copilot', label: 'Copilot', href: '/account/copilot' },
+  { id: 'voyager', label: 'Voyager', href: '/account/voyager' },
   { id: 'activity', label: 'Activity', href: '/account/activity' },
   { id: 'academy', label: 'Academy', href: '/account/academy' },
   { id: 'purchases', label: 'Purchases', href: '/account/purchases' },
@@ -51,9 +51,9 @@ export const NOTIFICATIONS: Notification[] = [
   },
   {
     id: 'insight',
-    title: 'New Copilot insight',
+    title: 'New Voyager insight',
     message: 'US CPI came in above expectations — affects your saved bonds theme.',
-    meta: 'Copilot · 2 h ago',
+    meta: 'Voyager · 2 h ago',
   },
   {
     id: 'lesson',
@@ -70,11 +70,11 @@ export const NOTIFICATION_NOTE =
 export const CONTINUE_ITEMS = [
   { type: 'CHART', title: 'S&P 500 · 1M view', meta: 'Viewed 2 hours ago' },
   { type: 'COURSE', title: 'Why people invest', meta: 'Lesson 1 · in progress' },
-  { type: 'COPILOT', title: '“Why is gold rising today?”', meta: 'Yesterday · 6 messages' },
+  { type: 'VOYAGER', title: '“Why is gold rising today?”', meta: 'Yesterday · 6 messages' },
 ];
 
 /** Each insight explains why it is being shown — no unexplained recommendations. */
-export const COPILOT_INSIGHTS = [
+export const VOYAGER_INSIGHTS = [
   {
     title: 'NVIDIA — saved company',
     body: 'Cloud capex guidance was raised; demand visibility extends into 2027.',
@@ -149,7 +149,7 @@ export const RESEARCH_ITEMS = [
 ];
 
 export const REPORTS = [
-  { title: 'Rate-cut scenario for my watchlist', meta: 'Copilot report · Jul 29' },
+  { title: 'Rate-cut scenario for my watchlist', meta: 'Voyager report · Jul 29' },
   {
     title: 'Consultation summary — Anna Keller',
     meta: 'Expert report · pending session #TN-8347',
@@ -162,7 +162,7 @@ export const ALERTS = [
   { id: 't', name: 'TSLA falls 5% in a day', meta: 'Price alert · In-app' },
 ];
 
-export const COPILOT_TABS = [
+export const VOYAGER_TABS = [
   { id: 'conversations', label: 'Conversations' },
   { id: 'insights', label: 'Saved Insights' },
   { id: 'memory', label: 'Memory' },
@@ -204,7 +204,7 @@ export const SAVED_INSIGHTS = [
   },
 ];
 
-/** Everything Copilot remembers — nothing hidden, everything editable. */
+/** Everything Voyager remembers — nothing hidden, everything editable. */
 export const MEMORY = [
   { id: 'm1', k: 'Experience level', v: 'Beginner — learning', src: 'Source: Academy diagnostic · Jul 30' },
   { id: 'm2', k: 'Interests', v: 'ETFs, gold, US tech', src: 'Source: browsing activity · updating' },
@@ -213,7 +213,7 @@ export const MEMORY = [
 ];
 
 export const MEMORY_NOTE =
-  'Everything Copilot remembers about you — nothing hidden, everything editable.';
+  'Everything Voyager remembers about you — nothing hidden, everything editable.';
 
 export const PERMISSIONS = [
   'Use current page context',
@@ -236,7 +236,7 @@ export const ACTIVITY_FILTERS = [
   'All',
   'Viewed',
   'Saved',
-  'Copilot',
+  'Voyager',
   'Academy',
   'Alerts',
   'Marketplace',
@@ -244,7 +244,7 @@ export const ACTIVITY_FILTERS = [
 
 export const ACTIVITY = [
   { type: 'Viewed', title: 'Tesla — Symbol Research Overview', time: '2 h ago' },
-  { type: 'Copilot', title: 'Asked: Why is gold rising today?', time: 'Yesterday' },
+  { type: 'Voyager', title: 'Asked: Why is gold rising today?', time: 'Yesterday' },
   { type: 'Saved', title: 'Saved NVIDIA to Companies I follow', time: 'Yesterday' },
   { type: 'Academy', title: 'Completed: Why people invest', time: 'Jul 30' },
   { type: 'Alerts', title: 'Created alert: Gold above $3,000', time: 'Jul 29' },
@@ -314,7 +314,7 @@ export const SETTINGS_ROWS: Record<string, SettingRow[]> = {
   ],
   notifications: [
     { kind: 'toggle', k: 'Market alerts', id: 'n1', on: true, sub: 'In-app · Push · Email' },
-    { kind: 'toggle', k: 'Copilot insights', id: 'n2', on: true, sub: 'In-app' },
+    { kind: 'toggle', k: 'Voyager insights', id: 'n2', on: true, sub: 'In-app' },
     { kind: 'toggle', k: 'Academy reminders', id: 'n3', on: true, sub: 'Push' },
     { kind: 'toggle', k: 'Expert messages', id: 'n4', on: true, sub: 'In-app · Email' },
     { kind: 'toggle', k: 'Product news', id: 'n5', on: false, sub: 'Email' },
@@ -325,7 +325,7 @@ export const SETTINGS_ROWS: Record<string, SettingRow[]> = {
       kind: 'value',
       k: 'Current plan',
       v: 'Free',
-      sub: 'Core research tools, Academy, limited Copilot',
+      sub: 'Core research tools, Academy, limited Voyager',
     },
     { kind: 'value', k: 'AI messages', v: '37 / 100 monthly' },
     { kind: 'value', k: 'Collections', v: '3 of 5' },
@@ -416,7 +416,7 @@ export const SETTINGS_ROWS: Record<string, SettingRow[]> = {
 export const SETTINGS_NOTES: Record<string, string> = {
   notifications: 'Security and billing notifications cannot be fully disabled.',
   privacy:
-    'Copilot conversations, collections and history are private by default. Public profile is opt-in per block.',
+    'Voyager conversations, collections and history are private by default. Public profile is opt-in per block.',
   subscription:
     'Locked features stay visible with a short explanation — no aggressive paywalls.',
 };

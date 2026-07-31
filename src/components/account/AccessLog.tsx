@@ -42,7 +42,7 @@ export function AccessLog({ entries }: { entries: AccessEntry[] }) {
       </div>
       <div className={styles.note}>
         This log is append-only. It exists so you can tell whether anything other than you — a
-        Copilot query, an expert snapshot — has read your record.
+        Voyager query, an expert snapshot — has read your record.
       </div>
     </>
   );

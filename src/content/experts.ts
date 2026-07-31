@@ -465,14 +465,14 @@ export const SHARING_ITEMS = [
   { id: 'holdings', label: { en: 'Individual holdings' } },
   { id: 'goals', label: { en: 'Goals and risk profile' } },
   { id: 'research', label: { en: 'Saved research' } },
-  { id: 'copilot', label: { en: 'Copilot thread' } },
+  { id: 'voyager', label: { en: 'Voyager thread' } },
   { id: 'documents', label: { en: 'Uploaded documents' } },
 ];
 
 export const NEVER_SHARED = [
   { en: 'Your login credentials' },
   { en: 'Transaction history' },
-  { en: 'Copilot threads you did not select' },
+  { en: 'Voyager threads you did not select' },
   { en: 'Payment details' },
 ];
 

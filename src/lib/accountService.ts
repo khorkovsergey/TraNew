@@ -21,8 +21,8 @@ export function getContinueItems() {
   return data.CONTINUE_ITEMS;
 }
 
-export function getCopilotInsights() {
-  return data.COPILOT_INSIGHTS;
+export function getVoyagerInsights() {
+  return data.VOYAGER_INSIGHTS;
 }
 
 export function getCollections() {

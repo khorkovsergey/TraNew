@@ -6,6 +6,8 @@ import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
 import styles from '@/components/marketplace/Marketplace.module.css';
+import { VoyagerPageContext } from '@/components/voyager/VoyagerProvider';
+import { buildContext } from '@/lib/voyager/context';
 
 type Props = { params: Promise<{ locale: Locale }> };
 
@@ -30,6 +32,7 @@ export default async function ExpertsLandingPage({ params }: Props) {
 
   return (
     <div className={styles.wrap}>
+      <VoyagerPageContext context={buildContext('experts')} />
       <Link className={styles.backHome} href="/marketplace">
         ← {tScreens('marketplace.title')}
       </Link>

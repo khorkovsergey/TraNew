@@ -6,7 +6,7 @@ import {
   ACTIVITY_FILTERS,
   ACTIVITY_NOTE,
   COLLECTIONS_NOTE,
-  COPILOT_TABS,
+  VOYAGER_TABS,
   MEMORY_NOTE,
   PURCHASE_TABS,
   SAVED_FILTERS,
@@ -21,7 +21,7 @@ import {
   getCollections,
   getContinueItems,
   getConversations,
-  getCopilotInsights,
+  getVoyagerInsights,
   getMemory,
   getPermissions,
   getProfileFields,
@@ -67,9 +67,9 @@ export function AccountOverview() {
         ))}
       </div>
 
-      <h2 className={styles.sectionTitle}>Copilot insights</h2>
+      <h2 className={styles.sectionTitle}>Voyager insights</h2>
       <div className={styles.grid3}>
-        {getCopilotInsights().map((insight) => (
+        {getVoyagerInsights().map((insight) => (
           <div className={styles.insightCard} key={insight.title}>
             <div className={styles.insightTitle}>{insight.title}</div>
             {/* Each card says why it appeared. */}
@@ -302,10 +302,10 @@ export function AccountWorkspace() {
   );
 }
 
-/* ----------------------------------------------------------------- Copilot */
+/* ----------------------------------------------------------------- Voyager */
 
-export function AccountCopilot() {
-  const [tab, setTab] = useState<(typeof COPILOT_TABS)[number]['id']>('conversations');
+export function AccountVoyager() {
+  const [tab, setTab] = useState<(typeof VOYAGER_TABS)[number]['id']>('conversations');
   const [memoryOff, setMemoryOff] = useState<Record<string, boolean>>({});
   const [memoryDeleted, setMemoryDeleted] = useState<Record<string, boolean>>({});
   const [permissionsOff, setPermissionsOff] = useState<Record<number, boolean>>({});
@@ -313,10 +313,10 @@ export function AccountCopilot() {
 
   return (
     <>
-      <h1 className={styles.h1}>Copilot</h1>
+      <h1 className={styles.h1}>Voyager</h1>
 
       <div className={styles.tabs} role="tablist">
-        {COPILOT_TABS.map((item) => (
+        {VOYAGER_TABS.map((item) => (
           <button
             key={item.id}
             role="tab"

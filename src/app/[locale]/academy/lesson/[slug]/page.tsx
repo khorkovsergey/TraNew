@@ -8,6 +8,8 @@ import { Link } from '@/i18n/navigation';
 import { routing, type Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
 import styles from '@/components/academy/Academy.module.css';
+import { VoyagerPageContext } from '@/components/voyager/VoyagerProvider';
+import { buildContext } from '@/lib/voyager/context';
 
 type Props = { params: Promise<{ locale: Locale; slug: string }> };
 
@@ -40,6 +42,7 @@ export default async function AcademyLessonPage({ params }: Props) {
 
   return (
     <div className={styles.wrap}>
+      <VoyagerPageContext context={buildContext('academy')} />
       <Link className={styles.backHome} href="/academy/dashboard">
         ← {t('dashboard.yourPath')}
       </Link>

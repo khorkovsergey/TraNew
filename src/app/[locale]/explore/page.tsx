@@ -32,7 +32,7 @@ const TOOLS: Array<{ key: string; href: StaticPathname | null; slug?: string }> 
   { key: 'watchlists', href: null, slug: 'watchlists' },
   { key: 'portfolio', href: '/portfolio' },
   { key: 'brokers', href: '/brokers' },
-  { key: 'copilot', href: '/research' },
+  { key: 'voyager', href: '/research' },
 ];
 
 export default async function ExplorePage({ params }: Props) {

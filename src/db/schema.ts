@@ -221,7 +221,7 @@ export const dataAccessLog = pgTable(
     /** wealth_asset | wealth_liability | wealth_goal | wealth_overview | consent */
     resource: text('resource').notNull(),
     resourceId: text('resource_id'),
-    /** Who or what performed it: the person, Copilot, or an expert snapshot. */
+    /** Who or what performed it: the person, Voyager, or an expert snapshot. */
     actor: text('actor').notNull(),
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
@@ -235,6 +235,31 @@ export const dataAccessLog = pgTable(
     index('data_access_user_idx').on(table.userId),
     index('data_access_created_idx').on(table.createdAt),
   ]
+);
+
+/* ------------------------------------------------------------ Voyager usage */
+
+/**
+ * Daily question counter, so the Basic tier's limit means something.
+ *
+ * `subject` is a user id for a signed-in person and an HMAC of the IP address for
+ * an anonymous one — hashed rather than stored raw, because the only thing this
+ * table needs to know is "the same visitor as before", not who they are. Rows are
+ * per day, so history expires by being irrelevant rather than by retention policy.
+ */
+export const voyagerUsage = pgTable(
+  'voyager_usage',
+  {
+    id: text('id').primaryKey(),
+    subject: text('subject').notNull(),
+    /** Calendar day in UTC, as YYYY-MM-DD. */
+    day: text('day').notNull(),
+    count: integer('count').notNull().default(0),
+    updatedAt: timestamp('updated_at')
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  (table) => [uniqueIndex('voyager_usage_subject_day_idx').on(table.subject, table.day)]
 );
 
 /* ---------------------------------------------------- Email preview outbox */
@@ -276,7 +301,7 @@ export const consent = pgTable(
     userId: text('user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
-    /** copilot_context | expert_sharing | ai_processing | marketplace_terms | cancellation */
+    /** voyager_context | expert_sharing | ai_processing | marketplace_terms | cancellation */
     kind: text('kind').notNull(),
     /** For expert_sharing: which expert or booking the grant is scoped to. */
     scope: text('scope'),

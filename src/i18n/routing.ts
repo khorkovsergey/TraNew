@@ -70,7 +70,7 @@ export const routing = defineRouting({
     // My TradingNew — the signed-in account area.
     '/account': '/account',
     '/account/workspace': '/account/workspace',
-    '/account/copilot': '/account/copilot',
+    '/account/voyager': '/account/voyager',
     '/account/activity': '/account/activity',
     '/account/academy': '/account/academy',
     '/account/purchases': '/account/purchases',

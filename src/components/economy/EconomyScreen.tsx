@@ -6,7 +6,7 @@ import { TrustLabel } from '@/components/ui/TrustLabel';
 import {
   CALENDAR_FULL,
   CALENDAR_PREVIEW,
-  COPILOT_QUESTIONS,
+  VOYAGER_QUESTIONS,
   COUNTRY_GROUPS,
   ECONOMY_TABS,
   ESSENTIAL_INDICATORS,
@@ -299,10 +299,10 @@ export function EconomyScreen() {
             ))}
           </div>
 
-          <div className={styles.copilot}>
-            <div className={styles.copilotTitle}>Ask Copilot about the economy</div>
+          <div className={styles.voyager}>
+            <div className={styles.voyagerTitle}>Ask Voyager about the economy</div>
             <div className={styles.chips} style={{ marginTop: 14 }}>
-              {COPILOT_QUESTIONS.map((question) => (
+              {VOYAGER_QUESTIONS.map((question) => (
                 <Link
                   className={styles.chipPurple}
                   key={question}

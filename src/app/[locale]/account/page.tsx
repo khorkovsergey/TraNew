@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     href: '/account',
     locale,
     title: "My TradingNew",
-    description: "Your personal space: workspace, Copilot, learning and purchases.",
+    description: "Your personal space: workspace, Voyager, learning and purchases.",
   });
 }
 

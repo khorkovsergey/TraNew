@@ -8,14 +8,14 @@ import { requestFingerprint } from './session';
 /**
  * Consent records.
  *
- * Each kind is its own record — sharing context with Copilot and sharing it with a
+ * Each kind is its own record — sharing context with Voyager and sharing it with a
  * human expert are different decisions and are never covered by one checkbox.
  * Records are versioned: if the wording of what is being agreed to changes, the old
  * grant stops counting and must be given again.
  */
 
 export type ConsentKind =
-  | 'copilot_context'
+  | 'voyager_context'
   | 'expert_sharing'
   | 'ai_processing'
   | 'marketplace_terms'
@@ -23,7 +23,7 @@ export type ConsentKind =
 
 /** Bump a version when the meaning of the consent changes, not for copy edits. */
 export const CONSENT_VERSION: Record<ConsentKind, number> = {
-  copilot_context: 1,
+  voyager_context: 1,
   expert_sharing: 1,
   ai_processing: 1,
   marketplace_terms: 1,
@@ -31,8 +31,8 @@ export const CONSENT_VERSION: Record<ConsentKind, number> = {
 };
 
 export const CONSENT_TEXT: Record<ConsentKind, string> = {
-  copilot_context:
-    'Copilot may use the items I select from my Wealth Record to answer my questions. It may not use anything I have not selected.',
+  voyager_context:
+    'Voyager may use the items I select from my Wealth Record to answer my questions. It may not use anything I have not selected.',
   expert_sharing:
     'I agree to share the items I selected with this expert, for this consultation only.',
   ai_processing: 'I agree that AI may process my brief to prepare this consultation.',
@@ -134,11 +134,11 @@ export async function revokeConsent(options: {
 }
 
 /**
- * The gate Copilot must pass before touching the wealth record. Returns only the
+ * The gate Voyager must pass before touching the wealth record. Returns only the
  * items explicitly granted, so an un-granted item cannot leak through a wide query.
  */
-export async function copilotAllowedContext(userId: string): Promise<string[]> {
-  const consent = await getConsent(userId, 'copilot_context');
+export async function voyagerAllowedContext(userId: string): Promise<string[]> {
+  const consent = await getConsent(userId, 'voyager_context');
   if (!consent.granted || consent.stale) return [];
   return consent.grants;
 }

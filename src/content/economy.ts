@@ -317,7 +317,7 @@ export const NEWS_CLUSTERS = [
   },
 ];
 
-export const COPILOT_QUESTIONS = [
+export const VOYAGER_QUESTIONS = [
   'Why is inflation falling so slowly?',
   'How could this affect bond prices?',
   'Compare the US and Eurozone economies',
