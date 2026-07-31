@@ -6,6 +6,7 @@ import { TrustLabel } from '@/components/ui/TrustLabel';
 import { INDICATOR, type Tone } from '@/content/economy';
 import { Link } from '@/i18n/navigation';
 import { routing, type Locale } from '@/i18n/routing';
+import { getMacroSeries } from '@/lib/market/client';
 import { pageMetadata } from '@/lib/metadata';
 import styles from '@/components/economy/Economy.module.css';
 import { VoyagerPageContext } from '@/components/voyager/VoyagerProvider';
@@ -62,6 +63,37 @@ export default async function IndicatorPage({ params }: Props) {
   // Only the CPI indicator is authored in full; the rest of the catalogue is planned.
   if (slug !== INDICATOR.slug) notFound();
 
+  /*
+   * CPIAUCSL is the US Consumer Price Index for all urban consumers. FRED
+   * publishes the index level, so the headline figure is the year-over-year
+   * change derived from it — that is what this page's title promises, and the
+   * raw index level would be accurate and meaningless to a reader.
+   */
+  const series = await getMacroSeries('CPIAUCSL');
+
+  const monthOverMonth =
+    series?.previous && series.previous.value !== 0
+      ? ((series.latest.value - series.previous.value) / series.previous.value) * 100
+      : null;
+
+  const stats =
+    series && series.yearOverYear !== null
+      ? [
+          { k: 'YEAR OVER YEAR', v: `${series.yearOverYear.toFixed(1)}%`, tone: 'plain' as const },
+          {
+            k: 'MONTH OVER MONTH',
+            v: monthOverMonth === null ? '—' : `${monthOverMonth.toFixed(2)}%`,
+            tone: 'muted' as const,
+          },
+          { k: 'INDEX LEVEL', v: series.latest.value.toFixed(1), tone: 'muted' as const },
+          { k: 'AS OF', v: series.latest.date, tone: 'muted' as const },
+        ]
+      : INDICATOR.stats;
+
+  const sourceLine = series
+    ? `${series.title} · FRED series CPIAUCSL · updated ${series.asOf.slice(0, 10)}`
+    : 'Reference figures — no macro feed connected';
+
   return (
     <div className={styles.wrap}>
       <VoyagerPageContext context={buildContext('indicator', INDICATOR.name)} />
@@ -82,13 +114,17 @@ export default async function IndicatorPage({ params }: Props) {
       <CountryActions name={INDICATOR.name} />
 
       <div className={styles.statGrid}>
-        {INDICATOR.stats.map((stat) => (
+        {stats.map((stat) => (
           <div className={styles.card} key={stat.k}>
             <div className={styles.statKey}>{stat.k}</div>
             <div className={`${styles.statValue} ${STAT_TONE[stat.tone]} tn-num`}>{stat.v}</div>
           </div>
         ))}
       </div>
+
+      {/* Named source and publication date: a macro figure without them is a
+          claim rather than a measurement. */}
+      <div className={styles.statKey}>{sourceLine}</div>
 
       <div className={styles.grid}>
         <div className={styles.column}>

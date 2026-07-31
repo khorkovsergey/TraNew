@@ -8,6 +8,7 @@ import { SYMBOLS } from '@/content/symbols';
 import { pick } from '@/content/types';
 import { Link } from '@/i18n/navigation';
 import { routing, type Locale } from '@/i18n/routing';
+import { getQuote } from '@/lib/market/client';
 import { pageMetadata } from '@/lib/metadata';
 import { isTicker, TICKERS, type Ticker } from '@/lib/symbolSearch';
 import styles from '@/components/screens/Symbol.module.css';
@@ -56,9 +57,26 @@ export default async function SymbolPage({ params }: Props) {
   const tCommon = await getTranslations('common');
   const name = pick(symbol.name, locale);
 
+  /*
+   * A live quote when the vendor answers, the authored figure when it does not.
+   * The distinction is shown rather than hidden: a delayed price says so, and a
+   * reference figure says that instead of quietly passing for a real one.
+   */
+  const quote = await getQuote(key);
+  const price = quote
+    ? quote.price.toLocaleString('en-GB', { style: 'currency', currency: quote.currency })
+    : symbol.price;
+  const change = quote
+    ? `${quote.changePercent >= 0 ? '+' : ''}${quote.changePercent.toFixed(2)}%`
+    : symbol.change;
+  const up = quote ? quote.changePercent >= 0 : symbol.up;
+  const freshness = quote
+    ? `${quote.exchange} · delayed 15 min · ${quote.asOf}`
+    : 'Reference figure — no live feed connected';
+
   return (
     <div className={styles.wrap}>
-      <VoyagerPageContext context={buildContext('symbol', name, { ticker: key, price: symbol.price, change: symbol.change })} />
+      <VoyagerPageContext context={buildContext('symbol', name, { ticker: key, price, change })} />
       <Link className={styles.backHome} href="/">
         {tCommon('backHome')}
       </Link>
@@ -71,14 +89,16 @@ export default async function SymbolPage({ params }: Props) {
           <h1 className={styles.name}>{name}</h1>
         </div>
         <div className={styles.priceBlock}>
-          <div className={`${styles.price} tn-num`}>{symbol.price}</div>
-          <div className={`${styles.change} ${symbol.up ? styles.up : styles.down} tn-num`}>
-            {symbol.change} {t('today')}
+          <div className={`${styles.price} tn-num`}>{price}</div>
+          <div className={`${styles.change} ${up ? styles.up : styles.down} tn-num`}>
+            {change} {t('today')}
           </div>
+          {/* Where the number came from and how old it is, always. */}
+          <div className={styles.eyebrow}>{freshness}</div>
         </div>
       </div>
 
-      <SymbolActions ticker={symbol.ticker} name={name} price={symbol.price} />
+      <SymbolActions ticker={symbol.ticker} name={name} price={price} />
 
       <div className={styles.grid}>
         <div className={styles.column}>
