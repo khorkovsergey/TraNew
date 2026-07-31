@@ -660,8 +660,16 @@ export function AccountSettings({ plan = 'free' }: { plan?: 'free' | 'premium' |
         <div className={styles.card} style={{ marginTop: 18 }}>
           {getProfileFields().map((field) => (
             <div key={field.label}>
-              <div className={styles.fieldLabel}>{field.label}</div>
-              <input className={styles.field} defaultValue={field.value} />
+              {/* A real label rather than an aria-label: the text is already on
+                  screen, and tying them together also makes it clickable. */}
+              <label className={styles.fieldLabel} htmlFor={`profile-${field.label}`}>
+                {field.label}
+              </label>
+              <input
+                className={styles.field}
+                id={`profile-${field.label}`}
+                defaultValue={field.value}
+              />
             </div>
           ))}
           <button className={styles.primary}>Save changes</button>

@@ -668,12 +668,14 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
                 <input
                   className={styles.field}
                   placeholder="Name — something you will recognise"
+          aria-label="Asset name"
                   value={draft.name}
                   onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 />
                 <input
                   className={styles.field}
                   placeholder="Estimated value"
+          aria-label="Estimated value"
                   inputMode="decimal"
                   value={draft.value}
                   onChange={(e) => setDraft({ ...draft, value: e.target.value })}
@@ -681,12 +683,14 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
                 <input
                   className={styles.field}
                   placeholder="Currency — EUR"
+          aria-label="Currency"
                   value={draft.currency}
                   onChange={(e) => setDraft({ ...draft, currency: e.target.value })}
                 />
                 <input
                   className={styles.field}
                   placeholder="Country (optional)"
+          aria-label="Country"
                   value={draft.country}
                   onChange={(e) => setDraft({ ...draft, country: e.target.value })}
                 />
@@ -700,7 +704,11 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
                 </div>
                 {/* Says what was actually stored: a figure someone typed is manual,
                     and the record will keep saying so until a source confirms it. */}
-                {error && <div className={styles.note}>{error}</div>}
+                {error && (
+                  <div className={styles.note} role="alert">
+                    {error}
+                  </div>
+                )}
                 {saved && <div className={styles.toast}>{ADD_SAVED_TOAST}</div>}
               </>
             )}

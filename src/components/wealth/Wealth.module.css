@@ -420,6 +420,13 @@
   padding: 8px 8px 8px 20px;
   margin-top: 18px;
 }
+/* The input inside strips its own outline, so the ring lives here. Without it a
+   keyboard user has no idea the field is focused. */
+.voyagerField:focus-within {
+  outline: 2px solid var(--tn-blue);
+  outline-offset: 2px;
+}
+
 
 .voyagerInput {
   flex: 1;
@@ -427,7 +434,7 @@
   border: none;
   outline: none;
   background: transparent;
-  font-size: 15px;
+  font-size: 16px;
   padding: 10px 4px;
 }
 
@@ -855,7 +862,7 @@
   border: 1px solid var(--tn-border-input);
   border-radius: 12px;
   padding: 12px 14px;
-  font-size: 14px;
+  font-size: 16px;
   margin-top: 10px;
   background: var(--tn-surface);
 }

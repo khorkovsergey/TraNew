@@ -113,7 +113,7 @@ export function SignInForm({ providers, next }: { providers: SocialProvider[]; n
           onChange={(event) => setPassword(event.target.value)}
         />
 
-        {error && <div className={styles.error}>{error}</div>}
+        {error && <div className={styles.error} role="alert">{error}</div>}
 
         <button className={styles.primary} type="submit" disabled={busy}>
           {busy ? 'Signing in…' : 'Continue'}
@@ -249,7 +249,7 @@ export function SignUpForm({ providers }: { providers: SocialProvider[] }) {
           password with punctuation.
         </div>
 
-        {error && <div className={styles.error}>{error}</div>}
+        {error && <div className={styles.error} role="alert">{error}</div>}
 
         <button className={styles.primary} type="submit" disabled={busy || score === 0}>
           {busy ? 'Creating…' : 'Create account'}
@@ -405,7 +405,7 @@ export function ResetPasswordForm({ token }: { token: string | null }) {
         />
         <div className={styles.hint}>At least 10 characters.</div>
 
-        {error && <div className={styles.error}>{error}</div>}
+        {error && <div className={styles.error} role="alert">{error}</div>}
 
         <button className={styles.primary} type="submit" disabled={busy}>
           {busy ? 'Saving…' : 'Set new password'}

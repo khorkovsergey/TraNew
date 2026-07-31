@@ -38,7 +38,7 @@
   border: 1px solid var(--tn-border-input);
   border-radius: 12px;
   padding: 12px 14px;
-  font-size: 14.5px;
+  font-size: 16px;
   margin-top: 7px;
   background: var(--tn-surface);
 }

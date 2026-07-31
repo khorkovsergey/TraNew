@@ -61,6 +61,7 @@ export function OwnThis({ ticker, name, price }: { ticker: Ticker; name: string;
             <input
               className={styles.field}
               placeholder="Quantity"
+              aria-label="Quantity"
               inputMode="decimal"
               value={quantity}
               onChange={(event) => setQuantity(event.target.value)}
@@ -68,6 +69,7 @@ export function OwnThis({ ticker, name, price }: { ticker: Ticker; name: string;
             <input
               className={styles.field}
               placeholder="Average purchase price"
+              aria-label="Average purchase price"
               inputMode="decimal"
               value={avgPrice}
               onChange={(event) => setAvgPrice(event.target.value)}

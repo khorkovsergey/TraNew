@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#fbfcfe;}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#131722;}
+a{color:#2962ff;text-decoration:none;}
+a:hover{color:#1848d6;}
+</style>
+</helmet>
+<div style="max-width:1080px;margin:0 auto;padding:56px 32px 88px">
+
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#2962ff,#8b5cf6);display:flex;align-items:center;justify-content:center"><span style="color:#ffffff;font-size:18px;font-weight:800;letter-spacing:-0.5px">TN</span></div>
+    <div>
+      <div style="font-size:30px;font-weight:800;letter-spacing:-0.9px">TradingNew Brand Kit</div>
+      <div style="font-size:13.5px;color:#8a93a6;margin-top:2px">v1.0 · July 2026 · Derived from the live product interface</div>
+    </div>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:1.5px;color:#9aa3b5;margin-top:64px">01 — LOGO</div>
+  <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-top:16px">
+    <div style="background:#ffffff;border:1px solid #eceff4;border-radius:18px;padding:36px;display:flex;flex-direction:column;gap:26px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#2962ff,#8b5cf6);display:flex;align-items:center;justify-content:center"><span style="color:#ffffff;font-size:12.5px;font-weight:800">TN</span></div>
+        <span style="font-size:19px;font-weight:800;letter-spacing:-0.3px">TradingNew</span>
+      </div>
+      <div style="display:flex;gap:24px;align-items:center">
+        <div style="width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#2962ff,#8b5cf6);display:flex;align-items:center;justify-content:center"><span style="color:#ffffff;font-size:12.5px;font-weight:800">TN</span></div>
+        <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#2962ff,#8b5cf6);display:flex;align-items:center;justify-content:center"><span style="color:#ffffff;font-size:19px;font-weight:800">TN</span></div>
+        <div style="width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,#2962ff,#8b5cf6);display:flex;align-items:center;justify-content:center"><span style="color:#ffffff;font-size:28px;font-weight:800">TN</span></div>
+      </div>
+      <div style="font-size:12.5px;color:#5a6376;line-height:1.6">Monogram: rounded square (radius ≈ 30% of side), gradient 135° from Blue #2962ff to Violet #8b5cf6, white “TN” at 800 weight (~42% of tile height). Wordmark: Plus Jakarta Sans 800, letter-spacing −0.3px, always #131722 on light surfaces. Clear space: half the tile width on all sides.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="background:#131722;border-radius:18px;padding:26px;display:flex;align-items:center;gap:10px">
+        <div style="width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#2962ff,#8b5cf6);display:flex;align-items:center;justify-content:center"><span style="color:#ffffff;font-size:12.5px;font-weight:800">TN</span></div>
+        <span style="font-size:19px;font-weight:800;letter-spacing:-0.3px;color:#ffffff">TradingNew</span>
+      </div>
+      <div style="background:#ffffff;border:1px solid #eceff4;border-radius:18px;padding:22px">
+        <div style="font-size:12px;font-weight:800;color:#e0492f">Don't</div>
+        <div style="font-size:12.5px;color:#5a6376;line-height:1.7;margin-top:6px">Flat single-color monogram tile · stretch or rotate · wordmark in gradient · monogram without radius · place on busy imagery without a solid backing.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:1.5px;color:#9aa3b5;margin-top:64px">02 — COLOR</div>
+  <div style="font-size:13.5px;color:#5a6376;margin-top:10px;max-width:680px;line-height:1.6">One accent per semantic role. Blue is the only action color; purple belongs exclusively to AI (Voyager) and learning; green/red are reserved for market direction and data labels — never decoration.</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px">
+    <sc-for list="{{ coreColors }}" as="c" hint-placeholder-count="8">
+      <div style="background:#ffffff;border:1px solid #eceff4;border-radius:16px;overflow:hidden">
+        <div style="height:74px;background:{{ c.bg }};display:flex;align-items:flex-end;padding:10px 14px"><span style="font-size:12px;font-weight:800;color:{{ c.chip }};font-family:monospace">{{ c.hex }}</span></div>
+        <div style="padding:12px 14px">
+          <div style="font-size:13px;font-weight:800">{{ c.name }}</div>
+          <div style="font-size:11.5px;color:#8a93a6;margin-top:3px;line-height:1.5">{{ c.use }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:14px">
+    <sc-for list="{{ tintColors }}" as="tc" hint-placeholder-count="6">
+      <div style="border:1px solid #eceff4;border-radius:14px;overflow:hidden">
+        <div style="height:44px;background:{{ tc.bg }}"></div>
+        <div style="padding:9px 12px;background:#ffffff">
+          <div style="font-size:11px;font-weight:800;font-family:monospace">{{ tc.hex }}</div>
+          <div style="font-size:10.5px;color:#8a93a6;margin-top:2px">{{ tc.use }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+    <div style="border-radius:16px;padding:22px;background:linear-gradient(90deg,#8b5cf6,#2962ff)">
+      <div style="font-size:13px;font-weight:800;color:#ffffff">Headline gradient · 90° #8b5cf6 → #2962ff</div>
+      <div style="font-size:11.5px;color:rgba(255,255,255,0.85);margin-top:4px">Text-clip only, one line per screen max (“Invest better.”)</div>
+    </div>
+    <div style="border-radius:16px;padding:22px;background:linear-gradient(135deg,#7c4dff,#2962ff)">
+      <div style="font-size:13px;font-weight:800;color:#ffffff">Voyager gradient · 135° #7c4dff → #2962ff</div>
+      <div style="font-size:11.5px;color:rgba(255,255,255,0.85);margin-top:4px">AI assistant icon and avatar surfaces only</div>
+    </div>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:1.5px;color:#9aa3b5;margin-top:64px">03 — TYPOGRAPHY</div>
+  <div style="background:#ffffff;border:1px solid #eceff4;border-radius:18px;padding:30px 34px;margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px">
+      <span style="font-size:22px;font-weight:800">Plus Jakarta Sans</span>
+      <span style="font-size:12.5px;color:#8a93a6">400 · 500 · 600 · 700 · 800 — Google Fonts · fallback: system-ui</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px;margin-top:26px">
+      <sc-for list="{{ typeScale }}" as="t" hint-placeholder-count="7">
+        <div style="display:grid;grid-template-columns:210px 1fr;gap:20px;align-items:baseline;border-top:1px solid #f6f7fa;padding-top:16px">
+          <div><div style="font-size:12.5px;font-weight:800">{{ t.name }}</div><div style="font-size:11px;color:#9aa3b5;margin-top:3px;font-family:monospace">{{ t.spec }}</div></div>
+          <div style="{{ t.style }}">{{ t.sample }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="background:#f2f4f9;border-radius:12px;padding:14px 18px;margin-top:22px;font-size:12.5px;color:#3a4254;line-height:1.6"><b>Numbers:</b> every price, percentage and metric uses <span style="font-family:monospace">font-variant-numeric: tabular-nums</span>. Market direction is color-coded green/red, never bold-only.</div>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:1.5px;color:#9aa3b5;margin-top:64px">04 — TRUST LABELS</div>
+  <div style="font-size:13.5px;color:#5a6376;margin-top:10px;max-width:680px;line-height:1.6">The signature system of the brand: every content block declares what it is, with source and timestamp. Colors are fixed and non-negotiable.</div>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:16px">
+    <sc-for list="{{ labels }}" as="lb" hint-placeholder-count="7">
+      <div style="display:flex;align-items:center;gap:10px;background:#ffffff;border:1px solid #eceff4;border-radius:14px;padding:12px 16px">
+        <span style="font-size:11px;font-weight:700;background:{{ lb.bg }};color:{{ lb.fg }};border-radius:10px;padding:3px 9px">{{ lb.name }}</span>
+        <span style="font-size:11.5px;color:#8a93a6">{{ lb.use }}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:1.5px;color:#9aa3b5;margin-top:64px">05 — SHAPE, ELEVATION & MOTION</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px">
+    <div style="background:#ffffff;border:1px solid #eceff4;border-radius:18px;padding:24px 28px">
+      <div style="font-size:14px;font-weight:800">Radii</div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-top:12px">
+        <sc-for list="{{ radii }}" as="r" hint-placeholder-count="5">
+          <div style="display:flex;justify-content:space-between;font-size:12.5px"><span style="color:#5a6376">{{ r.k }}</span><span style="font-weight:800;font-family:monospace">{{ r.v }}</span></div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="background:#ffffff;border:1px solid #eceff4;border-radius:18px;padding:24px 28px">
+      <div style="font-size:14px;font-weight:800">Shadows & motion</div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-top:12px">
+        <sc-for list="{{ shadows }}" as="sh" hint-placeholder-count="5">
+          <div style="font-size:12px"><span style="font-weight:800">{{ sh.k }}</span> <span style="color:#8a93a6;font-family:monospace">{{ sh.v }}</span></div>
+        </sc-for>
+      </div>
+      <div style="font-size:12px;color:#5a6376;line-height:1.6;margin-top:12px">Hover lift: translateY(−2px), transition .18s. All motion .15–.3s ease; respect prefers-reduced-motion.</div>
+    </div>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:1.5px;color:#9aa3b5;margin-top:64px">06 — CORE COMPONENTS</div>
+  <div style="background:#ffffff;border:1px solid #eceff4;border-radius:18px;padding:28px 32px;margin-top:16px;display:flex;flex-direction:column;gap:24px">
+    <div>
+      <div style="font-size:12px;font-weight:800;color:#8a93a6">Buttons — pill, 700 weight</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center">
+        <button style="background:#2962ff;color:#ffffff;border:none;border-radius:22px;padding:12px 22px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer" style-hover="background:#1848d6">Primary action</button>
+        <button style="background:#131722;color:#ffffff;border:none;border-radius:22px;padding:12px 22px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer" style-hover="background:#2a3040">Brand / mode</button>
+        <button style="background:#ffffff;color:#131722;border:1px solid #e2e6ee;border-radius:22px;padding:11px 21px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer" style-hover="background:#f4f6fa">Secondary</button>
+        <button style="background:transparent;color:#2962ff;border:1.5px solid #2962ff;border-radius:22px;padding:11px 21px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer" style-hover="background:#eef2ff">Outline</button>
+        <button style="background:#efe9fd;color:#7c4dff;border:none;border-radius:22px;padding:12px 22px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer" style-hover="background:#e3d8fb">Ask Voyager</button>
+        <button style="background:#c3cad8;color:#ffffff;border:none;border-radius:22px;padding:12px 22px;font-family:inherit;font-size:14px;font-weight:700;cursor:default">Disabled</button>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:12px;font-weight:800;color:#8a93a6">Chips & inputs</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center">
+        <span style="background:#ffffff;border:1px solid #e6eaf2;border-radius:18px;padding:8px 16px;font-size:13.5px;font-weight:600">Neutral chip</span>
+        <span style="background:#e8edfd;border-radius:18px;padding:8px 16px;font-size:13.5px;font-weight:700;color:#2962ff">Selected chip</span>
+        <span style="background:#f2f4f9;border-radius:14px;padding:7px 14px;font-size:12.5px;font-weight:600;color:#3a4254">Tag</span>
+        <input placeholder="Input · radius 12–20 · outline #2962ff" style="border:1px solid #e2e6ee;border-radius:14px;padding:11px 16px;font-size:13px;outline-color:#2962ff;background:#fbfcfe;width:260px">
+      </div>
+    </div>
+    <div>
+      <div style="font-size:12px;font-weight:800;color:#8a93a6">Card & data pattern</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px">
+        <div style="border:1px solid #eceff4;border-radius:18px;padding:20px 24px;cursor:pointer;transition:box-shadow .18s,transform .18s" style-hover="box-shadow:0 10px 30px rgba(19,23,34,0.09);transform:translateY(-2px)">
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-size:15px;font-weight:800">Why it moves today</span><span style="font-size:11px;font-weight:700;background:#efe9fd;color:#7c4dff;border-radius:10px;padding:3px 9px">AI explanation</span></div>
+          <div style="font-size:13px;color:#3a4254;line-height:1.6;margin-top:9px">White card, 1px #eceff4 border, radius 18, hover lift. Every claim carries its label and source line.</div>
+          <div style="font-size:11px;color:#9aa3b5;margin-top:9px">Sources: market data 09:45 UTC · Reuters 09:12</div>
+        </div>
+        <div style="border:1px solid #eceff4;border-radius:18px;padding:20px 24px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">Tesla · TSLA</span><span style="font-size:16px;font-weight:800;font-variant-numeric:tabular-nums">$317.42 <span style="font-size:12.5px;color:#1aa966">+2.9%</span></span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-top:12px"><span style="color:#8a93a6">Market cap</span><span style="font-weight:700;font-variant-numeric:tabular-nums">$1.01T</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-top:7px"><span style="color:#8a93a6">P/E (TTM)</span><span style="font-weight:700;font-variant-numeric:tabular-nums">68.4</span></div>
+          <div style="font-size:11px;color:#9aa3b5;margin-top:11px">tabular-nums · green #1aa966 up / red #e0492f down</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;letter-spacing:1.5px;color:#9aa3b5;margin-top:64px">07 — VOICE & PRINCIPLES</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px">
+    <sc-for list="{{ voice }}" as="v" hint-placeholder-count="6">
+      <div style="background:#ffffff;border:1px solid #eceff4;border-radius:16px;padding:20px 24px">
+        <div style="font-size:13.5px;font-weight:800">{{ v.k }}</div>
+        <div style="font-size:12.5px;color:#5a6376;line-height:1.65;margin-top:6px">{{ v.v }}</div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+    <div style="background:#e3f6ec;border-radius:16px;padding:18px 22px">
+      <div style="font-size:12.5px;font-weight:800;color:#0e6e44">Say</div>
+      <div style="font-size:12.5px;color:#2b6a4d;line-height:1.7;margin-top:6px">“may remain a headwind” · “options to explore” · “research plan” · “signals describe behaviour” · “decisions are yours”</div>
+    </div>
+    <div style="background:#fdeee3;border-radius:16px;padding:18px 22px">
+      <div style="font-size:12.5px;font-weight:800;color:#b0430e">Never say</div>
+      <div style="font-size:12.5px;color:#8f4a1e;line-height:1.7;margin-top:6px">“guaranteed returns” · “you should buy” · “will definitely rise” · “start trading now” · urgency or FOMO of any kind</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1180}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      coreColors: [
+        { name: 'Ink', hex: '#131722', bg: '#131722', chip: '#ffffff', use: 'Headings, body text, dark buttons, brand pill' },
+        { name: 'Action Blue', hex: '#2962ff', bg: '#2962ff', chip: '#ffffff', use: 'CTAs, links, selection, active states — the only action color' },
+        { name: 'Voyager Purple', hex: '#7c4dff', bg: '#7c4dff', chip: '#ffffff', use: 'AI assistant, Academy, learning — never for generic CTAs' },
+        { name: 'Data Green', hex: '#1aa966', bg: '#1aa966', chip: '#ffffff', use: 'Positive change, market data label, success' },
+        { name: 'Alert Red', hex: '#e0492f', bg: '#e0492f', chip: '#ffffff', use: 'Negative change, destructive actions, risk states' },
+        { name: 'Signal Amber', hex: '#b07708', bg: '#b07708', chip: '#ffffff', use: 'Community opinion label, warnings, held states' },
+        { name: 'Text Secondary', hex: '#5a6376', bg: '#5a6376', chip: '#ffffff', use: 'Subtitles, descriptions; muted: #8a93a6 / #9aa3b5' },
+        { name: 'Canvas', hex: '#fbfcfe', bg: '#fbfcfe', chip: '#131722', use: 'Page background; hero gradient #eef1fb → #fbfcfe' }
+      ],
+      tintColors: [
+        { hex: '#e8edfd', bg: '#e8edfd', use: 'Blue tint — selection' },
+        { hex: '#efe9fd', bg: '#efe9fd', use: 'Purple tint — AI blocks' },
+        { hex: '#e3f6ec', bg: '#e3f6ec', use: 'Green tint — data/success' },
+        { hex: '#fdeee3', bg: '#fdeee3', use: 'Red tint — risk' },
+        { hex: '#fdf3e3', bg: '#fdf3e3', use: 'Amber tint — opinion' },
+        { hex: '#f2f4f9', bg: '#f2f4f9', use: 'Neutral chips, sections' }
+      ],
+      typeScale: [
+        { name: 'Hero H1', spec: '68 / 800 / −2.5px / 1.08', style: 'font-size:44px;font-weight:800;letter-spacing:-1.6px;line-height:1.08', sample: 'Know more. Invest better.' },
+        { name: 'Page H1', spec: '30–40 / 800 / −0.8…−1.2px', style: 'font-size:32px;font-weight:800;letter-spacing:-0.9px', sample: 'Understand what is moving the economy' },
+        { name: 'Section H2', spec: '26–30 / 800', style: 'font-size:26px;font-weight:800;letter-spacing:-0.6px', sample: 'How would you like to get started?' },
+        { name: 'Card title', spec: '16–20 / 700–800', style: 'font-size:17px;font-weight:800', sample: 'Why it moves today' },
+        { name: 'Body', spec: '13.5–15 / 400–600 / 1.55–1.7', style: 'font-size:14px;color:#3a4254;line-height:1.65', sample: 'Learn, research and compare investments with the tools trusted by millions.' },
+        { name: 'Meta / caption', spec: '11–12.5 / 600–700', style: 'font-size:12px;color:#8a93a6;font-weight:600', sample: 'Sources: market data 09:45 UTC · Updated 2 min ago' },
+        { name: 'Overline', spec: '11.5 / 700 / +1px / uppercase', style: 'font-size:11.5px;font-weight:700;letter-spacing:1px;color:#9aa3b5', sample: 'RESEARCH WORKSPACE' }
+      ],
+      labels: [
+        { name: 'Market data', bg: '#e3f6ec', fg: '#1aa966', use: 'Verifiable data + source + timestamp' },
+        { name: 'Fact', bg: '#e3f6ec', fg: '#1aa966', use: 'Confirmed news facts' },
+        { name: 'AI explanation', bg: '#efe9fd', fg: '#7c4dff', use: 'Voyager-generated, grounded in cited sources' },
+        { name: 'Technical signal', bg: '#e8edfd', fg: '#2962ff', use: 'Price behaviour — never a recommendation' },
+        { name: 'Analysis', bg: '#e8edfd', fg: '#2962ff', use: 'Editorial / analyst interpretation' },
+        { name: 'Community opinion', bg: '#fdf3e3', fg: '#b07708', use: 'Author-disclosed views, idea status shown' },
+        { name: 'Sponsored', bg: '#f0f2f7', fg: '#8a93a6', use: 'Always labelled, never mixed into ranking' }
+      ],
+      radii: [
+        { k: 'Cards', v: '18px' }, { k: 'Feature showcases', v: '26px' }, { k: 'Buttons (pill)', v: '20–24px' },
+        { k: 'Chips / tags', v: '13–18px' }, { k: 'Option rows / inputs', v: '12–14px' }, { k: 'Search bar (hero)', v: '36px' }, { k: 'Label pills', v: '8–10px' }
+      ],
+      shadows: [
+        { k: 'Card hover', v: '0 10px 30px rgba(19,23,34,.09)' },
+        { k: 'Dropdown', v: '0 18px 50px rgba(19,23,34,.14)' },
+        { k: 'Modal', v: '0 24px 70px rgba(19,23,34,.25)' },
+        { k: 'Hero search', v: '0 6px 24px rgba(41,98,255,.09)' },
+        { k: 'Voyager pill', v: '0 10px 30px rgba(19,23,34,.28)' }
+      ],
+      voice: [
+        { k: 'Trust-first', v: 'Every content block declares its type, source and update time. Facts, signals, opinions and ads are never mixed.' },
+        { k: 'Value-first', v: 'Registration is asked only to save something — never as a gate. Upgrades are contextual, never banners or locks.' },
+        { k: 'Probabilistic language', v: 'The product describes what may happen and what the data shows — it never predicts or instructs.' },
+        { k: 'Calm, precise, adult', v: 'No hype, no emoji, no urgency. Short sentences. Numbers speak; adjectives stay quiet.' },
+        { k: 'Progressive complexity', v: 'Simple / Standard / Pro are views of one product. The interface grows with the user, never talks down.' },
+        { k: 'One accent per meaning', v: 'Blue acts, purple assists, green/red measure, amber flags opinion. A color never moonlights in another role.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

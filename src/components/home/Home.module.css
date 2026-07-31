@@ -126,6 +126,13 @@
   padding: 8px 8px 8px 24px;
   box-shadow: var(--tn-shadow-search);
 }
+/* The input inside strips its own outline, so the ring lives here. Without it a
+   keyboard user has no idea the field is focused. */
+.search:focus-within {
+  outline: 2px solid var(--tn-blue);
+  outline-offset: 2px;
+}
+
 
 .searchIcon {
   color: var(--tn-text-faint);
@@ -136,6 +143,8 @@
   flex: 1;
   min-width: 0;
   border: none;
+  /* The ring moves to the wrapper below rather than disappearing: an input with
+     no outline and no replacement is invisible to anyone navigating by keyboard. */
   outline: none;
   font-size: 16.5px;
   background: transparent;
