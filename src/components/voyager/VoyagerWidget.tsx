@@ -10,6 +10,7 @@ import type {
   VoyagerTier,
 } from '@/lib/voyager/types';
 import { routeFor } from './actionRoutes';
+import { VoyagerMark } from './VoyagerMark';
 import { useVoyagerContext } from './VoyagerProvider';
 import styles from './Voyager.module.css';
 
@@ -48,24 +49,6 @@ const STARTERS = [
   { label: 'Tell me what you want to achieve', question: 'I want to plan my investments' },
 ];
 
-function Star({ small }: { small?: boolean }) {
-  return (
-    <span className={`${styles.star} ${small ? styles.starSmall : ''}`} aria-hidden="true">
-      <svg
-        width={small ? 13 : 14}
-        height={small ? 13 : 14}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#ffffff"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
-      </svg>
-    </span>
-  );
-}
 
 export function VoyagerWidget() {
   const context = useVoyagerContext();
@@ -218,7 +201,7 @@ export function VoyagerWidget() {
   if (mode === 'collapsed') {
     return (
       <button className={styles.pill} onClick={() => setMode('peek')}>
-        <Star />
+        <VoyagerMark size={28} className={styles.mark} />
         <span className={styles.pillLabel}>{context.prompt}</span>
       </button>
     );
@@ -236,7 +219,7 @@ export function VoyagerWidget() {
         />
         <div className={styles.peek}>
           <div className={styles.peekHead}>
-            <Star small />
+            <VoyagerMark size={26} className={styles.mark} />
             <span className={styles.nameSmall}>Voyager</span>
             <span className={styles.tier} style={tierStyle}>
               {state?.tierLabel ?? 'Voyager Basic'}
@@ -269,7 +252,7 @@ export function VoyagerWidget() {
       aria-label="Voyager assistant"
     >
       <div className={styles.head}>
-        <Star />
+        <VoyagerMark size={28} className={styles.mark} />
         <span className={styles.name}>Voyager</span>
         <span className={styles.tier} style={tierStyle}>
           {state?.tierLabel ?? 'Voyager Basic'}

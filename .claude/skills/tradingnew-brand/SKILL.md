@@ -44,10 +44,28 @@ grep -rlE "#[0-9a-fA-F]{6}" src --include=*.css
 | Gradient | Value | Used for, and only for |
 |---|---|---|
 | Headline | `90°  #8b5cf6 → #2962ff` (`--tn-gradient-headline`) | Text-clip on a headline. **One line per screen, maximum.** |
-| Voyager | `135° #7c4dff → #2962ff` | The AI assistant's star icon and avatar surfaces |
+| Voyager | `#7c4dff → #2962ff`, left to right | The eyes of the Voyager orb, and nothing else |
 | Logo tile | `135° #2962ff → #8b5cf6` (`--tn-gradient-logo`) | The TN monogram tile |
 
 A gradient on a button, a card, or a second headline in the same view is wrong.
+
+## The Voyager mark
+
+A pearl orb with two arched eyes, rendered by `components/voyager/VoyagerMark.tsx`
+— never re-drawn by hand and never replaced with an emoji or a stock avatar.
+
+The brand gradient runs through the **eyes**, left purple to right blue. The body
+is near-white with its own shading: a highlight at the upper left and a crescent
+of shade at the lower right. That is what gives it volume, because the mark sits
+on white panels and on the near-black pill and an inline SVG cannot know which.
+
+**Don't:** put a halo or outer glow behind it — as a gradient ring it reads as a
+bloom on white and as a grey donut on dark · fill the orb with the gradient · give
+it open eyes, pupils or a mouth · draw the eyes at even stroke width below 34px,
+where they vanish.
+
+It replaced a gradient tile with a white star in July 2026. Anything still showing
+the star is stale.
 
 ## Logo
 
