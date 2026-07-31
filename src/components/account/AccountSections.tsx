@@ -14,6 +14,7 @@ import {
   WORKSPACE_TABS,
 } from '@/content/account';
 import { Link } from '@/i18n/navigation';
+import type { ActivityView, WorkspaceView } from '@/lib/data/accountView';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import {
   getActivity,
@@ -123,20 +124,15 @@ export function AccountOverview() {
 
 /* --------------------------------------------------------------- Workspace */
 
-export function AccountWorkspace() {
+export function AccountWorkspace({ data }: { data: WorkspaceView }) {
   const [tab, setTab] = useState<(typeof WORKSPACE_TABS)[number]['id']>('collections');
   const [savedFilter, setSavedFilter] = useState('All');
-  const [extraCollections, setExtraCollections] = useState(0);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
   const [deleted, setDeleted] = useState<Record<string, boolean>>({});
 
-  const collections = [
-    ...getCollections(),
-    ...Array.from({ length: extraCollections }, (_, index) => ({
-      name: `New collection ${index + 1}`,
-      meta: '0 items · just created · Private',
-    })),
-  ];
+  const collections = data.collections;
+  const saved =
+    savedFilter === 'All' ? data.saved : data.saved.filter((item) => item.type === savedFilter);
 
   return (
     <>
@@ -160,18 +156,21 @@ export function AccountWorkspace() {
         <>
           <div className={styles.grid3}>
             {collections.map((collection) => (
-              <div className={styles.card} key={collection.name}>
+              <div className={styles.card} key={collection.id}>
                 <div className={styles.cardTitle}>{collection.name}</div>
                 <div className={styles.itemMeta}>{collection.meta}</div>
               </div>
             ))}
           </div>
-          <button
-            className={styles.primary}
-            onClick={() => setExtraCollections((value) => value + 1)}
-          >
-            + Create collection
-          </button>
+          {collections.length === 0 && (
+            <div className={styles.note}>
+              No collections yet. Save something from a symbol, country or research page and group
+              it here.
+            </div>
+          )}
+          <Link className={styles.primary} href="/explore">
+            Find something to save
+          </Link>
           <div className={styles.note}>{COLLECTIONS_NOTE}</div>
         </>
       )}
@@ -190,8 +189,8 @@ export function AccountWorkspace() {
             ))}
           </div>
           <div className={styles.stack}>
-            {getSavedItems(savedFilter).map((item) => (
-              <div className={styles.row} key={item.title}>
+            {saved.map((item) => (
+              <div className={styles.row} key={item.id}>
                 <span>
                   <span className={styles.typeChip}>{item.type}</span>
                   <span className={styles.itemTitle}>{item.title}</span>
@@ -259,19 +258,21 @@ export function AccountWorkspace() {
 
       {tab === 'alerts' && (
         <div className={styles.stack}>
-          {getAlerts()
+          {data.alerts
             .filter((alert) => !deleted[alert.id])
             .map((alert) => {
-              const isPaused = paused[alert.id];
+              // A draft has never been switched on; pausing is a separate state.
+              const isDraft = alert.status === 'draft';
+              const isPaused = paused[alert.id] || alert.status === 'paused';
               return (
                 <div className={styles.row} key={alert.id}>
                   <span>
                     <span
                       className={`${styles.typeChip} ${
-                        isPaused ? styles.statusPaused : styles.statusActive
+                        isPaused || isDraft ? styles.statusPaused : styles.statusActive
                       }`}
                     >
-                      {isPaused ? 'Paused' : 'Active'}
+                      {isDraft ? 'Draft' : isPaused ? 'Paused' : 'Active'}
                     </span>
                     <span className={styles.itemTitle}>{alert.name}</span>
                     {/* Delivery channel lives in the meta line, per the design. */}
@@ -465,8 +466,9 @@ export function AccountVoyager() {
 
 /* ---------------------------------------------------------------- Activity */
 
-export function AccountActivity() {
+export function AccountActivity({ data }: { data: ActivityView }) {
   const [filter, setFilter] = useState('All');
+  const entries = filter === 'All' ? data.entries : data.entries.filter((e) => e.type === filter);
 
   return (
     <>
@@ -485,8 +487,8 @@ export function AccountActivity() {
       </div>
 
       <div className={styles.stack}>
-        {getActivity(filter).map((event) => (
-          <div className={styles.row} key={event.title}>
+        {entries.map((event) => (
+          <div className={styles.row} key={event.id}>
             <span>
               <span className={styles.typeChip}>{event.type}</span>
               <span className={styles.itemTitle}>{event.title}</span>
@@ -495,6 +497,13 @@ export function AccountActivity() {
           </div>
         ))}
       </div>
+
+      {data.empty && (
+        <div className={styles.note}>
+          Nothing here yet. Your activity appears as you save things, ask Voyager and work through
+          Academy — and it is yours to clear at any time.
+        </div>
+      )}
 
       <div className={styles.note}>{ACTIVITY_NOTE}</div>
     </>

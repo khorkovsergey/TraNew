@@ -4,6 +4,7 @@ import { AccountLayout } from '@/components/account/AccountLayout';
 import { AccountWorkspace } from '@/components/account/AccountSections';
 import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
+import { getWorkspaceView } from '@/lib/data/accountView';
 import { requireUser } from '@/lib/session';
 
 type Props = { params: Promise<{ locale: Locale }> };
@@ -24,11 +25,12 @@ export default async function Page({ params }: Props) {
   setRequestLocale(locale);
 
   // Middleware only checks that a cookie exists; this is the real gate.
-  await requireUser();
+  const user = await requireUser();
+  const data = await getWorkspaceView(user.id);
 
   return (
     <AccountLayout>
-      <AccountWorkspace />
+      <AccountWorkspace data={data} />
     </AccountLayout>
   );
 }
