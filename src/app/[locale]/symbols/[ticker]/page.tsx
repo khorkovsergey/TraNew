@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { EconomicDrivers, loadEconomicDrivers } from '@/components/economy/EconomicDrivers';
 import { SymbolActions } from '@/components/screens/SymbolActions';
 import { Icon } from '@/components/ui/Icon';
 import { TrustLabel } from '@/components/ui/TrustLabel';
@@ -62,7 +63,21 @@ export default async function SymbolPage({ params }: Props) {
    * The distinction is shown rather than hidden: a delayed price says so, and a
    * reference figure says that instead of quietly passing for a real one.
    */
+  /*
+   * Which macro forces to show. Mapped from the ticker rather than inferred from
+   * price history: a correlation computed over a handful of symbols would look
+   * precise and mean nothing.
+   */
+  const DRIVER_GROUP = {
+    TSLA: 'consumer',
+    NVDA: 'tech',
+    SPX: 'index',
+    GOLD: 'commodity',
+    BTC: 'commodity',
+  } as const;
+
   const quote = await getQuote(key);
+  const drivers = await loadEconomicDrivers(DRIVER_GROUP[key]);
   const price = quote
     ? quote.price.toLocaleString('en-GB', { style: 'currency', currency: quote.currency })
     : symbol.price;
@@ -173,6 +188,10 @@ export default async function SymbolPage({ params }: Props) {
               ))}
             </div>
           </section>
+
+          {/* Path from an asset into the macro data that moves it, with the asset
+              still in context. */}
+          <EconomicDrivers drivers={drivers} assetName={name} />
 
           <section className={styles.nextCard}>
             <h2 className={styles.cardTitleSmall}>{t('nextTitle')}</h2>
