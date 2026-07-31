@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { WealthScreen } from '@/components/wealth/WealthScreen';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
-import { recordAccess } from '@/lib/audit';
+import { getWealthRecord, type DataStatus as ServiceStatus } from '@/lib/data/wealth';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { pageMetadata } from '@/lib/metadata';
 import { requireUser } from '@/lib/session';
@@ -35,8 +35,48 @@ export default async function WealthPage({ params }: Props) {
   if (!FEATURE_FLAGS.wealthHubEnabled) notFound();
 
   const user = await requireUser('/account/wealth');
-  // Opening the hub is itself an access to financial data and is logged as one.
-  await recordAccess({ userId: user.id, action: 'read', resource: 'wealth_overview' });
+  // getWealthRecord logs the read itself — opening the hub is an access to
+  // financial data and is recorded as one, once rather than per table.
+  const record = await getWealthRecord(user.id);
+
+  /*
+   * The service and the screen name freshness differently. Mapping here rather
+   * than renaming either side keeps the storage vocabulary ('live', 'stale') apart
+   * from the one people read on screen.
+   */
+  const STATUS: Record<ServiceStatus, 'connected' | 'manual' | 'estimated' | 'outdated'> = {
+    live: 'connected',
+    manual: 'manual',
+    estimated: 'estimated',
+    stale: 'outdated',
+  };
+
+  const CATEGORY_LABEL: Record<string, string> = {
+    property: 'Property',
+    securities: 'Securities',
+    cash: 'Cash & Deposits',
+    deposit: 'Cash & Deposits',
+    business: 'Business',
+    crypto: 'Crypto',
+    other: 'Other',
+  };
+
+  const assets = record.assets.map((asset) => ({
+    id: asset.id,
+    category: CATEGORY_LABEL[asset.category] ?? 'Other',
+    name: asset.name,
+    value:
+      asset.value === null
+        ? '—'
+        : asset.value.toLocaleString('en-GB', { style: 'currency', currency: asset.currency }),
+    currency: asset.currency,
+    status: STATUS[asset.dataStatus],
+    sub:
+      asset.details ??
+      [asset.country, asset.source, asset.valuedAt ? `valued ${asset.valuedAt.toLocaleDateString('en-GB')}` : null]
+        .filter(Boolean)
+        .join(' · '),
+  }));
 
   return (
     <div className={styles.wrap}>
@@ -45,7 +85,7 @@ export default async function WealthPage({ params }: Props) {
         ← My TradingNew
       </Link>
 
-      <WealthScreen />
+      <WealthScreen assets={assets} />
     </div>
   );
 }

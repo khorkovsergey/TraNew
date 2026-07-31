@@ -139,7 +139,9 @@ export function AccountWorkspace({ data }: { data: WorkspaceView }) {
       <h1 className={styles.h1}>My Workspace</h1>
 
       <div className={styles.tabs} role="tablist">
-        {WORKSPACE_TABS.map((item) => (
+        {WORKSPACE_TABS.filter(
+          (item) => item.id !== 'alerts' || FEATURE_FLAGS.alertsEnabled
+        ).map((item) => (
           <button
             key={item.id}
             role="tab"

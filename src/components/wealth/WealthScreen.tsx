@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { addAssetAction } from '@/app/actions/wealth';
 import { useLoginModal } from '@/components/shell/LoginModalProvider';
 import { Icon } from '@/components/ui/Icon';
 import {
@@ -10,9 +11,7 @@ import {
   ADD_HOW,
   ADD_SAVED_TOAST,
   ADD_WHAT,
-  ASSETS,
   ASSETS_NOTE,
-  ASSETS_TOTAL,
   ATTENTION,
   DATA_SOURCES,
   DATA_STATUS_LABEL,
@@ -63,19 +62,43 @@ const TONE: Record<string, string> = {
   info: styles.info,
 };
 
+/** Matches the categories the wealth service accepts. */
+const ASSET_CATEGORIES = [
+  { id: 'property', label: 'Property' },
+  { id: 'securities', label: 'Securities' },
+  { id: 'cash', label: 'Cash' },
+  { id: 'deposit', label: 'Deposit' },
+  { id: 'business', label: 'Business' },
+  { id: 'crypto', label: 'Crypto' },
+  { id: 'other', label: 'Other' },
+];
+
 const STATE_CLASS = {
   good: styles.stateGood,
   warn: styles.stateWarn,
   bad: styles.stateBad,
 };
 
-export function WealthScreen() {
+export type WealthAssetView = {
+  id: string;
+  category: string;
+  name: string;
+  /** Pre-formatted for display; the raw number stays on the server. */
+  value: string;
+  currency: string;
+  /** Freshness of the figure, so a stale estimate never reads as a live price. */
+  status: DataStatus;
+  sub: string;
+};
+
+export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
   const router = useRouter();
   const { openLogin } = useLoginModal();
 
-  /**
-   * Wealth state is in-memory only. It is deliberately not persisted to
-   * localStorage — a net-worth breakdown is not something to leave lying around in
+  /*
+   * The record itself comes from the server, encrypted at rest and decrypted per
+   * request. Only view state lives here — and it is still never written to
+   * localStorage: a net-worth breakdown is not something to leave lying around in
    * browser storage on a shared machine.
    */
   const [tab, setTab] = useState<WealthTab>('overview');
@@ -85,6 +108,35 @@ export function WealthScreen() {
   const [addStage, setAddStage] = useState<'what' | 'how' | 'manual' | 'voyager'>('what');
   const [saved, setSaved] = useState(false);
   const [question, setQuestion] = useState('');
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState({
+    category: 'property',
+    name: '',
+    value: '',
+    currency: 'EUR',
+    country: '',
+  });
+
+  const onSaveAsset = () =>
+    startTransition(async () => {
+      setError(null);
+      const result = await addAssetAction(draft);
+
+      if (result.status === 'sign_in_required') {
+        openLogin();
+        return;
+      }
+      if (result.status === 'invalid') {
+        setError(result.message);
+        return;
+      }
+
+      setSaved(true);
+      setDraft({ category: 'property', name: '', value: '', currency: 'EUR', country: '' });
+      // The server re-renders the record; this brings the new row onto the page.
+      router.refresh();
+    });
 
   const goTarget = (target: (typeof ATTENTION)[number]['target']) => {
     if (target.assetId) {
@@ -107,9 +159,19 @@ export function WealthScreen() {
     router.push({ pathname: '/research', query: { q: question } });
   };
 
-  const grouped = ASSETS.reduce<Record<string, typeof ASSETS>>((acc, asset) => {
+  // The demo constant is gone from this path: an empty record shows an empty
+  // record. Filling it with someone else's sample assets would be the same lie the
+  // mocks told, just with a database behind it.
+  const grouped = assets.reduce<Record<string, WealthAssetView[]>>((acc, asset) => {
     (acc[asset.category] ??= []).push(asset);
     return acc;
+  }, {});
+
+  const totalsByCurrency = assets.reduce<Record<string, number>>((totals, asset) => {
+    const amount = Number(asset.value.replace(/[^\d.-]/g, ''));
+    if (!Number.isFinite(amount)) return totals;
+    totals[asset.currency] = (totals[asset.currency] ?? 0) + amount;
+    return totals;
   }, {});
 
   return (
@@ -311,48 +373,41 @@ export function WealthScreen() {
             {Object.entries(grouped).map(([category, rows]) => (
               <div key={category}>
                 <div className={styles.assetGroup}>{category}</div>
-                {rows.map((asset) =>
-                  asset.hasDetail ? (
-                    <Link
-                      className={`${styles.assetRow} ${styles.assetRowLink}`}
-                      key={asset.id}
-                      href={{
-                        pathname: '/account/wealth/assets/[id]',
-                        params: { id: asset.id },
-                      }}
-                    >
-                      <span>
-                        <span className={styles.assetName}>{asset.name}</span>
-                        <span className={styles.assetSub}>{asset.sub}</span>
+                {rows.map((asset) => (
+                  <div className={styles.assetRow} key={asset.id}>
+                    <span>
+                      <span className={styles.assetName}>{asset.name}</span>
+                      <span className={styles.assetSub}>{asset.sub}</span>
+                    </span>
+                    <span className={styles.assetRight}>
+                      <span className={`${styles.assetValue} tn-num`}>{asset.value}</span>
+                      {/* Every figure states how it was obtained. A typed estimate
+                          and a connected price are both useful and are not the
+                          same kind of number. */}
+                      <span className={`${styles.statusChip} ${STATUS_CLASS[asset.status]}`}>
+                        {DATA_STATUS_LABEL[asset.status]}
                       </span>
-                      <span className={styles.assetRight}>
-                        <span className={`${styles.assetValue} tn-num`}>{asset.value}</span>
-                        <span className={`${styles.statusChip} ${STATUS_CLASS[asset.status]}`}>
-                          {DATA_STATUS_LABEL[asset.status]}
-                        </span>
-                      </span>
-                    </Link>
-                  ) : (
-                    <div className={styles.assetRow} key={asset.id}>
-                      <span>
-                        <span className={styles.assetName}>{asset.name}</span>
-                        <span className={styles.assetSub}>{asset.sub}</span>
-                      </span>
-                      <span className={styles.assetRight}>
-                        <span className={`${styles.assetValue} tn-num`}>{asset.value}</span>
-                        <span className={`${styles.statusChip} ${STATUS_CLASS[asset.status]}`}>
-                          {DATA_STATUS_LABEL[asset.status]}
-                        </span>
-                      </span>
-                    </div>
-                  )
-                )}
+                    </span>
+                  </div>
+                ))}
               </div>
             ))}
-            <div className={styles.total}>
-              <span>Total</span>
-              <span className="tn-num">{ASSETS_TOTAL}</span>
-            </div>
+            {assets.length === 0 && (
+              <div className={styles.note}>
+                Your record is empty. Add what you own — a property, a deposit, a holding — and
+                this becomes a picture of your capital that only you can read.
+              </div>
+            )}
+            {/* Totals stay split by currency. Summing across them needs a rate, and
+                a rate applied silently turns an estimate into what looks like a fact. */}
+            {Object.entries(totalsByCurrency).map(([currency, amount]) => (
+              <div className={styles.total} key={currency}>
+                <span>Total ({currency})</span>
+                <span className="tn-num">
+                  {amount.toLocaleString('en-GB', { style: 'currency', currency })}
+                </span>
+              </div>
+            ))}
             <div className={styles.note}>{ASSETS_NOTE}</div>
           </>
         )}
@@ -596,19 +651,56 @@ export function WealthScreen() {
             {addStage === 'manual' && (
               <>
                 <h2 className={styles.sectionTitle} style={{ marginTop: 0 }}>
-                  Add a property
+                  Add an asset
                 </h2>
-                {MANUAL_FIELDS.map((field) => (
-                  <input className={styles.field} key={field} placeholder={field} />
-                ))}
+                <select
+                  className={styles.field}
+                  value={draft.category}
+                  onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+                  aria-label="Asset type"
+                >
+                  {ASSET_CATEGORIES.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className={styles.field}
+                  placeholder="Name — something you will recognise"
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                />
+                <input
+                  className={styles.field}
+                  placeholder="Estimated value"
+                  inputMode="decimal"
+                  value={draft.value}
+                  onChange={(e) => setDraft({ ...draft, value: e.target.value })}
+                />
+                <input
+                  className={styles.field}
+                  placeholder="Currency — EUR"
+                  value={draft.currency}
+                  onChange={(e) => setDraft({ ...draft, currency: e.target.value })}
+                />
+                <input
+                  className={styles.field}
+                  placeholder="Country (optional)"
+                  value={draft.country}
+                  onChange={(e) => setDraft({ ...draft, country: e.target.value })}
+                />
                 <div className={styles.quickActions}>
-                  <button className={styles.primary} onClick={() => setSaved(true)}>
-                    Save to my Wealth Record
+                  <button className={styles.primary} onClick={onSaveAsset} disabled={pending}>
+                    {pending ? 'Saving…' : 'Save to my Wealth Record'}
                   </button>
                   <button className={styles.ghost} onClick={() => setAddStage('how')}>
                     Back
                   </button>
                 </div>
+                {/* Says what was actually stored: a figure someone typed is manual,
+                    and the record will keep saying so until a source confirms it. */}
+                {error && <div className={styles.note}>{error}</div>}
                 {saved && <div className={styles.toast}>{ADD_SAVED_TOAST}</div>}
               </>
             )}

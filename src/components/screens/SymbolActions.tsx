@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { draftAlertAction, isSavedAction, toggleSavedAction } from '@/app/actions/saved';
 import { useLoginModal } from '@/components/shell/LoginModalProvider';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { Link } from '@/i18n/navigation';
 import type { Ticker } from '@/lib/symbolSearch';
 import { OwnThis } from './OwnThis';
@@ -88,11 +89,13 @@ export function SymbolActions({
         {saved ? 'In your watchlist' : t('watchlist')}
       </button>
 
-      {/* Says "drafted", not "created": the alert is not watching anything until
-          it is switched on in the workspace. */}
-      <button className={styles.action} onClick={onAlert} disabled={pending || alerted}>
-        {alerted ? 'Alert drafted' : t('alert')}
-      </button>
+      {/* Hidden until a live price feed exists. Says "drafted", not "created":
+          even then the alert is not watching anything until it is switched on. */}
+      {FEATURE_FLAGS.alertsEnabled && (
+        <button className={styles.action} onClick={onAlert} disabled={pending || alerted}>
+          {alerted ? 'Alert drafted' : t('alert')}
+        </button>
+      )}
 
       <Link
         className={`${styles.action} ${styles.actionAi}`}
