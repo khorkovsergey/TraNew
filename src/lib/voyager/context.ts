@@ -103,7 +103,9 @@ const TEMPLATES: Record<VoyagerScreen, Template> = {
   },
   generic: {
     subject: 'TradingNew',
-    prompt: 'Ask Voyager',
+    // Screenshot 01: with no page subject to name, the pill carries the product
+    // name. Contextual prompts ('Ask about Tesla') are unchanged.
+    prompt: 'Voyager AI',
     quick: [
       'What can I do on this page?',
       'How do I start investing?',

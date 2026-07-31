@@ -203,7 +203,7 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
             className={`${styles.ghost} ${styles.ghostAi}`}
             href={{ pathname: '/research', query: { q: 'Review my capital structure' } }}
           >
-            Ask Voyager
+            Voyager AI
           </Link>
         </div>
       </div>

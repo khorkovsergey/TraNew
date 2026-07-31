@@ -139,7 +139,7 @@
   "news": {
     "whyItMatters": "Why it matters:",
     "openChart": "Open chart",
-    "askVoyager": "Ask Voyager"
+    "askVoyager": "Voyager AI"
   },
   "ideas": {
     "statusActive": "Active",
@@ -188,7 +188,7 @@
     },
     "actions": {
       "explain": "Explain this move",
-      "voyager": "Ask Voyager",
+      "voyager": "Voyager AI",
       "news": "Related news",
       "events": "Important events",
       "compare": "Compare",
@@ -550,7 +550,7 @@
       "compare": "Compare",
       "watchlist": "Add to watchlist",
       "alert": "Create alert",
-      "voyager": "Ask Voyager"
+      "voyager": "Voyager AI"
     },
     "next": {
       "competitors": "View competitors",

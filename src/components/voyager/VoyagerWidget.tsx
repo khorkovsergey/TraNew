@@ -10,7 +10,7 @@ import type {
   VoyagerTier,
 } from '@/lib/voyager/types';
 import { routeFor } from './actionRoutes';
-import { VoyagerMark } from './VoyagerMark';
+import { VoyagerOrb, VoyagerWordmark } from './VoyagerOrb';
 import { useVoyagerContext } from './VoyagerProvider';
 import styles from './Voyager.module.css';
 
@@ -201,7 +201,7 @@ export function VoyagerWidget() {
   if (mode === 'collapsed') {
     return (
       <button className={styles.pill} onClick={() => setMode('peek')}>
-        <VoyagerMark size={28} className={styles.mark} />
+        <VoyagerOrb size={26} className={styles.mark} />
         <span className={styles.pillLabel}>{context.prompt}</span>
       </button>
     );
@@ -219,8 +219,8 @@ export function VoyagerWidget() {
         />
         <div className={styles.peek}>
           <div className={styles.peekHead}>
-            <VoyagerMark size={26} className={styles.mark} />
-            <span className={styles.nameSmall}>Voyager</span>
+            <VoyagerOrb size={24} className={styles.mark} />
+            <VoyagerWordmark className={styles.nameSmall} />
             <span className={styles.tier} style={tierStyle}>
               {state?.tierLabel ?? 'Voyager Basic'}
             </span>
@@ -252,8 +252,8 @@ export function VoyagerWidget() {
       aria-label="Voyager assistant"
     >
       <div className={styles.head}>
-        <VoyagerMark size={28} className={styles.mark} />
-        <span className={styles.name}>Voyager</span>
+        <VoyagerOrb size={26} className={styles.mark} />
+        <VoyagerWordmark className={styles.name} />
         <span className={styles.tier} style={tierStyle}>
           {state?.tierLabel ?? 'Voyager Basic'}
         </span>

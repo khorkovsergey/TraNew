@@ -300,7 +300,7 @@ export function EconomyScreen() {
           </div>
 
           <div className={styles.voyager}>
-            <div className={styles.voyagerTitle}>Ask Voyager about the economy</div>
+            <div className={styles.voyagerTitle}>Voyager AI: ask about the economy</div>
             <div className={styles.chips} style={{ marginTop: 14 }}>
               {VOYAGER_QUESTIONS.map((question) => (
                 <Link

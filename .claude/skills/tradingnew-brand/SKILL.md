@@ -44,28 +44,50 @@ grep -rlE "#[0-9a-fA-F]{6}" src --include=*.css
 | Gradient | Value | Used for, and only for |
 |---|---|---|
 | Headline | `90°  #8b5cf6 → #2962ff` (`--tn-gradient-headline`) | Text-clip on a headline. **One line per screen, maximum.** |
-| Voyager | `#7c4dff → #2962ff`, left to right | The eyes of the Voyager orb, and nothing else |
+| Voyager | `90° #8b5cf6 → #2962ff` | The orb's eyes and the Voyager wordmark, nothing else |
 | Logo tile | `135° #2962ff → #8b5cf6` (`--tn-gradient-logo`) | The TN monogram tile |
 
 A gradient on a button, a card, or a second headline in the same view is wrong.
 
-## The Voyager mark
+## Voyager identity — Brand Kit section 07
 
-A pearl orb with two arched eyes, rendered by `components/voyager/VoyagerMark.tsx`
-— never re-drawn by hand and never replaced with an emoji or a stock avatar.
+The assistant is a character: **a soft white orb with gradient smiling eyes**.
+Friendly and calm, never anthropomorphised past the eyes — no mouth, no limbs, no
+emotion beyond attentive warmth.
 
-The brand gradient runs through the **eyes**, left purple to right blue. The body
-is near-white with its own shading: a highlight at the upper left and a crescent
-of shade at the lower right. That is what gives it volume, because the mark sits
-on white panels and on the near-black pill and an inline SVG cannot know which.
+Rendered by `components/voyager/VoyagerOrb.tsx`. Never re-drawn by hand, never
+replaced with an emoji or a stock avatar.
 
-**Don't:** put a halo or outer glow behind it — as a gradient ring it reads as a
-bloom on white and as a grey donut on dark · fill the orb with the gradient · give
-it open eyes, pupils or a mouth · draw the eyes at even stroke width below 34px,
-where they vanish.
+| Part | Specification |
+|---|---|
+| Body | `radial-gradient(circle at 35% 30%, #ffffff 0%, #f2f3f8 55%, #dde1ec 100%)` |
+| Inner shading | `inset -2px -3px 5px rgba(120,130,160,0.28)` and `inset 2px 3px 5px rgba(255,255,255,0.9)` |
+| Drop shadow | `0 2px 6px rgba(19,23,34,0.22)` |
+| Eyes | Two ∩-arcs, round caps, stroke **≈10% of the orb diameter**, one gradient across both |
+| Wordmark | Plus Jakarta Sans 800, same 90° gradient, `background-clip: text` |
 
-It replaced a gradient tile with a white star in July 2026. Anything still showing
-the star is stale.
+Shadow values are authored for a 26px orb and **scale with the size**, so a large
+orb keeps the same weight of shading rather than a hairline.
+
+Sizes in the UI: **26px** on the collapsed pill and the panel header, **24px** in
+peek. The Brand Kit shows 88 / 48 / 34 / 26.
+
+**Don't:** add a mouth or extra features · use a flat solid circle · recolour the
+eyes outside the gradient · replace the orb with a star, spark or robot · animate
+emotions — a bounce is out, a single blink on load is acceptable · put a halo
+behind it, which reads as a bloom on white and a grey donut on the dark pill.
+
+For marketing use a 3D render (matte ceramic, studio light). The CSS version is for
+UI only.
+
+## "Voyager AI" is the button label
+
+Buttons that open the assistant from a page read **"Voyager AI"** — symbol,
+Supercharts, Economy, country, indicator, Wealth Hub, News. The Economy block is
+headed "Voyager AI: ask about the economy".
+
+Tier names (Voyager Basic / Personal / Private), the account section and the pill's
+contextual prompt ("Ask about Tesla") are unchanged.
 
 ## Logo
 

@@ -26,7 +26,7 @@ export function CountryActions({ name }: { name: string }) {
         className={`${styles.action} ${styles.actionAi}`}
         href={{ pathname: '/research', query: { q: `What is happening in the ${name} economy?` } }}
       >
-        Ask Voyager
+        Voyager AI
       </Link>
     </div>
   );
