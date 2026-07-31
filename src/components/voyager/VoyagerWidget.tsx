@@ -10,6 +10,8 @@ import type {
   VoyagerTier,
 } from '@/lib/voyager/types';
 import { routeFor } from './actionRoutes';
+import { hasSeenIntro, markIntroSeen } from '@/lib/voyager/introSeen';
+import { VoyagerIntro } from './VoyagerIntro';
 import { VoyagerOrb, VoyagerWordmark } from './VoyagerOrb';
 import { useVoyagerContext } from './VoyagerProvider';
 import styles from './Voyager.module.css';
@@ -35,6 +37,7 @@ type State = {
   remaining: number | null;
   signedIn: boolean;
   personalization: boolean | null;
+  introSeen: boolean;
 };
 
 const TIER_STYLE: Record<VoyagerTier, { background: string; color: string }> = {
@@ -54,7 +57,7 @@ export function VoyagerWidget() {
   const context = useVoyagerContext();
   const router = useRouter();
 
-  const [mode, setMode] = useState<'collapsed' | 'peek' | 'panel'>('collapsed');
+  const [mode, setMode] = useState<'collapsed' | 'intro' | 'peek' | 'panel'>('collapsed');
   const [full, setFull] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -196,11 +199,33 @@ export function VoyagerWidget() {
   const tierStyle = TIER_STYLE[state?.tier ?? 'basic'];
   const firstRun = turns.length === 0;
 
+  /* ------------------------------------------------------------------ Intro */
+
+  if (mode === 'intro') {
+    return (
+      <VoyagerIntro
+        onFinish={() => {
+          markIntroSeen();
+          // Straight into the conversation, which is what they clicked for.
+          setMode('panel');
+        }}
+      />
+    );
+  }
+
   /* -------------------------------------------------------------- Collapsed */
 
   if (mode === 'collapsed') {
     return (
-      <button className={styles.pill} onClick={() => setMode('peek')}>
+      <button
+        className={styles.pill}
+        onClick={() => {
+          // First open plays the introduction, then hands over to the assistant.
+          // hasSeenIntro reads localStorage, so a returning visitor never sees a
+          // flash of video while a network check resolves.
+          setMode(hasSeenIntro() || state?.introSeen ? 'peek' : 'intro');
+        }}
+      >
         <VoyagerOrb size={26} className={styles.mark} />
         <span className={styles.pillLabel}>{context.prompt}</span>
       </button>

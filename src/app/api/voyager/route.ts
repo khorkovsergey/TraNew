@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { recordAccess } from '@/lib/audit';
 import { getConsent } from '@/lib/consent';
+import { getPreferences } from '@/lib/data/profile';
 import { getSession, type AuthedUser, type PlanId } from '@/lib/session';
 import { askVoyager, isModelConfigured } from '@/lib/voyager/orchestrator';
 import {
@@ -82,6 +83,9 @@ export async function GET(request: NextRequest) {
     personalization
   );
   const usage = await peekUsage(user?.id ?? null, tier);
+  // Carried so a second device does not replay the introduction. The client still
+  // decides from localStorage first — this only fills the gap for a new browser.
+  const introSeen = user ? (await getPreferences(user.id))['voyager.intro_seen'] === true : false;
 
   return NextResponse.json({
     tier,
@@ -92,6 +96,7 @@ export async function GET(request: NextRequest) {
     signedIn: Boolean(user),
     /** null until the person has answered the personalization question. */
     personalization: user ? personalization : null,
+    introSeen,
     modelConfigured: isModelConfigured(),
   });
 }
