@@ -110,10 +110,19 @@
 
 /* ---- Dropdown shell ---- */
 
+/*
+ * Below the header (40), not above it.
+ *
+ * At 45 the scrim covered the nav, so pressing the open item again never reached
+ * the button — the click landed on the scrim. The menu still closed, which is why
+ * it looked like it worked, but the only way to dismiss it was to click somewhere
+ * off to the side. Under the header, the trigger toggles and the scrim catches
+ * everything else.
+ */
 .scrim {
   position: fixed;
   inset: 0;
-  z-index: 45;
+  z-index: 35;
 }
 
 .panel {
