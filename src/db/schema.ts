@@ -237,6 +237,391 @@ export const dataAccessLog = pgTable(
   ]
 );
 
+/* ============================================================================
+ * The user object model
+ *
+ * Everything below hangs off a user and is the reason the sections stop being
+ * separate screens. Two rules run through it:
+ *
+ * - **One saved-object table, not one per section.** A symbol saved from Explore,
+ *   referenced by an alert and attached to an expert brief is the *same* row. A
+ *   per-section table would give three copies that drift apart, which is exactly
+ *   the "sections don't know about each other" problem.
+ * - **Encrypt what is sensitive, leave queryable what is not.** Values, names and
+ *   free text are ciphertext; kinds, ids and timestamps stay in the clear so the
+ *   database can still filter and join. Encrypting a `kind` column would buy
+ *   nothing and make the feature impossible to build.
+ * ========================================================================== */
+
+/* ----------------------------------------------------------------- Profile */
+
+/**
+ * Who the person is as an investor, separate from the auth record.
+ *
+ * better-auth owns `user`; anything we would want to change without touching the
+ * authentication row lives here, so a schema change on our side never risks the
+ * table that guards sign-in.
+ */
+export const profile = pgTable(
+  'profile',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    displayName: text('display_name'),
+    /** IANA zone; drives how release times and market hours are shown. */
+    timezone: text('timezone'),
+    baseCurrency: text('base_currency').$defaultFn(() => 'EUR').notNull(),
+    /** beginner | standard | pro — set by the Academy diagnostic, editable after. */
+    experience: text('experience').$defaultFn(() => 'beginner').notNull(),
+    /** Free text the person wrote about what they are trying to achieve. */
+    goalsEnc: text('goals_enc'),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [uniqueIndex('profile_user_idx').on(table.userId)]
+);
+
+/* ------------------------------------------------------------- Preferences */
+
+/**
+ * Settings the person toggles: notification channels, privacy, display.
+ *
+ * A key/value table rather than a wide column list, because settings screens grow
+ * constantly and a migration per toggle is friction that ends with toggles living
+ * in localStorage again.
+ */
+export const preference = pgTable(
+  'preference',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    /** Dotted key, e.g. `notifications.market_alerts` or `privacy.public_profile`. */
+    key: text('key').notNull(),
+    value: jsonb('value').$type<string | number | boolean | string[]>().notNull(),
+
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [uniqueIndex('preference_user_key_idx').on(table.userId, table.key)]
+);
+
+/* ------------------------------------------------------------ Subscription */
+
+/**
+ * Billing history. `user.plan` stays the fast entitlement check; this is the
+ * record of how it got that way, which a plan column cannot answer.
+ */
+export const subscription = pgTable(
+  'subscription',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    plan: text('plan').notNull(),
+    /** active | past_due | cancelled | expired */
+    status: text('status').notNull(),
+    /** monthly | yearly | lifetime */
+    interval: text('interval'),
+    priceCents: integer('price_cents'),
+    currency: text('currency').$defaultFn(() => 'EUR').notNull(),
+
+    startedAt: timestamp('started_at').$defaultFn(() => new Date()).notNull(),
+    renewsAt: timestamp('renews_at'),
+    cancelledAt: timestamp('cancelled_at'),
+
+    /** Reference at the payment provider. Never a card number. */
+    externalRef: text('external_ref'),
+  },
+  (table) => [index('subscription_user_idx').on(table.userId, table.startedAt)]
+);
+
+/* --------------------------------------------------------- Voyager memory */
+
+/**
+ * What Voyager is allowed to remember between sessions.
+ *
+ * Every row is individually visible and deletable in the account, which is the
+ * whole point: memory a person cannot inspect is memory they cannot trust. The
+ * content is encrypted because it describes their finances and intentions.
+ */
+export const voyagerMemory = pgTable(
+  'voyager_memory',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    /** goal | preference | holding | constraint | fact */
+    kind: text('kind').notNull(),
+    contentEnc: text('content_enc').notNull(),
+    /** Where it came from, so the person can see why Voyager believes it. */
+    sourceEvent: text('source_event'),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+    /** Soft delete: forgetting is an event worth keeping in the audit trail. */
+    forgottenAt: timestamp('forgotten_at'),
+  },
+  (table) => [index('voyager_memory_user_idx').on(table.userId, table.createdAt)]
+);
+
+/* ----------------------------------------------------- Saved objects */
+
+/**
+ * The join between sections.
+ *
+ * `kind` + `ref` identifies the thing (a ticker, a lesson slug, an expert id); a
+ * saved symbol is one row that Workspace lists, an alert points at, and an expert
+ * brief can attach. This is what makes the sections aware of each other.
+ */
+export const savedObject = pgTable(
+  'saved_object',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    /** symbol | country | news | research | chart | expert | lesson | screener | idea */
+    kind: text('kind').notNull(),
+    /** Stable identifier within the kind: "TSLA", "us-cpi", "exp_014". */
+    ref: text('ref').notNull(),
+    /** Denormalised for listing without fetching every source. */
+    title: text('title').notNull(),
+    subtitle: text('subtitle'),
+
+    /** The person's own note — their words about their money, so encrypted. */
+    noteEnc: text('note_enc'),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [
+    // Saving the same thing twice is a no-op rather than a duplicate row.
+    uniqueIndex('saved_object_user_kind_ref_idx').on(table.userId, table.kind, table.ref),
+    index('saved_object_user_created_idx').on(table.userId, table.createdAt),
+  ]
+);
+
+/* -------------------------------------------------------------- Collections */
+
+export const collection = pgTable(
+  'collection',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    name: text('name').notNull(),
+    description: text('description'),
+    /** Sharing is opt-in per collection, never account-wide. */
+    isPublic: boolean('is_public').$defaultFn(() => false).notNull(),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [index('collection_user_idx').on(table.userId, table.createdAt)]
+);
+
+export const collectionItem = pgTable(
+  'collection_item',
+  {
+    id: text('id').primaryKey(),
+    collectionId: text('collection_id')
+      .notNull()
+      .references(() => collection.id, { onDelete: 'cascade' }),
+    savedObjectId: text('saved_object_id')
+      .notNull()
+      .references(() => savedObject.id, { onDelete: 'cascade' }),
+
+    position: integer('position').$defaultFn(() => 0).notNull(),
+    addedAt: timestamp('added_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [
+    uniqueIndex('collection_item_idx').on(table.collectionId, table.savedObjectId),
+  ]
+);
+
+/* ------------------------------------------------------------------ Alerts */
+
+export const alert = pgTable(
+  'alert',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    /** Optional link to the saved object it watches, so deleting one cleans up. */
+    savedObjectId: text('saved_object_id').references(() => savedObject.id, {
+      onDelete: 'set null',
+    }),
+
+    /** price | percent_move | indicator_release | news | earnings */
+    kind: text('kind').notNull(),
+    /** What it watches: a ticker, an indicator slug. */
+    ref: text('ref').notNull(),
+    label: text('label').notNull(),
+    /** Threshold and comparison, shape depending on kind. */
+    condition: jsonb('condition').$type<Record<string, string | number>>(),
+
+    /** in_app | email | push, as chosen per alert. */
+    channels: jsonb('channels').$type<string[]>(),
+
+    /** draft | active | paused | triggered */
+    status: text('status').$defaultFn(() => 'draft').notNull(),
+    lastTriggeredAt: timestamp('last_triggered_at'),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [index('alert_user_idx').on(table.userId, table.status)]
+);
+
+/* --------------------------------------------------------------- Purchases */
+
+export const purchase = pgTable(
+  'purchase',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    /** subscription | consultation | report | course */
+    kind: text('kind').notNull(),
+    title: text('title').notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    currency: text('currency').$defaultFn(() => 'EUR').notNull(),
+    /** paid | pending | refunded | failed */
+    status: text('status').notNull(),
+
+    /** Provider reference for reconciliation. Never card details. */
+    externalRef: text('external_ref'),
+    invoiceUrl: text('invoice_url'),
+
+    purchasedAt: timestamp('purchased_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [index('purchase_user_idx').on(table.userId, table.purchasedAt)]
+);
+
+/* --------------------------------------------------------- Expert bookings */
+
+/**
+ * A consultation from intake to outcome.
+ *
+ * The intake brief describes someone's finances in their own words, so it is
+ * encrypted. `sharedContext` records which context blocks they approved — the
+ * expert-facing counterpart of the consent record, kept here so a booking can be
+ * audited on its own terms.
+ */
+export const expertBooking = pgTable(
+  'expert_booking',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    expertRef: text('expert_ref').notNull(),
+    packageRef: text('package_ref'),
+
+    /** draft | slot_held | payment_pending | confirmed | completed | cancelled | refunded | no_show | disputed */
+    status: text('status').$defaultFn(() => 'draft').notNull(),
+
+    briefEnc: text('brief_enc'),
+    /** Ids of the context blocks the person explicitly approved sharing. */
+    sharedContext: jsonb('shared_context').$type<string[]>(),
+
+    slotAt: timestamp('slot_at'),
+    /** A held slot that is never paid for must expire, not linger. */
+    holdExpiresAt: timestamp('hold_expires_at'),
+
+    purchaseId: text('purchase_id').references(() => purchase.id, { onDelete: 'set null' }),
+    rating: integer('rating'),
+    summaryEnc: text('summary_enc'),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [index('expert_booking_user_idx').on(table.userId, table.createdAt)]
+);
+
+/* -------------------------------------------------------- Academy progress */
+
+/**
+ * Learning progress, one row per user.
+ *
+ * A single row rather than an event table: the Academy flow reads the whole state
+ * on every screen, and splitting it would mean a join on every render for data
+ * that is only ever used together.
+ */
+export const academyProgress = pgTable(
+  'academy_progress',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    /** landing | diagnostic | path | dashboard | lesson | done */
+    stage: text('stage').$defaultFn(() => 'landing').notNull(),
+    mode: text('mode').$defaultFn(() => 'beginner').notNull(),
+    /** Diagnostic answers: five lists of option ids. */
+    diagnostic: jsonb('diagnostic').$type<string[][]>(),
+    diagnosticStep: integer('diagnostic_step').$defaultFn(() => 0).notNull(),
+    pathReady: boolean('path_ready').$defaultFn(() => false).notNull(),
+
+    /** Slugs of completed lessons, in completion order. */
+    lessonsDone: jsonb('lessons_done').$type<string[]>(),
+    /** Glossary terms the person opened — feeds "explain differently" in Voyager. */
+    termsSeen: jsonb('terms_seen').$type<string[]>(),
+    questionsAsked: integer('questions_asked').$defaultFn(() => 0).notNull(),
+    completed: boolean('completed').$defaultFn(() => false).notNull(),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [uniqueIndex('academy_progress_user_idx').on(table.userId)]
+);
+
+/* ---------------------------------------------------------------- Activity */
+
+/**
+ * What the person did — the product feed behind the Activity tab.
+ *
+ * Deliberately *not* the same table as `dataAccessLog`. That one answers "who
+ * touched financial data", is written for compliance and must stay small enough to
+ * read line by line. Mixing "viewed a chart" into it would bury the entries that
+ * matter. Two logs, two jobs.
+ */
+export const activity = pgTable(
+  'activity',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    /** viewed | saved | asked | learned | alert | booking | purchase | wealth */
+    type: text('type').notNull(),
+    title: text('title').notNull(),
+    /** Where it happened, so the entry can link back. */
+    kind: text('kind'),
+    ref: text('ref'),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [index('activity_user_idx').on(table.userId, table.createdAt)]
+);
+
 /* ------------------------------------------------------------ Voyager usage */
 
 /**
