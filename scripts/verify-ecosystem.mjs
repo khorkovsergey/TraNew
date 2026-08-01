@@ -37,9 +37,15 @@ async function trackX(page) {
   });
 }
 
-/** Which card index is currently centred, read from the position of the track. */
+/** Which slot on the strip is centred, read from the position of the track. */
 function posFrom(x) {
   return Math.round((-x - OFFSET) / PITCH);
+}
+
+/** The real card behind that slot — the strip is padded with two clones in front. */
+const LEAD = 2;
+function cardFrom(x) {
+  return posFrom(x) - LEAD;
 }
 
 async function activeTitle(page) {
@@ -66,8 +72,30 @@ try {
   check('seven titles', (await page.locator('[role="tab"]').count()) === 7);
   check('seven dots', (await page.locator('[aria-current]').count()) === 7);
   check(
-    'eight cards on the track (seven plus the clone)',
-    (await page.locator('[aria-roledescription="carousel"] > div > div').count()) === 8
+    'eleven cards on the track (seven plus two clones each side)',
+    (await page.locator('[aria-roledescription="carousel"] > div > div').count()) === 11
+  );
+
+  /*
+   * The property the whole wrap rests on, and the one that was broken: the strip
+   * either side of a reset must be identical three cards wide, not one. If only
+   * the centre matches, the reset swaps what peeks from the left and right edges
+   * and reads as a jolt even though nothing moved.
+   */
+  console.log('\nThe seam');
+  const strip = await page
+    .locator('[aria-roledescription="carousel"] > div > div h3')
+    .allInnerTexts();
+  const window3 = (i) => strip.slice(i - 1, i + 2).join(' | ');
+  check(
+    'forward reset keeps all three visible cards',
+    window3(9) === window3(2),
+    `${window3(9)}  ≠  ${window3(2)}`
+  );
+  check(
+    'backward reset keeps all three visible cards',
+    window3(1) === window3(8),
+    `${window3(1)}  ≠  ${window3(8)}`
   );
 
   console.log('\nThe three replaced blocks are gone');
@@ -79,31 +107,32 @@ try {
 
   console.log('\nNext');
   const start = await trackX(page);
-  check('starts on card 1', posFrom(start) === 0, `pos ${posFrom(start)}`);
+  check('starts on card 1', cardFrom(start) === 0, `card ${cardFrom(start)}`);
   await page.getByLabel('Next', { exact: true }).click();
   await settle(page);
-  check('next moves one card', posFrom(await trackX(page)) === 1);
+  check('next moves one card', cardFrom(await trackX(page)) === 1);
   check('title follows', (await activeTitle(page)) === 'Market Intelligence');
 
   console.log('\nPrev');
   await page.getByLabel('Previous', { exact: true }).click();
   await settle(page);
-  check('prev moves back', posFrom(await trackX(page)) === 0);
+  check('prev moves back', cardFrom(await trackX(page)) === 0);
   check('title follows back', (await activeTitle(page)) === 'AI Voyager');
 
   console.log('\nDots and titles');
   await page.getByRole('tab', { name: 'Wealth Hub' }).click();
   await settle(page);
-  check('a title jumps to its card', posFrom(await trackX(page)) === 4);
+  check('a title jumps to its card', cardFrom(await trackX(page)) === 4);
   await page.locator('[aria-label="Show Academy"][aria-current]').click();
   await settle(page);
-  check('a dot jumps to its card', posFrom(await trackX(page)) === 5);
+  check('a dot jumps to its card', cardFrom(await trackX(page)) === 5);
   check('active dot is wide', (await page.locator('[aria-current="true"]').boundingBox()).width > 20);
 
   console.log('\nClicking a neighbour');
-  await page.locator('[aria-roledescription="carousel"] > div > div').nth(6).click();
+  await page.locator('[aria-roledescription="carousel"] > div > div').nth(8).click();
   await settle(page);
-  check('an off-centre card centres itself', posFrom(await trackX(page)) === 6);
+  check('an off-centre card centres itself', cardFrom(await trackX(page)) === 6);
+  check('and its title follows', (await activeTitle(page)) === 'Marketplace');
 
   console.log('\nWrap forwards');
   check('sitting on the last card', (await activeTitle(page)) === 'Marketplace');
@@ -131,14 +160,14 @@ try {
   // Read from the rendered transform, so this is where the slide actually
   // arrived, not where it was aimed.
   const arrived = resetAt > 0 ? posFrom(samples[resetAt - 1].x) : null;
-  check('the slide arrives on the clone', arrived === 7, `pos ${arrived}`);
+  check('the slide arrives on the clone', arrived === LEAD + 7, `slot ${arrived}`);
 
   check(
     'the reset waits for the slide to finish',
     reset && reset.at >= slide,
     reset ? `reset at ${reset.at}ms, slide is ${slide}ms` : 'no reset seen'
   );
-  check('lands silently back on card 1', posFrom(await trackX(page)) === 0);
+  check('lands silently back on card 1', cardFrom(await trackX(page)) === 0);
   check('title is card 1', (await activeTitle(page)) === 'AI Voyager');
   check(
     'transition is live again after the reset',
@@ -148,10 +177,84 @@ try {
     })
   );
 
+  /*
+   * And the check that actually answers the question, by looking at the screen
+   * rather than at the numbers behind it: nothing visible may change once the
+   * slide has finished.
+   *
+   * Compared at an eighth scale on purpose. A byte comparison fails on every
+   * run, because moving the track 5,642px makes the compositor re-rasterise and
+   * the text antialiasing lands a fraction differently — 69% of pixels identical,
+   * the rest ±1 to 3 along glyph edges, invisible at 1×. Downscaling averages
+   * that away while leaving any real change, such as a neighbouring card
+   * swapping for a different one, plainly visible.
+   */
+  console.log('\nThe reset is invisible');
+  await page.getByRole('tab', { name: 'Marketplace' }).click();
+  await settle(page);
+  const view = page.locator('[aria-roledescription="carousel"]');
+  await view.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+
+  const frames = [];
+  const from = Date.now();
+  await page.getByLabel('Next', { exact: true }).click();
+  while (Date.now() - from < 1300) {
+    const at = Date.now() - from;
+    if (at > slide + 20) frames.push((await view.screenshot()).toString('base64'));
+  }
+
+  const drift = async (a, b) =>
+    page.evaluate(async ([one, two]) => {
+      const load = (b64) =>
+        new Promise((done) => {
+          const img = new Image();
+          img.onload = () => done(img);
+          img.src = `data:image/png;base64,${b64}`;
+        });
+      const [first, second] = await Promise.all([load(one), load(two)]);
+      const small = (img) => {
+        const c = document.createElement('canvas');
+        c.width = Math.ceil(img.width / 8);
+        c.height = Math.ceil(img.height / 8);
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        return ctx.getImageData(0, 0, c.width, c.height).data;
+      };
+      const [x, y] = [small(first), small(second)];
+      let total = 0;
+      for (let i = 0; i < x.length; i += 4) {
+        total += Math.abs(x[i] - y[i]) + Math.abs(x[i + 1] - y[i + 1]) + Math.abs(x[i + 2] - y[i + 2]);
+      }
+      return total / (x.length / 4);
+    }, [a, b]);
+
+  let worst = 0;
+  for (let i = 1; i < frames.length; i += 1) {
+    worst = Math.max(worst, await drift(frames[i - 1], frames[i]));
+  }
+  check(
+    'no frame changes after the slide ends',
+    frames.length >= 3 && worst < 1,
+    `${frames.length} frames, worst drift ${worst.toFixed(2)}`
+  );
+  console.log(`       (${frames.length} frames, worst drift ${worst.toFixed(2)})`);
+
+  // The same measure against a genuinely different card, so a threshold of 1
+  // is known to mean something rather than being unfalsifiable.
+  await page.getByRole('tab', { name: 'Wealth Hub' }).click();
+  await settle(page);
+  const elsewhere = (await view.screenshot()).toString('base64');
+  const real = await drift(frames[0], elsewhere);
+  check('a real change would register', real > 10, `drift ${real.toFixed(1)}`);
+  console.log(`       (drift against a different card: ${real.toFixed(1)})`);
+
   console.log('\nWrap backwards');
+  await page.getByRole('tab', { name: 'AI Voyager' }).click();
+  await settle(page);
   await page.getByLabel('Previous', { exact: true }).click();
   await page.waitForTimeout(1200);
-  check('prev from card 1 reaches the last card', posFrom(await trackX(page)) === 6);
+  check('prev from card 1 reaches the last card', cardFrom(await trackX(page)) === 6);
   check('title is the last card', (await activeTitle(page)) === 'Marketplace');
 
   console.log('\nNavigation is locked mid-wrap');
@@ -160,7 +263,7 @@ try {
   await page.getByLabel('Previous', { exact: true }).click();
   await page.getByLabel('Previous', { exact: true }).click(); // ignored — wrap in flight
   await page.waitForTimeout(1200);
-  check('a second click during the wrap is ignored', posFrom(await trackX(page)) === 6);
+  check('a second click during the wrap is ignored', cardFrom(await trackX(page)) === 6);
 
   console.log('\nCTAs');
   await page.locator('[aria-label="Show AI Voyager"][aria-current]').click();
@@ -212,7 +315,7 @@ try {
   await small.locator('#ecosystem-title').scrollIntoViewIfNeeded();
   await small.waitForTimeout(400);
 
-  const card = small.locator('[aria-roledescription="carousel"] > div > div').first();
+  const card = small.locator('[aria-roledescription="carousel"] > div > div[aria-hidden="false"]');
   const cardBox = await card.boundingBox();
   check('the card fits the screen', cardBox.width <= 390, `${cardBox.width}px wide`);
 

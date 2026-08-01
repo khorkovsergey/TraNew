@@ -10,42 +10,61 @@ import styles from './Ecosystem.module.css';
 /**
  * The ecosystem carousel — seven cards, one centred, its neighbours peeking.
  *
- * The interesting part is the wrap. A track that stops at the last card announces
- * its own ends, so the seventh card is followed by a clone of the first: Next
- * animates onto the clone and the position is then reset to the real first card
- * with the transition switched off, which the eye cannot separate from a normal
- * step. Prev from the first card does the same in reverse — jump to the clone with
- * no animation, then animate back to the seventh.
+ * The wrap is the whole problem. A track that stops at the last card announces
+ * its own ends, so the strip is padded with clones and the position is quietly
+ * reset once a slide has carried it into them.
  *
- * Two details make it seamless rather than nearly seamless. The transition has to
- * be killed on the cards as well as the track, because the opacity/scale crossfade
- * between clone and original gives away a seam the position never revealed. And
- * navigation is locked while it happens: a second click mid-reset lands on a
- * position that is about to be thrown away.
+ * Two clones on each side, not one. With a single trailing clone the position
+ * reset is invisible but the *neighbours* are not: standing on the clone of card
+ * one, Marketplace peeks from the left and nothing peeks from the right, and the
+ * moment the reset lands that swaps to nothing on the left and Market
+ * Intelligence on the right. The centre never moves, and it still reads as a
+ * jolt, because the eye is watching the edges. Padding with the last two cards
+ * and the first two makes both peeks identical either side of the reset, so
+ * there is nothing left to notice.
+ *
+ * That also removes the special case that used to make Prev worse than Next: it
+ * no longer has to jump to a clone before it can animate. Both directions are
+ * now an ordinary slide, and the reset happens afterwards, off-screen in every
+ * sense that matters.
+ *
+ * Navigation is locked during that window. The clones give two cards of runway,
+ * so the lock is not what keeps the position in range — it is what stops a
+ * queued click from being applied to a position that is about to be replaced.
  */
 
 const COUNT = ECOSYSTEM.length;
-const CLONE = COUNT;
+/** Clones of the last two cards sit in front, so real card i lives at i + LEAD. */
+const LEAD = 2;
+const FIRST = LEAD;
+const LAST = LEAD + COUNT - 1;
+
 /**
  * Longer than `--slide` in the stylesheet, so the silent reset always lands after
  * the animation has finished. Reset it too early and the jump becomes visible —
- * which is the one thing the clone exists to prevent.
+ * which is the one thing the clones exist to prevent.
  */
 const WRAP_AFTER = 680;
 
-const CARDS = [...ECOSYSTEM, ECOSYSTEM[0]];
+const CARDS = [
+  ECOSYSTEM[COUNT - 2],
+  ECOSYSTEM[COUNT - 1],
+  ...ECOSYSTEM,
+  ECOSYSTEM[0],
+  ECOSYSTEM[1],
+];
 
 export function Ecosystem() {
-  const [pos, setPos] = useState(0);
+  const [pos, setPos] = useState(FIRST);
   const [animated, setAnimated] = useState(true);
 
   const locked = useRef(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const frames = useRef<number[]>([]);
   /* Read outside render, by callbacks that run frames apart from it. */
-  const posRef = useRef(0);
+  const posRef = useRef(FIRST);
 
-  const active = pos % COUNT;
+  const active = (((pos - LEAD) % COUNT) + COUNT) % COUNT;
 
   useEffect(
     () => () => {
@@ -77,21 +96,24 @@ export function Ecosystem() {
     setPos(value);
   };
 
-  const next = useCallback(() => {
+  /**
+   * Slide one card, and if that lands on a clone, quietly step back onto the real
+   * card wearing the same face once the slide has finished. Both the position and
+   * its two neighbours are identical across that step, so there is nothing to see.
+   */
+  const step = useCallback((delta: 1 | -1) => {
     if (locked.current) return;
+
     setAnimated(true);
+    const target = posRef.current + delta;
+    move(target);
 
-    if (posRef.current < CLONE - 1) {
-      move(posRef.current + 1);
-      return;
-    }
+    if (target >= FIRST && target <= LAST) return;
 
-    // Onto the clone, then quietly back to the real card underneath it.
     locked.current = true;
-    move(CLONE);
     later(() => {
       setAnimated(false);
-      move(0);
+      move(target - delta * COUNT);
       afterPaint(() => {
         setAnimated(true);
         locked.current = false;
@@ -99,33 +121,13 @@ export function Ecosystem() {
     }, WRAP_AFTER);
   }, []);
 
-  const prev = useCallback(() => {
-    if (locked.current) return;
-
-    if (posRef.current > 0) {
-      setAnimated(true);
-      move(posRef.current - 1);
-      return;
-    }
-
-    // Standing on the first card there is nothing to its left, so the identical
-    // clone is slid under the pointer first and the animation runs from there.
-    locked.current = true;
-    setAnimated(false);
-    move(CLONE);
-    afterPaint(() => {
-      setAnimated(true);
-      move(CLONE - 1);
-      later(() => {
-        locked.current = false;
-      }, WRAP_AFTER);
-    });
-  }, []);
+  const next = useCallback(() => step(1), [step]);
+  const prev = useCallback(() => step(-1), [step]);
 
   const goTo = useCallback((index: number) => {
     if (locked.current) return;
     setAnimated(true);
-    move(index);
+    move(index + LEAD);
   }, []);
 
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -240,11 +242,14 @@ export function Ecosystem() {
                 </div>
 
                 {/* A card off to the side is a destination, not a page: clicking
-                    anywhere on it brings it to the centre. */}
+                    anywhere on it brings it to the centre. Only the immediate
+                    neighbours are ever reachable, and stepping onto one is the
+                    same move as the arrow beside it — including when the one you
+                    clicked is a clone. */}
                 {!isActive && (
                   <button
                     className={styles.cardHit}
-                    onClick={() => goTo(index)}
+                    onClick={() => (index > pos ? next() : prev())}
                     tabIndex={-1}
                     aria-label={`Show ${card.label}`}
                   />
