@@ -1,6 +1,18 @@
 /* ---- Section ---- */
 
+/*
+ * One curve and one duration for everything that moves in here.
+ *
+ * The card is 780px wide, so a slide covers most of the screen; a fast ease-out
+ * makes that read as a snap. This curve leaves almost immediately and spends the
+ * rest of its time slowing down, which is what makes a large movement feel
+ * carried rather than flicked. The fade runs slightly longer than the slide, so
+ * the neighbour is still settling as the movement finishes.
+ */
 .section {
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --slide: 620ms;
+  --fade: 760ms;
   margin: 64px auto 0;
   overflow: hidden;
 }
@@ -54,7 +66,7 @@
   color: var(--tn-text-secondary);
   cursor: pointer;
   white-space: nowrap;
-  transition: color var(--tn-transition-fast);
+  transition: color 300ms var(--ease);
 }
 
 .title:hover {
@@ -99,7 +111,7 @@
 }
 
 .animated {
-  transition: transform 0.45s cubic-bezier(0.25, 0.8, 0.3, 1);
+  transition: transform var(--slide) var(--ease);
 }
 
 /* ---- Card ---- */
@@ -120,8 +132,8 @@
   opacity: 0.45;
   transform: scale(0.94);
   transition:
-    opacity 0.45s cubic-bezier(0.25, 0.8, 0.3, 1),
-    transform 0.45s cubic-bezier(0.25, 0.8, 0.3, 1);
+    opacity var(--fade) var(--ease),
+    transform var(--fade) var(--ease);
 }
 
 .cardActive {
@@ -239,16 +251,6 @@
   padding: 14px 18px;
   box-shadow: 0 8px 26px rgba(19, 23, 34, 0.1);
   text-align: left;
-}
-
-.satellite {
-  position: absolute;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: 0 6px 18px rgba(19, 23, 34, 0.1);
 }
 
 /* ---- Scene text ---- */
@@ -528,8 +530,8 @@
   border-radius: 4px;
   background: #d5dae5;
   transition:
-    width var(--tn-transition-fast),
-    background var(--tn-transition-fast);
+    width var(--slide) var(--ease),
+    background var(--slide) var(--ease);
 }
 
 .dotActive .dotVisual {

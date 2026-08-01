@@ -47,7 +47,7 @@ async function activeTitle(page) {
 }
 
 async function settle(page) {
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(900);
 }
 
 const browser = await chromium.launch();
@@ -107,11 +107,37 @@ try {
 
   console.log('\nWrap forwards');
   check('sitting on the last card', (await activeTitle(page)) === 'Marketplace');
+  /*
+   * Sampled rather than snapshotted, because the failure worth catching is a
+   * reset that fires while the slide is still running: the final position would
+   * be correct either way, and only the timing of the jump gives it away.
+   */
+  const slide = await page.evaluate(() => {
+    const track = document.querySelector('[aria-roledescription="carousel"] > div');
+    return parseFloat(getComputedStyle(track).transitionDuration) * 1000;
+  });
+
+  const samples = [];
+  const started = Date.now();
   await page.getByLabel('Next', { exact: true }).click();
-  await page.waitForTimeout(200);
-  const mid = posFrom(await trackX(page));
-  check('animates onto the clone first', mid === 7, `pos ${mid}`);
-  await page.waitForTimeout(900);
+  while (Date.now() - started < 1400) {
+    samples.push({ at: Date.now() - started, x: await trackX(page) });
+  }
+
+  // The reset is the one moment the track jumps back toward the start.
+  const resetAt = samples.findIndex((s, i) => i > 0 && s.x - samples[i - 1].x > PITCH / 2);
+  const reset = samples[resetAt];
+
+  // Read from the rendered transform, so this is where the slide actually
+  // arrived, not where it was aimed.
+  const arrived = resetAt > 0 ? posFrom(samples[resetAt - 1].x) : null;
+  check('the slide arrives on the clone', arrived === 7, `pos ${arrived}`);
+
+  check(
+    'the reset waits for the slide to finish',
+    reset && reset.at >= slide,
+    reset ? `reset at ${reset.at}ms, slide is ${slide}ms` : 'no reset seen'
+  );
   check('lands silently back on card 1', posFrom(await trackX(page)) === 0);
   check('title is card 1', (await activeTitle(page)) === 'AI Voyager');
   check(
@@ -124,7 +150,7 @@ try {
 
   console.log('\nWrap backwards');
   await page.getByLabel('Previous', { exact: true }).click();
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(1200);
   check('prev from card 1 reaches the last card', posFrom(await trackX(page)) === 6);
   check('title is the last card', (await activeTitle(page)) === 'Marketplace');
 
@@ -133,7 +159,7 @@ try {
   await settle(page);
   await page.getByLabel('Previous', { exact: true }).click();
   await page.getByLabel('Previous', { exact: true }).click(); // ignored — wrap in flight
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(1200);
   check('a second click during the wrap is ignored', posFrom(await trackX(page)) === 6);
 
   console.log('\nCTAs');
@@ -214,7 +240,7 @@ try {
       clientY: y,
       isPrimary: true,
     });
-    await small.waitForTimeout(700);
+    await small.waitForTimeout(900);
   };
   const activeOn = () => small.locator('[role="tab"][aria-selected="true"]').innerText();
 

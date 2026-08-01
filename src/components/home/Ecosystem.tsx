@@ -26,8 +26,12 @@ import styles from './Ecosystem.module.css';
 
 const COUNT = ECOSYSTEM.length;
 const CLONE = COUNT;
-/** Slightly longer than the 450ms transition, so the reset lands after it ends. */
-const WRAP_AFTER = 480;
+/**
+ * Longer than `--slide` in the stylesheet, so the silent reset always lands after
+ * the animation has finished. Reset it too early and the jump becomes visible —
+ * which is the one thing the clone exists to prevent.
+ */
+const WRAP_AFTER = 680;
 
 const CARDS = [...ECOSYSTEM, ECOSYSTEM[0]];
 

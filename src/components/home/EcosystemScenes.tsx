@@ -12,7 +12,9 @@ import styles from './Ecosystem.module.css';
  * why every scene is composed to sit at the bottom of the card and be croppable.
  *
  * Two layers per card. The decor sits behind everything, clipped to the card's
- * radius and inert to the pointer; the scene sits in front of it.
+ * radius and inert to the pointer; the scene sits in front of it. The decor is
+ * deliberately shapes only — dashed orbits, arcs, a grid, rings, a staircase — so
+ * that the only icons on a card are the ones inside the product it is showing.
  */
 
 /* ------------------------------------------------------------ Small pieces */
@@ -74,36 +76,6 @@ function Bar({ label, width, color, value }: { label: string; width: string; col
   );
 }
 
-/** A white satellite disc carrying one icon — the recurring decor motif. */
-function Satellite({
-  d,
-  color,
-  size,
-  style,
-}: {
-  d: string;
-  color: string;
-  size: number;
-  style: React.CSSProperties;
-}) {
-  return (
-    <span className={styles.satellite} style={{ width: size, height: size, ...style }}>
-      <svg
-        width={Math.round(size * 0.42)}
-        height={Math.round(size * 0.42)}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke={color}
-        strokeWidth={1.9}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d={d} />
-      </svg>
-    </span>
-  );
-}
-
 function Orbit({ r, color, style }: { r: number; color?: string; style: React.CSSProperties }) {
   return (
     <svg width={r * 2} height={r * 2} style={{ position: 'absolute', opacity: 0.55, ...style }} aria-hidden="true">
@@ -144,18 +116,10 @@ function Rings({ radii, color, style }: { radii: number[]; color: string; style:
 
 /** Icon paths reused across the decor layers. */
 const P = {
-  chart: 'M3 3v16a2 2 0 0 0 2 2h16M7 14l4-4 3 3 5-6',
-  search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14M21 21l-4.35-4.35',
-  pie: 'M12 3a9 9 0 1 0 9 9h-9zM21 8a9 9 0 0 0-6-4.8V8z',
   bars: 'M3 20h18M7 20v-8M12 20V4M17 20v-6',
-  bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
   grad: 'M22 10 12 5 2 10l10 5 10-5zM6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5M22 10v6',
-  target: 'M12 7a5 5 0 1 0 5 5M12 12l4-4M16 8V5l3-3v3h3l-3 3h-3M12 3a9 9 0 1 0 9 9',
   user: 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8',
   star: 'M12 3l2.6 5.3 5.9.9-4.3 4.2 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.2l5.9-.9z',
-  home: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
-  dollar: 'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
-  bulb: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z',
 };
 
 /* ----------------------------------------------------------------- Decor */
@@ -167,9 +131,6 @@ function Decor({ card }: { card: EcosystemCard['key'] }) {
         <>
           <Orbit r={95} style={{ left: 46, top: 150 }} />
           <Orbit r={70} color="#c9d4f5" style={{ right: 54, top: 190 }} />
-          <Satellite d={P.chart} color="#7c4dff" size={46} style={{ left: 86, top: 168 }} />
-          <Satellite d={P.search} color="#2962ff" size={40} style={{ left: 56, top: 268 }} />
-          <Satellite d={P.pie} color="#7c4dff" size={42} style={{ right: 70, top: 226 }} />
         </>
       );
     case 'market':
@@ -188,8 +149,6 @@ function Decor({ card }: { card: EcosystemCard['key'] }) {
               />
             ))}
           </svg>
-          <Satellite d={P.bell} color="#2962ff" size={42} style={{ left: 64, top: 150 }} />
-          <Satellite d={P.search} color="#1aa966" size={44} style={{ right: 60, top: 190 }} />
         </>
       );
     case 'charts':
@@ -203,16 +162,12 @@ function Decor({ card }: { card: EcosystemCard['key'] }) {
               <line key={`v${i}`} x1={90 + i * 100} y1={50} x2={90 + i * 100} y2={440} stroke="#b9cdf2" strokeWidth={1} />
             ))}
           </svg>
-          <Satellite d={P.target} color="#2962ff" size={42} style={{ left: 56, top: 160 }} />
-          <Satellite d={P.bell} color="#7c4dff" size={40} style={{ right: 60, top: 146 }} />
         </>
       );
     case 'strategy':
       return (
         <>
           <Rings radii={[26, 52, 80]} color="#8fceaa" style={{ right: 46, top: 128 }} />
-          <Satellite d={P.dollar} color="#2962ff" size={40} style={{ left: 70, top: 150 }} />
-          <Satellite d={P.bulb} color="#f4a71f" size={42} style={{ left: 98, top: 248 }} />
         </>
       );
     case 'wealth':
@@ -222,9 +177,6 @@ function Decor({ card }: { card: EcosystemCard['key'] }) {
             <path d="M120 130 C 300 90, 480 90, 640 150" fill="none" stroke="#aab3c5" strokeWidth={1.5} strokeDasharray="3 8" strokeLinecap="round" />
             <path d="M110 210 C 300 250, 500 250, 660 200" fill="none" stroke="#aab3c5" strokeWidth={1.5} strokeDasharray="3 8" strokeLinecap="round" />
           </svg>
-          <Satellite d={P.home} color="#131722" size={44} style={{ left: 78, top: 110 }} />
-          <Satellite d={P.pie} color="#2962ff" size={40} style={{ right: 64, top: 128 }} />
-          <Satellite d={P.dollar} color="#1aa966" size={42} style={{ right: 92, top: 234 }} />
         </>
       );
     case 'academy':
@@ -236,8 +188,6 @@ function Decor({ card }: { card: EcosystemCard['key'] }) {
             ))}
             <path d="M20 190 L80 150 L140 110 L200 70 L260 30" fill="none" stroke="#c9b8f2" strokeWidth={1.5} strokeDasharray="2 8" strokeLinecap="round" />
           </svg>
-          <Satellite d={P.grad} color="#7c4dff" size={46} style={{ left: 70, top: 160 }} />
-          <Satellite d={P.bulb} color="#f4a71f" size={40} style={{ left: 102, top: 256 }} />
         </>
       );
     case 'marketplace':
@@ -254,8 +204,6 @@ function Decor({ card }: { card: EcosystemCard['key'] }) {
               <path d={P.star} fill="#f4b26b" />
             </svg>
           ))}
-          <Satellite d={P.user} color="#2962ff" size={44} style={{ left: 88, top: 188 }} />
-          <Satellite d={P.bars} color="#7c4dff" size={40} style={{ right: 86, top: 188 }} />
         </>
       );
   }
