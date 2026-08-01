@@ -21,6 +21,9 @@ const FRED = 'https://api.stlouisfed.org/fred';
 /** Quotes move; macro series do not. Cache each for as long as it stays true. */
 const QUOTE_TTL = 15 * 60; // matches the vendor's own 15-minute delay
 const MACRO_TTL = 12 * 60 * 60; // CPI is monthly — a half-day cache is generous
+/* A daily candle changes once a day; an hour of cache costs nothing and one
+   uncached chart load would otherwise spend an eighth of a minute's allowance. */
+const SERIES_TTL = 60 * 60;
 
 export type Quote = {
   symbol: string;
@@ -30,6 +33,17 @@ export type Quote = {
   changePercent: number;
   currency: string;
   exchange: string;
+  asOf: string;
+  /** Always true on the free tier. Drives the "15-minute delay" label. */
+  delayed: boolean;
+};
+
+export type Series = {
+  symbol: string;
+  interval: '1day';
+  /** Oldest first, so an index into `closes` is an index into `dates`. */
+  closes: number[];
+  dates: string[];
   asOf: string;
   /** Always true on the free tier. Drives the "15-minute delay" label. */
   delayed: boolean;
@@ -103,6 +117,66 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
     };
   } catch (error) {
     console.warn(`[market] quote for ${symbol} failed`, error);
+    return null;
+  }
+}
+
+/**
+ * Daily closes, or null.
+ *
+ * Studies need history, not a price: an RSI(14) has nothing to say until it has
+ * fifteen bars, and a 200-day average needs two hundred. 260 is about a trading
+ * year, which is enough for every study in the registry and still one request.
+ *
+ * The vendor returns newest-first and every number as a string, so both are
+ * corrected here rather than in each caller.
+ */
+export async function getSeries(symbol: string, outputsize = 260): Promise<Series | null> {
+  if (!quotesConfigured()) return null;
+
+  try {
+    const url = new URL(`${TWELVE_DATA}/time_series`);
+    url.searchParams.set('symbol', symbol);
+    url.searchParams.set('interval', '1day');
+    url.searchParams.set('outputsize', String(outputsize));
+    url.searchParams.set('apikey', process.env.TWELVE_DATA_API_KEY!);
+
+    const response = await fetch(url, { next: { revalidate: SERIES_TTL } });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    // Rate limits and unknown symbols come back as 200 with a status field, so
+    // the HTTP code alone does not say whether this worked.
+    if (data?.status === 'error' || !Array.isArray(data?.values)) {
+      console.warn(`[market] series for ${symbol} unavailable: ${data?.message ?? 'no data'}`);
+      return null;
+    }
+
+    const rows = [...data.values].reverse();
+    const closes: number[] = [];
+    const dates: string[] = [];
+
+    for (const row of rows) {
+      const close = Number.parseFloat(row?.close);
+      if (!Number.isFinite(close)) continue;
+      closes.push(close);
+      dates.push(String(row?.datetime ?? ''));
+    }
+
+    // A handful of bars is worse than none: every study would be null and the
+    // chart would claim to be real while showing almost nothing.
+    if (closes.length < 30) return null;
+
+    return {
+      symbol: data.meta?.symbol ?? symbol,
+      interval: '1day',
+      closes,
+      dates,
+      asOf: dates[dates.length - 1],
+      delayed: true,
+    };
+  } catch (error) {
+    console.warn(`[market] series for ${symbol} failed`, error);
     return null;
   }
 }

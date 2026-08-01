@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -59,6 +59,8 @@ try {
       'src/lib/events/access.ts',
       'src/lib/events/recommend.ts',
       'src/lib/events/related.ts',
+      'src/lib/studies/registry.ts',
+      'src/lib/wave.ts',
       '--outDir',
       out,
       '--module',
@@ -72,9 +74,31 @@ try {
     { stdio: 'inherit', shell: process.platform === 'win32' }
   );
 
-  // tsc computes the output root from the common prefix of the inputs, so with
-  // every file in one directory the emitted tree is flat.
-  const load = (name) => import(pathToFileURL(join(out, `${name}.js`)).href);
+  /*
+   * tsc computes the output root from the common prefix of the inputs, so the
+   * emitted tree is flat only while every input sits in one directory — adding
+   * `lib/studies` and `lib/wave.ts` moved the root up and broke that assumption
+   * silently. Finding the file instead of computing its path means the next
+   * module added here does not have to think about it.
+   */
+  const find = (dir, name) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const hit = find(path, name);
+        if (hit) return hit;
+      } else if (entry.name === `${name}.js`) {
+        return path;
+      }
+    }
+    return null;
+  };
+
+  const load = (name) => {
+    const path = find(out, name);
+    if (!path) throw new Error(`compiled module ${name}.js was not emitted`);
+    return import(pathToFileURL(path).href);
+  };
 
   const filters = await load('filters');
   const cta = await load('cta');
@@ -84,6 +108,8 @@ try {
   const sanitize = await load('sanitize');
   const access = await load('access');
   const recommend = await load('recommend');
+  const studies = await load('registry');
+  const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
 
@@ -658,6 +684,131 @@ try {
     );
     // Limassol to Nicosia is about 60km.
     assert.equal(km > 50 && km < 75, true, `got ${km}`);
+  });
+
+  /* --------------------------------------------------------- Chart studies */
+
+  group('Chart studies');
+
+  check("RSI(14) matches Wilder's reference", () => {
+    // The sequence every RSI implementation is checked against; the first
+    // defined value is 70.5. A plain EMA in place of Wilder's smoothing lands
+    // near 69, which is close enough to look right and wrong enough to disagree
+    // with the `ta.rsi` the Pine block claims this is.
+    const closes = [
+      44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.1, 45.42, 45.84, 46.08, 45.89, 46.03, 45.61,
+      46.28, 46.28,
+    ];
+    const values = studies.STUDIES.rsi.compute(closes, { length: 14 })[0].values;
+    const first = values.findIndex((value) => value !== null);
+
+    assert.equal(first, 14, 'RSI needs 14 changes before it exists');
+    assert.ok(Math.abs(values[first] - 70.5) <= 0.5, `got ${values[first]}`);
+  });
+
+  check('an unknown study is refused rather than approximated', () => {
+    assert.equal(studies.clampSpec({ id: 'vwap' }), null);
+    assert.equal(studies.clampSpec({ id: 'ichimoku', params: { a: 9 } }), null);
+    assert.equal(studies.clampSpec(null), null);
+    assert.equal(studies.clampSpec({}), null);
+  });
+
+  check('missing parameters take the defaults', () => {
+    assert.deepEqual(studies.clampSpec({ id: 'rsi' }), { id: 'rsi', params: { length: 14 } });
+    assert.deepEqual(studies.clampSpec({ id: 'sma' }), {
+      id: 'sma',
+      params: { fast: 50, slow: 200 },
+    });
+  });
+
+  check('out-of-range parameters are pulled in, not rejected', () => {
+    const spec = studies.clampSpec({ id: 'sma', params: { fast: 9999, slow: -3 } });
+    assert.equal(spec.params.fast, 200);
+    assert.equal(spec.params.slow, 2);
+  });
+
+  check('a non-numeric parameter falls back to its default', () => {
+    const spec = studies.clampSpec({ id: 'rsi', params: { length: 'fourteen' } });
+    assert.equal(spec.params.length, 14);
+  });
+
+  check('every study warms up before it draws', () => {
+    const closes = Array.from({ length: 260 }, (_, i) => 100 + Math.sin(i / 9) * 8);
+
+    for (const id of studies.STUDY_IDS) {
+      const spec = studies.clampSpec({ id });
+      for (const line of studies.STUDIES[id].compute(closes, spec.params)) {
+        assert.equal(line.values.length, closes.length, `${id}/${line.key} length`);
+        assert.ok(
+          line.values.some((value) => value !== null),
+          `${id}/${line.key} produced nothing`
+        );
+      }
+    }
+  });
+
+  check('a series shorter than the window produces no line rather than nonsense', () => {
+    const values = studies.STUDIES.sma.compute([1, 2, 3], { fast: 50, slow: 200 })[0].values;
+    assert.ok(values.every((value) => value === null));
+  });
+
+  check('Bollinger bands sit either side of their basis', () => {
+    const closes = Array.from({ length: 60 }, (_, i) => 100 + Math.sin(i / 4) * 5);
+    const lines = studies.STUDIES.bbands.compute(closes, { length: 20, mult: 2 });
+    const [upper, basis, lower] = ['upper', 'basis', 'lower'].map(
+      (key) => lines.find((line) => line.key === key).values
+    );
+
+    for (let i = 0; i < closes.length; i += 1) {
+      if (basis[i] === null) continue;
+      assert.ok(upper[i] > basis[i] && basis[i] > lower[i], `bands inverted at ${i}`);
+    }
+  });
+
+  check('the MACD histogram is the gap between its two lines', () => {
+    const closes = Array.from({ length: 120 }, (_, i) => 100 + Math.sin(i / 7) * 6);
+    const lines = studies.STUDIES.macd.compute(closes, { fast: 12, slow: 26, signal: 9 });
+    const macd = lines.find((line) => line.key === 'macd').values;
+    const signal = lines.find((line) => line.key === 'signal').values;
+    const hist = lines.find((line) => line.key === 'hist').values;
+
+    for (let i = 0; i < closes.length; i += 1) {
+      if (hist[i] === null) continue;
+      assert.ok(Math.abs(hist[i] - (macd[i] - signal[i])) < 1e-9, `histogram wrong at ${i}`);
+    }
+  });
+
+  check('every Pine template declares v6 and carries the parameters in force', () => {
+    for (const id of studies.STUDY_IDS) {
+      const spec = studies.clampSpec({ id });
+      const code = studies.STUDIES[id].pine(spec.params);
+
+      assert.ok(code.startsWith('//@version=6'), `${id} is not v6`);
+      assert.ok(code.includes('indicator('), `${id} declares no indicator`);
+
+      for (const value of Object.values(spec.params)) {
+        assert.ok(code.includes(String(value)), `${id} does not mention ${value}`);
+      }
+    }
+  });
+
+  check('a study never describes itself as a reason to trade', () => {
+    const forbidden = /\b(buy|sell|short|long the|entry signal|take profit)\b/i;
+
+    for (const id of studies.STUDY_IDS) {
+      const spec = studies.clampSpec({ id });
+      assert.ok(!forbidden.test(studies.STUDIES[id].pine(spec.params)), `${id} pine`);
+      assert.ok(!forbidden.test(studies.STUDIES[id].label(spec.params)), `${id} label`);
+    }
+  });
+
+  check('the fallback series is deterministic and priced around its base', () => {
+    const a = wave.waveSeries(5.1, 260, 250);
+    const b = wave.waveSeries(5.1, 260, 250);
+
+    assert.deepEqual(a, b, 'two calls disagreed — this would be a hydration mismatch');
+    assert.equal(a.length, 260);
+    assert.ok(Math.min(...a) > 150 && Math.max(...a) < 350, `${Math.min(...a)}..${Math.max(...a)}`);
   });
 } finally {
   rmSync(out, { recursive: true, force: true });
