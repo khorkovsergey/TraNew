@@ -1,5 +1,6 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
+import { clampSpec, STUDY_IDS } from '@/lib/studies/registry';
 import { scriptedAnswer } from './scenarios';
 import {
   VOYAGER_ACTIONS,
@@ -104,6 +105,12 @@ Offer two to four actions. Choose them from the allowed list given below and use
 
 Never offer an action that executes a financial transaction; nothing in the list does, and you must not describe an action as placing an order.
 
+## Chart studies
+
+On the chart screen you may attach one study to your answer using the "study" field: sma (moving averages), rsi, bbands (Bollinger Bands) or macd. Attach a study only when the person asks to see, add or apply an indicator, or asks a question that a specific indicator directly illustrates. Explain in the text what the study describes and what its limits are. A study describes behaviour, never a recommendation: never present overbought, oversold, a crossover or a band touch as a signal to buy or sell.
+
+If the person asks for an indicator that is not in the list, say which studies are available here and that the full library lives in the professional layout.
+
 ## Follow-ups
 
 Suggest exactly three short follow-up questions the person might ask next, phrased as they would type them.`;
@@ -129,6 +136,19 @@ const ANSWER_SCHEMA = {
       },
     },
     followUps: { type: 'array', items: { type: 'string' } },
+    /*
+     * Optional, and deliberately narrow: an id from a closed set and a bag of
+     * numbers. There is no field here the model could put code in.
+     */
+    study: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', enum: STUDY_IDS },
+        params: { type: 'object', additionalProperties: { type: 'number' } },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
   },
   required: ['contentType', 'text', 'bullets', 'sources', 'confidence', 'actions', 'followUps'],
   additionalProperties: false,
@@ -159,6 +179,9 @@ function allowedActions(context: VoyagerContext, tier: VoyagerTier): VoyagerActi
     // intended path.
     'open_events',
     'open_my_events',
+    // Only where there is a chart to reveal the code on. Everywhere else the
+    // action would resolve to nothing and the button would be a dead end.
+    ...(context.screen === 'chart' ? (['view_pine'] as VoyagerActionId[]) : []),
     // Offered at every tier: an anonymous visitor lands on the sign-in prompt,
     // which is the intended path. This list exists to stop the model inventing a
     // destination, not to re-implement route protection the server already does.
@@ -216,7 +239,7 @@ function requestBrief(
 }
 
 /** Keeps a model response inside the contract even if it drifts from the schema. */
-function coerce(raw: unknown, allowed: VoyagerActionId[]): VoyagerAnswer | null {
+function coerce(raw: unknown, allowed: VoyagerActionId[], studiesAllowed: boolean): VoyagerAnswer | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const value = raw as Record<string, unknown>;
 
@@ -248,6 +271,17 @@ function coerce(raw: unknown, allowed: VoyagerActionId[]): VoyagerAnswer | null 
 
   if (actions.length > 0) actions[0].primary = true;
 
+  /*
+   * Two gates, both of which have to pass. The screen decides whether a study is
+   * allowed at all — a study attached from the wealth page is dropped without
+   * comment — and `clampSpec` decides whether this particular one exists and
+   * whether its numbers are usable. An unknown id yields no study rather than a
+   * substitute, and the answer around it renders exactly as it would have.
+   */
+  const study = studiesAllowed
+    ? (clampSpec(value.study as { id?: unknown; params?: unknown }) ?? undefined)
+    : undefined;
+
   return {
     contentType,
     text: value.text,
@@ -256,6 +290,7 @@ function coerce(raw: unknown, allowed: VoyagerActionId[]): VoyagerAnswer | null 
     confidence,
     actions,
     followUps: strings(value.followUps).slice(0, 3),
+    ...(study ? { study } : {}),
   };
 }
 
@@ -265,13 +300,23 @@ function coerce(raw: unknown, allowed: VoyagerActionId[]): VoyagerAnswer | null 
  * The scripted layer goes through this too, so the guarantee holds uniformly: no
  * answer from any source can offer an action this request does not permit.
  */
-function withAllowedActions(answer: VoyagerAnswer, allowed: VoyagerActionId[]): VoyagerAnswer {
+function withAllowedActions(
+  answer: VoyagerAnswer,
+  allowed: VoyagerActionId[],
+  studiesAllowed: boolean
+): VoyagerAnswer {
   const actions = answer.actions
     .filter((action) => allowed.includes(action.action))
     .slice(0, 4)
     .map((action, index) => ({ ...action, primary: index === 0 }));
 
-  return { ...answer, actions };
+  // The screen gate applies to every layer, not only the model's. A scripted
+  // answer is structurally safe today because studies only appear in the chart
+  // case, but "safe by how it happens to be written" is not the guarantee this
+  // function exists to make.
+  const study = studiesAllowed ? answer.study : undefined;
+
+  return { ...answer, actions, ...(study ? { study } : { study: undefined }) };
 }
 
 export async function askVoyager(options: {
@@ -283,7 +328,8 @@ export async function askVoyager(options: {
 }): Promise<VoyagerAnswer> {
   const { question, context, tier, sources, history } = options;
   const allowed = allowedActions(context, tier);
-  const scripted = () => withAllowedActions(scriptedAnswer(question, context, tier), allowed);
+  const scripted = () =>
+    withAllowedActions(scriptedAnswer(question, context, tier), allowed, context.screen === 'chart');
 
   if (!client) {
     return scripted();
@@ -328,7 +374,7 @@ export async function askVoyager(options: {
       return scripted();
     }
 
-    const coerced = coerce(JSON.parse(block.text), allowed);
+    const coerced = coerce(JSON.parse(block.text), allowed, context.screen === 'chart');
     return coerced ?? scripted();
   } catch (error) {
     // Surfaced in the server log rather than to the person: the scripted answer

@@ -14,11 +14,13 @@ const TEMPLATES: Record<VoyagerScreen, Template> = {
   chart: {
     subject: 'this chart',
     prompt: 'Ask about this chart',
+    // Two of these apply a study and one explains the language behind it. The
+    // point of the screen is that the way into an indicator is a sentence.
     quick: [
+      'Show RSI on this chart',
+      'Add 50/200 moving averages',
       'Explain this chart',
-      'Find key levels',
-      'Compare with another asset',
-      'Create an alert',
+      'What is Pine Script?',
     ],
   },
   symbol: {

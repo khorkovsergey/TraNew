@@ -199,7 +199,20 @@
       "watchlist": "Add to watchlist",
       "alert": "Create alert",
       "screener": "Open screener"
-    }
+    },
+    "studies": {
+      "sma": "Moving averages",
+      "rsi": "RSI",
+      "bbands": "Bollinger Bands",
+      "macd": "MACD"
+    },
+    "pineTitle": "View as Pine Script",
+    "pineCaption": "This is the same study written in Pine Script v6 — the language that professional TradingView-class charts run. In the full product it opens directly in the Pine Editor.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "illustrative": "Illustrative data",
+    "delayedAsOf": "Delayed 15 min · as of {time}",
+    "removeStudy": "Remove {study}"
   },
   "portfolio": {
     "onboardingTitle": "See how market events affect what you own",

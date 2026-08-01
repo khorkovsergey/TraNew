@@ -44,6 +44,13 @@
 
   --tn-red: #e0492f;
 
+  /* Study lines. Indexed rather than named, because a study says "colour 0",
+     not "blue" — which line gets which colour is the registry's business. */
+  --tn-study-0: #7c4dff;
+  --tn-study-1: #f4a71f;
+  --tn-study-2: #1aa966;
+  --tn-study-3: #e0492f;
+
   --tn-gradient-headline: linear-gradient(90deg, #8b5cf6, #2962ff);
   --tn-gradient-logo: linear-gradient(135deg, #2962ff, #8b5cf6);
 

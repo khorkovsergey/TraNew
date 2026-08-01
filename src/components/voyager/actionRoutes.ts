@@ -58,6 +58,10 @@ export function routeFor(
       // An alert is a reversible action, but it still belongs to the person's
       // account — the draft is made where they can see and confirm it.
       return '/account/workspace';
+    // Reveals the Pine block on the chart already open. Nothing to navigate to,
+    // which is why it resolves to null like `none` does.
+    case 'view_pine':
+      return null;
     case 'none':
       return null;
   }

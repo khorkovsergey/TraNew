@@ -14,7 +14,7 @@ import { hasSeenIntro, markIntroSeen } from '@/lib/voyager/introSeen';
 import { onVoyagerOpenRequest } from '@/lib/voyager/openRequest';
 import { VoyagerIntro } from './VoyagerIntro';
 import { VoyagerOrb, VoyagerWordmark } from './VoyagerOrb';
-import { useVoyagerContext } from './VoyagerProvider';
+import { useChartStudies, useVoyagerContext } from './VoyagerProvider';
 import styles from './Voyager.module.css';
 
 /**
@@ -56,6 +56,7 @@ const STARTERS = [
 
 export function VoyagerWidget() {
   const context = useVoyagerContext();
+  const { applyStudy, requestPine } = useChartStudies();
   const router = useRouter();
 
   const [mode, setMode] = useState<'collapsed' | 'intro' | 'peek' | 'panel'>('collapsed');
@@ -156,6 +157,18 @@ export function VoyagerWidget() {
           { role: 'assistant', text: data.answer.text, answer: data.answer },
         ]);
         setState((prev) => (prev ? { ...prev, remaining: data.remaining, tier: data.tier } : prev));
+
+        /*
+         * A study attached to an answer is applied straight away rather than
+         * offered as a button. Same test as `create_alert`: the change is
+         * visible the moment it happens and one click undoes it. Asking "may I
+         * draw this?" after someone said "show me RSI" is a dialogue box in
+         * place of the thing they asked for.
+         *
+         * The server has already decided whether a study is permitted here; by
+         * this point it either exists in the payload or it does not.
+         */
+        if (data.answer.study) applyStudy(data.answer.study);
       } catch {
         setTurns((prev) => [
           ...prev,
@@ -177,7 +190,7 @@ export function VoyagerWidget() {
         setBusy(false);
       }
     },
-    [disabled, turns]
+    [disabled, turns, applyStudy]
   );
 
   const submit = () => {
@@ -199,6 +212,14 @@ export function VoyagerWidget() {
   };
 
   const runAction = (actionId: Parameters<typeof routeFor>[0], label: string) => {
+    // Reveals the Pine block on the chart behind the panel, and steps out of the
+    // way — the answer is the code, and it is not in here.
+    if (actionId === 'view_pine') {
+      requestPine();
+      setMode('collapsed');
+      return;
+    }
+
     const target = routeFor(actionId, context);
     if (!target) {
       void ask(label, context);

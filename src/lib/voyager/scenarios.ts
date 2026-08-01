@@ -1,3 +1,4 @@
+import { defaultSpec, type StudyId } from '@/lib/studies/registry';
 import type { VoyagerAnswer, VoyagerContext, VoyagerTier } from './types';
 
 /**
@@ -28,6 +29,13 @@ function byScreen(
   tier: VoyagerTier
 ): VoyagerAnswer {
   const subject = context.subject;
+
+  // A study question is answered before the generic screen answer: "show me
+  // RSI" and "why did it move" want different things from the same screen.
+  if (context.screen === 'chart') {
+    const study = chartStudyAnswer(question);
+    if (study) return study;
+  }
 
   switch (context.screen) {
     case 'chart':
@@ -210,4 +218,124 @@ export function quotaAnswer(): VoyagerAnswer {
     followUps: [],
     simulated: true,
   };
+}
+
+/* ------------------------------------------------------- Chart studies */
+
+/**
+ * The scripted half of the studies feature.
+ *
+ * Substring matching, deliberately: this exists so the demo works with no
+ * `ANTHROPIC_API_KEY`, and someone typing "show rsi" should get RSI whether or
+ * not a model is configured. It is not trying to understand the question — the
+ * model does that when there is one.
+ *
+ * Every answer here is descriptive. An indicator says what price has done; none
+ * of these texts say what anyone should do about it.
+ */
+function chartStudyAnswer(question: string): VoyagerAnswer | null {
+  const q = question.toLowerCase();
+  const has = (...terms: string[]) => terms.some((term) => q.includes(term));
+
+  const withStudy = (id: StudyId, answer: Omit<VoyagerAnswer, 'study'>): VoyagerAnswer => ({
+    ...answer,
+    study: defaultSpec(id),
+  });
+
+  if (has('rsi', 'relative strength', 'overbought', 'oversold')) {
+    return withStudy('rsi', {
+      contentType: 'AI explanation',
+      text: 'RSI is now on the chart, in its own pane below the price. It compares the size of recent gains with the size of recent losses over 14 bars and puts the result on a scale of 0 to 100.',
+      bullets: [
+        'Above 70 is conventionally called overbought and below 30 oversold — both describe momentum, not what happens next',
+        'A strong trend can hold RSI above 70 for weeks without turning',
+        'It is derived from price alone: it knows nothing about earnings, news or flows',
+      ],
+      sources: 'Scripted demo answer',
+      confidence: 'medium',
+      actions: [
+        { label: 'View as Pine Script', action: 'view_pine', primary: true },
+        { label: 'Explain this chart', action: 'none' },
+      ],
+      followUps: ['What is Pine Script?', 'Add 50/200 moving averages', 'Show Bollinger Bands'],
+    });
+  }
+
+  if (has('moving average', 'moving averages', 'ma 50', '50/200', 'sma', 'crossover', 'golden cross')) {
+    return withStudy('sma', {
+      contentType: 'AI explanation',
+      text: 'The 50 and 200-day moving averages are drawn over the price. Each is the average close over that many days, so they smooth the daily noise and lag the price by design.',
+      bullets: [
+        'The gap between them describes whether recent prices sit above or below the longer run',
+        'Crossovers are widely watched, which makes them a description of attention as much as of price',
+        'Both lines start late on the chart: a 200-day average needs 200 days before it exists',
+      ],
+      sources: 'Scripted demo answer',
+      confidence: 'medium',
+      actions: [
+        { label: 'View as Pine Script', action: 'view_pine', primary: true },
+        { label: 'Explain this chart', action: 'none' },
+      ],
+      followUps: ['Show RSI on this chart', 'What is Pine Script?', 'Show Bollinger Bands'],
+    });
+  }
+
+  if (has('bollinger', 'bands', 'volatility band')) {
+    return withStudy('bbands', {
+      contentType: 'AI explanation',
+      text: 'Bollinger Bands are on the chart: a 20-day average with a band two standard deviations either side of it. The bands widen when recent prices have been spread out and narrow when they have been close together.',
+      bullets: [
+        'They describe how far price has been ranging, not where it is heading',
+        'Price touching a band is ordinary in a trend and says nothing on its own',
+        'Two standard deviations is a convention, not a threshold with meaning behind it',
+      ],
+      sources: 'Scripted demo answer',
+      confidence: 'medium',
+      actions: [
+        { label: 'View as Pine Script', action: 'view_pine', primary: true },
+        { label: 'Explain this chart', action: 'none' },
+      ],
+      followUps: ['Show RSI on this chart', 'What is Pine Script?', 'Add 50/200 moving averages'],
+    });
+  }
+
+  if (has('macd', 'convergence divergence')) {
+    return withStudy('macd', {
+      contentType: 'AI explanation',
+      text: 'MACD is in the pane below the price. It is the difference between a 12-day and a 26-day exponential average, with a 9-day average of that difference as the signal line and the gap between the two as the histogram.',
+      bullets: [
+        'It describes whether short-run averages are pulling away from longer-run ones',
+        'Everything in it is derived from past prices, so it turns after the price does',
+        'The histogram is the gap between the two lines, nothing more',
+      ],
+      sources: 'Scripted demo answer',
+      confidence: 'medium',
+      actions: [
+        { label: 'View as Pine Script', action: 'view_pine', primary: true },
+        { label: 'Explain this chart', action: 'none' },
+      ],
+      followUps: ['Show RSI on this chart', 'What is Pine Script?', 'Show Bollinger Bands'],
+    });
+  }
+
+  if (has('pine', 'source code of the indicator')) {
+    return {
+      contentType: 'AI explanation',
+      text: 'Pine Script is the language TradingView-class charts use to describe indicators and strategies. Every study you apply here has an equivalent written in it, and you can open that code under the chart.',
+      bullets: [
+        'A few lines describe an indicator: its inputs, its calculation and what to plot',
+        'It runs bar by bar over the series, which is why the code reads like a formula rather than a loop',
+        'The code shown here is the same study the chart is drawing, not a translation of it',
+      ],
+      sources: 'Scripted demo answer',
+      confidence: 'high',
+      actions: [
+        { label: 'View as Pine Script', action: 'view_pine', primary: true },
+        { label: 'Explain this chart', action: 'none' },
+      ],
+      followUps: ['Show RSI on this chart', 'Add 50/200 moving averages', 'Show Bollinger Bands'],
+    };
+  }
+
+  return null;
 }

@@ -639,3 +639,138 @@
   border-radius: 50%;
   background: var(--tn-purple);
 }
+
+/* ---- Chart studies ---- */
+
+/* The oscillator sits under the price and shares its width, so the two read as
+   one chart rather than as a chart and a separate picture. */
+.paneSvg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 10px;
+  border-top: 1px solid var(--tn-border-card);
+  padding-top: 10px;
+}
+
+.chartNote {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+}
+
+.legendRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--tn-chip-bg);
+  border-radius: var(--tn-radius-chip-sm);
+  padding: 5px 6px 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tn-text-nav);
+}
+
+.legendSwatch {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legendRemove {
+  background: none;
+  border: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--tn-text-muted);
+  cursor: pointer;
+}
+
+.legendRemove:hover {
+  color: var(--tn-red);
+}
+
+/* ---- Pine block ---- */
+
+.pineBlock {
+  margin-top: 16px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 14px;
+  padding: 4px 16px;
+  background: var(--tn-bg);
+}
+
+.pineSummary {
+  padding: 12px 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+  cursor: pointer;
+}
+
+.pineSnippet {
+  margin-bottom: 14px;
+}
+
+.pineHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.pineName {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+}
+
+.pineCopy {
+  background: var(--tn-surface);
+  border: 1px solid var(--tn-border-input);
+  border-radius: 10px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tn-text);
+  cursor: pointer;
+}
+
+.pineCopy:hover {
+  border-color: var(--tn-purple);
+}
+
+.pineCode {
+  margin: 0;
+  overflow-x: auto;
+  background: var(--tn-surface);
+  border: 1px solid var(--tn-border-card);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--tn-text-nav);
+  /* Pine is whitespace-sensitive and the lines are short; wrapping would change
+     what the code appears to say. It scrolls instead. */
+  white-space: pre;
+}
+
+.pineCaption {
+  margin: 0;
+  padding-bottom: 14px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--tn-text-muted);
+}

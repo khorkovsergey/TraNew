@@ -1,3 +1,5 @@
+import type { StudySpec } from '@/lib/studies/registry';
+
 /**
  * Voyager — the shared vocabulary between the widget, the policy layer and the
  * model orchestrator.
@@ -78,6 +80,7 @@ export const VOYAGER_ACTIONS = {
   open_indicator: 'Open the US CPI indicator page',
   open_academy: 'Continue in Academy',
   open_events: 'Find financial events',
+  view_pine: 'Show the Pine Script for the applied study',
   open_my_events: 'See the events I signed up for',
   open_experts: 'Browse the expert marketplace',
   open_experts_intake: 'Structure my request for an expert',
@@ -123,6 +126,14 @@ export type VoyagerAnswer = {
   upgrade?: VoyagerUpgrade;
   /** Set when the scripted layer answered because no model was configured. */
   simulated?: boolean;
+  /**
+   * A chart study to apply, on the chart screen only.
+   *
+   * The model chooses an id and numbers; it never writes the calculation or the
+   * Pine. `clampSpec` is the gate, in the same place and for the same reason the
+   * action allowlist is — see `lib/studies/registry.ts`.
+   */
+  study?: StudySpec;
 };
 
 export type VoyagerRequest = {
