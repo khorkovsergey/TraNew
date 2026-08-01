@@ -24,6 +24,7 @@ export type VoyagerScreen =
   | 'news'
   | 'portfolio'
   | 'strategy'
+  | 'events'
   | 'generic';
 
 /**
@@ -76,6 +77,8 @@ export const VOYAGER_ACTIONS = {
   open_economy: 'Open the economy overview',
   open_indicator: 'Open the US CPI indicator page',
   open_academy: 'Continue in Academy',
+  open_events: 'Find financial events',
+  open_my_events: 'See the events I signed up for',
   open_experts: 'Browse the expert marketplace',
   open_experts_intake: 'Structure my request for an expert',
   open_strategy: 'Build my strategy',

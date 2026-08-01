@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "test": "node scripts/test-events.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

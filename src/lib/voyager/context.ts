@@ -31,6 +31,16 @@ const TEMPLATES: Record<VoyagerScreen, Template> = {
       'Create an alert',
     ],
   },
+  events: {
+    subject: 'financial events',
+    prompt: 'Ask about events',
+    quick: [
+      'Any beginner investing events near me this month?',
+      'What online sessions are coming up?',
+      'Find a workshop on portfolio construction',
+      'What am I registered for?',
+    ],
+  },
   economy: {
     subject: 'the economy',
     prompt: 'Ask about the economy',

@@ -121,8 +121,12 @@
       "toolsData": "Tools and data",
       "toolsDataSub": "Indicators, screeners, data feeds",
       "learningEvents": "Learning and events",
-      "learningEventsSub": "Programmes and live sessions",
-      "merchandise": "Merchandise"
+      "learningEventsSub": "Courses and financial events",
+      "merchandise": "Merchandise",
+      "events": "Events near you",
+      "eventsSub": "Meetups, webinars and conferences",
+      "createEvent": "Create an event",
+      "createEventSub": "Publish yours to the community"
     }
   },
   "login": {

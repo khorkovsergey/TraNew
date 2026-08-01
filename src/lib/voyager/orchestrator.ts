@@ -154,6 +154,11 @@ function allowedActions(context: VoyagerContext, tier: VoyagerTier): VoyagerActi
     'open_strategy',
     'open_explore',
     'open_screener',
+    // Events are public, so finding one is offered at every tier. "My events"
+    // is too — an anonymous visitor lands on the sign-in prompt, which is the
+    // intended path.
+    'open_events',
+    'open_my_events',
     // Offered at every tier: an anonymous visitor lands on the sign-in prompt,
     // which is the intended path. This list exists to stop the model inventing a
     // destination, not to re-implement route protection the server already does.

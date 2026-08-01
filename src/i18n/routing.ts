@@ -46,6 +46,25 @@ export const routing = defineRouting({
     '/academy/practice/[ticker]': '/academy/practice/[ticker]',
     '/academy/done': '/academy/done',
 
+    /*
+     * Learning & Events. The hub is the shared entry point for the two halves —
+     * Academy keeps its own routes, so nothing that already links to a lesson
+     * has to change.
+     *
+     * `/events/my` is not in the handoff's route list; the product structure
+     * names "My events" as a screen without giving it one, and folding it into
+     * `/events/manage` would put an attendee's registrations on the organizer's
+     * dashboard, which are two different people's pages.
+     */
+    '/learning-events': '/learning-events',
+    '/events': '/events',
+    '/events/[slug]': '/events/[slug]',
+    '/events/create': '/events/create',
+    '/events/my': '/events/my',
+    '/events/manage': '/events/manage',
+    '/events/manage/[eventId]': '/events/manage/[eventId]',
+    '/organizers/[slug]': '/organizers/[slug]',
+
     // Strategy
     '/strategy': '/strategy',
 

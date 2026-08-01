@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Icon } from '@/components/ui/Icon';
+import { RelatedEvents } from '@/components/events/RelatedEvents';
 import { Link } from '@/i18n/navigation';
 import type { Locale, StaticPathname } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
@@ -66,6 +67,10 @@ export default async function AcademyDonePage({ params }: Props) {
           </Link>
         ))}
       </div>
+
+      {/* The other half of the loop: a lesson finished is the moment a live
+          session on the same topic is worth knowing about. */}
+      <RelatedEvents topics={['Investing basics', 'Macroeconomics']} title="Take it further, live" />
 
       {/* Deliberately understated: an expert is an option, never the pushed next step. */}
       <Link className={styles.mutedLink} href="/marketplace/experts">

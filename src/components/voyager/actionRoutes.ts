@@ -30,6 +30,10 @@ export function routeFor(
       return '/economy';
     case 'open_academy':
       return '/academy';
+    case 'open_events':
+      return '/events';
+    case 'open_my_events':
+      return '/events/my';
     case 'open_experts':
       return '/marketplace/experts';
     case 'open_experts_intake':

@@ -99,6 +99,8 @@ function pageSourceLabel(context: VoyagerContext): string {
       return 'Wealth Profile (with your permission)';
     case 'academy':
       return 'Current lesson & your progress';
+    case 'events':
+      return 'Upcoming events & your location';
     case 'strategy':
       return 'Your interview answers';
     case 'generic':

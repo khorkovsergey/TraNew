@@ -46,6 +46,15 @@ export const user = pgTable(
     planRenewsAt: timestamp('plan_renews_at'),
 
     /**
+     * Staff role — separate from `plan`, which is what someone bought. Paying for
+     * AI Private must never confer the ability to approve an event or read
+     * another organizer's attendee list.
+     *
+     * user | moderator | admin
+     */
+    role: text('role').$defaultFn(() => 'user').notNull(),
+
+    /**
      * Per-user data key, itself encrypted with the master key. Wealth ciphertext is
      * encrypted with this key, so rotating a user's key never touches other rows.
      */
@@ -703,4 +712,331 @@ export const consent = pgTable(
     index('consent_user_idx').on(table.userId),
     index('consent_kind_idx').on(table.userId, table.kind),
   ]
+);
+
+/* ------------------------------------------------------------------ Events */
+
+/**
+ * Events.
+ *
+ * Three rules are enforced by the shape rather than by the code that writes it.
+ *
+ * `status` decides visibility, so a draft cannot leak by being read through the
+ * wrong query — the public catalogue selects on it and nothing else.
+ *
+ * `onlineMeetingUrl` sits apart from every other location field because it is the
+ * one column that must never reach an anonymous client or a calendar export.
+ * Keeping it in its own column rather than inside a venue blob is what makes
+ * "select everything except this" possible.
+ *
+ * Registration counters live on the event rather than being counted on read.
+ * Capacity is a promise to the people who registered, and it has to be checked
+ * inside the same statement that takes the place.
+ */
+
+export const organizer = pgTable(
+  'organizer',
+  {
+    id: text('id').primaryKey(),
+    slug: text('slug').notNull(),
+    /** Null for TradingNew itself and for imported external organizers. */
+    userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
+
+    name: text('name').notNull(),
+    initials: text('initials').notNull(),
+    /** tradingnew | individual | company | institution | community */
+    type: text('type').notNull(),
+    /** unverified | pending | verified | suspended */
+    verificationStatus: text('verification_status')
+      .$defaultFn(() => 'unverified')
+      .notNull(),
+
+    description: text('description'),
+    website: text('website'),
+    country: text('country'),
+    followerCount: integer('follower_count').$defaultFn(() => 0).notNull(),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [
+    uniqueIndex('organizer_slug_idx').on(table.slug),
+    index('organizer_user_idx').on(table.userId),
+  ]
+);
+
+export const organizerFollow = pgTable(
+  'organizer_follow',
+  {
+    id: text('id').primaryKey(),
+    organizerId: text('organizer_id')
+      .notNull()
+      .references(() => organizer.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [uniqueIndex('organizer_follow_idx').on(table.organizerId, table.userId)]
+);
+
+export const event = pgTable(
+  'event',
+  {
+    id: text('id').primaryKey(),
+    slug: text('slug').notNull(),
+
+    title: text('title').notNull(),
+    shortDescription: text('short_description').notNull(),
+    description: text('description').notNull(),
+    coverImageUrl: text('cover_image_url'),
+    /** A brand gradient, until image upload exists. */
+    coverGradient: text('cover_gradient'),
+
+    /** draft | pending_review | changes_requested | published | rejected | suspended | cancelled | completed */
+    status: text('status').$defaultFn(() => 'draft').notNull(),
+    /** public | unlisted */
+    visibility: text('visibility').$defaultFn(() => 'public').notNull(),
+    /** in_person | online | hybrid */
+    format: text('format').notNull(),
+    /** conference | meetup | webinar | workshop | masterclass | panel | networking | live_market_session */
+    eventType: text('event_type').notNull(),
+
+    organizerId: text('organizer_id')
+      .notNull()
+      .references(() => organizer.id, { onDelete: 'restrict' }),
+
+    /** tradingnew | community | external */
+    sourceType: text('source_type').$defaultFn(() => 'community').notNull(),
+    externalUrl: text('external_url'),
+    externalDomain: text('external_domain'),
+    externalTrusted: boolean('external_trusted').$defaultFn(() => false).notNull(),
+
+    /** UTC. The organizer's IANA zone is the column beside them, never folded in. */
+    startsAt: timestamp('starts_at').notNull(),
+    endsAt: timestamp('ends_at').notNull(),
+    timezone: text('timezone').notNull(),
+    registrationDeadline: timestamp('registration_deadline'),
+
+    language: jsonb('language').$type<string[]>().notNull(),
+    country: text('country'),
+    city: text('city'),
+    venueName: text('venue_name'),
+    venueAddress: text('venue_address'),
+    /** Venue coordinates. An attendee location is never written to an event. */
+    latitude: text('latitude'),
+    longitude: text('longitude'),
+    /** Never selected for an anonymous client or a calendar export. */
+    onlineMeetingUrl: text('online_meeting_url'),
+
+    capacity: integer('capacity'),
+    registrationCount: integer('registration_count').$defaultFn(() => 0).notNull(),
+    waitlistCount: integer('waitlist_count').$defaultFn(() => 0).notNull(),
+    waitlistEnabled: boolean('waitlist_enabled').$defaultFn(() => false).notNull(),
+
+    /** free | paid | external */
+    priceType: text('price_type').$defaultFn(() => 'free').notNull(),
+    /** Minor units, so no float ever touches a price. */
+    priceAmount: integer('price_amount'),
+    currency: text('currency'),
+
+    /** beginner | intermediate | advanced | all_levels */
+    experienceLevel: text('experience_level').$defaultFn(() => 'all_levels').notNull(),
+    topics: jsonb('topics').$type<string[]>().notNull(),
+    markets: jsonb('markets').$type<string[]>(),
+    tags: jsonb('tags').$type<string[]>(),
+
+    learningOutcomes: jsonb('learning_outcomes').$type<string[]>(),
+    intendedAudience: text('intended_audience'),
+    importantNotice: text('important_notice'),
+
+    agenda: jsonb('agenda').$type<
+      Array<{
+        id: string;
+        time: string;
+        title: string;
+        speaker: string | null;
+        kind: string | null;
+        position: number;
+      }>
+    >(),
+    speakers: jsonb('speakers').$type<
+      Array<{
+        id: string;
+        name: string;
+        role: string;
+        company: string | null;
+        initials: string;
+        avatarUrl: string | null;
+        position: number;
+      }>
+    >(),
+
+    isFeatured: boolean('is_featured').$defaultFn(() => false).notNull(),
+    isPromoted: boolean('is_promoted').$defaultFn(() => false).notNull(),
+
+    createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+    publishedAt: timestamp('published_at'),
+    moderationReason: text('moderation_reason'),
+    cancellationReason: text('cancellation_reason'),
+  },
+  (table) => [
+    uniqueIndex('event_slug_idx').on(table.slug),
+    // The catalogue query: published events, soonest first.
+    index('event_status_starts_idx').on(table.status, table.startsAt),
+    index('event_organizer_idx').on(table.organizerId, table.startsAt),
+    index('event_created_by_idx').on(table.createdBy),
+    index('event_city_idx').on(table.country, table.city),
+  ]
+);
+
+export const eventRegistration = pgTable(
+  'event_registration',
+  {
+    id: text('id').primaryKey(),
+    eventId: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    /** registered | waitlisted | cancelled | attended | no_show */
+    status: text('status').$defaultFn(() => 'registered').notNull(),
+
+    name: text('name').notNull(),
+    email: text('email').notNull(),
+    company: text('company'),
+    role: text('role'),
+    experienceLevel: text('experience_level'),
+
+    eventUpdatesConsent: boolean('event_updates_consent').$defaultFn(() => false).notNull(),
+    termsAccepted: boolean('terms_accepted').$defaultFn(() => false).notNull(),
+
+    /** Queue order. Promotion takes the lowest number, not the oldest row. */
+    waitlistPosition: integer('waitlist_position'),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [
+    // One row per person per event. This is what makes registration idempotent:
+    // a repeated submit collides here instead of taking a second seat.
+    uniqueIndex('event_registration_idx').on(table.eventId, table.userId),
+    index('event_registration_user_idx').on(table.userId, table.status),
+    index('event_registration_waitlist_idx').on(table.eventId, table.waitlistPosition),
+  ]
+);
+
+export const eventBookmark = pgTable(
+  'event_bookmark',
+  {
+    id: text('id').primaryKey(),
+    eventId: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [
+    uniqueIndex('event_bookmark_idx').on(table.eventId, table.userId),
+    index('event_bookmark_user_idx').on(table.userId, table.createdAt),
+  ]
+);
+
+export const eventReport = pgTable(
+  'event_report',
+  {
+    id: text('id').primaryKey(),
+    eventId: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    /** Null when reported by someone who is not signed in. */
+    reporterId: text('reporter_id').references(() => user.id, { onDelete: 'set null' }),
+
+    reason: text('reason').notNull(),
+    detail: text('detail'),
+    resolved: boolean('resolved').$defaultFn(() => false).notNull(),
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [
+    index('event_report_event_idx').on(table.eventId, table.resolved),
+    index('event_report_created_idx').on(table.createdAt),
+  ]
+);
+
+/**
+ * Append-only. Nothing updates or deletes a row here — a moderation history that
+ * can be rewritten answers no question anyone would ask of it.
+ */
+export const eventModeration = pgTable(
+  'event_moderation',
+  {
+    id: text('id').primaryKey(),
+    eventId: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    actorId: text('actor_id').references(() => user.id, { onDelete: 'set null' }),
+    /** submitted | approved | rejected | changes_requested | suspended | restored | cancelled */
+    action: text('action').notNull(),
+    reason: text('reason'),
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [index('event_moderation_event_idx').on(table.eventId, table.createdAt)]
+);
+
+export const eventNotificationPreference = pgTable(
+  'event_notification_preference',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** registration_confirmed | reminder_24h | reminder_1h | event_changed | ... */
+    kind: text('kind').notNull(),
+    enabled: boolean('enabled').$defaultFn(() => true).notNull(),
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [uniqueIndex('event_notification_pref_idx').on(table.userId, table.kind)]
+);
+
+/**
+ * Counters for the organizer dashboard. One row per event per metric per day, so
+ * a chart is a range scan rather than a scan of every page view ever recorded.
+ */
+export const eventMetric = pgTable(
+  'event_metric',
+  {
+    id: text('id').primaryKey(),
+    eventId: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    /** page_view | card_view | registration | cancellation | save | external_click | share */
+    metric: text('metric').notNull(),
+    /** UTC date, midnight. */
+    day: timestamp('day').notNull(),
+    count: integer('count').$defaultFn(() => 0).notNull(),
+  },
+  (table) => [uniqueIndex('event_metric_idx').on(table.eventId, table.metric, table.day)]
+);
+
+/** Wizard drafts, autosaved long before anything on them is valid. */
+export const eventDraft = pgTable(
+  'event_draft',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** Set once the draft has become a real event row. */
+    eventId: text('event_id').references(() => event.id, { onDelete: 'cascade' }),
+    payload: jsonb('payload').notNull(),
+    step: integer('step').$defaultFn(() => 0).notNull(),
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [index('event_draft_user_idx').on(table.userId, table.updatedAt)]
 );

@@ -51,4 +51,16 @@ export const db = new Proxy({} as Db, {
   },
 });
 
+/**
+ * Whether a database is reachable at all.
+ *
+ * The public parts of Events — the catalogue, an event page, an organizer profile
+ * — must render for an anonymous visitor with no database behind them, since
+ * there is no events backend yet and the catalogue is seeded. Anything personal
+ * still requires one, and says so rather than pretending the answer is "none".
+ */
+export function isDatabaseConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL);
+}
+
 export { schema };

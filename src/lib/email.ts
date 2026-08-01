@@ -23,7 +23,12 @@ function extractUrl(text: string): string | null {
   return match ? match[0] : null;
 }
 
-async function send(to: string, subject: string, text: string) {
+/**
+ * Exported so other transactional senders — event notifications, organizer
+ * messages — go through the same transport selection rather than each choosing
+ * their own and drifting apart on which one is a stub.
+ */
+export async function send(to: string, subject: string, text: string) {
   const transport = emailTransport();
 
   if (transport === 'resend' && resend) {

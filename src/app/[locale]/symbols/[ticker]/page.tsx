@@ -3,6 +3,8 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { EconomicDrivers, loadEconomicDrivers } from '@/components/economy/EconomicDrivers';
 import { SymbolActions } from '@/components/screens/SymbolActions';
+import { RelatedEvents } from '@/components/events/RelatedEvents';
+import { topicsForSymbol } from '@/lib/events/related';
 import { Icon } from '@/components/ui/Icon';
 import { TrustLabel } from '@/components/ui/TrustLabel';
 import { SYMBOLS } from '@/content/symbols';
@@ -211,6 +213,11 @@ export default async function SymbolPage({ params }: Props) {
               ))}
             </div>
           </section>
+
+          {/* Events belongs beside the thing it is about, not only in its own
+              section — someone reading about an asset is exactly who a session
+              on it is for. */}
+          <RelatedEvents topics={topicsForSymbol(key)} title="Events on this asset" limit={2} />
         </div>
       </div>
     </div>
