@@ -1,4 +1,4 @@
-import type { StudySpec } from '@/lib/studies/registry';
+import type { StudySpec } from '../studies/registry';
 
 /**
  * Voyager — the shared vocabulary between the widget, the policy layer and the

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -60,6 +60,7 @@ try {
       'src/lib/events/recommend.ts',
       'src/lib/events/related.ts',
       'src/lib/studies/registry.ts',
+      'src/lib/voyager/answerSchema.ts',
       'src/lib/wave.ts',
       '--outDir',
       out,
@@ -100,6 +101,27 @@ try {
     return import(pathToFileURL(path).href);
   };
 
+  /*
+   * tsc emits `from '../studies/registry'` with no extension under
+   * `moduleResolution: bundler`, and Node's ESM loader refuses that. It went
+   * unnoticed while every compiled module imported only types, which are erased.
+   */
+  const addExtensions = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        addExtensions(path);
+      } else if (entry.name.endsWith('.js')) {
+        const source = readFileSync(path, 'utf8');
+        writeFileSync(path, source.replace(/(from '\.[^']*?)(')/g, (all, head, tail) =>
+          head.endsWith('.js') ? all : `${head}.js${tail}`
+        ));
+      }
+    }
+  };
+
+  addExtensions(out);
+
   const filters = await load('filters');
   const cta = await load('cta');
   const external = await load('externalUrl');
@@ -109,6 +131,7 @@ try {
   const access = await load('access');
   const recommend = await load('recommend');
   const studies = await load('registry');
+  const schema = await load('answerSchema');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -792,6 +815,54 @@ try {
     }
   });
 
+  check('the answer schema is one the API will accept', () => {
+    /*
+     * A schema the API rejects fails invisibly: the orchestrator catches the
+     * error, logs it and returns a scripted answer, so the widget still replies
+     * and the screen looks fine. Every answer on production was scripted for an
+     * hour before a log line gave it away, and the cause was one property.
+     *
+     * The rule is that `additionalProperties` must be `false` — never a type.
+     */
+    const walk = (node, path) => {
+      if (!node || typeof node !== 'object') return;
+
+      if ('additionalProperties' in node && node.additionalProperties !== false) {
+        assert.fail(`${path}.additionalProperties must be false, got ${JSON.stringify(node.additionalProperties)}`);
+      }
+
+      if (node.type === 'object' && node.properties) {
+        assert.ok(
+          'additionalProperties' in node,
+          `${path} is an object without additionalProperties: false`
+        );
+        for (const [key, child] of Object.entries(node.properties)) walk(child, `${path}.${key}`);
+      }
+
+      if (node.type === 'array' && node.items) walk(node.items, `${path}[]`);
+    };
+
+    walk(schema.ANSWER_SCHEMA, 'answer');
+  });
+
+  check('the study schema names every parameter the registry uses', () => {
+    // Derived rather than written down, so a study gaining a parameter cannot
+    // leave the schema behind and quietly make that parameter unavailable.
+    const declared = Object.keys(schema.ANSWER_SCHEMA.properties.study.properties.params.properties);
+    for (const id of studies.STUDY_IDS) {
+      for (const name of Object.keys(studies.STUDIES[id].params)) {
+        assert.ok(declared.includes(name), `${id}.${name} is missing from the schema`);
+      }
+    }
+  });
+
+  check('every study id is offered to the model', () => {
+    assert.deepEqual(
+      [...schema.ANSWER_SCHEMA.properties.study.properties.id.enum].sort(),
+      [...studies.STUDY_IDS].sort()
+    );
+  });
+
   check('the code copied is the code shown, on any platform', () => {
     // The templates are literals in a checked-out file, so a Windows checkout
     // carries CRLF and a Linux one LF. Without normalising, the bytes on the
@@ -821,6 +892,10 @@ try {
     assert.equal(a.length, 260);
     assert.ok(Math.min(...a) > 150 && Math.max(...a) < 350, `${Math.min(...a)}..${Math.max(...a)}`);
   });
+} catch (error) {
+  failed += 1;
+  console.log(`
+  FAIL the run stopped early — ${String(error).split(String.fromCharCode(10))[0]}`);
 } finally {
   rmSync(out, { recursive: true, force: true });
   console.log(`\n${passed}/${passed + failed} passed`);

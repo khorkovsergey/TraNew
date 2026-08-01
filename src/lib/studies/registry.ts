@@ -315,6 +315,17 @@ hline(0, "Zero", color = color.new(color.gray, 60))`),
 
 export const STUDY_IDS = Object.keys(STUDIES) as StudyId[];
 
+/**
+ * Every parameter name any study takes, deduplicated.
+ *
+ * Derived rather than written down because it is used to build the schema the
+ * model answers against: a study gaining a parameter would otherwise leave that
+ * schema behind, and the new parameter would be silently unavailable.
+ */
+export const STUDY_PARAM_NAMES = [
+  ...new Set(Object.values(STUDIES).flatMap((study) => Object.keys(study.params))),
+];
+
 function isStudyId(value: unknown): value is StudyId {
   return typeof value === 'string' && value in STUDIES;
 }

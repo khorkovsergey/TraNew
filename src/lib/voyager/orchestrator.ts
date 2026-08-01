@@ -1,6 +1,7 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
-import { clampSpec, STUDY_IDS } from '@/lib/studies/registry';
+import { clampSpec } from '@/lib/studies/registry';
+import { ANSWER_SCHEMA, CONTENT_TYPES } from './answerSchema';
 import { scriptedAnswer } from './scenarios';
 import {
   VOYAGER_ACTIONS,
@@ -49,13 +50,7 @@ export function isModelConfigured(): boolean {
   return client !== null;
 }
 
-const CONTENT_TYPES: VoyagerContentType[] = [
-  'AI explanation',
-  'AI analysis',
-  'AI summary',
-  'AI structured',
-  'Academy context',
-];
+
 
 /**
  * The stable half of the system prompt.
@@ -115,44 +110,7 @@ If the person asks for an indicator that is not in the list, say which studies a
 
 Suggest exactly three short follow-up questions the person might ask next, phrased as they would type them.`;
 
-const ANSWER_SCHEMA = {
-  type: 'object',
-  properties: {
-    contentType: { type: 'string', enum: CONTENT_TYPES },
-    text: { type: 'string' },
-    bullets: { type: 'array', items: { type: 'string' } },
-    sources: { type: 'string' },
-    confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
-    actions: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          label: { type: 'string' },
-          action: { type: 'string', enum: Object.keys(VOYAGER_ACTIONS) },
-        },
-        required: ['label', 'action'],
-        additionalProperties: false,
-      },
-    },
-    followUps: { type: 'array', items: { type: 'string' } },
-    /*
-     * Optional, and deliberately narrow: an id from a closed set and a bag of
-     * numbers. There is no field here the model could put code in.
-     */
-    study: {
-      type: 'object',
-      properties: {
-        id: { type: 'string', enum: STUDY_IDS },
-        params: { type: 'object', additionalProperties: { type: 'number' } },
-      },
-      required: ['id'],
-      additionalProperties: false,
-    },
-  },
-  required: ['contentType', 'text', 'bullets', 'sources', 'confidence', 'actions', 'followUps'],
-  additionalProperties: false,
-} as const;
+
 
 /**
  * Which actions this request may offer.
