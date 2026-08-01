@@ -612,3 +612,30 @@
     grid-template-columns: 1fr;
   }
 }
+
+/** The community rules. A list, because they are read as a set, not as prose. */
+.ruleList {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ruleList li {
+  position: relative;
+  padding-left: 22px;
+  margin-bottom: 9px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--tn-text-nav);
+}
+
+.ruleList li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tn-purple);
+}

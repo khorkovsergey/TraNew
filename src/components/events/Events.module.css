@@ -412,6 +412,7 @@
 /* ---- Card ---- */
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--tn-surface);
@@ -486,6 +487,27 @@
 
 .cardLink:hover {
   color: var(--tn-blue);
+}
+
+/* The whole card is the target. Below the Save button (z-index 2) so that keeps
+   working, and above nothing else, since nothing else on a card is interactive. */
+.cardLink::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/* Without this the focus ring would be drawn around the stretched box rather
+   than around the words, which is not where the eye looks for it. */
+.cardLink:focus-visible {
+  outline: 2px solid var(--tn-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.cardLink:focus-visible::after {
+  content: none;
 }
 
 .cardSummary {
@@ -651,6 +673,8 @@
   position: absolute;
   top: 10px;
   right: 10px;
+  /* Above the stretched card link, or saving would open the event instead. */
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   justify-content: center;

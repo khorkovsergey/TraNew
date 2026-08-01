@@ -210,3 +210,22 @@
   margin-top: 2px;
 }
 
+/*
+ * "Soon" beside a menu label.
+ *
+ * A word, not only a colour: the point is to be readable, and a grey dot would
+ * mean nothing to anyone who has not been told what it means.
+ */
+.soon {
+  display: inline-block;
+  margin-left: 8px;
+  border-radius: 8px;
+  background: var(--tn-chip-bg);
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+  vertical-align: 1px;
+}

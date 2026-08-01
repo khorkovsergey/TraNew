@@ -113,13 +113,69 @@
 
 /* ---- Search ---- */
 
+/* The field and its suggestion list are one unit, so the list can be positioned
+   against the field rather than against the page. */
+.searchWrap {
+  position: relative;
+  width: 100%;
+  max-width: 740px;
+  margin: 30px auto 0;
+}
+
+.suggestions {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  background: var(--tn-surface);
+  border: 1px solid var(--tn-border-control);
+  border-radius: 20px;
+  box-shadow: var(--tn-shadow-dropdown);
+  max-height: 340px;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.suggestion {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 14px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestionOn {
+  background: var(--tn-chip-bg);
+}
+
+.suggestionLabel {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--tn-text);
+}
+
+.suggestionHint {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--tn-text-muted);
+}
+
 .search {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  max-width: 740px;
-  margin-top: 30px;
   background: var(--tn-surface);
   border: 1px solid var(--tn-border-control);
   border-radius: var(--tn-radius-search);

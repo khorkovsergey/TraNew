@@ -7,6 +7,8 @@ import type { AppPathname } from '@/i18n/routing';
 export type MenuEntry = {
   labelKey: string;
   subKey?: string;
+  /** Routed, but the screen behind it is still being built. */
+  soon?: boolean;
 } & (
   | {
       kind: 'route';
@@ -25,10 +27,22 @@ export type MenuGroup = {
 
 export type NavKey = 'home' | 'market' | 'symbols' | 'economy' | 'community' | 'marketplace';
 
-const tool = (slug: string): { kind: 'route'; href: AppPathname; params: Record<string, string> } => ({
+/**
+ * A destination that is routed but not yet built.
+ *
+ * Half the navigation currently lands on the generic tool page, which says the
+ * screen is still being built — but it only says so *after* the click. Marking
+ * them here means the menu tells the truth before someone spends a navigation
+ * finding out, and it gives one list to work through as each screen lands:
+ * delete the flag, and the badge goes with it.
+ */
+const tool = (
+  slug: string
+): { kind: 'route'; href: AppPathname; params: Record<string, string>; soon: true } => ({
   kind: 'route',
   href: '/tool/[slug]',
   params: { slug },
+  soon: true,
 });
 
 const symbol = (
@@ -192,12 +206,14 @@ export const MENUS: Record<Exclude<NavKey, 'home'>, MenuGroup[]> = {
     {
       titleKey: 'marketplace.featuredTitle',
       items: [
-        {
-          labelKey: 'marketplace.goBeyond',
-          subKey: 'marketplace.goBeyondSub',
-          kind: 'route',
-          href: '/marketplace',
-        },
+        /*
+         * "Go beyond your plan" used to lead this list. It opened the Marketplace
+         * hub, whose entire content is the four links directly below it — a click
+         * that costs a navigation and returns the menu you were already looking
+         * at. The hub is still reachable from the home carousel, from Community
+         * and from the breadcrumb on the expert pages, where it lands as a
+         * destination rather than as a detour.
+         */
         {
           labelKey: 'marketplace.expertServices',
           subKey: 'marketplace.expertServicesSub',
@@ -207,7 +223,10 @@ export const MENUS: Record<Exclude<NavKey, 'home'>, MenuGroup[]> = {
         {
           labelKey: 'marketplace.toolsData',
           subKey: 'marketplace.toolsDataSub',
-          ...tool('tools-and-data'),
+          kind: 'route',
+          // The real screen, not the placeholder the menu used to point at while
+          // the hub page pointed here.
+          href: '/tools',
         },
         {
           labelKey: 'marketplace.learningEvents',

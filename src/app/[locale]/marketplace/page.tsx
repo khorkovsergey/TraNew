@@ -20,12 +20,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
+/*
+ * The four categories, and the same four destinations the Marketplace menu uses.
+ *
+ * They had drifted apart: three of the four led somewhere different depending on
+ * whether you arrived through the menu or through this page, and Merchandise —
+ * "physical goods and limited editions" — opened the page about choosing a
+ * broker. Two lists describing one thing will always end up disagreeing, so
+ * changing a destination now means changing it here and in `menu.ts`, and the
+ * verification script compares the two.
+ */
 const CATEGORIES: Array<{
   key: 'expert' | 'tools' | 'learning' | 'merch';
-  href: StaticPathname;
+  href: StaticPathname | { pathname: '/tool/[slug]'; params: { slug: string } };
   icon: IconName;
   color: string;
   tile: string;
+  /** Routed, but the screen behind it is still being built. */
+  soon?: boolean;
 }> = [
   {
     key: 'expert',
@@ -43,17 +55,18 @@ const CATEGORIES: Array<{
   },
   {
     key: 'learning',
-    href: '/academy',
+    href: '/learning-events',
     icon: 'grad',
     color: 'var(--tn-green)',
     tile: 'var(--tn-green-tint)',
   },
   {
     key: 'merch',
-    href: '/brokers',
+    href: { pathname: '/tool/[slug]', params: { slug: 'merchandise' } },
     icon: 'star',
     color: 'var(--tn-orange)',
     tile: 'var(--tn-orange-tint)',
+    soon: true,
   },
 ];
 
@@ -78,7 +91,7 @@ export default async function MarketplaceHubPage({ params }: Props) {
 
       <div className={styles.cardGrid}>
         {CATEGORIES.map((category) => (
-          <Link className={styles.taskCard} href={category.href} key={category.key}>
+          <Link className={styles.taskCard} href={category.href as never} key={category.key}>
             <div className={styles.categoryIcon} style={{ background: category.tile }}>
               <Icon
                 name={category.icon}
@@ -87,7 +100,10 @@ export default async function MarketplaceHubPage({ params }: Props) {
                 style={{ color: category.color }}
               />
             </div>
-            <div className={styles.taskTitle}>{t(`${category.key}Title`)}</div>
+            <div className={styles.taskTitle}>
+              {t(`${category.key}Title`)}
+              {category.soon && <span className={styles.soon}>Soon</span>}
+            </div>
             <div className={styles.taskDesc}>{t(`${category.key}Text`)}</div>
             <span className={styles.categoryCta}>{t(`${category.key}Cta`)} →</span>
           </Link>

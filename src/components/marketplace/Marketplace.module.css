@@ -964,3 +964,18 @@
     grid-template-columns: 1fr;
   }
 }
+
+/** Matches the "Soon" badge in the header menu — same word, same weight. */
+.soon {
+  display: inline-block;
+  margin-left: 8px;
+  border-radius: 8px;
+  background: var(--tn-chip-bg);
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+  vertical-align: 1px;
+}

@@ -121,6 +121,118 @@ try {
     (await marketplace.getAttribute('aria-expanded')) === 'false'
   );
 
+  /*
+   * The Marketplace menu and the Marketplace hub describe the same four
+   * categories. They had drifted apart — three of the four led somewhere
+   * different depending on which one you used, and Merchandise opened the page
+   * about choosing a broker. Two descriptions of one thing drift again unless
+   * something compares them.
+   */
+  console.log('\nThe Marketplace menu and its hub agree');
+
+  await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Marketplace', exact: true }).click();
+  await page.waitForTimeout(250);
+
+  const menuHrefs = await page.evaluate(() => {
+    const panel = [...document.querySelectorAll('div')].find(
+      (el) => getComputedStyle(el).position === 'fixed' && getComputedStyle(el).zIndex === '50'
+    );
+    return [...panel.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+  });
+  await page.keyboard.press('Escape');
+
+  check(
+    'the menu no longer opens a copy of itself',
+    !menuHrefs.includes('/en/marketplace'),
+    'an entry leading back to the hub is present again'
+  );
+
+  await page.goto(`${BASE}/en/marketplace`, { waitUntil: 'networkidle' });
+  const hubHrefs = await page.evaluate(() =>
+    [...document.querySelectorAll('main a[href^="/en"]')]
+      .map((a) => a.getAttribute('href'))
+      .filter((href) => href !== '/en')
+  );
+
+  for (const href of hubHrefs) {
+    check(`the hub's ${href} is also in the menu`, menuHrefs.includes(href), menuHrefs.join(', '));
+  }
+
+  check(
+    'Merchandise does not open the brokers page',
+    !hubHrefs.includes('/en/brokers'),
+    'the merchandise card points at /en/brokers again'
+  );
+
+  console.log('\nUnbuilt destinations say so before the click');
+
+  await page.goto(HOME, { waitUntil: 'networkidle' });
+  let badged = 0;
+  let placeholders = 0;
+  let mismatched = 0;
+
+  for (const name of MENUS) {
+    await page.getByRole('button', { name, exact: true }).click();
+    await page.waitForTimeout(250);
+
+    const entries = await page.evaluate(() => {
+      const panel = [...document.querySelectorAll('div')].find(
+        (el) => getComputedStyle(el).position === 'fixed' && getComputedStyle(el).zIndex === '50'
+      );
+      return [...panel.querySelectorAll('a')].map((a) => ({
+        href: a.getAttribute('href'),
+        soon: a.textContent?.includes('Soon') ?? false,
+      }));
+    });
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(120);
+
+    for (const entry of entries) {
+      const unbuilt = (entry.href ?? '').startsWith('/en/tool/');
+      if (unbuilt) placeholders += 1;
+      if (entry.soon) badged += 1;
+      if (unbuilt !== entry.soon) mismatched += 1;
+    }
+  }
+
+  check('every unbuilt destination is badged, and only those', mismatched === 0, `${mismatched} disagree`);
+  check('the badge count matches the placeholder count', badged === placeholders, `${badged} badged, ${placeholders} placeholders`);
+  check('and there is at least one to badge', placeholders > 0);
+
+  console.log('\nSearch answers while you type');
+
+  await page.goto(HOME, { waitUntil: 'networkidle' });
+  const field = page.getByPlaceholder(/Search any asset/i);
+
+  await field.fill('Tes');
+  await page.waitForTimeout(400);
+  const symbolRows = await page.locator('[role="option"]').allInnerTexts();
+  check('a known asset is offered', symbolRows.some((row) => row.includes('Tesla')), symbolRows.join(' / '));
+
+  await field.fill('event');
+  await page.waitForTimeout(400);
+  const sectionRows = await page.locator('[role="option"]').allInnerTexts();
+  check('a section is offered', sectionRows.some((row) => row.includes('Events')), sectionRows.join(' / '));
+
+  await field.fill('qqqzzz');
+  await page.waitForTimeout(400);
+  const fallback = await page.locator('[role="option"]').allInnerTexts();
+  check('an unknown query still offers a way forward', fallback.length > 0, 'nothing offered');
+
+  await field.press('ArrowDown');
+  await field.press('Enter');
+  await page.waitForTimeout(1200);
+  check('the keyboard can take a suggestion', page.url().includes('/research'), page.url());
+
+  await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByPlaceholder(/Search any asset/i).fill('Tes');
+  await page.waitForTimeout(300);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  check('Escape closes the list', (await page.locator('[role="option"]').count()) === 0);
+
   console.log('\nAfter scrolling');
   await page.mouse.wheel(0, 1500);
   await page.waitForTimeout(400);
@@ -133,6 +245,14 @@ try {
       ? `panel centre ${Math.round(scrolled.panel.left + scrolled.panel.width / 2)}, trigger ${Math.round(scrolled.trigger.centre)}`
       : 'no panel'
   );
+} catch (error) {
+  /*
+   * Without this an exception halfway through lands in `finally`, which prints
+   * the checks that did run and exits zero — a suite that stopped early
+   * reporting itself as a suite that passed.
+   */
+  failed += 1;
+  console.log(`\n  FAIL the run stopped early — ${String(error).split('\n')[0]}`);
 } finally {
   console.log(`\n${passed}/${passed + failed} passed`);
   await browser.close();

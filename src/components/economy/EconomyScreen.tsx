@@ -147,6 +147,9 @@ export function EconomyScreen() {
         ))}
       </div>
 
+      {/* Every one of these still opens the placeholder screen, so they say so
+          here for the same reason the header menu does — before the click, not
+          after it. */}
       <div className={styles.toolsRow}>
         <span className={styles.toolsLabel}>Macro tools</span>
         {MACRO_TOOLS.map((tool) => (
@@ -156,6 +159,7 @@ export function EconomyScreen() {
             href={{ pathname: '/tool/[slug]', params: { slug: tool.slug } }}
           >
             {tool.label}
+            <span className={styles.soon}>Soon</span>
           </Link>
         ))}
       </div>

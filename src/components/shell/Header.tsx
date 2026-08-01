@@ -105,7 +105,13 @@ export function Header() {
     const sub = entry.subKey ? tMenu(entry.subKey) : null;
     const body = (
       <>
-        <div className={styles.menuItemLabel}>{label}</div>
+        <div className={styles.menuItemLabel}>
+          {label}
+          {/* Said before the click rather than after it. The destination still
+              exists and still explains itself — this only stops the menu from
+              implying the screen is finished. */}
+          {entry.soon && <span className={styles.soon}>Soon</span>}
+        </div>
         {sub && <div className={styles.menuItemSub}>{sub}</div>}
       </>
     );

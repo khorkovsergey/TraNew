@@ -837,3 +837,17 @@
     gap: 4px;
   }
 }
+
+/** Same "Soon" badge as the header menu — one word, one meaning, everywhere. */
+.soon {
+  display: inline-block;
+  margin-left: 7px;
+  border-radius: 8px;
+  background: var(--tn-chip-bg);
+  padding: 1px 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}

@@ -91,6 +91,15 @@ export function EventCard({
           <span>{times.local}</span>
         </div>
 
+        {/*
+          * The link covers the card, not just the words.
+          *
+          * On a phone the title was a 21px-tall text link and the only target on
+          * a card several hundred pixels tall — the cover, the summary and the
+          * chips all did nothing. `::after` stretches the anchor over the whole
+          * card without nesting anything inside it, so the accessible name stays
+          * the title and the Save button on top of it still takes its own taps.
+          */}
         <h3 className={styles.cardTitle}>
           <Link
             className={styles.cardLink}
