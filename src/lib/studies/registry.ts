@@ -162,11 +162,20 @@ function toRsi(averageGain: number, averageLoss: number): number {
 /**
  * Normalises the line endings of a Pine template.
  *
- * The templates are written as literals in this file, so on a Windows checkout
- * they carry CRLF and on a Linux one LF — meaning the bytes someone copies
- * depend on which machine built the site, while the code on screen looks
- * identical either way. Pine does not care, but "what you copy is what you see"
- * should not be true only by accident of platform.
+ * The templates are literals in a checked-out file, so a Windows checkout gives
+ * them CRLF and a Linux one LF: the string this module produces would otherwise
+ * differ by build machine. It is a small thing — nothing downstream reads a line
+ * ending — but a pure function whose output depends on how git happened to write
+ * the file is not really a pure function, and the unit test pins it.
+ *
+ * It is *not* what makes a copied snippet match the one on screen. Reading the
+ * clipboard back on Windows always returns CRLF whatever was written to it —
+ * `writeText('a
+b')` reads back as `a
+b` — so a test comparing the two will
+ * differ by one character per line and mean nothing. That cost an hour of
+ * chasing a deploy that was fine; it is written down here so it costs nobody
+ * else one.
  */
 function lf(template: string): string {
   return template.replace(/\r\n/g, '\n');
