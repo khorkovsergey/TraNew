@@ -174,6 +174,58 @@ try {
   await page.waitForTimeout(300);
   check('a scrolled header still takes a click', (await marketNav.getAttribute('aria-expanded')) === 'true');
   await page.keyboard.press('Escape');
+
+  console.log('\nOn a phone');
+  const phone = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  const small = await phone.newPage();
+  await small.goto(HOME, { waitUntil: 'networkidle' });
+  await small.locator('#ecosystem-title').scrollIntoViewIfNeeded();
+  await small.waitForTimeout(400);
+
+  const card = small.locator('[aria-roledescription="carousel"] > div > div').first();
+  const cardBox = await card.boundingBox();
+  check('the card fits the screen', cardBox.width <= 390, `${cardBox.width}px wide`);
+
+  // The headline is the one thing that must survive the crop.
+  const title = await card.locator('h3').boundingBox();
+  check(
+    'the headline is not cropped',
+    title.x >= -1 && title.x + title.width <= 391,
+    `${Math.round(title.x)}…${Math.round(title.x + title.width)}`
+  );
+
+  const viewport = small.locator('[aria-roledescription="carousel"]');
+  const box = await viewport.boundingBox();
+  const y = box.y + box.height / 2;
+  const swipe = async (fromX, toX) => {
+    await viewport.dispatchEvent('pointerdown', {
+      pointerType: 'touch',
+      clientX: fromX,
+      clientY: y,
+      isPrimary: true,
+    });
+    await viewport.dispatchEvent('pointerup', {
+      pointerType: 'touch',
+      clientX: toX,
+      clientY: y,
+      isPrimary: true,
+    });
+    await small.waitForTimeout(700);
+  };
+  const activeOn = () => small.locator('[role="tab"][aria-selected="true"]').innerText();
+
+  await swipe(box.x + 300, box.x + 80);
+  check('swiping left advances', (await activeOn()) === 'Market Intelligence');
+  await swipe(box.x + 80, box.x + 300);
+  check('swiping right goes back', (await activeOn()) === 'AI Voyager');
+  await swipe(box.x + 200, box.x + 180);
+  check('a short drag is not a swipe', (await activeOn()) === 'AI Voyager');
+
+  await phone.close();
 } finally {
   console.log(`\n${passed}/${passed + failed} passed`);
   await browser.close();

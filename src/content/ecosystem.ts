@@ -100,8 +100,3 @@ export const ECOSYSTEM: EcosystemCard[] = [
     href: '/marketplace',
   },
 ];
-
-/** Card and track geometry, shared by the carousel and its stylesheet. */
-export const CARD_WIDTH = 780;
-export const CARD_GAP = 26;
-export const CARD_PITCH = CARD_WIDTH + CARD_GAP;

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from '@/i18n/navigation';
 import { openVoyager } from '@/lib/voyager/openRequest';
-import { CARD_PITCH, CARD_WIDTH, ECOSYSTEM } from '@/content/ecosystem';
+import { ECOSYSTEM } from '@/content/ecosystem';
 import { EcosystemArt } from './EcosystemScenes';
 import styles from './Ecosystem.module.css';
 
@@ -28,9 +28,6 @@ const COUNT = ECOSYSTEM.length;
 const CLONE = COUNT;
 /** Slightly longer than the 450ms transition, so the reset lands after it ends. */
 const WRAP_AFTER = 480;
-
-/** The track is anchored at the viewport centre; this pulls the card back onto it. */
-const CENTRE_OFFSET = CARD_WIDTH / 2;
 
 const CARDS = [...ECOSYSTEM, ECOSYSTEM[0]];
 
@@ -137,6 +134,30 @@ export function Ecosystem() {
     }
   };
 
+  /*
+   * Swipe. On a phone the arrows are hidden and dragging the cards is what
+   * anyone will try first. The threshold is deliberately generous — below 45px
+   * a horizontal wobble during a vertical scroll would steal the gesture, and
+   * `touch-action: pan-y` already leaves the page's own scrolling alone.
+   */
+  const dragFrom = useRef<{ x: number; y: number } | null>(null);
+
+  const onPointerDown = (event: React.PointerEvent) => {
+    if (event.pointerType === 'mouse') return;
+    dragFrom.current = { x: event.clientX, y: event.clientY };
+  };
+
+  const onPointerUp = (event: React.PointerEvent) => {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    if (!from) return;
+
+    const dx = event.clientX - from.x;
+    if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(event.clientY - from.y)) return;
+    if (dx < 0) next();
+    else prev();
+  };
+
   return (
     <section className={styles.section} aria-labelledby="ecosystem-title">
       <div className={styles.head}>
@@ -167,10 +188,15 @@ export function Ecosystem() {
         aria-label="One platform, seven ways it works for you"
         tabIndex={0}
         onKeyDown={onKeyDown}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onPointerCancel={() => {
+          dragFrom.current = null;
+        }}
       >
         <div
           className={`${styles.track} ${animated ? styles.animated : styles.instant}`}
-          style={{ transform: `translateX(-${CENTRE_OFFSET + pos * CARD_PITCH}px)` }}
+          style={{ '--pos': pos } as React.CSSProperties}
         >
           {CARDS.map((card, index) => {
             const isActive = index === pos;

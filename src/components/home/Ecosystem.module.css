@@ -68,21 +68,34 @@
 
 /* ---- Viewport and track ---- */
 
+/*
+ * The card width is a variable, and the track's offset is derived from it, so
+ * the two can never disagree. The component sets only --pos; everything
+ * positional is here, which is what lets a narrow screen shrink the card
+ * without a line of JavaScript knowing about it.
+ */
 .viewport {
+  --card-w: 780px;
+  --card-gap: 26px;
   position: relative;
   /* The neighbours are meant to be cut off by the edge of the screen, not to
      widen the page — every ancestor of this is at the document's own width. */
   overflow: hidden;
   margin-top: 18px;
+  /* Horizontal drags belong to the carousel, vertical ones to the page. */
+  touch-action: pan-y;
 }
 
 .track {
   position: relative;
   left: 50%;
   display: flex;
-  gap: 26px;
+  gap: var(--card-gap);
   width: max-content;
   will-change: transform;
+  transform: translateX(
+    calc(var(--card-w) / -2 - var(--pos) * (var(--card-w) + var(--card-gap)))
+  );
 }
 
 .animated {
@@ -94,9 +107,9 @@
 .card {
   position: relative;
   box-sizing: border-box;
-  width: 780px;
-  height: 440px;
-  flex: 0 0 780px;
+  width: var(--card-w);
+  height: var(--card-h, 440px);
+  flex: 0 0 var(--card-w);
   border-radius: 24px;
   padding: 52px 48px 0;
   overflow: hidden;
@@ -526,12 +539,43 @@
 
 /* ---- Narrow screens ---- */
 
-@media (max-width: 900px) {
+/*
+ * Below this the 780px card is wider than the screen and crops its own
+ * headline. The card follows the viewport instead, and the type comes down with
+ * it. The scenes are still drawn at their full size and get cropped — they are
+ * decoration, and the sentence and the button are what has to survive.
+ */
+@media (max-width: 860px) {
+  .viewport {
+    --card-w: min(780px, calc(100vw - 28px));
+    --card-h: 470px;
+  }
+
   .titles {
     gap: 18px;
+    margin-top: 16px;
   }
 
   .title {
     font-size: 13px;
+    padding: 9px 2px;
+  }
+
+  .card {
+    padding: 34px 22px 0;
+  }
+
+  .cardTitle {
+    font-size: 22px;
+    letter-spacing: -0.4px;
+  }
+
+  .cardValue {
+    font-size: 14px;
+  }
+
+  /* At this width an arrow would sit on top of the card it points away from. */
+  .arrow {
+    display: none;
   }
 }
