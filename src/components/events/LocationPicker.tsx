@@ -16,7 +16,7 @@ import styles from './Events.module.css';
  * knowing which building someone is in.
  */
 
-const KEY = 'tn_events_location';
+const KEY = 'tn_events_location_v2';
 
 export function LocationPicker({
   city,

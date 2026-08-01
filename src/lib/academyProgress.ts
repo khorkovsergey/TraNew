@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'tn_learn_v1';
+const STORAGE_KEY = 'tn_learn_v2';
 
 export type AcademyMode = 'beginner' | 'standard' | 'pro';
 

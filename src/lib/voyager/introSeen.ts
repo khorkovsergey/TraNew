@@ -18,7 +18,7 @@
  * that setting under which a 58-second autoplaying video is what they meant.
  */
 
-const KEY = 'tn_voyager_intro_v1';
+const KEY = 'tn_voyager_intro_v2';
 
 export function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined') return false;

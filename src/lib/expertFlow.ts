@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'tn_expert_v1';
+const STORAGE_KEY = 'tn_expert_v2';
 
 /**
  * Production booking lifecycle. The prototype exercises the first three; the rest
