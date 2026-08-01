@@ -149,9 +149,15 @@
   overflow-y: auto;
 }
 
+/*
+ * `left` is written by the header once the panel has been measured, so it sits
+ * under the item that opened it. The 12px here is only what it starts at for the
+ * one layout pass before that happens — every panel used to be centred on the
+ * viewport instead, which happens to look right under the wide menus and leaves
+ * the narrow Marketplace one floating a long way from its own trigger.
+ */
 .menuPanel {
-  left: 50%;
-  transform: translateX(-50%);
+  left: 12px;
   padding: 26px 30px;
   display: flex;
   flex-wrap: wrap;

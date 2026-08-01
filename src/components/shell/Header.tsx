@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
 import { requestSearchFocus } from '@/lib/searchFocus';
@@ -19,6 +19,40 @@ export function Header() {
 
   const [openMenu, setOpenMenu] = useState<NavKey | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggers = useRef<Partial<Record<NavKey, HTMLButtonElement | null>>>({});
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelLeft, setPanelLeft] = useState<number | null>(null);
+
+  /*
+   * A dropdown belongs under the thing that opened it. The panel is fixed, so
+   * that means measuring the trigger and writing a pixel `left` — and clamping
+   * it, because the Marketplace item sits near the right edge and its panel
+   * would otherwise hang off the screen at narrow widths.
+   */
+  const placePanel = useCallback(() => {
+    if (!openMenu) return;
+    const trigger = triggers.current[openMenu];
+    const panel = panelRef.current;
+    if (!trigger || !panel) return;
+
+    const anchor = trigger.getBoundingClientRect();
+    const width = panel.offsetWidth;
+    const margin = 12;
+    const centred = anchor.left + anchor.width / 2 - width / 2;
+    const rightmost = Math.max(margin, window.innerWidth - width - margin);
+
+    setPanelLeft(Math.round(Math.min(Math.max(centred, margin), rightmost)));
+  }, [openMenu]);
+
+  // Before paint, so the panel is never seen at the position it starts from.
+  useLayoutEffect(placePanel, [placePanel]);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    window.addEventListener('resize', placePanel);
+    return () => window.removeEventListener('resize', placePanel);
+  }, [openMenu, placePanel]);
 
   const cancelClose = () => {
     if (closeTimer.current) {
@@ -155,6 +189,9 @@ export function Header() {
               return (
                 <button
                   key={key}
+                  ref={(element) => {
+                    triggers.current[key] = element;
+                  }}
                   className={className}
                   aria-expanded={openMenu === key}
                   aria-haspopup="true"
@@ -185,7 +222,11 @@ export function Header() {
         </header>
 
         {openMenu && (
-          <div className={`${styles.panel} ${styles.menuPanel}`}>
+          <div
+            ref={panelRef}
+            className={`${styles.panel} ${styles.menuPanel}`}
+            style={panelLeft === null ? undefined : { left: panelLeft }}
+          >
             {MENUS[openMenu as Exclude<NavKey, 'home'>].map((group) => (
               <div className={styles.group} key={group.titleKey}>
                 <div className={styles.groupTitle}>{tMenu(group.titleKey)}</div>
