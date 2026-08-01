@@ -1,0 +1,537 @@
+/* ---- Section ---- */
+
+.section {
+  margin: 64px auto 0;
+  overflow: hidden;
+}
+
+.head {
+  text-align: center;
+  padding: 0 var(--tn-page-pad);
+}
+
+.h2 {
+  margin: 0;
+  font-size: clamp(24px, 3.2vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  color: var(--tn-text);
+}
+
+.sub {
+  margin: 10px 0 0;
+  font-size: clamp(14px, 1.7vw, 16px);
+  color: var(--tn-text-secondary);
+}
+
+/* ---- Titles row ---- */
+
+.titles {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 34px;
+  margin-top: 24px;
+  padding: 0 var(--tn-page-pad);
+}
+
+/*
+ * The handoff greys these to #b6bdcb, which is 1.8:1 against the page — below
+ * every readability threshold there is, on a control whose whole job is to be
+ * read and clicked. Secondary text carries the same "not the current one"
+ * meaning at 5.9:1, so the hierarchy survives and the label stays legible.
+ *
+ * The padding is vertical only: it lifts the target from 22px to 40px tall
+ * without moving anything, since the row's own margin absorbs it.
+ */
+.title {
+  background: none;
+  border: 0;
+  padding: 13px 2px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tn-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--tn-transition-fast);
+}
+
+.title:hover {
+  color: var(--tn-text-nav);
+}
+
+.titleActive,
+.titleActive:hover {
+  color: var(--tn-text);
+}
+
+/* ---- Viewport and track ---- */
+
+.viewport {
+  position: relative;
+  /* The neighbours are meant to be cut off by the edge of the screen, not to
+     widen the page — every ancestor of this is at the document's own width. */
+  overflow: hidden;
+  margin-top: 18px;
+}
+
+.track {
+  position: relative;
+  left: 50%;
+  display: flex;
+  gap: 26px;
+  width: max-content;
+  will-change: transform;
+}
+
+.animated {
+  transition: transform 0.45s cubic-bezier(0.25, 0.8, 0.3, 1);
+}
+
+/* ---- Card ---- */
+
+.card {
+  position: relative;
+  box-sizing: border-box;
+  width: 780px;
+  height: 440px;
+  flex: 0 0 780px;
+  border-radius: 24px;
+  padding: 52px 48px 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  opacity: 0.45;
+  transform: scale(0.94);
+  transition:
+    opacity 0.45s cubic-bezier(0.25, 0.8, 0.3, 1),
+    transform 0.45s cubic-bezier(0.25, 0.8, 0.3, 1);
+}
+
+.cardActive {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/*
+ * Killed on both the track and the cards during the wrap reset. Leaving it on the
+ * cards alone is enough to give the seam away: the clone fades out while the real
+ * first card fades in, and the eye reads it as a blink even though the position
+ * never moved.
+ */
+.instant,
+.instant .card {
+  transition: none;
+}
+
+.cardBody {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.7px;
+  color: var(--tn-text);
+}
+
+.cardValue {
+  margin: 8px 0 0;
+  max-width: 460px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--tn-text-secondary);
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 18px;
+  border: 0;
+  border-radius: 22px;
+  padding: 12px 24px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  transition: filter var(--tn-transition-fast);
+}
+
+.cta:hover {
+  filter: brightness(1.08);
+}
+
+/* A card that is not centred is a navigation target, not a page of content:
+   its own controls must not be reachable by keyboard or pointer. */
+.cardInert .cta {
+  pointer-events: none;
+}
+
+.cardHit {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cardActive .cardHit {
+  display: none;
+}
+
+/* ---- Decor and scene ---- */
+
+.decor,
+.scene {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.decor {
+  z-index: 0;
+  overflow: hidden;
+  border-radius: 24px;
+}
+
+.scene {
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.sceneRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.miniCard {
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: 0 8px 26px rgba(19, 23, 34, 0.1);
+  text-align: left;
+}
+
+.satellite {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 6px 18px rgba(19, 23, 34, 0.1);
+}
+
+/* ---- Scene text ---- */
+
+/* The uppercase ones are written uppercase — no transform, so a screen reader
+   that reaches them reads "NET WEALTH" as the two words it is. */
+.miniLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tn-text-muted);
+}
+
+.question {
+  margin-top: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+.answer {
+  margin-top: 8px;
+  border-top: 1px solid var(--tn-border-card);
+  padding-top: 8px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--tn-text-nav);
+}
+
+.source {
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--tn-text-faint);
+}
+
+.sceneText {
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--tn-text);
+}
+
+.tickerHead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--tn-text);
+  margin-bottom: 6px;
+}
+
+.profileText {
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--tn-text);
+}
+
+.netWealth {
+  margin-top: 2px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.lessonTitle {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.quickCheck {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tn-purple);
+}
+
+.answerChips {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.answerRight,
+.answerPlain {
+  border-radius: 9px;
+  padding: 4px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.answerRight {
+  background: var(--tn-green-tint);
+  color: var(--tn-green);
+}
+
+.answerPlain {
+  background: var(--tn-chip-bg);
+  color: var(--tn-text-muted);
+}
+
+/* ---- Bars ---- */
+
+.bar {
+  margin-top: 8px;
+}
+
+.barHead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tn-text-nav);
+}
+
+.barValue {
+  color: var(--tn-text-muted);
+}
+
+.barTrack {
+  height: 6px;
+  border-radius: 3px;
+  background: #eef0f5;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+/* ---- Supercharts workspace ---- */
+
+.workspace {
+  box-sizing: border-box;
+  width: 620px;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 30px rgba(19, 23, 34, 0.08);
+  padding: 16px 20px 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.toolbarSymbol {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.toolChip {
+  border-radius: 9px;
+  background: var(--tn-chip-bg);
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+  white-space: nowrap;
+}
+
+.toolChipAi {
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple);
+}
+
+/* ---- Wealth stack ---- */
+
+.assetStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.assetRow {
+  background: #fff;
+  border-radius: 10px;
+  padding: 7px 13px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+  box-shadow: 0 4px 14px rgba(19, 23, 34, 0.08);
+}
+
+/* ---- Marketplace categories ---- */
+
+.categoryCard {
+  box-sizing: border-box;
+  width: 118px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: 0 8px 26px rgba(19, 23, 34, 0.1);
+}
+
+.categoryLabel {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--tn-text);
+}
+
+/* ---- Arrows ---- */
+
+.arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--tn-border-control);
+  box-shadow: 0 4px 14px rgba(19, 23, 34, 0.12);
+  color: var(--tn-text);
+  cursor: pointer;
+  transition:
+    background var(--tn-transition-fast),
+    box-shadow var(--tn-transition-fast);
+}
+
+.arrow:hover {
+  background: var(--tn-chip-bg);
+}
+
+.arrowPrev {
+  left: max(10px, calc(50% - 470px));
+}
+
+.arrowNext {
+  right: max(10px, calc(50% - 470px));
+}
+
+/* ---- Dots ---- */
+
+.dots {
+  display: flex;
+  justify-content: center;
+  margin-top: 22px;
+}
+
+/*
+ * The button is the target, the span inside it is the dot. An 8×8px control is
+ * a quarter of the smallest target anyone should have to hit; padding takes it
+ * to 16×32 while the 8px gap between the visible dots stays exactly as drawn.
+ */
+.dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 32px;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.dotActive {
+  width: 34px;
+}
+
+.dotVisual {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: #d5dae5;
+  transition:
+    width var(--tn-transition-fast),
+    background var(--tn-transition-fast);
+}
+
+.dotActive .dotVisual {
+  width: 26px;
+  background: var(--tn-text);
+}
+
+/* ---- Narrow screens ---- */
+
+@media (max-width: 900px) {
+  .titles {
+    gap: 18px;
+  }
+
+  .title {
+    font-size: 13px;
+  }
+}

@@ -1,7 +1,19 @@
-.header {
+/*
+ * The dock is what sticks, not the header inside it.
+ *
+ * A sticky element can never travel outside its parent's box, and this wrapper —
+ * which exists so the header and its dropdown share one pointer region — is only
+ * as tall as the header itself. Sticky on the header therefore had nowhere to go
+ * and scrolled away with the page. Moving it to the dock puts the constraint back
+ * on the document, which is the box it should have been measured against.
+ */
+.headerDock {
   position: sticky;
   top: 0;
   z-index: 40;
+}
+
+.header {
   display: flex;
   align-items: center;
   justify-content: space-between;

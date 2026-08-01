@@ -127,7 +127,11 @@ export function Header() {
       {/* Header and panel share one pointer region so leaving either closes the
           menu. The scrim stays outside it: a full-viewport child would mean the
           pointer never leaves, and the close would never fire. */}
-      <div onPointerLeave={scheduleClose} onPointerEnter={cancelClose}>
+      <div
+        className={styles.headerDock}
+        onPointerLeave={scheduleClose}
+        onPointerEnter={cancelClose}
+      >
         <header className={styles.header}>
           <Link className={styles.logo} href="/" aria-label={t('homeLink')} onClick={closeAll}>
             <span className={styles.mark} aria-hidden="true">

@@ -11,6 +11,7 @@ import type {
 } from '@/lib/voyager/types';
 import { routeFor } from './actionRoutes';
 import { hasSeenIntro, markIntroSeen } from '@/lib/voyager/introSeen';
+import { onVoyagerOpenRequest } from '@/lib/voyager/openRequest';
 import { VoyagerIntro } from './VoyagerIntro';
 import { VoyagerOrb, VoyagerWordmark } from './VoyagerOrb';
 import { useVoyagerContext } from './VoyagerProvider';
@@ -98,6 +99,23 @@ export function VoyagerWidget() {
   useEffect(() => {
     if (mode === 'panel') inputRef.current?.focus();
   }, [mode]);
+
+  /*
+   * Opened from elsewhere on the page — today the "Ask AI Voyager" card on the home
+   * page. It lands on the panel rather than the peek because the button said "ask",
+   * but a first-ever open still plays the introduction: which door someone came
+   * through should not decide whether they get introduced to the thing.
+   */
+  useEffect(
+    () =>
+      onVoyagerOpenRequest(() => {
+        setMode((current) => {
+          if (current === 'collapsed' && !(hasSeenIntro() || state?.introSeen)) return 'intro';
+          return 'panel';
+        });
+      }),
+    [state?.introSeen]
+  );
 
   // Escape closes the panel — a fixed overlay that traps people is a bad overlay.
   useEffect(() => {

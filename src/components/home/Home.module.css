@@ -218,20 +218,11 @@
   margin: 0;
 }
 
-.h2Small {
-  font-size: 26px;
-  letter-spacing: -0.6px;
-}
-
 .sectionSub {
   font-size: 16.5px;
   color: var(--tn-text-secondary);
   text-align: center;
   margin: 10px 0 0;
-}
-
-.sectionSubSmall {
-  font-size: 15.5px;
 }
 
 /* ---- Goal cards ---- */
@@ -343,7 +334,7 @@
   margin-top: 14px;
 }
 
-/* ---- Divider + quick links ---- */
+/* ---- Divider ---- */
 
 .divider {
   max-width: 1140px;
@@ -353,183 +344,6 @@
 
 .dividerLine {
   border-top: 1px solid var(--tn-border-control);
-}
-
-.sectionQuick {
-  margin-top: 48px;
-}
-
-.quickRow {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 28px;
-}
-
-.quickChip {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  background: var(--tn-surface);
-  border: 1px solid var(--tn-border-control);
-  border-radius: 26px;
-  padding: 13px 20px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--tn-text);
-  transition: box-shadow var(--tn-transition-fast);
-}
-
-.quickChip:hover {
-  box-shadow: 0 4px 14px rgba(19, 23, 34, 0.08);
-}
-
-.quickChipAccent {
-  background: transparent;
-  border-color: var(--tn-blue);
-  color: var(--tn-blue);
-}
-
-/* ---- Showcases ---- */
-
-.sectionShowcase {
-  margin-top: 56px;
-}
-
-.showcaseGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.showcase {
-  border-radius: var(--tn-radius-showcase);
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.showcaseCharts {
-  background: linear-gradient(180deg, #e3ecfd, #f5f9ff);
-  padding: 56px 32px 0;
-  overflow: hidden;
-}
-
-.showcaseMarket {
-  background: linear-gradient(180deg, #ece5fc, #f9f6ff);
-  padding: 56px 32px 48px;
-}
-
-.showcaseTitle {
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: -0.9px;
-  margin: 0;
-}
-
-.showcaseSub {
-  font-size: 15px;
-  color: var(--tn-text-secondary);
-  margin: 10px 0 0;
-  max-width: 380px;
-}
-
-.showcaseCtas {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.showcaseFilled {
-  color: #fff;
-  border-radius: 22px;
-  padding: 11px 20px;
-  font-size: 13.5px;
-  font-weight: 700;
-  transition: background var(--tn-transition-fast);
-}
-
-.showcaseOutline {
-  background: transparent;
-  border-radius: 22px;
-  padding: 10px 18px;
-  font-size: 13.5px;
-  font-weight: 700;
-  border: 1.5px solid currentColor;
-  transition: background var(--tn-transition-fast);
-}
-
-.showcaseChart {
-  width: 110%;
-  margin-top: 28px;
-  display: block;
-}
-
-.showcaseIcons {
-  display: flex;
-  gap: 18px;
-  margin-top: 38px;
-}
-
-.showcaseIcon {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: var(--tn-surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 6px 18px rgba(124, 77, 255, 0.12);
-}
-
-/* ---- Trust principles ---- */
-
-.sectionFeatures {
-  margin-top: 48px;
-}
-
-.featureStrip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  background: var(--tn-chip-bg);
-  border-radius: 20px;
-  padding: 34px 10px;
-}
-
-.feature {
-  padding: 0 22px;
-  text-align: left;
-  display: block;
-}
-
-.feature + .feature {
-  border-left: 1px solid #e2e6ee;
-}
-
-.featureTile {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.featureTitle {
-  font-size: 15px;
-  font-weight: 700;
-  margin-top: 12px;
-}
-
-.featureText {
-  font-size: 13.5px;
-  color: var(--tn-text-secondary);
-  line-height: 1.55;
-  margin-top: 7px;
 }
 
 /* ---- Login banner ---- */
@@ -603,29 +417,9 @@
     grid-template-columns: 1fr;
   }
 
-  .showcaseGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .featureStrip {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 26px 0;
-  }
-
-  .feature:nth-child(odd) {
-    border-left: none;
-  }
 }
 
 @media (max-width: 640px) {
-  .featureStrip {
-    grid-template-columns: 1fr;
-  }
-
-  .feature + .feature {
-    border-left: none;
-  }
-
   .banner {
     flex-direction: column;
     align-items: flex-start;

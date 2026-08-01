@@ -5,7 +5,6 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { Header } from '@/components/shell/Header';
 import { LoginModalProvider } from '@/components/shell/LoginModalProvider';
-import { StubBanner } from '@/components/shell/StubBanner';
 import { VoyagerProvider } from '@/components/voyager/VoyagerProvider';
 import { VoyagerWidget } from '@/components/voyager/VoyagerWidget';
 import { routing } from '@/i18n/routing';
@@ -76,7 +75,6 @@ export default async function LocaleLayout(props: {
                 {t('skipToContent')}
               </a>
               <div className="tn-app">
-                <StubBanner />
                 <Header />
                 <main id="main">{props.children}</main>
               </div>

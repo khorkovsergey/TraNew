@@ -766,33 +766,6 @@
         "b4": "Advanced charts"
       }
     },
-    "knowTitle": "Already know what you need?",
-    "knowSub": "Jump straight in and use powerful tools to research, analyze and track the markets.",
-    "quick": {
-      "research": "Research an asset",
-      "today": "Explore today's market",
-      "ideas": "Find investment ideas",
-      "portfolio": "Track a portfolio",
-      "charts": "Open professional charts"
-    },
-    "showcase": {
-      "chartsTitle": "Supercharts",
-      "chartsSub": "Professional charting and market analysis.",
-      "chartsCta": "Open charts",
-      "marketTitle": "Marketplace",
-      "marketSub": "Go beyond your plan — experts, tools, learning and exclusive products.",
-      "marketCta": "Browse experts"
-    },
-    "features": {
-      "dataTitle": "Trusted data",
-      "dataText": "Reliable, real-time data from 150+ global markets.",
-      "explainTitle": "Clear explanations",
-      "explainText": "Understand what's happening and why it matters.",
-      "guidanceTitle": "Personal guidance",
-      "guidanceText": "Tools and insights tailored to your goals.",
-      "toolsTitle": "Professional tools",
-      "toolsText": "Powerful charts, screeners and analysis in one place."
-    },
     "bannerTitle": "Already using TradingNew?",
     "bannerSub": "Continue to your personal workspace, charts, watchlists and alerts.",
     "bannerCta": "Log in to your account"
