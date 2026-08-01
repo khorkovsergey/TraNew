@@ -31,7 +31,14 @@ Secondary text `--tn-text-secondary` `#5a6376`; muted `--tn-text-muted` `#8a93a6
 
 Every brand colour already exists in `src/app/tokens.css`. Writing `#2962ff` in a component instead of `var(--tn-blue)` breaks theming and hides the colour from any future audit.
 
+The reverse mistake is worse, because it is silent: `var(--tn-surface-alt)` for a
+token that was never declared drops the whole declaration, and the element renders
+with the inherited value, which looks like a styling decision rather than a bug.
+
 ```bash
+# Every var(--tn-*) must name a token that exists — fails if one does not
+node scripts/check-tokens.mjs
+
 # Raw hex values sitting in component CSS — should trend toward zero
 grep -rhoE "#[0-9a-fA-F]{6}" src --include=*.css | sort -u | wc -l
 
