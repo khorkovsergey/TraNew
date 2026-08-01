@@ -159,6 +159,19 @@ function toRsi(averageGain: number, averageLoss: number): number {
 
 /* --------------------------------------------------------------- Studies */
 
+/**
+ * Normalises the line endings of a Pine template.
+ *
+ * The templates are written as literals in this file, so on a Windows checkout
+ * they carry CRLF and on a Linux one LF — meaning the bytes someone copies
+ * depend on which machine built the site, while the code on screen looks
+ * identical either way. Pine does not care, but "what you copy is what you see"
+ * should not be true only by accident of platform.
+ */
+function lf(template: string): string {
+  return template.replace(/\r\n/g, '\n');
+}
+
 export const STUDIES: Record<StudyId, StudyDefinition> = {
   sma: {
     id: 'sma',
@@ -172,14 +185,14 @@ export const STUDIES: Record<StudyId, StudyDefinition> = {
       { key: 'fast', values: sma(closes, params.fast), color: 0 },
       { key: 'slow', values: sma(closes, params.slow), color: 1 },
     ],
-    pine: (params) => `//@version=6
+    pine: (params) => lf(`//@version=6
 indicator("Moving Averages", overlay = true)
 fastLen = input.int(${params.fast}, "Fast MA length", minval = 2)
 slowLen = input.int(${params.slow}, "Slow MA length", minval = 2)
 fastMa = ta.sma(close, fastLen)
 slowMa = ta.sma(close, slowLen)
 plot(fastMa, "Fast MA", color = color.new(color.blue, 0))
-plot(slowMa, "Slow MA", color = color.new(color.orange, 0))`,
+plot(slowMa, "Slow MA", color = color.new(color.orange, 0))`),
   },
 
   rsi: {
@@ -192,13 +205,13 @@ plot(slowMa, "Slow MA", color = color.new(color.orange, 0))`,
     compute: (closes, params) => [
       { key: 'rsi', values: rsi(closes, params.length), color: 2 },
     ],
-    pine: (params) => `//@version=6
+    pine: (params) => lf(`//@version=6
 indicator("RSI", overlay = false)
 length = input.int(${params.length}, "Length", minval = 2)
 rsi = ta.rsi(close, length)
 plot(rsi, "RSI", color = color.new(color.purple, 0))
 hline(70, "Overbought", color = color.new(color.red, 50))
-hline(30, "Oversold", color = color.new(color.green, 50))`,
+hline(30, "Oversold", color = color.new(color.green, 50))`),
   },
 
   bbands: {
@@ -225,7 +238,7 @@ hline(30, "Oversold", color = color.new(color.green, 50))`,
         { key: 'lower', values: band(-1), color: 1 },
       ];
     },
-    pine: (params) => `//@version=6
+    pine: (params) => lf(`//@version=6
 indicator("Bollinger Bands", overlay = true)
 length = input.int(${params.length}, "Length", minval = 2)
 mult = input.float(${params.mult}, "Standard deviations", minval = 1, maxval = 4)
@@ -236,7 +249,7 @@ lower = basis - dev
 plot(basis, "Basis", color = color.new(color.blue, 0))
 plot(upper, "Upper", color = color.new(color.orange, 0))
 plot(lower, "Lower", color = color.new(color.orange, 0))
-fill(plot(upper, display = display.none), plot(lower, display = display.none), color = color.new(color.blue, 92))`,
+fill(plot(upper, display = display.none), plot(lower, display = display.none), color = color.new(color.blue, 92))`),
   },
 
   macd: {
@@ -278,7 +291,7 @@ fill(plot(upper, display = display.none), plot(lower, display = display.none), c
         { key: 'hist', values: hist, color: 1 },
       ];
     },
-    pine: (params) => `//@version=6
+    pine: (params) => lf(`//@version=6
 indicator("MACD", overlay = false)
 fastLen = input.int(${params.fast}, "Fast length", minval = 2)
 slowLen = input.int(${params.slow}, "Slow length", minval = 3)
@@ -287,7 +300,7 @@ signalLen = input.int(${params.signal}, "Signal length", minval = 2)
 plot(macdLine, "MACD", color = color.new(color.blue, 0))
 plot(signalLine, "Signal", color = color.new(color.orange, 0))
 plot(histLine, "Histogram", style = plot.style_columns, color = color.new(color.gray, 40))
-hline(0, "Zero", color = color.new(color.gray, 60))`,
+hline(0, "Zero", color = color.new(color.gray, 60))`),
   },
 };
 

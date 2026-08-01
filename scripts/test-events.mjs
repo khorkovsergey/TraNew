@@ -792,6 +792,17 @@ try {
     }
   });
 
+  check('the code copied is the code shown, on any platform', () => {
+    // The templates are literals in a checked-out file, so a Windows checkout
+    // carries CRLF and a Linux one LF. Without normalising, the bytes on the
+    // clipboard depend on which machine built the site while the screen looks
+    // the same either way.
+    for (const id of studies.STUDY_IDS) {
+      const code = studies.STUDIES[id].pine(studies.clampSpec({ id }).params);
+      assert.ok(!code.includes(String.fromCharCode(13)), `${id} carries a carriage return`);
+    }
+  });
+
   check('a study never describes itself as a reason to trade', () => {
     const forbidden = /\b(buy|sell|short|long the|entry signal|take profit)\b/i;
 
