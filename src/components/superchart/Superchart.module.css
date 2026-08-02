@@ -480,3 +480,38 @@
   line-height: 1.5;
   color: var(--tn-text-muted);
 }
+
+/* A confirmation with the way back attached, per the design's consent model:
+   every applied change is one Undo away, and the toast is one of the three
+   places that offers it. */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--tn-surface);
+  border: 1px solid var(--tn-border-card);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tn-text);
+  box-shadow: var(--tn-shadow-dropdown);
+}
+
+.toastUndo {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--tn-blue);
+  cursor: pointer;
+}
+
+.panelToggle:disabled { opacity: 0.4; cursor: default; }

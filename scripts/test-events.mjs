@@ -74,6 +74,8 @@ try {
       'src/lib/superchart/datafeed/portalAdapter.ts',
       'src/lib/superchart/drawings/types.ts',
       'src/lib/superchart/indicators/index.ts',
+      'src/lib/superchart/layouts/schema.ts',
+      'src/lib/superchart/transactions/index.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -175,6 +177,8 @@ try {
   const portal = await load('portalAdapter');
   const draw = await load('types', 'drawings');
   const indicators = await load('index', 'indicators');
+  const layouts = await load('schema', 'layouts');
+  const tr = await load('index', 'transactions');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -1890,6 +1894,204 @@ try {
     const again = indicators.recompute(created, testBars.slice(0, 80));
     assert.equal(again.id, created.id);
     assert.equal(again.plots[0].values.length, 80);
+  });
+
+  /* ============================ Superchart layouts ============================ */
+
+  group('Layout schema — untrusted input from a browser');
+
+  const goodState = {
+    symbolId: 'NASDAQ:TSLA',
+    interval: '1D',
+    chartType: 'candles',
+    studies: [{ definitionId: 'sma', params: { fast: 20, slow: 50 } }],
+    drawings: [
+      {
+        id: 'd1',
+        tool: 'trendLine',
+        points: [{ barIndex: 1, price: 100 }, { barIndex: 9, price: 120 }],
+        style: { colour: '#7c4dff', width: 1.6, dashed: false },
+        locked: false,
+        hidden: false,
+        source: 'user',
+        createdAt: '2026-08-01T00:00:00Z',
+        updatedAt: '2026-08-01T00:00:00Z',
+        draft: false,
+      },
+    ],
+    panelOpen: true,
+    dockOpen: false,
+  };
+
+  const goodLayout = layouts.serializeLayout('l1', 'Mine', goodState);
+
+  check('a layout round-trips', () => {
+    const back = layouts.parseLayout(JSON.parse(JSON.stringify(goodLayout)));
+    assert.equal(back.state.symbolId, 'NASDAQ:TSLA');
+    assert.equal(back.state.drawings.length, 1);
+    assert.equal(back.state.studies[0].definitionId, 'sma');
+  });
+
+  check('a version from the future is refused rather than guessed at', () => {
+    // Guessing at a shape written by newer code is how a layout gets silently
+    // truncated.
+    assert.equal(layouts.parseLayout({ ...goodLayout, schemaVersion: 99 }), null);
+  });
+
+  check('an unknown interval takes the whole layout down, not just the field', () => {
+    /*
+     * A half-restored workspace — the right symbol with an interval the
+     * provider cannot serve — is harder to recognise as broken than an empty
+     * one.
+     */
+    assert.equal(
+      layouts.parseLayout({ ...goodLayout, state: { ...goodState, interval: '3s' } }),
+      null
+    );
+  });
+
+  check('an unknown drawing tool is dropped, and the rest survives', () => {
+    const back = layouts.parseLayout({
+      ...goodLayout,
+      state: {
+        ...goodState,
+        drawings: [...goodState.drawings, { ...goodState.drawings[0], id: 'x', tool: 'wormhole' }],
+      },
+    });
+    assert.equal(back.state.drawings.length, 1);
+  });
+
+  check('a drawing with an unusable point is dropped', () => {
+    const back = layouts.parseLayout({
+      ...goodLayout,
+      state: {
+        ...goodState,
+        drawings: [{ ...goodState.drawings[0], points: [{ barIndex: 'x', price: null }] }],
+      },
+    });
+    assert.equal(back.state.drawings.length, 0);
+  });
+
+  check('a non-numeric study parameter is discarded, not passed through', () => {
+    const back = layouts.parseLayout({
+      ...goodLayout,
+      state: {
+        ...goodState,
+        studies: [{ definitionId: 'sma', params: { fast: 20, slow: 'lots' } }],
+      },
+    });
+    assert.deepEqual(back.state.studies[0].params, { fast: 20 });
+  });
+
+  check('a draft never survives a save', () => {
+    // A draft is a proposal, and a proposal is not part of a saved workspace.
+    const withDraft = layouts.serializeLayout('l2', 'Mine', {
+      ...goodState,
+      drawings: [...goodState.drawings, { ...goodState.drawings[0], id: 'draft', draft: true }],
+    });
+    assert.equal(withDraft.state.drawings.length, 1);
+    assert.equal(withDraft.state.drawings[0].id, 'd1');
+  });
+
+  check('and a stored draft flag is ignored on the way back in', () => {
+    const back = layouts.parseLayout({
+      ...goodLayout,
+      state: { ...goodState, drawings: [{ ...goodState.drawings[0], draft: true }] },
+    });
+    assert.equal(back.state.drawings[0].draft, false);
+  });
+
+  check('rubbish is null rather than a partial layout', () => {
+    assert.equal(layouts.parseLayout(null), null);
+    assert.equal(layouts.parseLayout('a string'), null);
+    assert.equal(layouts.parseLayout({}), null);
+  });
+
+  group('Undo and redo, by transaction');
+
+  const stateA = { studies: [], drawings: [] };
+  const stateB = { studies: [{ definitionId: 'sma', params: {} }], drawings: [] };
+  const stateC = {
+    studies: stateB.studies,
+    drawings: [goodState.drawings[0]],
+  };
+
+  const tx = (id, before, after, source = 'user') => ({
+    id,
+    title: tr.describe(before, after),
+    source,
+    before,
+    after,
+    createdAt: '',
+  });
+
+  check('nothing to undo at the start', () => {
+    assert.equal(tr.canUndo(tr.EMPTY_HISTORY), false);
+    assert.equal(tr.undo(tr.EMPTY_HISTORY), null);
+  });
+
+  const afterOne = tr.record(tr.EMPTY_HISTORY, tx('t1', stateA, stateB));
+  const afterTwo = tr.record(afterOne, tx('t2', stateB, stateC));
+
+  check('undo walks back one transaction, not one change', () => {
+    /*
+     * The point of the whole module: a Voyager request that adds two studies
+     * and a marker is one thing the person asked for, so it is one undo. A
+     * per-change history makes them press undo four times and watch the chart
+     * come apart in stages.
+     */
+    const step = tr.undo(afterTwo);
+    assert.deepEqual(step.state, stateB);
+    assert.equal(step.history.past.length, 1);
+    assert.equal(step.history.future.length, 1);
+  });
+
+  check('redo puts it back', () => {
+    const undone = tr.undo(afterTwo);
+    const redone = tr.redo(undone.history);
+    assert.deepEqual(redone.state, stateC);
+    assert.equal(redone.history.future.length, 0);
+  });
+
+  check('a new change discards the redo branch', () => {
+    // Redoing after diverging would apply a change to a state it was never
+    // computed against.
+    const undone = tr.undo(afterTwo);
+    const diverged = tr.record(undone.history, tx('t3', stateB, stateA));
+    assert.equal(tr.canRedo(diverged), false);
+  });
+
+  check('the history is bounded — a session is not an archive', () => {
+    let history = tr.EMPTY_HISTORY;
+    for (let i = 0; i < 80; i += 1) history = tr.record(history, tx(`t${i}`, stateA, stateB));
+    assert.equal(history.past.length, 50);
+  });
+
+  group('The description comes from the diff, not from the caller');
+
+  check('adding a study says so', () => {
+    assert.match(tr.describe(stateA, stateB), /added 1 study/i);
+  });
+
+  check('removing one says so too', () => {
+    assert.match(tr.describe(stateB, stateA), /removed 1 study/i);
+  });
+
+  check('adding a drawing is counted', () => {
+    assert.match(tr.describe(stateB, stateC), /added 1 drawing/i);
+  });
+
+  check('an edit with the same counts is still described', () => {
+    const moved = {
+      studies: stateC.studies,
+      drawings: [{ ...stateC.drawings[0], points: [{ barIndex: 5, price: 200 }] }],
+    };
+    assert.match(tr.describe(stateC, moved), /edited a drawing/i);
+  });
+
+  check('no change is recognised as no change', () => {
+    assert.equal(tr.unchanged(stateC, stateC), true);
+    assert.match(tr.describe(stateC, stateC), /no change/i);
   });
 } catch (error) {
   failed += 1;

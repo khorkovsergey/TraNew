@@ -31,6 +31,26 @@ import {
   INDICATORS,
   type IndicatorInstance,
 } from '@/lib/superchart/indicators';
+import {
+  LAYOUT_STORAGE_KEY,
+  parseLayout,
+  serializeLayout,
+  type StudyChoice,
+} from '@/lib/superchart/layouts/schema';
+import {
+  canRedo,
+  canUndo,
+  describe,
+  EMPTY_HISTORY,
+  lastTitle,
+  record,
+  redo,
+  undo,
+  unchanged,
+  type History,
+  type UndoableState,
+} from '@/lib/superchart/transactions';
+import { saveLayoutAction } from '@/app/actions/superchart';
 import styles from './Superchart.module.css';
 
 /**
@@ -105,14 +125,16 @@ export function SuperchartWorkspace({
    * effect whenever the bars changed, which is a second copy of the truth and a
    * render cascade to keep it in step.
    */
-  const [studyChoices, setStudyChoices] = useState<
-    Array<{ definitionId: string; params: Record<string, number> }>
-  >([]);
+  const [studyChoices, setStudyChoices] = useState<StudyChoice[]>([]);
+  const [history, setHistory] = useState<History>(EMPTY_HISTORY);
+  const [toast, setToast] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<DrawingTool | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Points collected for the drawing being created. */
   const pending = useRef<DataPoint[]>([]);
   const dragState = useRef<{ id: string; handle: number | null; from: DataPoint } | null>(null);
+  /** The drawings as they were when a drag began, so the whole drag is one undo. */
+  const dragBaseline = useRef<DrawingInstance[] | null>(null);
 
   const [resolved, setResolved] = useState<ResolvedSymbol | null>(null);
   const [bars, setBars] = useState<Bar[]>([]);
@@ -218,13 +240,74 @@ export function SuperchartWorkspace({
     engineRef.current?.setIndicators(indicators, studyPalette);
   }, [indicators, studyPalette]);
 
-  const toggleIndicator = useCallback((definitionId: string) => {
-    setStudyChoices((current) => {
-      const existing = current.find((choice) => choice.definitionId === definitionId);
-      if (existing) return current.filter((choice) => choice !== existing);
-      return [...current, { definitionId, params: {} }];
+  /*
+   * Every undoable change goes through here.
+   *
+   * One call is one entry in the history, which is what makes a Voyager request
+   * that adds two studies and a marker undo in a single press. The description
+   * is computed from the diff rather than passed in, so the history cannot
+   * claim something other than what happened.
+   */
+  const commit = useCallback(
+    (source: 'user' | 'voyager', mutate: (state: UndoableState) => UndoableState) => {
+      const before: UndoableState = { studies: studyChoices, drawings };
+      const after = mutate(before);
+
+      if (unchanged(before, after)) return;
+
+      const title = describe(before, after);
+      setStudyChoices(after.studies);
+      setDrawings(after.drawings);
+      setHistory((current) =>
+        record(current, {
+          id: `tx_${current.past.length + 1}`,
+          title,
+          source,
+          before,
+          after,
+          createdAt: new Date().toISOString(),
+        })
+      );
+      setToast(title);
+    },
+    [studyChoices, drawings]
+  );
+
+  const applyUndo = useCallback(() => {
+    setHistory((current) => {
+      const step = undo(current);
+      if (!step) return current;
+      setStudyChoices(step.state.studies);
+      setDrawings(step.state.drawings);
+      setSelectedId(null);
+      return step.history;
     });
   }, []);
+
+  const applyRedo = useCallback(() => {
+    setHistory((current) => {
+      const step = redo(current);
+      if (!step) return current;
+      setStudyChoices(step.state.studies);
+      setDrawings(step.state.drawings);
+      return step.history;
+    });
+  }, []);
+
+  const toggleIndicator = useCallback(
+    (definitionId: string) => {
+      commit('user', (state) => {
+        const existing = state.studies.find((choice) => choice.definitionId === definitionId);
+        return {
+          ...state,
+          studies: existing
+            ? state.studies.filter((choice) => choice !== existing)
+            : [...state.studies, { definitionId, params: {} }],
+        };
+      });
+    },
+    [commit]
+  );
 
   /*
    * Drawing, selecting and dragging, on the canvas.
@@ -249,21 +332,24 @@ export function SuperchartWorkspace({
 
         if (pending.current.length >= TOOL_POINTS[activeTool]) {
           const now = new Date().toISOString();
-          setDrawings((current) => [
-            ...current,
-            {
-              id: `d_${current.length + 1}_${Math.round(point.price)}`,
-              tool: activeTool,
-              points: [...pending.current],
-              style: { colour: studyPalette[0] ?? '#7c4dff', width: 1.6, dashed: false },
-              locked: false,
-              hidden: false,
-              source: 'user',
-              createdAt: now,
-              updatedAt: now,
-              draft: false,
-            },
-          ]);
+          commit('user', (state) => ({
+            ...state,
+            drawings: [
+              ...state.drawings,
+              {
+                id: `d_${state.drawings.length + 1}_${Math.round(point.price)}`,
+                tool: activeTool,
+                points: [...pending.current],
+                style: { colour: studyPalette[0] ?? '#7c4dff', width: 1.6, dashed: false },
+                locked: false,
+                hidden: false,
+                source: 'user' as const,
+                createdAt: now,
+                updatedAt: now,
+                draft: false,
+              },
+            ],
+          }));
 
           pending.current = [];
           setActiveTool(null);
@@ -273,9 +359,12 @@ export function SuperchartWorkspace({
 
       const hit = engine.hitAt(x, y);
       setSelectedId(hit?.drawingId ?? null);
-      if (hit) dragState.current = { id: hit.drawingId, handle: hit.handleIndex, from: point };
+      if (hit) {
+        dragState.current = { id: hit.drawingId, handle: hit.handleIndex, from: point };
+        dragBaseline.current = drawings;
+      }
     },
-    [activeTool, studyPalette]
+    [activeTool, studyPalette, commit, drawings]
   );
 
   const onStagePointerMove = useCallback((event: React.PointerEvent) => {
@@ -304,13 +393,66 @@ export function SuperchartWorkspace({
   }, []);
 
   const onStagePointerUp = useCallback(() => {
+    // A drag is one transaction, recorded when the pointer is released rather
+    // than on every pixel of movement — otherwise dragging a line across the
+    // chart fills the history with two hundred entries.
+    if (dragState.current) {
+      setHistory((current) =>
+        record(current, {
+          id: `tx_${current.past.length + 1}`,
+          title: 'Moved a drawing',
+          source: 'user',
+          before: { studies: studyChoices, drawings: dragBaseline.current ?? drawings },
+          after: { studies: studyChoices, drawings },
+          createdAt: new Date().toISOString(),
+        })
+      );
+      dragBaseline.current = null;
+    }
     dragState.current = null;
-  }, []);
+  }, [studyChoices, drawings]);
 
-  const removeDrawing = useCallback((id: string) => {
-    setDrawings((current) => current.filter((drawing) => drawing.id !== id));
-    setSelectedId((current) => (current === id ? null : current));
-  }, []);
+  const saveLayout = useCallback(async () => {
+    const layout = serializeLayout('current', 'My layout', {
+      symbolId,
+      interval,
+      chartType,
+      studies: studyChoices,
+      drawings,
+      panelOpen,
+      dockOpen,
+    });
+
+    // The browser copy is written first and unconditionally: it is what makes
+    // the workspace survive a reload for someone who is not signed in, and it
+    // must not depend on a request succeeding.
+    try {
+      localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+    } catch {
+      /* Private mode. The account copy below may still work. */
+    }
+
+    const result = await saveLayoutAction({ name: 'My layout', layout }).catch(() => null);
+
+    setToast(
+      result?.status === 'saved'
+        ? 'Layout saved to your account'
+        : result?.status === 'sign_in_required'
+          ? 'Layout saved in this browser. An account keeps it anywhere.'
+          : 'Layout saved in this browser.'
+    );
+  }, [symbolId, interval, chartType, studyChoices, drawings, panelOpen, dockOpen]);
+
+  const removeDrawing = useCallback(
+    (id: string) => {
+      commit('user', (state) => ({
+        ...state,
+        drawings: state.drawings.filter((drawing) => drawing.id !== id),
+      }));
+      setSelectedId((current) => (current === id ? null : current));
+    },
+    [commit]
+  );
 
   const toggleDrawingFlag = useCallback((id: string, flag: 'hidden' | 'locked') => {
     setDrawings((current) =>
@@ -324,11 +466,69 @@ export function SuperchartWorkspace({
     setChartType((current) => CHART_TYPES[(CHART_TYPES.indexOf(current) + 1) % CHART_TYPES.length]);
   }, []);
 
+  /*
+   * Restored once, on arrival, from the browser copy.
+   *
+   * Read here rather than through `usePending` because a layout is not a live
+   * value the component follows — it is a starting point, and re-reading it
+   * later would undo whatever the person had since changed.
+   */
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
+      if (!raw) return;
+
+      const layout = parseLayout(JSON.parse(raw));
+      if (!layout) return;
+
+      /*
+       * setState in an effect, deliberately.
+       *
+       * The alternative is a lazy initialiser reading localStorage during
+       * render, and the server already rendered this component with the
+       * defaults — so that produces a hydration mismatch on every restored
+       * workspace. Deriving does not apply either: a layout is a starting
+       * point the person then edits, not a value the component follows.
+       */
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSymbolId(layout.state.symbolId);
+      setInterval(layout.state.interval);
+      setChartType(layout.state.chartType);
+      setStudyChoices(layout.state.studies);
+      setDrawings(layout.state.drawings);
+      setPanelOpen(layout.state.panelOpen);
+      setDockOpen(layout.state.dockOpen);
+    } catch {
+      /* Unreadable storage means starting fresh, which is the safe default. */
+    }
+    // Once, deliberately: this is a starting point, not a subscription.
+  }, []);
+
+  // The toast clears itself; a confirmation that stays is a notification.
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
   // `F` toggles focus and Escape leaves it, per the design's keyboard map.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) applyRedo();
+        else applyUndo();
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void saveLayout();
+        return;
+      }
 
       if (event.key === 'f' || event.key === 'F') setFocus((value) => !value);
       if (event.key === 'Escape') {
@@ -345,7 +545,7 @@ export function SuperchartWorkspace({
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeTool, selectedId]);
+  }, [activeTool, selectedId, applyUndo, applyRedo, saveLayout]);
 
   const last = bars[bars.length - 1];
   const previous = bars[bars.length - 2];
@@ -458,6 +658,26 @@ export function SuperchartWorkspace({
         </button>
 
         <div className={styles.spacer} />
+
+        <button
+          className={styles.panelToggle}
+          disabled={!canUndo(history)}
+          onClick={applyUndo}
+          title={canUndo(history) ? `Undo: ${lastTitle(history)}` : 'Nothing to undo'}
+        >
+          Undo
+        </button>
+        <button
+          className={styles.panelToggle}
+          disabled={!canRedo(history)}
+          onClick={applyRedo}
+          title="Redo"
+        >
+          Redo
+        </button>
+        <button className={styles.panelToggle} onClick={() => void saveLayout()} title="Save layout (⌘S)">
+          Save
+        </button>
 
         <button
           className={styles.panelToggle}
@@ -646,6 +866,17 @@ export function SuperchartWorkspace({
           </aside>
         )}
       </div>
+
+      {toast && (
+        <div className={styles.toast} role="status">
+          <span>{toast}</span>
+          {canUndo(history) && (
+            <button className={styles.toastUndo} onClick={applyUndo}>
+              Undo
+            </button>
+          )}
+        </div>
+      )}
 
       {dockOpen && (
         <div className={styles.dock}>

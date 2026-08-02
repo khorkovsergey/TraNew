@@ -391,6 +391,40 @@ export const voyagerMemory = pgTable(
  * saved symbol is one row that Workspace lists, an alert points at, and an expert
  * brief can attach. This is what makes the sections aware of each other.
  */
+/* -------------------------------------------------------- Chart layouts */
+
+/**
+ * A saved Superchart workspace.
+ *
+ * The JSON is versioned by the application rather than by the column, because
+ * the shape changes far more often than the table does and a migration for a
+ * field inside a layout should not be a database migration.
+ *
+ * One layout per user per name, so saving over an existing name replaces it
+ * rather than leaving two entries a person cannot tell apart.
+ */
+export const chartLayout = pgTable(
+  'chart_layout',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    name: text('name').notNull(),
+    /** Serialized `ChartLayout`; `schemaVersion` inside it drives migration. */
+    state: text('state').notNull(),
+    schemaVersion: integer('schema_version').notNull(),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [
+    uniqueIndex('chart_layout_user_name_idx').on(table.userId, table.name),
+    index('chart_layout_user_updated_idx').on(table.userId, table.updatedAt),
+  ]
+);
+
 export const savedObject = pgTable(
   'saved_object',
   {
