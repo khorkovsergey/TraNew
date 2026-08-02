@@ -214,12 +214,19 @@ export default async function SymbolPage({ params }: Props) {
             </div>
           </section>
 
-          {/* Events belongs beside the thing it is about, not only in its own
-              section — someone reading about an asset is exactly who a session
-              on it is for. */}
-          <RelatedEvents topics={topicsForSymbol(key)} title="Events on this asset" limit={2} />
         </div>
       </div>
+
+      {/*
+        * Events belongs beside the thing it is about — but below both columns
+        * rather than inside the right one.
+        *
+        * It was the last item in that column, which is already the longer of the
+        * two, so it rendered against a screen-height of empty space on the left
+        * and squeezed its cards into half a column. This is a section about the
+        * whole asset, so it gets the whole width.
+        */}
+      <RelatedEvents topics={topicsForSymbol(key)} title="Events on this asset" limit={2} />
     </div>
   );
 }

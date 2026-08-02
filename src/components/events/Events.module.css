@@ -399,14 +399,27 @@
   color: var(--tn-blue);
 }
 
+/*
+ * Fits the column it is given, rather than always three across.
+ *
+ * It was `repeat(3, 1fr)`, which is right on the events pages and wrong
+ * everywhere else this section is reused: on a symbol page the block sits in a
+ * 412px column, so three columns gave each card 125px — a card laid out for
+ * three hundred. The result wrapped one word per line and pushed its badges
+ * twelve pixels past the border.
+ *
+ * 300px is the width the card was designed at, so the full-width pages still
+ * get their three columns and a narrow column gets one.
+ */
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: 18px;
 }
 
+/* Kept as a name for the pages that ask for it; the base grid now does this. */
 .gridWide {
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
 }
 
 /* ---- Card ---- */
