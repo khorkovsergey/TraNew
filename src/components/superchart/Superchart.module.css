@@ -404,3 +404,79 @@
 }
 
 .headerLink:hover { background: var(--tn-chip-bg); color: var(--tn-text); }
+
+.toolOn { background: var(--tn-blue-tint); color: var(--tn-blue); }
+
+.toolHint {
+  position: absolute;
+  left: 64px;
+  bottom: 16px;
+  z-index: 5;
+  background: var(--tn-surface);
+  border: 1px solid var(--tn-purple);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tn-text-nav);
+  box-shadow: var(--tn-shadow-dropdown);
+}
+
+.stageColumn { position: relative; }
+
+.objectTree { padding: 12px; border-bottom: 1px solid var(--tn-border-card); }
+
+.objectRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: var(--tn-chip-bg);
+  border: 1px solid var(--tn-border-card);
+  border-radius: 9px;
+  padding: 7px 10px;
+  margin-bottom: 5px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--tn-text-nav);
+  cursor: pointer;
+}
+
+.objectRowOn { border-color: var(--tn-blue); background: var(--tn-blue-tint); }
+
+.objectName {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--tn-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.objectMeta { font-size: 11px; font-weight: 700; color: var(--tn-text-muted); }
+
+.objectActions { display: flex; gap: 6px; }
+
+.objectActions button {
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--tn-text-muted);
+  cursor: pointer;
+}
+
+.objectActions button:hover { color: var(--tn-blue); }
+
+.emptyNote {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}

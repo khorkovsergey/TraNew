@@ -72,6 +72,8 @@ try {
       'src/lib/superchart/datafeed/types.ts',
       'src/lib/superchart/datafeed/demo.ts',
       'src/lib/superchart/datafeed/portalAdapter.ts',
+      'src/lib/superchart/drawings/types.ts',
+      'src/lib/superchart/indicators/index.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -171,6 +173,8 @@ try {
   const feedTypes = await load('types', 'datafeed');
   const demo = await load('demo');
   const portal = await load('portalAdapter');
+  const draw = await load('types', 'drawings');
+  const indicators = await load('index', 'indicators');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -1688,6 +1692,204 @@ try {
   check('it only advertises the intervals it can serve', async () => {
     const resolved = await portalFeed.resolveSymbol('NASDAQ:TSLA');
     assert.deepEqual(resolved.supportedIntervals, ['1D', '1W', '1M']);
+  });
+
+  /* ============================ Superchart drawings ============================ */
+
+  group('Projection — data space survives zoom and resize');
+
+  const PROJ = { plotWidth: 1000, plotHeight: 500, fromIndex: 0, toIndex: 100, low: 100, high: 200 };
+
+  check('a point maps to the pixel it should', () => {
+    const point = { barIndex: 50, price: 150 };
+    assert.equal(draw.toScreenX(point, PROJ), 500);
+    assert.equal(draw.toScreenY(point, PROJ), 250);
+  });
+
+  check('price grows upward, which is the axis inversion everyone gets wrong once', () => {
+    const high = draw.toScreenY({ barIndex: 0, price: 200 }, PROJ);
+    const low = draw.toScreenY({ barIndex: 0, price: 100 }, PROJ);
+    assert.ok(high < low, `${high} should be above ${low}`);
+  });
+
+  check('screen and data round-trip', () => {
+    const back = draw.fromScreen(500, 250, PROJ);
+    assert.ok(Math.abs(back.barIndex - 50) < 1e-9);
+    assert.ok(Math.abs(back.price - 150) < 1e-9);
+  });
+
+  check('a drawing stays on the same bars when the view zooms', () => {
+    /*
+     * The reason points are stored as bar index and price rather than pixels: a
+     * line drawn at one zoom must still touch the same bars at another, and
+     * pixels do not survive that.
+     */
+    const point = { barIndex: 50, price: 150 };
+    const zoomed = { ...PROJ, fromIndex: 40, toIndex: 60 };
+    const x = draw.toScreenX(point, zoomed);
+    assert.ok(Math.abs(x - 500) < 1e-9, String(x));
+    assert.equal(Math.round(draw.fromScreen(x, 0, zoomed).barIndex), 50);
+  });
+
+  group('Hit testing — what canvas does not give away');
+
+  const line = (id, points, extra = {}) => ({
+    id,
+    tool: 'trendLine',
+    points,
+    style: { colour: '#000', width: 1, dashed: false },
+    locked: false,
+    hidden: false,
+    source: 'user',
+    createdAt: '',
+    updatedAt: '',
+    draft: false,
+    ...extra,
+  });
+
+  const diagonal = line('a', [
+    { barIndex: 0, price: 200 },
+    { barIndex: 100, price: 100 },
+  ]);
+
+  check('a click on the line selects it', () => {
+    // The line runs corner to corner, so its midpoint is the centre of the plot.
+    assert.equal(draw.hitTest([diagonal], 500, 250, PROJ)?.drawingId, 'a');
+  });
+
+  check('a click beside the line does not', () => {
+    assert.equal(draw.hitTest([diagonal], 500, 300, PROJ), null);
+  });
+
+  check('a click within tolerance does', () => {
+    assert.ok(draw.hitTest([diagonal], 500, 254, PROJ));
+  });
+
+  check('a handle beats the line it sits on', () => {
+    const hit = draw.hitTest([diagonal], 0, 0, PROJ);
+    assert.equal(hit?.handleIndex, 0);
+  });
+
+  check('a click past the end measures to the end, not to the infinite line', () => {
+    /*
+     * Without clamping the projection, every trend line is selectable from
+     * anywhere along its extension — including far off the chart.
+     */
+    const short = line('s', [
+      { barIndex: 10, price: 150 },
+      { barIndex: 20, price: 150 },
+    ]);
+    assert.ok(draw.hitTest([short], 150, 250, PROJ), 'on the segment');
+    assert.equal(draw.hitTest([short], 900, 250, PROJ), null, 'far beyond it');
+  });
+
+  check('a locked drawing cannot be picked up', () => {
+    assert.equal(draw.hitTest([line('l', diagonal.points, { locked: true })], 500, 250, PROJ), null);
+  });
+
+  check('a hidden drawing cannot either', () => {
+    assert.equal(draw.hitTest([line('h', diagonal.points, { hidden: true })], 500, 250, PROJ), null);
+  });
+
+  check('the most recently drawn object wins an overlap', () => {
+    const under = line('under', diagonal.points);
+    const over = line('over', diagonal.points);
+    assert.equal(draw.hitTest([under, over], 500, 250, PROJ)?.drawingId, 'over');
+  });
+
+  check('a horizontal line is hit anywhere along the plot', () => {
+    const horizontal = line('h1', [{ barIndex: 50, price: 150 }], { tool: 'horizontalLine' });
+    assert.ok(draw.hitTest([horizontal], 20, 250, PROJ));
+    assert.ok(draw.hitTest([horizontal], 980, 250, PROJ));
+    assert.equal(draw.hitTest([horizontal], 500, 400, PROJ), null);
+  });
+
+  check('a rectangle is picked up by its edge, not by its fill', () => {
+    // A rectangle used to mark a zone should not swallow every click inside it.
+    const rect = line('r', [
+      { barIndex: 20, price: 180 },
+      { barIndex: 60, price: 120 },
+    ], { tool: 'rectangle' });
+
+    assert.ok(draw.hitTest([rect], 200, 250, PROJ), 'left edge');
+    assert.equal(draw.hitTest([rect], 400, 250, PROJ), null, 'middle of the fill');
+  });
+
+  check('a zero-length segment is a point, not a division by zero', () => {
+    const degenerate = line('z', [
+      { barIndex: 50, price: 150 },
+      { barIndex: 50, price: 150 },
+    ]);
+    const distance = draw.distanceToSegment(510, 250, 500, 250, 500, 250);
+    assert.ok(Number.isFinite(distance), String(distance));
+    assert.equal(Math.round(distance), 10);
+    assert.ok(draw.hitTest([degenerate], 502, 250, PROJ));
+  });
+
+  group('Moving a drawing');
+
+  check('moving shifts every point together', () => {
+    const moved = draw.moveDrawing(diagonal, 5, -10);
+    assert.equal(moved.points[0].barIndex, 5);
+    assert.equal(moved.points[1].barIndex, 105);
+    assert.equal(moved.points[0].price, 190);
+  });
+
+  check('moving a handle leaves the other end alone', () => {
+    const moved = draw.moveHandle(diagonal, 1, { barIndex: 70, price: 130 });
+    assert.deepEqual(moved.points[0], diagonal.points[0]);
+    assert.equal(moved.points[1].barIndex, 70);
+  });
+
+  group('Indicators reuse the calculations rather than repeating them');
+
+  const testBars = Array.from({ length: 120 }, (_, i) => ({
+    time: i * 86400,
+    open: 100 + Math.sin(i / 7) * 5,
+    high: 106 + Math.sin(i / 7) * 5,
+    low: 94 + Math.sin(i / 7) * 5,
+    close: 100 + Math.sin(i / 7) * 5,
+    volume: 1_000_000 * (i === 60 ? 6 : 1 + (i % 5) * 0.1),
+  }));
+
+  check('an unknown indicator is refused rather than approximated', () => {
+    assert.equal(indicators.createIndicator('ichimoku', testBars), null);
+  });
+
+  check('parameters are pulled into range', () => {
+    const created = indicators.createIndicator('sma', testBars, { fast: 9999, slow: -4 });
+    assert.equal(created.params.fast, 200);
+    assert.equal(created.params.slow, 2);
+  });
+
+  check('a moving average warms up before it draws', () => {
+    const created = indicators.createIndicator('sma', testBars, { fast: 20, slow: 50 });
+    const fast = created.plots.find((plot) => plot.key === 'fast').values;
+    assert.equal(fast[18], null);
+    assert.ok(typeof fast[19] === 'number');
+  });
+
+  check('the volume anomaly flags the spike and nothing else', () => {
+    const created = indicators.createIndicator('volume-anomaly', testBars, {
+      lookback: 20,
+      multiple: 2,
+    });
+    const flagged = created.plots.find((plot) => plot.key === 'flagged').values;
+    const hits = flagged.map((value, index) => (value === null ? -1 : index)).filter((i) => i >= 0);
+
+    assert.deepEqual(hits, [60], `flagged ${hits.join(', ')}`);
+  });
+
+  check('its label states the rule in words', () => {
+    const created = indicators.createIndicator('volume-anomaly', testBars, { multiple: 3, lookback: 30 });
+    assert.match(created.label, /3× 30-bar average/);
+  });
+
+  check('recomputing keeps the instance identity', () => {
+    const created = indicators.createIndicator('sma', testBars);
+    const again = indicators.recompute(created, testBars.slice(0, 80));
+    assert.equal(again.id, created.id);
+    assert.equal(again.plots[0].values.length, 80);
   });
 } catch (error) {
   failed += 1;

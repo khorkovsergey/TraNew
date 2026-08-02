@@ -16,6 +16,21 @@ import {
 import { CachingDatafeed } from '@/lib/superchart/datafeed/cache';
 import { DemoDatafeed, DEMO_SYMBOLS } from '@/lib/superchart/datafeed/demoAdapter';
 import type { ResolvedSymbol } from '@/lib/superchart/datafeed/types';
+import {
+  fromScreen,
+  moveDrawing,
+  moveHandle,
+  TOOL_LABEL,
+  TOOL_POINTS,
+  type DataPoint,
+  type DrawingInstance,
+  type DrawingTool,
+} from '@/lib/superchart/drawings/types';
+import {
+  createIndicator,
+  INDICATORS,
+  type IndicatorInstance,
+} from '@/lib/superchart/indicators';
 import styles from './Superchart.module.css';
 
 /**
@@ -81,6 +96,23 @@ export function SuperchartWorkspace({
   const [panelOpen, setPanelOpen] = useState(true);
   const [dockOpen, setDockOpen] = useState(false);
   const [crosshair, setCrosshair] = useState<CrosshairContext | null>(null);
+
+  const [drawings, setDrawings] = useState<DrawingInstance[]>([]);
+  /*
+   * What is stored is the choice — which study, with which parameters. The
+   * plotted values are derived from it and the bars, because that is what they
+   * are: a pure function of both. Storing the plots meant recomputing them in an
+   * effect whenever the bars changed, which is a second copy of the truth and a
+   * render cascade to keep it in step.
+   */
+  const [studyChoices, setStudyChoices] = useState<
+    Array<{ definitionId: string; params: Record<string, number> }>
+  >([]);
+  const [activeTool, setActiveTool] = useState<DrawingTool | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** Points collected for the drawing being created. */
+  const pending = useRef<DataPoint[]>([]);
+  const dragState = useRef<{ id: string; handle: number | null; from: DataPoint } | null>(null);
 
   const [resolved, setResolved] = useState<ResolvedSymbol | null>(null);
   const [bars, setBars] = useState<Bar[]>([]);
@@ -158,6 +190,136 @@ export function SuperchartWorkspace({
     engineRef.current?.setChartType(chartType);
   }, [chartType]);
 
+  // The study palette is read from the stylesheet, so the colours stay in
+  // tokens.css where check-tokens.mjs can see them.
+  const studyPalette = useMemo(() => {
+    if (typeof window === 'undefined') return [];
+    const style = getComputedStyle(document.documentElement);
+    return [0, 1, 2, 3].map(
+      (index) => style.getPropertyValue(`--tn-study-${index}`).trim() || '#7c4dff'
+    );
+  }, []);
+
+  useEffect(() => {
+    engineRef.current?.setDrawings(drawings, selectedId);
+  }, [drawings, selectedId]);
+
+  // Derived, so switching interval keeps the studies a person added and
+  // recomputes them against the new bars without an effect in between.
+  const indicators = useMemo<IndicatorInstance[]>(
+    () =>
+      studyChoices
+        .map((choice) => createIndicator(choice.definitionId, bars, choice.params))
+        .filter((instance): instance is IndicatorInstance => instance !== null),
+    [studyChoices, bars]
+  );
+
+  useEffect(() => {
+    engineRef.current?.setIndicators(indicators, studyPalette);
+  }, [indicators, studyPalette]);
+
+  const toggleIndicator = useCallback((definitionId: string) => {
+    setStudyChoices((current) => {
+      const existing = current.find((choice) => choice.definitionId === definitionId);
+      if (existing) return current.filter((choice) => choice !== existing);
+      return [...current, { definitionId, params: {} }];
+    });
+  }, []);
+
+  /*
+   * Drawing, selecting and dragging, on the canvas.
+   *
+   * All three are one pointer handler because they are one gesture from the
+   * person's side: press decides which of the three is happening, and it cannot
+   * be decided anywhere else.
+   */
+  const onStagePointerDown = useCallback(
+    (event: React.PointerEvent) => {
+      const engine = engineRef.current;
+      const stage = stageRef.current;
+      if (!engine || !stage) return;
+
+      const rect = stage.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const point = fromScreen(x, y, engine.projection());
+
+      if (activeTool) {
+        pending.current.push(point);
+
+        if (pending.current.length >= TOOL_POINTS[activeTool]) {
+          const now = new Date().toISOString();
+          setDrawings((current) => [
+            ...current,
+            {
+              id: `d_${current.length + 1}_${Math.round(point.price)}`,
+              tool: activeTool,
+              points: [...pending.current],
+              style: { colour: studyPalette[0] ?? '#7c4dff', width: 1.6, dashed: false },
+              locked: false,
+              hidden: false,
+              source: 'user',
+              createdAt: now,
+              updatedAt: now,
+              draft: false,
+            },
+          ]);
+
+          pending.current = [];
+          setActiveTool(null);
+        }
+        return;
+      }
+
+      const hit = engine.hitAt(x, y);
+      setSelectedId(hit?.drawingId ?? null);
+      if (hit) dragState.current = { id: hit.drawingId, handle: hit.handleIndex, from: point };
+    },
+    [activeTool, studyPalette]
+  );
+
+  const onStagePointerMove = useCallback((event: React.PointerEvent) => {
+    const drag = dragState.current;
+    const engine = engineRef.current;
+    const stage = stageRef.current;
+    if (!drag || !engine || !stage) return;
+
+    const rect = stage.getBoundingClientRect();
+    const point = fromScreen(
+      event.clientX - rect.left,
+      event.clientY - rect.top,
+      engine.projection()
+    );
+
+    setDrawings((current) =>
+      current.map((drawing) => {
+        if (drawing.id !== drag.id) return drawing;
+        return drag.handle === null
+          ? moveDrawing(drawing, point.barIndex - drag.from.barIndex, point.price - drag.from.price)
+          : moveHandle(drawing, drag.handle, point);
+      })
+    );
+
+    if (drag.handle === null) dragState.current = { ...drag, from: point };
+  }, []);
+
+  const onStagePointerUp = useCallback(() => {
+    dragState.current = null;
+  }, []);
+
+  const removeDrawing = useCallback((id: string) => {
+    setDrawings((current) => current.filter((drawing) => drawing.id !== id));
+    setSelectedId((current) => (current === id ? null : current));
+  }, []);
+
+  const toggleDrawingFlag = useCallback((id: string, flag: 'hidden' | 'locked') => {
+    setDrawings((current) =>
+      current.map((drawing) =>
+        drawing.id === id ? { ...drawing, [flag]: !drawing[flag] } : drawing
+      )
+    );
+  }, []);
+
   const cycleChartType = useCallback(() => {
     setChartType((current) => CHART_TYPES[(CHART_TYPES.indexOf(current) + 1) % CHART_TYPES.length]);
   }, []);
@@ -169,12 +331,21 @@ export function SuperchartWorkspace({
       if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
 
       if (event.key === 'f' || event.key === 'F') setFocus((value) => !value);
-      if (event.key === 'Escape') setFocus(false);
+      if (event.key === 'Escape') {
+        // Escape cancels the gesture before it touches the workspace: a
+        // half-drawn line and a selection are more likely what someone wants
+        // out of than focus mode.
+        if (activeTool || pending.current.length) {
+          setActiveTool(null);
+          pending.current = [];
+        } else if (selectedId) setSelectedId(null);
+        else setFocus(false);
+      }
     };
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [activeTool, selectedId]);
 
   const last = bars[bars.length - 1];
   const previous = bars[bars.length - 2];
@@ -306,12 +477,36 @@ export function SuperchartWorkspace({
 
       <div className={styles.body}>
         <nav className={styles.toolRail} aria-label="Chart tools">
-          {['cursor', 'crosshair', 'trendLine', 'horizontal', 'text', 'measure'].map((tool) => (
-            <button className={styles.tool} key={tool} title={tool} aria-label={tool} disabled>
-              <Icon name="chart" size={17} />
-            </button>
-          ))}
-          <span className={styles.toolNote}>Phase 3</span>
+          <button
+            className={`${styles.tool} ${activeTool === null ? styles.toolOn : ''}`}
+            title="Select"
+            aria-label="Select"
+            aria-pressed={activeTool === null}
+            onClick={() => {
+              setActiveTool(null);
+              pending.current = [];
+            }}
+          >
+            <Icon name="arrowRight" size={17} />
+          </button>
+
+          {(['trendLine', 'horizontalLine', 'verticalLine', 'rectangle', 'text'] as DrawingTool[]).map(
+            (tool) => (
+              <button
+                key={tool}
+                className={`${styles.tool} ${activeTool === tool ? styles.toolOn : ''}`}
+                title={TOOL_LABEL[tool]}
+                aria-label={TOOL_LABEL[tool]}
+                aria-pressed={activeTool === tool}
+                onClick={() => {
+                  setActiveTool(tool);
+                  pending.current = [];
+                }}
+              >
+                <Icon name="chart" size={17} />
+              </button>
+            )
+          )}
         </nav>
 
         <div className={styles.stageColumn}>
@@ -336,7 +531,19 @@ export function SuperchartWorkspace({
           </div>
 
           {/* The canvas is aria-hidden; this is the series a screen reader gets. */}
-          <div className={styles.stage} ref={stageRef} />
+          <div
+            className={styles.stage}
+            ref={stageRef}
+            onPointerDown={onStagePointerDown}
+            onPointerMove={onStagePointerMove}
+            onPointerUp={onStagePointerUp}
+          />
+          {activeTool && (
+            <div className={styles.toolHint} role="status">
+              {TOOL_LABEL[activeTool]}: click {TOOL_POINTS[activeTool]} point
+              {TOOL_POINTS[activeTool] > 1 ? 's' : ''} on the chart. Escape cancels.
+            </div>
+          )}
           <p className={styles.srOnly}>
             {symbol} at {interval}, {bars.length} bars. Latest close {last?.close.toFixed(2)},{' '}
             {up ? 'up' : 'down'} {Math.abs(changePercent).toFixed(2)} percent on the previous bar.
@@ -346,8 +553,73 @@ export function SuperchartWorkspace({
         {panelOpen && (
           <aside className={styles.rightPanel} aria-label="Chart panels">
             <div className={styles.panelTabs}>
-              <span className={`${styles.panelTab} ${styles.panelTabActive}`}>Data</span>
+              <span className={`${styles.panelTab} ${styles.panelTabActive}`}>Objects &amp; data</span>
               <span className={styles.panelTabSoon}>Voyager · Phase 5</span>
+            </div>
+
+            <div className={styles.objectTree}>
+              <div className={styles.dataTitle}>STUDIES</div>
+              {Object.values(INDICATORS).map((definition) => {
+                const on = indicators.some(
+                  (instance) => instance.definitionId === definition.id
+                );
+                return (
+                  <button
+                    key={definition.id}
+                    className={`${styles.objectRow} ${on ? styles.objectRowOn : ''}`}
+                    aria-pressed={on}
+                    onClick={() => toggleIndicator(definition.id)}
+                  >
+                    <span className={styles.objectName}>{definition.name}</span>
+                    <span className={styles.objectMeta}>{on ? 'On' : 'Add'}</span>
+                  </button>
+                );
+              })}
+
+              <div className={styles.dataTitle} style={{ marginTop: 14 }}>
+                DRAWINGS ({drawings.length})
+              </div>
+              {drawings.length === 0 && (
+                <p className={styles.emptyNote}>
+                  Nothing drawn yet. Pick a tool on the left, then click the chart.
+                </p>
+              )}
+              {drawings.map((drawing) => (
+                <div
+                  key={drawing.id}
+                  className={`${styles.objectRow} ${drawing.id === selectedId ? styles.objectRowOn : ''}`}
+                >
+                  <button
+                    className={styles.objectName}
+                    onClick={() => setSelectedId(drawing.id)}
+                  >
+                    {TOOL_LABEL[drawing.tool]}
+                  </button>
+                  <span className={styles.objectActions}>
+                    <button
+                      onClick={() => toggleDrawingFlag(drawing.id, 'hidden')}
+                      title={drawing.hidden ? 'Show' : 'Hide'}
+                      aria-label={drawing.hidden ? 'Show' : 'Hide'}
+                    >
+                      {drawing.hidden ? 'Show' : 'Hide'}
+                    </button>
+                    <button
+                      onClick={() => toggleDrawingFlag(drawing.id, 'locked')}
+                      title={drawing.locked ? 'Unlock' : 'Lock'}
+                      aria-label={drawing.locked ? 'Unlock' : 'Lock'}
+                    >
+                      {drawing.locked ? 'Unlock' : 'Lock'}
+                    </button>
+                    <button
+                      onClick={() => removeDrawing(drawing.id)}
+                      title="Remove"
+                      aria-label="Remove"
+                    >
+                      Remove
+                    </button>
+                  </span>
+                </div>
+              ))}
             </div>
 
             <div className={styles.dataWindow}>

@@ -1,3 +1,11 @@
+import type { IndicatorInstance } from '../indicators';
+import {
+  hitTest,
+  toScreenX,
+  toScreenY,
+  type DrawingInstance,
+  type Projection,
+} from '../drawings/types';
 import {
   CHART_TYPE_LABEL,
   NotImplementedYet,
@@ -69,6 +77,17 @@ export class CanvasChartEngine implements ChartEngineAdapter {
   private listeners = new Map<ChartEngineEvent, Set<(payload: unknown) => void>>();
 
   private dragging: { startX: number; startFrom: number; startTo: number } | null = null;
+
+  /*
+   * Drawings and indicators are handed in whole rather than built through
+   * `addDrawing`. React owns those lists — undo, the object tree and the saved
+   * layout all read them from there — and the engine paints whatever it is
+   * given. Two copies of one list drift.
+   */
+  private drawings: DrawingInstance[] = [];
+  private indicators: IndicatorInstance[] = [];
+  private studyPalette: string[] = [];
+  private selectedId: string | null = null;
 
   async initialize(container: HTMLElement, options: EngineOptions): Promise<void> {
     this.container = container;
@@ -152,6 +171,38 @@ export class CanvasChartEngine implements ChartEngineAdapter {
   setTheme(_theme: ChartTheme, palette: ChartPalette): void {
     this.palette = palette;
     this.paint();
+  }
+
+  setDrawings(drawings: DrawingInstance[], selectedId: string | null): void {
+    this.drawings = drawings;
+    this.selectedId = selectedId;
+    this.paint();
+  }
+
+  setIndicators(indicators: IndicatorInstance[], palette: string[]): void {
+    this.indicators = indicators;
+    this.studyPalette = palette;
+    this.paint();
+  }
+
+  /** The mapping a hit test needs, in the units drawings are stored in. */
+  projection(): Projection {
+    const layout = this.layout();
+    const { low, high } = this.extremes();
+
+    return {
+      plotWidth: layout.width - layout.scaleWidth,
+      plotHeight: layout.priceHeight,
+      fromIndex: this.range.from,
+      toIndex: this.range.to,
+      low,
+      high,
+    };
+  }
+
+  /** What sits under the pointer. */
+  hitAt(x: number, y: number) {
+    return hitTest(this.drawings, x, y, this.projection());
   }
 
   /* -------------------------------------------------------------- Range */
@@ -380,6 +431,8 @@ export class CanvasChartEngine implements ChartEngineAdapter {
       this.drawBarSeries(ctx, bars, step, bodyWidth, toY, palette);
     }
 
+    this.drawIndicators(ctx, toY, step);
+    this.drawDrawings(ctx, layout);
     this.drawVolume(ctx, bars, step, layout, palette);
     this.drawPriceScale(ctx, layout, palette, low, high);
     this.drawTimeScale(ctx, bars, step, layout, palette);
@@ -484,6 +537,121 @@ export class CanvasChartEngine implements ChartEngineAdapter {
       gradient.addColorStop(1, `${colour}00`);
       ctx.fillStyle = gradient;
       ctx.fill();
+    }
+  }
+
+  /**
+   * Overlay indicators, on the price pane scale.
+   *
+   * Separate-pane studies are not drawn here: they need their own vertical
+   * scale and their own strip of canvas, which is the pane manager's job.
+   * Putting a volume figure of forty million on the price scale would place it
+   * somewhere off the top of the chart.
+   */
+  private drawIndicators(
+    ctx: CanvasRenderingContext2D,
+    toY: (price: number) => number,
+    step: number
+  ): void {
+    const offset = Math.floor(this.range.from);
+
+    for (const indicator of this.indicators) {
+      if (indicator.hidden || indicator.pane !== 'main') continue;
+
+      for (const plot of indicator.plots) {
+        if (plot.style !== 'line') continue;
+
+        ctx.beginPath();
+        ctx.strokeStyle = this.studyPalette[plot.colour % this.studyPalette.length] ?? '#7c4dff';
+        ctx.lineWidth = 1.6;
+        // A draft is dashed and stays dashed until it is applied, so nothing
+        // proposed can be mistaken for something already accepted.
+        ctx.setLineDash(indicator.draft ? [5, 4] : []);
+
+        let started = false;
+        for (let i = 0; i < Math.ceil(this.range.to) - offset; i += 1) {
+          const value = plot.values[offset + i];
+          if (value === null || value === undefined) continue;
+
+          const x = i * step + step / 2;
+          const y = toY(value);
+          if (started) ctx.lineTo(x, y);
+          else {
+            ctx.moveTo(x, y);
+            started = true;
+          }
+        }
+
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
+  private drawDrawings(ctx: CanvasRenderingContext2D, layout: Layout): void {
+    const projection = this.projection();
+
+    for (const drawing of this.drawings) {
+      if (drawing.hidden) continue;
+
+      const points = drawing.points.map((point) => ({
+        x: toScreenX(point, projection),
+        y: toScreenY(point, projection),
+      }));
+
+      ctx.save();
+      ctx.strokeStyle = drawing.style.colour;
+      ctx.lineWidth = drawing.style.width;
+      ctx.setLineDash(drawing.style.dashed || drawing.draft ? [5, 4] : []);
+
+      if (drawing.tool === 'trendLine' || drawing.tool === 'fibonacci') {
+        if (points.length >= 2) {
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          ctx.lineTo(points[1].x, points[1].y);
+          ctx.stroke();
+        }
+      } else if (drawing.tool === 'horizontalLine' || drawing.tool === 'priceLabel') {
+        ctx.beginPath();
+        ctx.moveTo(0, points[0].y);
+        ctx.lineTo(layout.width - layout.scaleWidth, points[0].y);
+        ctx.stroke();
+      } else if (drawing.tool === 'verticalLine') {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, 0);
+        ctx.lineTo(points[0].x, layout.priceHeight);
+        ctx.stroke();
+      } else if (drawing.tool === 'rectangle') {
+        if (points.length >= 2) {
+          ctx.strokeRect(
+            Math.min(points[0].x, points[1].x),
+            Math.min(points[0].y, points[1].y),
+            Math.abs(points[1].x - points[0].x),
+            Math.abs(points[1].y - points[0].y)
+          );
+        }
+      } else if (drawing.tool === 'text') {
+        ctx.fillStyle = drawing.style.colour;
+        ctx.font = '12px "Plus Jakarta Sans", sans-serif';
+        ctx.fillText(drawing.text ?? 'Text', points[0].x, points[0].y);
+      }
+
+      // Handles only on the selected object: showing them on everything turns a
+      // chart with a dozen drawings into a field of squares.
+      if (drawing.id === this.selectedId) {
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = drawing.style.colour;
+        ctx.lineWidth = 1.5;
+        for (const point of points) {
+          ctx.beginPath();
+          ctx.rect(point.x - 3.5, point.y - 3.5, 7, 7);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      ctx.restore();
     }
   }
 
@@ -610,17 +778,22 @@ export class CanvasChartEngine implements ChartEngineAdapter {
 
   /* -------------------------------------------------------- Later phases */
 
+  /*
+   * These stay on the interface for callers written against the whole surface,
+   * and point at the setter instead of quietly doing nothing: the lists live in
+   * React, not in the engine.
+   */
   async addIndicator(): Promise<string> {
-    throw new NotImplementedYet('Indicators', 'Phase 3');
+    throw new Error('Use setIndicators(): the chart paints the list, it does not own it.');
   }
   async removeIndicator(): Promise<void> {
-    throw new NotImplementedYet('Indicators', 'Phase 3');
+    throw new Error('Use setIndicators(): the chart paints the list, it does not own it.');
   }
   async addDrawing(): Promise<string> {
-    throw new NotImplementedYet('Drawings', 'Phase 3');
+    throw new Error('Use setDrawings(): the chart paints the list, it does not own it.');
   }
   async removeDrawing(): Promise<void> {
-    throw new NotImplementedYet('Drawings', 'Phase 3');
+    throw new Error('Use setDrawings(): the chart paints the list, it does not own it.');
   }
   async highlightRange(): Promise<string> {
     throw new NotImplementedYet('Highlights', 'Phase 6');
