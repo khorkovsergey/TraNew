@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Supercharts } from '@/components/content/Supercharts';
+import { SuperchartWorkspace } from '@/components/superchart/SuperchartWorkspace';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { getSeries } from '@/lib/market/client';
@@ -41,6 +43,25 @@ export default async function SuperchartsPage({ params }: Props) {
   const series = await getSeries('TSLA');
   const closes = series?.closes ?? waveSeries(5.1, 260, 250);
   const dates = series?.dates ?? [];
+
+  /*
+   * Two screens behind one route while Superchart is built.
+   *
+   * The workspace is Phase 1: a frame and a chart. The screen it will replace
+   * still has the studies, the Pine block and the Voyager integration, so
+   * swapping now would be a regression. The flag is the swap, and it happens
+   * when Superchart reaches parity rather than before.
+   */
+  if (FEATURE_FLAGS.superchartEnabled) {
+    return (
+      <SuperchartWorkspace
+        symbol="TSLA"
+        companyName="Tesla"
+        exchange="NASDAQ"
+        lastPrice={closes[closes.length - 1]}
+      />
+    );
+  }
 
   return (
     <div className={styles.wrap}>

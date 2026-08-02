@@ -1,0 +1,342 @@
+/* Superchart workspace — geometry from the design handoff, colours from tokens. */
+
+/*
+ * Sized against what is left below the portal header rather than against the
+ * viewport: `100vh` inside a page that already has chrome pushes the volume
+ * pane and the time scale below the fold, which is what it did.
+ */
+.workspace {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--tn-header-h, 72px));
+  min-height: 0;
+  background: var(--tn-bg);
+  /* Contains the stage rather than letting it push the page: the layout's own
+     padding makes the exact remaining height a few pixels less than the token
+     arithmetic suggests, and the chart should lose those pixels, not the page. */
+  overflow: hidden;
+}
+
+/* Focus mode hides the portal chrome and gives the whole viewport to the chart. */
+.focused {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  height: 100dvh;
+}
+
+.globalHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  flex: 0 0 44px;
+  padding: 0 12px;
+  background: var(--tn-surface);
+  border-bottom: 1px solid var(--tn-border-card);
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--tn-gradient-logo);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: #fff;
+}
+
+.brand {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--tn-text);
+}
+
+.spacer { flex: 1; }
+
+.headerButton {
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tn-text-nav);
+  cursor: pointer;
+}
+
+.headerButton:hover { background: var(--tn-chip-bg); color: var(--tn-text); }
+
+.restoreStrip {
+  height: 20px;
+  flex: 0 0 20px;
+  border: 0;
+  background: var(--tn-surface);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--tn-text-muted);
+  cursor: pointer;
+}
+
+/* ---- Chart header ---- */
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 54px;
+  flex: 0 0 54px;
+  padding: 0 12px;
+  background: var(--tn-surface);
+  border-bottom: 1px solid var(--tn-border-card);
+  overflow-x: auto;
+}
+
+.symbolButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--tn-chip-bg);
+  border: 1px solid var(--tn-border-input);
+  border-radius: 10px;
+  padding: 7px 12px;
+  font: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.symbolButton:hover { border-color: var(--tn-blue); }
+
+.ticker {
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--tn-text);
+}
+
+.exchange {
+  border-radius: 5px;
+  background: var(--tn-chip-bg);
+  padding: 2px 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--tn-text-muted);
+}
+
+.quote { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+
+.price { font-size: 16px; font-weight: 800; color: var(--tn-text); }
+
+.change { font-size: 12.5px; font-weight: 700; }
+
+.up { color: var(--tn-green); }
+.down { color: var(--tn-red); }
+
+.quoteSub { font-size: 10.5px; font-weight: 600; color: var(--tn-text-muted); }
+
+.divider {
+  width: 1px;
+  height: 26px;
+  background: var(--tn-border-card);
+  flex-shrink: 0;
+}
+
+.intervalGroup {
+  display: flex;
+  gap: 2px;
+  background: var(--tn-chip-bg);
+  border: 1px solid var(--tn-border-card);
+  border-radius: 9px;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.intervalItem {
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+  cursor: pointer;
+}
+
+.intervalActive { background: var(--tn-blue-tint); color: var(--tn-text); }
+
+.typeButton, .panelToggle {
+  background: transparent;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 9px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.typeButton:hover, .panelToggle:hover { background: var(--tn-chip-bg); }
+
+/* ---- Body ---- */
+
+.body { display: flex; flex: 1; min-height: 0; }
+
+.toolRail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 52px;
+  flex: 0 0 52px;
+  padding: 6px 0;
+  background: var(--tn-surface);
+  border-right: 1px solid var(--tn-border-card);
+}
+
+.tool {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--tn-text-nav);
+  cursor: pointer;
+}
+
+.tool:disabled { opacity: 0.35; cursor: default; }
+
+.toolNote {
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--tn-text-muted);
+}
+
+.stageColumn { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  height: 34px;
+  flex: 0 0 34px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--tn-border-card);
+  background: var(--tn-surface);
+}
+
+.legendSymbol { font-size: 12px; font-weight: 800; color: var(--tn-text); }
+
+.demoPill {
+  border-radius: 999px;
+  background: var(--tn-amber-tint);
+  padding: 2px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--tn-amber-text);
+}
+
+.ohlc { font-size: 11.5px; color: var(--tn-text-nav); }
+
+.stage { flex: 1; min-height: 0; background: var(--tn-surface); }
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- Right panel ---- */
+
+.rightPanel {
+  width: 412px;
+  flex: 0 0 412px;
+  background: var(--tn-surface);
+  border-left: 1px solid var(--tn-border-card);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.panelTabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--tn-border-card);
+}
+
+.panelTab { font-size: 12px; font-weight: 700; color: var(--tn-text-nav); }
+
+.panelTabActive {
+  color: var(--tn-text);
+  border-bottom: 2px solid var(--tn-purple);
+  padding-bottom: 6px;
+}
+
+.panelTabSoon { font-size: 11px; font-weight: 600; color: var(--tn-text-muted); }
+
+.dataWindow { padding: 12px; }
+
+.dataTitle {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.9px;
+  color: var(--tn-text-muted);
+  margin-bottom: 8px;
+}
+
+.dataRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--tn-text-nav);
+  border-radius: 6px;
+}
+
+.dataRow:nth-child(odd) { background: var(--tn-chip-bg); }
+
+/* ---- Dock ---- */
+
+.dock {
+  height: 264px;
+  flex: 0 0 264px;
+  background: var(--tn-surface);
+  border-top: 1px solid var(--tn-border-card);
+  padding: 12px;
+}
+
+.dockTabs { display: flex; gap: 14px; margin-bottom: 10px; }
+
+.dockTabSoon { font-size: 12px; font-weight: 700; color: var(--tn-text-muted); }
+
+.dockNote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--tn-text-nav);
+  max-width: 60ch;
+}
+
+@media (max-width: 1180px) {
+  .rightPanel { display: none; }
+}
