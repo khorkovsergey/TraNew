@@ -82,12 +82,19 @@ try {
   await page.locator('button').filter({ hasText: /Ask about/ }).first().click();
   await page.waitForTimeout(900);
 
+  /*
+   * The pill opens a peek showing suggested questions, not a text field. The
+   * field is in the full panel behind "Open Voyager" — clicking a suggestion
+   * instead asks a different question, which spends the allowance and never
+   * reaches the investment trigger. That is what made this look broken.
+   */
   let field = page.getByPlaceholder(/ask|question/i).last();
   if (!(await field.count())) {
-    await page.locator('button').filter({ hasText: /Explain|Why|What/ }).first().click();
-    await page.waitForTimeout(2500);
+    await page.getByRole('button', { name: /Open Voyager/i }).click();
+    await page.waitForTimeout(1200);
     field = page.getByPlaceholder(/ask|question/i).last();
   }
+  check('the panel offers a question field', (await field.count()) > 0);
 
   await field.fill('Is this worth holding for a long-term portfolio?');
   await field.press('Enter');
@@ -100,7 +107,9 @@ try {
    * sends someone looking in the wrong place.
    */
   const panelText = await page.locator('body').innerText();
-  if (/limited questions per day/i.test(panelText) && !/Business quality/.test(panelText)) {
+  // The panel footer always reads "limited questions per day", so matching on
+  // that skipped every anonymous run. The quota *answer* is what to look for.
+  if (/saving history, working with your portfolio/i.test(panelText)) {
     console.log('  skipped — the assistant allowance is spent, so the panel never reached the engine');
     console.log(`
 ${passed}/${passed + failed} passed`);
@@ -108,21 +117,26 @@ ${passed}/${passed + failed} passed`);
     process.exit(failed === 0 ? 0 : 1);
   }
 
-  const card = page.locator('[class*="Investment-module"]').first();
+  /*
+   * Found by what it says, not by its class name: CSS module names are hashed
+   * differently in a production build, so a selector on the module prefix
+   * passes locally and fails on the deployed site.
+   */
+  const card = page.locator('section').filter({ hasText: 'Business quality' }).last();
   check('an assessment card appears', (await card.count()) > 0);
 
   const text = await card.innerText();
   check('it leads with a plain-language reading', /evidence (leans|points)/i.test(text), text.slice(0, 60));
-  check('it shows the readings', /Business quality/.test(text) && /Valuation/.test(text));
+  check('it shows the readings', /business quality/i.test(text) && /valuation/i.test(text));
   check('it states the date it describes', /As of \d{4}-\d{2}-\d{2}/.test(text));
   check('it says confidence is not a probability of profit', /not a probability/i.test(await page.locator('body').innerText()) || true);
 
   // The detail is present but closed: a beginner sees a summary, not a table.
-  const drawers = await page.locator('[class*="drawerToggle"]').count();
-  check('detail is behind disclosures', drawers >= 4, `${drawers} drawers`);
+  const drawers = await page.getByRole('button', { name: /^\+ (Show|How)/ }).count();
+  check('detail is behind four disclosures', drawers === 4, `${drawers} drawers`);
   check('the arithmetic is closed by default', !/formula/i.test(text) && !/v1\.0\.0/.test(text));
 
-  await page.locator('[class*="drawerToggle"]').first().click();
+  await page.getByRole('button', { name: /Show the arithmetic/ }).click();
   await page.waitForTimeout(400);
   const opened = await card.innerText();
   check('opening it reveals the calculations with versions', /v1\.0\.0/.test(opened));
