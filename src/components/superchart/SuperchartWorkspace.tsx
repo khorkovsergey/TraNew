@@ -2,16 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
+import { Link } from '@/i18n/navigation';
 import { CanvasChartEngine } from '@/lib/superchart/chart-engine/canvas';
 import {
   CHART_TYPE_LABEL,
+  INTERVAL_SECONDS,
   type Bar,
   type ChartInterval,
   type ChartPalette,
   type ChartType,
   type CrosshairContext,
 } from '@/lib/superchart/chart-engine/types';
-import { DEMO_NOTICE, demoBars } from '@/lib/superchart/datafeed/demo';
+import { CachingDatafeed } from '@/lib/superchart/datafeed/cache';
+import { DemoDatafeed, DEMO_SYMBOLS } from '@/lib/superchart/datafeed/demoAdapter';
+import type { ResolvedSymbol } from '@/lib/superchart/datafeed/types';
 import styles from './Superchart.module.css';
 
 /**
@@ -61,14 +65,12 @@ export type SuperchartWorkspaceProps = {
   symbol: string;
   companyName: string;
   exchange: string;
-  lastPrice: number;
 };
 
 export function SuperchartWorkspace({
   symbol,
   companyName,
   exchange,
-  lastPrice,
 }: SuperchartWorkspaceProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<CanvasChartEngine | null>(null);
@@ -80,10 +82,45 @@ export function SuperchartWorkspace({
   const [dockOpen, setDockOpen] = useState(false);
   const [crosshair, setCrosshair] = useState<CrosshairContext | null>(null);
 
-  const bars = useMemo<Bar[]>(
-    () => demoBars({ symbol, interval, bars: 5000, lastPrice }),
-    [symbol, interval, lastPrice]
-  );
+  const [resolved, setResolved] = useState<ResolvedSymbol | null>(null);
+  const [bars, setBars] = useState<Bar[]>([]);
+  const [note, setNote] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [symbolId, setSymbolId] = useState(`NASDAQ:${symbol}`);
+
+  // One instance for the life of the component: the cache is the point, and a
+  // new one per render would never hit.
+  const feed = useMemo(() => new CachingDatafeed(new DemoDatafeed()), []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const found = await feed.resolveSymbol(symbolId);
+      if (cancelled || !found) return;
+      setResolved(found);
+
+      const step = INTERVAL_SECONDS[interval];
+      const to = Math.floor(Date.now() / 1000);
+      const response = await feed.getBars({
+        symbolId: found.id,
+        interval,
+        from: to - step * 5000,
+        to,
+      });
+
+      // A superseded response carries no bars; applying it would replace what
+      // the person is looking at with what they left.
+      if (cancelled || response.note === 'superseded') return;
+
+      setBars(response.bars);
+      setNote(response.note ?? null);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [feed, symbolId, interval]);
 
   // The engine is created once and told about changes; recreating it on every
   // prop change would throw away the visible range the person just set.
@@ -150,27 +187,74 @@ export function SuperchartWorkspace({
   return (
     <div className={`${styles.workspace} ${focus ? styles.focused : ''}`}>
       {/*
-        * The design draws its own global header. The portal already renders one
-        * above this route, and two would be two — so the workspace uses the
-        * portal's and keeps only the Focus control, which is what that header
-        * was for here. Focus hides the portal chrome through the layout class
-        * rather than by drawing a second bar to hide.
+        * The workspace covers the portal chrome, so it carries its own header
+        * and its own way back.
+        *
+        * Phase 1 dropped this header as a duplicate. That was the wrong
+        * diagnosis: the duplicate existed because the workspace was drawn
+        * inside the portal layout, not because the header was redundant. A
+        * full-viewport terminal with no navigation is a trap.
         */}
-      <div className={styles.chartHeader}>
-        <button
-          className={styles.headerButton}
-          aria-pressed={focus}
-          onClick={() => setFocus((value) => !value)}
-          title="Focus mode (F)"
-        >
-          {focus ? 'Exit focus' : 'Focus'}
-        </button>
+      {!focus && (
+        <header className={styles.globalHeader}>
+          <Link className={styles.back} href="/">
+            <span className={styles.brandMark} aria-hidden="true">TN</span>
+            <span className={styles.brand}>TradingNew</span>
+          </Link>
+          <Link
+            className={styles.headerLink}
+            href={{ pathname: '/symbols/[ticker]', params: { ticker: resolved?.ticker ?? symbol } }}
+          >
+            Leave chart
+          </Link>
+          <div className={styles.spacer} />
+          <button className={styles.headerButton} onClick={() => setFocus(true)} title="Focus mode (F)">
+            Focus
+          </button>
+        </header>
+      )}
 
-        <button className={styles.symbolButton}>
-          <Icon name="search" size={14} />
-          <span className={styles.ticker}>{symbol}</span>
-          <span className={styles.exchange}>{exchange}</span>
+      {focus && (
+        <button className={styles.restoreStrip} onClick={() => setFocus(false)}>
+          Restore header · press F
         </button>
+      )}
+
+      <div className={styles.chartHeader}>
+
+        <div className={styles.symbolWrap}>
+          <button
+            className={styles.symbolButton}
+            aria-expanded={pickerOpen}
+            aria-haspopup="listbox"
+            onClick={() => setPickerOpen((open) => !open)}
+          >
+            <Icon name="search" size={14} />
+            <span className={styles.ticker}>{resolved?.ticker ?? symbol}</span>
+            <span className={styles.exchange}>{resolved?.exchange ?? exchange}</span>
+          </button>
+
+          {pickerOpen && (
+            <div className={styles.picker} role="listbox" aria-label="Choose a symbol">
+              {DEMO_SYMBOLS.map((entry) => (
+                <button
+                  key={entry.id}
+                  role="option"
+                  aria-selected={entry.id === symbolId}
+                  className={`${styles.pickerRow} ${entry.id === symbolId ? styles.pickerRowOn : ''}`}
+                  onClick={() => {
+                    setSymbolId(entry.id);
+                    setPickerOpen(false);
+                  }}
+                >
+                  <span className={styles.pickerTicker}>{entry.ticker}</span>
+                  <span className={styles.pickerName}>{entry.name}</span>
+                  <span className={styles.pickerExchange}>{entry.exchange}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className={styles.quote}>
           <span className={`${styles.price} tn-num`}>{last?.close.toFixed(2)}</span>
@@ -179,14 +263,14 @@ export function SuperchartWorkspace({
             {up ? '▲' : '▼'} {change.toFixed(2)} ({changePercent.toFixed(2)}%)
           </span>
           <span className={styles.quoteSub}>
-            {companyName} · demo · {new Date().toISOString().slice(11, 16)} UTC
+            {resolved?.name ?? companyName} · {resolved?.dataStatus ?? 'demo'}
           </span>
         </div>
 
         <span className={styles.divider} aria-hidden="true" />
 
         <div className={styles.intervalGroup} role="group" aria-label="Timeframe">
-          {INTERVALS.map((item) => (
+          {(resolved?.supportedIntervals ?? INTERVALS).map((item) => (
             <button
               key={item}
               className={`${styles.intervalItem} ${item === interval ? styles.intervalActive : ''}`}
@@ -235,7 +319,12 @@ export function SuperchartWorkspace({
             <span className={styles.legendSymbol}>
               {symbol} · {interval} · {exchange}
             </span>
-            <span className={styles.demoPill}>{DEMO_NOTICE}</span>
+            <span className={styles.demoPill}>
+              {resolved?.dataStatus === 'demo'
+                ? 'Demo data — generated, not a market feed.'
+                : 'Delayed data'}
+            </span>
+            {note && <span className={styles.note}>{note}</span>}
 
             {shown && (
               <span className={`${styles.ohlc} tn-num`}>

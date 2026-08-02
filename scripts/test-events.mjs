@@ -68,6 +68,10 @@ try {
       'src/lib/investment/data/fixtures.ts',
       'src/lib/investment/evidence/index.ts',
       'src/lib/investment/policy/index.ts',
+      'src/lib/superchart/chart-engine/types.ts',
+      'src/lib/superchart/datafeed/types.ts',
+      'src/lib/superchart/datafeed/demo.ts',
+      'src/lib/superchart/datafeed/portalAdapter.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -163,6 +167,10 @@ try {
   const evidence = await load('index', 'evidence');
   const policy = await load('index', 'policy');
   const graph = await load('index', 'graph');
+  const engineTypes = await load('types', 'chart-engine');
+  const feedTypes = await load('types', 'datafeed');
+  const demo = await load('demo');
+  const portal = await load('portalAdapter');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -1535,6 +1543,151 @@ try {
     assert.equal(emitted[emitted.length - 1], 'assessment_completed');
     assert.ok(emitted.indexOf('calculations_completed') < emitted.indexOf('validation_completed'));
     assert.ok(emitted.indexOf('validation_completed') < emitted.indexOf('assessment_completed'));
+  });
+
+  /* ============================== Superchart data ============================== */
+
+  group('Bar normalisation — the faults that only show on a chart');
+
+  check('bars are sorted, whatever order they arrived in', () => {
+    const out = feedTypes.normaliseBars([
+      { time: 300, open: 3, high: 3, low: 3, close: 3 },
+      { time: 100, open: 1, high: 1, low: 1, close: 1 },
+      { time: 200, open: 2, high: 2, low: 2, close: 2 },
+    ]);
+    assert.deepEqual(out.map((b) => b.time), [100, 200, 300]);
+  });
+
+  check('a repeated timestamp keeps the later bar, not both', () => {
+    // Providers repeat the boundary bar between pages. Two bars at one instant
+    // draws a doubled candle; keeping the later one treats it as a revision.
+    const out = feedTypes.normaliseBars([
+      { time: 100, open: 1, high: 1, low: 1, close: 1 },
+      { time: 100, open: 1, high: 9, low: 1, close: 5 },
+    ]);
+    assert.equal(out.length, 1);
+    assert.equal(out[0].close, 5);
+  });
+
+  check('a bar with a null price is dropped rather than drawn', () => {
+    const out = feedTypes.normaliseBars([
+      { time: 100, open: 1, high: 1, low: 1, close: 1 },
+      { time: 200, open: 2, high: 2, low: 2, close: NaN },
+      { time: 300, open: 3, high: 3, low: 3, close: 3 },
+    ]);
+    assert.deepEqual(out.map((b) => b.time), [100, 300]);
+  });
+
+  group('The demo feed');
+
+  check('the same symbol and interval always give the same series', () => {
+    // The server and the browser both render it, and a demo whose numbers move
+    // between visits cannot be discussed.
+    const a = demo.demoBars({ symbol: 'X', interval: '1D', bars: 50, lastPrice: 100 });
+    const b = demo.demoBars({ symbol: 'X', interval: '1D', bars: 50, lastPrice: 100 });
+    assert.deepEqual(a, b);
+  });
+
+  check('different symbols give different series', () => {
+    const a = demo.demoBars({ symbol: 'X', interval: '1D', bars: 50, lastPrice: 100 });
+    const b = demo.demoBars({ symbol: 'Y', interval: '1D', bars: 50, lastPrice: 100 });
+    assert.notDeepEqual(a, b);
+  });
+
+  check('the last bar closes at the price asked for', () => {
+    // A demo chart whose final candle disagrees with the quote above it reads
+    // as a bug rather than as a demo.
+    const bars = demo.demoBars({ symbol: 'X', interval: '1D', bars: 40, lastPrice: 123.45 });
+    assert.equal(bars[bars.length - 1].close, 123.45);
+  });
+
+  check('every bar is internally consistent', () => {
+    const bars = demo.demoBars({ symbol: 'Z', interval: '1H', bars: 300, lastPrice: 80 });
+    for (const bar of bars) {
+      assert.ok(bar.high >= Math.max(bar.open, bar.close), 'high below the body');
+      assert.ok(bar.low <= Math.min(bar.open, bar.close), 'low above the body');
+      assert.ok(bar.volume > 0, 'no volume');
+    }
+  });
+
+  check('intraday bars move less per bar than daily ones', () => {
+    // Without this every interval looks equally violent, which is the giveaway
+    // of a generated series.
+    const move = (interval) => {
+      const bars = demo.demoBars({ symbol: 'M', interval, bars: 400, lastPrice: 100 });
+      const moves = bars.slice(1).map((b, i) => Math.abs(b.close / bars[i].close - 1));
+      return moves.reduce((s, v) => s + v, 0) / moves.length;
+    };
+    assert.ok(move('5m') < move('1D'), 'intraday is not calmer than daily');
+  });
+
+  group('Heikin Ashi is a view, not different data');
+
+  check('the first bar opens at the midpoint of the raw bar', () => {
+    const raw = [{ time: 1, open: 10, high: 12, low: 9, close: 11 }];
+    const ha = engineTypes.toHeikinAshi(raw);
+    assert.equal(ha[0].open, 10.5);
+    assert.equal(ha[0].close, (10 + 12 + 9 + 11) / 4);
+  });
+
+  check('it keeps the bar count and the timestamps', () => {
+    const raw = demo.demoBars({ symbol: 'H', interval: '1D', bars: 60, lastPrice: 50 });
+    const ha = engineTypes.toHeikinAshi(raw);
+    assert.equal(ha.length, raw.length);
+    assert.deepEqual(ha.map((b) => b.time), raw.map((b) => b.time));
+  });
+
+  group('The portal adapter refuses what it cannot supply');
+
+  const portalFeed = new portal.PortalDatafeed(
+    async () => ({
+      closes: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      dates: ['2026-01-01','2026-01-02','2026-01-05','2026-01-06','2026-01-07','2026-01-08','2026-01-09','2026-01-12','2026-01-13','2026-01-14'],
+      asOf: '2026-01-14',
+      delayed: true,
+    }),
+    [{ id: 'NASDAQ:TSLA', ticker: 'TSLA', name: 'Tesla', exchange: 'NASDAQ', assetClass: 'stock' }]
+  );
+
+  const hourly = await portalFeed.getBars({ symbolId: 'NASDAQ:TSLA', interval: '1H', from: 0, to: 2e9 });
+
+  check('an interval it has no data for returns nothing and says why', () => {
+    /*
+     * The alternative is resampling a daily close into an hourly candle, whose
+     * open, high and low were never traded and which looks exactly like a real
+     * one.
+     */
+    assert.equal(hourly.bars.length, 0);
+    assert.match(hourly.note, /daily data only/i);
+  });
+
+  const daily = await portalFeed.getBars({ symbolId: 'NASDAQ:TSLA', interval: '1D', from: 0, to: 2e9 });
+
+  check('daily bars come back flat, because only the close is known', () => {
+    assert.equal(daily.bars.length, 10);
+    for (const bar of daily.bars) {
+      assert.equal(bar.open, bar.close);
+      assert.equal(bar.high, bar.close);
+    }
+    assert.match(daily.note, /no separate open/i);
+  });
+
+  check('and it never claims to be anything but delayed', () => {
+    assert.equal(daily.dataStatus, 'delayed');
+  });
+
+  check('weekly aggregation is honest — every price in it was traded', () => {
+    const weekly = portal.aggregateDaily(daily.bars, '1W');
+    assert.ok(weekly.length < daily.bars.length, 'nothing was grouped');
+    for (const bar of weekly) {
+      assert.ok(bar.high >= bar.low);
+      assert.ok(bar.high >= bar.open && bar.high >= bar.close);
+    }
+  });
+
+  check('it only advertises the intervals it can serve', async () => {
+    const resolved = await portalFeed.resolveSymbol('NASDAQ:TSLA');
+    assert.deepEqual(resolved.supportedIntervals, ['1D', '1W', '1M']);
   });
 } catch (error) {
   failed += 1;

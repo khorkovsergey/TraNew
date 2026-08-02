@@ -58,7 +58,6 @@ export default async function SuperchartsPage({ params }: Props) {
         symbol="TSLA"
         companyName="Tesla"
         exchange="NASDAQ"
-        lastPrice={closes[closes.length - 1]}
       />
     );
   }
