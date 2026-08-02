@@ -80,6 +80,9 @@ try {
       'src/lib/superchart/context/answers.ts',
       'src/lib/superchart/commands/index.ts',
       'src/lib/superchart/commands/planner.ts',
+      'src/lib/superchart/scripts/document.ts',
+      'src/lib/superchart/scripts/diagnostics.ts',
+      'src/lib/superchart/scripts/fixes.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -187,6 +190,9 @@ try {
   const ans = await load('answers', 'context');
   const cmd = await load('index', 'commands');
   const planner = await load('planner', 'commands');
+  const doc = await load('document', 'scripts');
+  const diag = await load('diagnostics', 'scripts');
+  const fix = await load('fixes', 'scripts');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -2445,6 +2451,352 @@ try {
     const crosses = instance.plots.find((plot) => plot.key === 'cross');
     const marked = crosses.values.filter((value) => value !== null);
     assert.equal(marked.length, 1, `expected one crossing, got ${marked.length}`);
+  });
+
+  /* ================================ Script Lab =============================== */
+
+  group('Generated Pine describes the chart, not something like it');
+
+  check('the script comes from the same registry that draws the study', () => {
+    /*
+     * The failure this prevents: a script that says `ta.sma` for a study the
+     * chart computes as an EMA. It looks right, and it is wrong somewhere it
+     * actually runs.
+     */
+    const pine = doc.pineForStudies([{ definitionId: 'ema', params: { fast: 12, slow: 26 } }]);
+    assert.match(pine, /ta\.ema/);
+    assert.ok(!/ta\.sma/.test(pine), 'an EMA study generated an SMA script');
+    assert.match(pine, /input\.int\(12/);
+    assert.match(pine, /input\.int\(26/);
+  });
+
+  check('a simple average generates a simple average', () => {
+    const pine = doc.pineForStudies([{ definitionId: 'sma', params: { fast: 20, slow: 50 } }]);
+    assert.match(pine, /ta\.sma/);
+    assert.ok(!/ta\.ema/.test(pine));
+  });
+
+  check('exactly one version directive, however many studies', () => {
+    // Two //@version= lines is not a Pine script; it is two of them in one file.
+    const pine = doc.pineForStudies([
+      { definitionId: 'ema', params: {} },
+      { definitionId: 'volume-ma', params: {} },
+    ]);
+    assert.equal(pine.split('\n').filter((line) => line.startsWith('//@version=')).length, 1);
+  });
+
+  check('and exactly one live indicator() declaration', () => {
+    /*
+     * Pine allows one declaration per script. The second study is commented out
+     * with a line saying why, rather than emitted as code that cannot compile.
+     */
+    const pine = doc.pineForStudies([
+      { definitionId: 'ema', params: {} },
+      { definitionId: 'volume-ma', params: {} },
+    ]);
+    const declarations = pine
+      .split('\n')
+      .filter((line) => /^indicator\s*\(/.test(line.trim()));
+    assert.equal(declarations.length, 1);
+    assert.match(pine, /separate indicators in Pine/);
+  });
+
+  check('an unknown study is skipped rather than emitted as a guess', () => {
+    const pine = doc.pineForStudies([{ definitionId: 'not-a-study', params: {} }]);
+    assert.match(pine, /have a Pine template/);
+    // Nothing invented: no plot, no ta call, no made-up study name.
+    assert.ok(!/ta\./.test(pine), pine);
+    assert.ok(!/not-a-study/.test(pine), pine);
+  });
+
+  check('no studies produces an honest empty script', () => {
+    assert.match(doc.pineForStudies([]), /Nothing is on the chart/);
+  });
+
+  check('the generated script passes its own checker', () => {
+    // If the thing the product generates trips its own diagnostics, one of the
+    // two is wrong and a person cannot tell which.
+    const pine = doc.pineForStudies([{ definitionId: 'ema', params: { fast: 20, slow: 50 } }]);
+    const found = diag.diagnose(pine);
+    const errors = found.filter((item) => item.severity === 'error');
+    assert.equal(errors.length, 0, JSON.stringify(errors));
+  });
+
+  group('Versions');
+
+  const firstDoc = doc.createDocument({ id: 's1', name: 'Mine', source: 'line one\nline two' });
+
+  check('a new document starts at version 1', () => {
+    assert.equal(firstDoc.versions.length, 1);
+    assert.equal(firstDoc.versions[0].number, 1);
+  });
+
+  check('an unchanged save is not a version', () => {
+    /*
+     * Autosave runs on a timer. A version per pause would bury the three that
+     * mattered under two hundred that did not.
+     */
+    const same = doc.commitVersion(firstDoc, {
+      source: 'line one\nline two',
+      author: 'user',
+      note: 'Edited',
+    });
+    assert.equal(same.versions.length, 1);
+  });
+
+  check('a changed save is', () => {
+    const next = doc.commitVersion(firstDoc, {
+      source: 'line one\nline two\nline three',
+      author: 'voyager',
+      note: 'Added a line',
+    });
+    assert.equal(next.versions.length, 2);
+    assert.equal(next.versions[1].number, 2);
+    assert.equal(next.versions[1].author, 'voyager');
+    assert.equal(next.source, 'line one\nline two\nline three');
+  });
+
+  check('the history is bounded and numbers are never reused', () => {
+    let document = firstDoc;
+    for (let i = 0; i < 50; i += 1) {
+      document = doc.commitVersion(document, { source: `v${i}`, author: 'user', note: 'x' });
+    }
+    assert.equal(document.versions.length, doc.MAX_VERSIONS);
+    // A dropped version leaves a gap rather than making v4 mean two things.
+    assert.equal(document.versions[document.versions.length - 1].number, 51);
+    assert.ok(document.versions[0].number > 1);
+  });
+
+  group('A stored document is untrusted input');
+
+  check('a document round-trips', () => {
+    const back = doc.parseDocument(JSON.parse(JSON.stringify(firstDoc)));
+    assert.equal(back.source, 'line one\nline two');
+    assert.equal(back.versions.length, 1);
+  });
+
+  check('a version with an unusable shape is dropped, the rest survives', () => {
+    const back = doc.parseDocument({
+      ...firstDoc,
+      versions: [...firstDoc.versions, { number: 'two', source: 'x' }],
+    });
+    assert.equal(back.versions.length, 1);
+  });
+
+  check('a document with no usable version at all is refused', () => {
+    // Half a history is harder to notice than none.
+    assert.equal(doc.parseDocument({ ...firstDoc, versions: [] }), null);
+  });
+
+  check('an unknown author is read as the person, never as Voyager', () => {
+    const back = doc.parseDocument({
+      ...firstDoc,
+      versions: [{ ...firstDoc.versions[0], author: 'somebody' }],
+    });
+    assert.equal(back.versions[0].author, 'user');
+  });
+
+  check('source past the limit is refused rather than truncated', () => {
+    const huge = 'x'.repeat(doc.MAX_SOURCE + 1);
+    assert.equal(doc.parseDocument({ ...firstDoc, source: huge }), null);
+  });
+
+  check('rubbish is null rather than a partial document', () => {
+    assert.equal(doc.parseDocument(null), null);
+    assert.equal(doc.parseDocument('a string'), null);
+    assert.equal(doc.parseDocument({}), null);
+  });
+
+  group('The diff survives an insertion at the top');
+
+  check('inserting one line reports one line, not a rewrite', () => {
+    /*
+     * The whole reason this is a longest-common-subsequence rather than line N
+     * against line N. A naive diff reports the entire file as changed the moment
+     * anything shifts, which is exactly when somebody stops reading it.
+     */
+    const diff = doc.diffLines('a\nb\nc', 'new\na\nb\nc');
+    const summary = doc.diffSummary(diff);
+    assert.equal(summary.added, 1);
+    assert.equal(summary.removed, 0);
+  });
+
+  check('a deletion in the middle is one removal', () => {
+    const summary = doc.diffSummary(doc.diffLines('a\nb\nc', 'a\nc'));
+    assert.equal(summary.removed, 1);
+    assert.equal(summary.added, 0);
+  });
+
+  check('a changed line is one of each', () => {
+    const summary = doc.diffSummary(doc.diffLines('a\nb\nc', 'a\nB\nc'));
+    assert.equal(summary.added, 1);
+    assert.equal(summary.removed, 1);
+  });
+
+  check('identical text is entirely unchanged', () => {
+    const diff = doc.diffLines('a\nb', 'a\nb');
+    assert.ok(diff.every((line) => line.kind === 'same'));
+  });
+
+  check('the diff keeps every line of both sides', () => {
+    const diff = doc.diffLines('a\nb\nc', 'a\nx\nc\nd');
+    const rebuiltBefore = diff.filter((l) => l.kind !== 'added').map((l) => l.text).join('\n');
+    const rebuiltAfter = diff.filter((l) => l.kind !== 'removed').map((l) => l.text).join('\n');
+    assert.equal(rebuiltBefore, 'a\nb\nc');
+    assert.equal(rebuiltAfter, 'a\nx\nc\nd');
+  });
+
+  group('Diagnostics name what they cannot do');
+
+  check('a missing version directive is an error', () => {
+    const found = diag.diagnose('indicator("x")\nplot(close)');
+    assert.ok(found.some((item) => item.severity === 'error' && /@version/.test(item.message)));
+  });
+
+  check('a version directive not on line one is an error', () => {
+    const found = diag.diagnose('indicator("x")\n//@version=6\nplot(close)');
+    assert.ok(found.some((item) => item.severity === 'error' && /first line/.test(item.message)));
+  });
+
+  check('two declarations are an error, pointed at the second', () => {
+    const found = diag.diagnose('//@version=6\nindicator("a")\nindicator("b")\nplot(close)');
+    const error = found.find((item) => item.severity === 'error');
+    assert.equal(error.line, 3);
+  });
+
+  check('an unsupported function is named, with the reason', () => {
+    /*
+     * "Some functions are unsupported" tells nobody which line to change. The
+     * design's acceptance list requires them named.
+     */
+    const found = diag.diagnose(
+      '//@version=6\nindicator("x")\nspx = request.security("SPX", "D", close)\nplot(spx)'
+    );
+    const warning = found.find((item) => /request\.security/.test(item.message));
+    assert.equal(warning.severity, 'warning');
+    assert.equal(warning.line, 3);
+    assert.match(warning.message, /does not fetch/);
+  });
+
+  check('a function named inside a comment is not reported as used', () => {
+    // Explaining why you avoided something is not using it.
+    const found = diag.diagnose(
+      '//@version=6\nindicator("x")\n// avoided request.security() on purpose\nplot(close)'
+    );
+    assert.ok(!found.some((item) => /request\.security/.test(item.message)));
+  });
+
+  check('real Pine outside the preview is a note, not an error', () => {
+    /*
+     * Pine has far more built-ins than this checker knows. Telling somebody
+     * their correct script is wrong is how a linter gets ignored.
+     */
+    const found = diag.diagnose('//@version=6\nindicator("x")\nplot(ta.vwap(close))');
+    const note = found.find((item) => /ta\.vwap/.test(item.message));
+    assert.equal(note.severity, 'note');
+  });
+
+  check('a script that plots nothing is flagged', () => {
+    const found = diag.diagnose('//@version=6\nindicator("x")\nvalue = close * 2');
+    assert.ok(found.some((item) => /Nothing is plotted/.test(item.message)));
+  });
+
+  check('an unbalanced closing bracket is an error', () => {
+    const found = diag.diagnose('//@version=6\nindicator("x")\nplot(close))');
+    assert.ok(found.some((item) => item.severity === 'error' && item.line === 3));
+  });
+
+  check('diagnostics come back in line order', () => {
+    const found = diag.diagnose(
+      'indicator("x")\nplot(close))\nx = request.financial("A", "B", "C")'
+    );
+    const lines = found.map((item) => item.line);
+    assert.deepEqual(lines, [...lines].sort((a, b) => a - b));
+  });
+
+  group('The status never claims more than was checked');
+
+  check('an error outranks a warning', () => {
+    assert.equal(diag.statusFor([{ severity: 'warning' }, { severity: 'error' }]), 'error');
+  });
+
+  check('a warning outranks a note', () => {
+    assert.equal(diag.statusFor([{ severity: 'note' }, { severity: 'warning' }]), 'warning');
+  });
+
+  check('and a clean result does not say "valid" to the person', () => {
+    /*
+     * `valid` in the type means "nothing was recognised as a problem". Saying
+     * that out loud is the difference between a checker used correctly and one
+     * trusted with a script that does not compile.
+     */
+    const label = diag.statusLabel(diag.statusFor([]));
+    assert.match(label, /not the same as verified/i);
+  });
+
+  group('Fix with Voyager changes one line and says what it costs');
+
+  check('a missing version directive gets a one-line fix', () => {
+    const source = 'indicator("x")\nplot(close)';
+    const offered = fix.fixesFor(source, diag.diagnose(source));
+    const repair = offered.find((item) => /Add the \/\/@version/.test(item.title));
+    assert.equal(repair.apply(source), '//@version=6\nindicator("x")\nplot(close)');
+  });
+
+  check('and the fixed source no longer trips the diagnostic it fixed', () => {
+    // A repair that leaves the warning in place is not a repair.
+    const source = 'indicator("x")\nplot(close)';
+    const repair = fix.fixesFor(source, diag.diagnose(source))[0];
+    const after = diag.diagnose(repair.apply(source));
+    assert.ok(!after.some((item) => /No \/\/@version/.test(item.message)));
+  });
+
+  check('an unsupported call is commented, not deleted', () => {
+    /*
+     * Deleting somebody's line to silence a warning is the failure this whole
+     * flow guards against. Commenting keeps the work and keeps the change small
+     * enough that the diff is actually read.
+     */
+    const source = '//@version=6\nindicator("x")\nspx = request.security("SPX", "D", close)\nplot(spx)';
+    const repair = fix.fixesFor(source, diag.diagnose(source))[0];
+    const after = repair.apply(source);
+    assert.match(after, /\/\/ spx = request\.security/);
+    assert.equal(after.split('\n').length, source.split('\n').length);
+  });
+
+  check('and the offer says what it will break', () => {
+    // Only ever showing the benefit is how somebody applies a fix that leaves
+    // the next line referring to a value that no longer exists.
+    const source = '//@version=6\nindicator("x")\nspx = request.security("SPX", "D", close)\nplot(spx)';
+    const repair = fix.fixesFor(source, diag.diagnose(source))[0];
+    assert.match(repair.detail, /second thing to fix|missing a value/);
+  });
+
+  check('a stray closing bracket is removed', () => {
+    const source = '//@version=6\nindicator("x")\nplot(close))';
+    const repair = fix.fixesFor(source, diag.diagnose(source)).find((item) => /bracket/.test(item.title));
+    assert.equal(repair.apply(source).split('\n')[2], 'plot(close)');
+  });
+
+  check('a fix never touches a line it was not about', () => {
+    const source = '//@version=6\nindicator("x")\nspx = request.security("SPX", "D", close)\nplot(spx)';
+    const repair = fix.fixesFor(source, diag.diagnose(source))[0];
+    const before = source.split('\n');
+    const after = repair.apply(source).split('\n');
+
+    for (let i = 0; i < before.length; i += 1) {
+      if (i === 2) continue;
+      assert.equal(after[i], before[i], `line ${i + 1} changed and should not have`);
+    }
+  });
+
+  check('a note is not offered a fix', () => {
+    /*
+     * Notes are real Pine this preview does not compute. Offering to "fix"
+     * correct code is how a linter teaches people to ignore it.
+     */
+    const source = '//@version=6\nindicator("x")\nplot(ta.vwap(close))';
+    assert.equal(fix.fixesFor(source, diag.diagnose(source)).length, 0);
   });
 
   /* ============================ Superchart layouts ============================ */

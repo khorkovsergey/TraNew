@@ -425,6 +425,36 @@ export const chartLayout = pgTable(
   ]
 );
 
+/**
+ * Script Lab documents.
+ *
+ * The whole document, versions included, is stored as one serialized value
+ * rather than a row per version. A version is only ever read with its document
+ * and never queried across users, so a table would buy nothing and cost a join
+ * on every open — and the version cap keeps the value bounded.
+ */
+export const chartScript = pgTable(
+  'chart_script',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    name: text('name').notNull(),
+    /** Serialized `ScriptDocument`, validated on the way in and on the way out. */
+    document: text('document').notNull(),
+    schemaVersion: integer('schema_version').notNull(),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [
+    uniqueIndex('chart_script_user_name_idx').on(table.userId, table.name),
+    index('chart_script_user_updated_idx').on(table.userId, table.updatedAt),
+  ]
+);
+
 export const savedObject = pgTable(
   'saved_object',
   {

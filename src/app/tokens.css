@@ -43,6 +43,9 @@
   --tn-amber-text: #b07708;
 
   --tn-red: #e0492f;
+  /* The counterpart to --tn-green-tint, at the same lightness, so an added and
+     a removed line in a diff read as a pair rather than as two intensities. */
+  --tn-red-tint: #fce8e4;
 
   /* Study lines. Indexed rather than named, because a study says "colour 0",
      not "blue" — which line gets which colour is the registry's business. */

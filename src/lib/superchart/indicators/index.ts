@@ -49,7 +49,27 @@ export type IndicatorDefinition = {
   ranges: Record<string, { min: number; max: number }>;
   compute: (bars: Bar[], params: Record<string, number>) => IndicatorPlot[];
   label: (params: Record<string, number>) => string;
+  /**
+   * The Pine v6 source for this study.
+   *
+   * A template with the parameters interpolated, never generated text. The
+   * chart and the script have to be the same study — a script that says
+   * something the chart is not drawing is worse than no script, because it will
+   * be pasted somewhere it does run.
+   */
+  pine: (params: Record<string, number>) => string;
 };
+
+/**
+ * Normalises a template's line endings.
+ *
+ * The templates are literals in a checked-out file, so a Windows checkout hands
+ * back CRLF and the exported script carries whichever line ending the machine
+ * that built it happened to use.
+ */
+function lf(template: string): string {
+  return template.replace(/\r\n/g, '\n');
+}
 
 /* ----------------------------------------------------------- Primitives */
 
@@ -139,6 +159,14 @@ const volumeAnomaly: IndicatorDefinition = {
     ];
   },
   label: (params) => `Volume ≥ ${params.multiple}× ${params.lookback}-bar average`,
+  pine: (params) => lf(`//@version=6
+indicator("Volume anomalies")
+lookback = input.int(${params.lookback}, "Lookback", minval = 2, maxval = 400)
+multiple = input.float(${params.multiple}, "Multiple", minval = 1, maxval = 10)
+average = ta.sma(volume, lookback)
+unusual = volume > average * multiple
+plot(volume, "Volume", style = plot.style_columns, color = unusual ? color.new(color.red, 0) : color.new(color.gray, 60))
+plot(average * multiple, "Threshold", color = color.new(color.orange, 0))`),
 };
 
 const movingAverages: IndicatorDefinition = {
@@ -155,6 +183,14 @@ const movingAverages: IndicatorDefinition = {
     ];
   },
   label: (params) => `MA ${params.fast}/${params.slow}`,
+  pine: (params) => lf(`//@version=6
+indicator("Moving averages", overlay = true)
+fastLength = input.int(${params.fast}, "Fast length", minval = 2, maxval = 200)
+slowLength = input.int(${params.slow}, "Slow length", minval = 2, maxval = 400)
+fastMa = ta.sma(close, fastLength)
+slowMa = ta.sma(close, slowLength)
+plot(fastMa, "Fast MA", color = color.new(color.purple, 0))
+plot(slowMa, "Slow MA", color = color.new(color.orange, 0))`),
 };
 
 const volumeAverage: IndicatorDefinition = {
@@ -172,6 +208,11 @@ const volumeAverage: IndicatorDefinition = {
     },
   ],
   label: (params) => `Volume MA ${params.length}`,
+  pine: (params) => lf(`//@version=6
+indicator("Volume moving average")
+length = input.int(${params.length}, "Length", minval = 2, maxval = 200)
+plot(volume, "Volume", style = plot.style_columns, color = color.new(color.gray, 40))
+plot(ta.sma(volume, length), "Average", color = color.new(color.orange, 0))`),
 };
 
 /**
@@ -215,6 +256,16 @@ const exponentialMovingAverages: IndicatorDefinition = {
     ];
   },
   label: (params) => `EMA ${params.fast}/${params.slow}`,
+  pine: (params) => lf(`//@version=6
+indicator("Exponential moving averages", overlay = true)
+fastLength = input.int(${params.fast}, "Fast length", minval = 2, maxval = 200)
+slowLength = input.int(${params.slow}, "Slow length", minval = 2, maxval = 400)
+fastEma = ta.ema(close, fastLength)
+slowEma = ta.ema(close, slowLength)
+plot(fastEma, "Fast EMA", color = color.new(color.purple, 0))
+plot(slowEma, "Slow EMA", color = color.new(color.orange, 0))
+crossed = ta.cross(fastEma, slowEma)
+plotshape(crossed, "Crossover", shape.circle, location.absolute, color.new(color.green, 0), size = size.tiny)`),
 };
 
 export const INDICATORS: Record<string, IndicatorDefinition> = {

@@ -60,6 +60,7 @@ import {
 } from '@/lib/superchart/commands';
 import type { ChartHighlight } from '@/lib/superchart/chart-engine/types';
 import { VoyagerChartPanel } from './VoyagerChartPanel';
+import { ScriptLab } from './ScriptLab';
 import styles from './Superchart.module.css';
 
 /**
@@ -1086,14 +1087,10 @@ export function SuperchartWorkspace({
       {dockOpen && (
         <div className={styles.dock}>
           <div className={styles.dockTabs}>
-            <span className={styles.dockTabSoon}>Script Lab · Phase 7</span>
+            <span className={`${styles.dockTab} ${styles.dockTabActive}`}>Script Lab</span>
             <span className={styles.dockTabSoon}>Strategy Tester · Coming next</span>
           </div>
-          <p className={styles.dockNote}>
-            The dock arrives with Script Lab. It is empty rather than filled with a placeholder,
-            because a panel that looks finished and does nothing is harder to trust than one that
-            says what it is waiting for.
-          </p>
+          <ScriptLab studies={studyChoices} symbolTicker={resolved?.ticker ?? symbolId} />
         </div>
       )}
     </div>

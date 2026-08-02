@@ -319,8 +319,11 @@
 /* ---- Dock ---- */
 
 .dock {
-  height: 264px;
-  flex: 0 0 264px;
+  height: 300px;
+  flex: 0 0 300px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: var(--tn-surface);
   border-top: 1px solid var(--tn-border-card);
   padding: 12px;
@@ -921,4 +924,254 @@
 .activityTime {
   color: var(--tn-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- Script Lab */
+
+.dockTab {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tn-text-muted);
+  cursor: default;
+}
+
+.dockTabActive {
+  color: var(--tn-text);
+  border-bottom: 2px solid var(--tn-purple);
+  padding-bottom: 2px;
+}
+
+.labEmpty {
+  max-width: 62ch;
+}
+
+/*
+ * Editor beside diagnostics, because a line number in a message is useless if
+ * the source is on another screen.
+ */
+.lab {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.labEditor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.labBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.labName {
+  font-size: 12.5px;
+  color: var(--tn-text);
+}
+
+.labStatus {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--tn-border-input);
+  font-size: 10.5px;
+  color: var(--tn-text-muted);
+}
+
+.labStatus_error {
+  border-color: var(--tn-red);
+  color: var(--tn-red);
+}
+
+.labStatus_warning {
+  border-color: var(--tn-amber-text);
+  color: var(--tn-amber-text);
+}
+
+.labStatus_valid {
+  border-color: var(--tn-green);
+  color: var(--tn-green);
+}
+
+.labButton {
+  padding: 5px 10px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tn-text);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.labButton:hover {
+  border-color: var(--tn-purple);
+}
+
+.labSource {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 8px;
+  background: var(--tn-bg);
+  color: var(--tn-text);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  resize: none;
+  tab-size: 4;
+}
+
+.labSource:focus-visible {
+  outline: 2px solid var(--tn-purple);
+  outline-offset: 1px;
+}
+
+.labNotice {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+}
+
+.labSide {
+  overflow-y: auto;
+  min-height: 0;
+  padding-left: 12px;
+  border-left: 1px solid var(--tn-border-card);
+}
+
+.diagnostic {
+  display: flex;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--tn-border-card);
+}
+
+/* Severity is a word as well as a colour: the three tiers must be separable
+   without relying on hue. */
+.diagSeverity {
+  flex: none;
+  align-self: flex-start;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.diag_error {
+  background: var(--tn-red);
+  color: #fff;
+}
+
+.diag_warning {
+  background: var(--tn-amber-tint);
+  color: var(--tn-amber-text);
+}
+
+.diag_note {
+  background: var(--tn-chip-bg);
+  color: var(--tn-text-muted);
+}
+
+.diagLine {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tn-text);
+}
+
+.versionRow {
+  display: flex;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.versionRow:hover {
+  border-color: var(--tn-border-input);
+}
+
+.versionOn {
+  border-color: var(--tn-purple);
+  background: var(--tn-chip-bg);
+}
+
+.versionNumber {
+  flex: none;
+  padding: 1px 7px;
+  height: fit-content;
+  border-radius: 999px;
+  background: var(--tn-chip-bg);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.diffBlock {
+  margin: 6px 0 0;
+  padding: 8px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 8px;
+  background: var(--tn-bg);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
+.diffAdded {
+  background: var(--tn-green-tint);
+  color: var(--tn-text);
+}
+
+.diffRemoved {
+  background: var(--tn-red-tint);
+  color: var(--tn-text-muted);
+  text-decoration: line-through;
+}
+
+.diffSame {
+  color: var(--tn-text-muted);
+}
+
+.fixButton {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--tn-purple);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tn-purple);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fixButton:hover {
+  background: var(--tn-chip-bg);
+}
+
+.fixCard {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--tn-purple);
+  border-radius: 12px;
+  background: var(--tn-chip-bg);
 }
