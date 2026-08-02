@@ -48,6 +48,26 @@ function clean(answers: unknown): string[][] | null {
   return out;
 }
 
+/**
+ * A subtitle someone can read.
+ *
+ * The first version stored the raw option ids — "u5 · preserve · u1 · any" —
+ * which is what the interview calls those answers and not what anyone else
+ * would. The labels come from the same content the questions were asked from.
+ */
+function describe(answers: string[][]): string {
+  const parts: string[] = [];
+
+  for (let index = 0; index < answers.length && parts.length < 3; index += 1) {
+    const option = STRATEGY_STEPS[index].options.find(
+      (candidate) => candidate.id === answers[index][0]
+    );
+    if (option) parts.push(option.label.en);
+  }
+
+  return parts.join(' · ');
+}
+
 export async function savePlanAction(input: { answers: unknown }): Promise<SavePlanResult> {
   const session = await getSession();
   if (!session?.user) return { status: 'sign_in_required' };
@@ -67,7 +87,7 @@ export async function savePlanAction(input: { answers: unknown }): Promise<SaveP
     kind: 'research',
     ref: 'strategy-plan',
     title: 'My research plan',
-    subtitle: answers.flat().slice(0, 4).join(' · '),
+    subtitle: describe(answers),
   });
 
   revalidatePath('/en/account/workspace');
