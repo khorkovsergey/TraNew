@@ -108,9 +108,22 @@ function subscribe(onChange: () => void): () => void {
   };
 }
 
+/**
+ * Tells the store the value moved — on the next microtask, not this one.
+ *
+ * Notifying synchronously re-renders every subscriber in the middle of whatever
+ * called `writePending`. That turned out to swallow the `router.push` that runs
+ * on the line after it: the claim flag was written, the navigation was issued,
+ * and the page stayed where it was, leaving the button spinning for ever.
+ *
+ * Deferring it lets the caller finish its own work first. Subscribers still
+ * update in the same frame, and nothing observable is slower.
+ */
 export function notifyPendingChanged(): void {
   snapshots.clear();
-  for (const listener of listeners) listener();
+  queueMicrotask(() => {
+    for (const listener of listeners) listener();
+  });
 }
 
 export function usePending<T>(kind: PendingKind): T | null {

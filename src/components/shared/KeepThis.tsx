@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { savePlanAction, saveLearningPathAction } from '@/app/actions/strategy';
 import { Link, useRouter } from '@/i18n/navigation';
 import { readPending, usePending, writePending, type PendingKind } from '@/lib/pendingWork';
@@ -51,6 +51,18 @@ export function KeepThis({
   const claim = usePending<{ claim?: boolean }>(kind)?.claim === true;
   const [state, setState] = useState<State>(claim ? 'saving' : 'idle');
 
+  /*
+   * Set while this tab is on its way to registration.
+   *
+   * Writing the claim flips `claim` to true, which wakes the effect below,
+   * which calls the server action again — and a server action starting while a
+   * route transition is in flight cancels the transition. The symptom was a
+   * button that stayed on "Saving…" and a page that never moved, with the claim
+   * correctly written to storage, which is what made it look like the write had
+   * failed rather than the navigation.
+   */
+  const leaving = useRef(false);
+
   const attempt = useCallback(
     async (fromReturn: boolean) => {
       if (!fromReturn) setState('saving');
@@ -96,6 +108,7 @@ export function KeepThis({
          * whoever happens to be signed in would be writing to an account nobody
          * asked us to write to.
          */
+        leaving.current = true;
         writePending(kind, { ...(readPending<object>(kind) ?? {}), claim: true });
         router.push('/sign-up');
         return;
@@ -115,7 +128,7 @@ export function KeepThis({
      * write on arrival is what an effect is for.
      */
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (claim) void attempt(true);
+    if (claim && !leaving.current) void attempt(true);
   }, [attempt, claim]);
 
   if (state === 'saved') {
