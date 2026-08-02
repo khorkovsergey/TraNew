@@ -37,6 +37,16 @@ function group(title) {
 /** Answers the interview from wherever it currently is to the end. */
 async function completeInterview(page) {
   for (let i = 0; i < 8; i += 1) {
+    /*
+     * Stop the moment the plan is on screen.
+     *
+     * Without this the loop takes one more turn, and the first button on the
+     * plan screen is "Keep this plan" — so the harness clicked straight through
+     * to the sign-up page and then reported that the plan had not been produced.
+     * The check was failing on its own last click.
+     */
+    if ((await page.locator('main').innerText()).includes('Your investment research plan')) break;
+
     const option = page
       .locator('main button')
       .filter({ hasNotText: /^Next$|^Back$|^Create my research plan$|^Restart/ })

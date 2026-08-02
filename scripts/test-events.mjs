@@ -76,6 +76,8 @@ try {
       'src/lib/superchart/indicators/index.ts',
       'src/lib/superchart/layouts/schema.ts',
       'src/lib/superchart/transactions/index.ts',
+      'src/lib/superchart/context/index.ts',
+      'src/lib/superchart/context/answers.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -179,6 +181,8 @@ try {
   const indicators = await load('index', 'indicators');
   const layouts = await load('schema', 'layouts');
   const tr = await load('index', 'transactions');
+  const ctx = await load('index', 'context');
+  const ans = await load('answers', 'context');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -1894,6 +1898,255 @@ try {
     const again = indicators.recompute(created, testBars.slice(0, 80));
     assert.equal(again.id, created.id);
     assert.equal(again.plots[0].values.length, 80);
+  });
+
+  /* ============================ Voyager chart context ========================= */
+
+  group('Context compression — what Voyager is actually told');
+
+  /*
+   * A series with a known shape: a steady drift, one violent bar, and one bar
+   * that trades on ten times the usual volume. Every assertion below is about
+   * whether the compression finds those two on its own.
+   */
+  const series = [];
+  for (let i = 0; i < 400; i += 1) {
+    const price = 100 + i * 0.05;
+    series.push({
+      time: 1_700_000_000 + i * 86_400,
+      open: price,
+      high: price + 0.4,
+      low: price - 0.4,
+      close: price,
+      volume: 1_000_000,
+    });
+  }
+  series[250] = { ...series[250], close: series[250].close * 1.18, high: series[250].close * 1.19 };
+  series[300] = { ...series[300], volume: 12_000_000 };
+
+  const baseInput = {
+    symbol: { id: 'X', ticker: 'X', name: 'X', exchange: 'DEMO', currency: 'USD' },
+    interval: '1D',
+    bars: series,
+    fromIndex: 0,
+    toIndex: series.length,
+    dataStatus: 'demo',
+    studies: [{ id: 'sma', label: 'MA 20/50', params: { fast: 20, slow: 50 } }],
+    drawings: [],
+    selection: null,
+  };
+
+  check('the whole window is never sent, however many bars are in it', () => {
+    /*
+     * The reason the module exists. 400 bars of JSON is most of a question's
+     * budget spent on numbers a model cannot reliably count anyway.
+     */
+    const context = ctx.buildChartContext(baseInput);
+    assert.equal(context.sampledBars.length, ctx.SAMPLE_LIMIT);
+    assert.ok(context.sampledBars.length < series.length / 5);
+  });
+
+  check('the sample keeps both ends', () => {
+    // The last bar is what every question is about; even sampling drops it
+    // whenever the count does not divide cleanly.
+    const sampled = ctx.sampleBars(series, 60);
+    assert.equal(sampled[0].time, series[0].time);
+    assert.equal(sampled[sampled.length - 1].time, series[series.length - 1].time);
+  });
+
+  check('a short window is passed through untouched', () => {
+    const short = series.slice(0, 20);
+    assert.equal(ctx.sampleBars(short, 60).length, 20);
+  });
+
+  check('the violent bar is found by arithmetic, not by looking', () => {
+    const context = ctx.buildChartContext(baseInput);
+    const found = context.visibleBarsSummary.largestUpBars;
+    assert.ok(found.length >= 1);
+    assert.equal(found[0].index, 250);
+  });
+
+  check('and the volume spike is found too', () => {
+    const context = ctx.buildChartContext(baseInput);
+    const spikes = context.visibleBarsSummary.volumeAnomalies;
+    assert.equal(spikes.length, 1);
+    assert.equal(spikes[0].index, 300);
+  });
+
+  check('every outlier carries the reason it was picked', () => {
+    // A bar in the payload with no reason is a number the model has to invent a
+    // story for.
+    const context = ctx.buildChartContext(baseInput);
+    for (const bar of context.visibleBarsSummary.largestUpBars) {
+      assert.match(bar.reason, /standard deviation/);
+    }
+    assert.match(context.visibleBarsSummary.volumeAnomalies[0].reason, /the average/);
+  });
+
+  check('a flat series reports no outliers rather than inventing some', () => {
+    /*
+     * The failure this guards against: a threshold that always returns its top
+     * three, so a chart where nothing happened comes back with three dramatic
+     * findings.
+     */
+    const flat = series.map((bar, i) => ({
+      time: bar.time,
+      open: 100,
+      high: 100,
+      low: 100,
+      close: 100,
+      volume: 1_000_000,
+    }));
+    const context = ctx.buildChartContext({ ...baseInput, bars: flat });
+    assert.equal(context.visibleBarsSummary.largestUpBars.length, 0);
+    assert.equal(context.visibleBarsSummary.volumeAnomalies.length, 0);
+  });
+
+  check('a window with no volume does not report volume findings', () => {
+    const noVolume = series.map(({ volume, ...bar }) => bar);
+    const context = ctx.buildChartContext({ ...baseInput, bars: noVolume });
+    assert.equal(context.visibleBarsSummary.averageVolume, null);
+    assert.equal(context.visibleBarsSummary.volumeAnomalies.length, 0);
+  });
+
+  check('two bars are not enough to describe, and say so', () => {
+    assert.equal(ctx.summariseVisible(series.slice(0, 1)), null);
+  });
+
+  group('The chips are the payload, not a caption');
+
+  check('removing the anomalies chip removes them from what is sent', () => {
+    /*
+     * The promise the panel makes: switching a chip off changes the answer,
+     * because the section is genuinely absent from the context rather than
+     * hidden in the panel.
+     */
+    const withThem = ctx.buildChartContext(baseInput);
+    const without = ctx.buildChartContext({ ...baseInput, excluded: ['anomalies'] });
+
+    assert.equal(withThem.visibleBarsSummary.volumeAnomalies.length, 1);
+    assert.equal(without.visibleBarsSummary.volumeAnomalies.length, 0);
+    assert.ok(ctx.contextSize(without) < ctx.contextSize(withThem));
+  });
+
+  check('removing the studies chip removes the studies', () => {
+    const without = ctx.buildChartContext({ ...baseInput, excluded: ['studies'] });
+    assert.equal(without.studies.length, 0);
+  });
+
+  check('a removed chip is not offered as still being sent', () => {
+    const context = ctx.buildChartContext({ ...baseInput, excluded: ['anomalies'] });
+    const ids = ctx.chipsFor(context, ['anomalies']).map((chip) => chip.id);
+    assert.ok(!ids.includes('anomalies'));
+    assert.ok(ids.includes('symbol'));
+  });
+
+  check('a selection scopes the statistics to the selection', () => {
+    // Asking about a selected range and being answered about the whole screen
+    // is the same bug as answering about the wrong symbol.
+    const scoped = ctx.buildChartContext({
+      ...baseInput,
+      selection: { fromIndex: 100, toIndex: 149 },
+    });
+    assert.equal(scoped.visibleBarsSummary.barCount, 50);
+    assert.equal(scoped.selection.barCount, 50);
+  });
+
+  group('Answers point at bars, and point at bars that exist');
+
+  check('an explanation numbers its references from one', () => {
+    const answer = ans.explainVisibleRange(ctx.buildChartContext(baseInput));
+    assert.deepEqual(
+      answer.references.map((reference) => reference.number),
+      answer.references.map((_, index) => index + 1)
+    );
+  });
+
+  check('every reference lands inside the series', () => {
+    /*
+     * References are offsets into the visible window added to the window's own
+     * start. Getting that addition wrong points the highlight at real bars that
+     * are not the ones described — which looks correct and is not.
+     */
+    const context = ctx.buildChartContext({ ...baseInput, fromIndex: 200, toIndex: 400 });
+    const answer = ans.explainVisibleRange(context);
+
+    for (const reference of answer.references) {
+      assert.ok(reference.fromIndex >= 200, `${reference.id} starts before the window`);
+      assert.ok(reference.toIndex <= series.length, `${reference.id} runs past the series`);
+    }
+  });
+
+  check('a reference in an offset window points at the bar it describes', () => {
+    const context = ctx.buildChartContext({ ...baseInput, fromIndex: 200, toIndex: 400 });
+    const answer = ans.explainVisibleRange(context);
+    const spike = answer.references.find((reference) => reference.title === 'Unusual volume');
+    assert.equal(spike.fromIndex, 300);
+  });
+
+  check('an answer always carries its source and date', () => {
+    const answer = ans.explainVisibleRange(ctx.buildChartContext(baseInput));
+    assert.match(answer.sources, /demo/);
+    assert.match(answer.sources, /\d{4}-\d{2}-\d{2}/);
+  });
+
+  check('the explanation declines to say why', () => {
+    // The chart knows the price moved. A cause attached to a real move is the
+    // most convincing kind of thing to be wrong about.
+    const answer = ans.explainVisibleRange(ctx.buildChartContext(baseInput));
+    assert.match(answer.summary, /does not explain why/);
+  });
+
+  check('a volume question is answered about volume', () => {
+    const answer = ans.answerFor('which bars had unusual volume?', ctx.buildChartContext(baseInput));
+    assert.match(answer.summary, /volume/i);
+    assert.equal(answer.references.length, 1);
+  });
+
+  check('and with the anomalies chip off, the same question answers differently', () => {
+    /*
+     * End to end: the chip is off, so the context has no anomalies, so the
+     * answer has no references. This is the behaviour the panel advertises.
+     */
+    const answer = ans.answerFor(
+      'which bars had unusual volume?',
+      ctx.buildChartContext({ ...baseInput, excluded: ['anomalies'] })
+    );
+    assert.equal(answer.references.length, 0);
+    assert.match(answer.summary, /No bar in this window/);
+  });
+
+  check('an empty window is refused rather than described', () => {
+    const answer = ans.explainVisibleRange(ctx.buildChartContext({ ...baseInput, bars: [] }));
+    assert.equal(answer.references.length, 0);
+    assert.match(answer.summary, /not enough bars/);
+  });
+
+  group('Mode selection is visible and reasoned');
+
+  check('an add request is a build', () => {
+    const choice = ans.chooseMode('add EMA 20 and EMA 50', ctx.buildChartContext(baseInput));
+    assert.equal(choice.mode, 'build');
+    assert.ok(choice.because.length > 0);
+  });
+
+  check('a why question is an analysis', () => {
+    const choice = ans.chooseMode('why did it drop here?', ctx.buildChartContext(baseInput));
+    assert.equal(choice.mode, 'analyze');
+  });
+
+  check('a definition question is teaching', () => {
+    const choice = ans.chooseMode('what is a moving average?', ctx.buildChartContext(baseInput));
+    assert.equal(choice.mode, 'learn');
+  });
+
+  check('a selection makes the answer about the selection, and says so', () => {
+    const choice = ans.chooseMode(
+      'talk me through it',
+      ctx.buildChartContext({ ...baseInput, selection: { fromIndex: 10, toIndex: 40 } })
+    );
+    assert.equal(choice.mode, 'analyze');
+    assert.match(choice.because, /selected/);
   });
 
   /* ============================ Superchart layouts ============================ */

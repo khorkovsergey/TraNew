@@ -8,11 +8,11 @@ import {
 } from '../drawings/types';
 import {
   CHART_TYPE_LABEL,
-  NotImplementedYet,
   toHeikinAshi,
   type Bar,
   type ChartEngineAdapter,
   type ChartEngineEvent,
+  type ChartHighlight,
   type ChartPalette,
   type ChartSelection,
   type ChartSnapshot,
@@ -85,6 +85,8 @@ export class CanvasChartEngine implements ChartEngineAdapter {
    * given. Two copies of one list drift.
    */
   private drawings: DrawingInstance[] = [];
+  private highlights: ChartHighlight[] = [];
+  private activeHighlight: string | null = null;
   private indicators: IndicatorInstance[] = [];
   private studyPalette: string[] = [];
   private selectedId: string | null = null;
@@ -177,6 +179,35 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     this.drawings = drawings;
     this.selectedId = selectedId;
     this.paint();
+  }
+
+  /**
+   * The zones an answer refers to.
+   *
+   * Held here rather than drawn by the panel because a reference has to stay
+   * attached to its bars while the chart is panned and zoomed, and only the
+   * engine knows where those bars currently are. The active one is passed
+   * separately so hovering a sentence can light up its zone without the whole
+   * set being rebuilt.
+   */
+  setHighlights(highlights: ChartHighlight[], activeId: string | null): void {
+    this.highlights = highlights;
+    this.activeHighlight = activeId;
+    this.paint();
+  }
+
+  /** Which reference is under the pointer, for the hover that runs the other way. */
+  highlightAt(x: number): ChartHighlight | null {
+    const layout = this.layout();
+    const step = (layout.width - layout.scaleWidth) / Math.max(1, this.range.to - this.range.from);
+
+    for (const highlight of this.highlights) {
+      const left = (highlight.fromIndex - this.range.from) * step;
+      const right = (highlight.toIndex - this.range.from + 1) * step;
+      if (x >= left - 2 && x <= right + 2) return highlight;
+    }
+
+    return null;
   }
 
   setIndicators(indicators: IndicatorInstance[], palette: string[]): void {
@@ -432,6 +463,7 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     }
 
     this.drawIndicators(ctx, toY, step);
+    this.drawHighlights(ctx, layout, step);
     this.drawDrawings(ctx, layout);
     this.drawVolume(ctx, bars, step, layout, palette);
     this.drawPriceScale(ctx, layout, palette, low, high);
@@ -585,6 +617,61 @@ export class CanvasChartEngine implements ChartEngineAdapter {
         ctx.stroke();
         ctx.setLineDash([]);
       }
+    }
+  }
+
+  /*
+   * A reference drawn as a zone with a number.
+   *
+   * Translucent rather than solid so the bars it is pointing at stay readable —
+   * a highlight that hides its own subject is decoration. Single-bar references
+   * get a minimum width, because one bar at a year of daily candles is under a
+   * pixel and would be invisible exactly when it matters most.
+   */
+  private drawHighlights(ctx: CanvasRenderingContext2D, layout: Layout, step: number): void {
+    if (!this.highlights.length) return;
+
+    const plotHeight = layout.priceHeight;
+
+    for (const highlight of this.highlights) {
+      const active = highlight.id === this.activeHighlight;
+      const left = (highlight.fromIndex - this.range.from) * step;
+      const width = Math.max(6, (highlight.toIndex - highlight.fromIndex + 1) * step);
+
+      if (left + width < 0 || left > layout.width - layout.scaleWidth) continue;
+
+      ctx.save();
+
+      if (highlight.kind !== 'window') {
+        ctx.fillStyle = active ? 'rgba(124, 77, 255, 0.20)' : 'rgba(124, 77, 255, 0.08)';
+        ctx.fillRect(left, 0, width, plotHeight);
+      }
+
+      ctx.strokeStyle = active ? 'rgba(124, 77, 255, 0.95)' : 'rgba(124, 77, 255, 0.45)';
+      ctx.lineWidth = active ? 1.6 : 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(left, 0);
+      ctx.lineTo(left, plotHeight);
+      ctx.moveTo(left + width, 0);
+      ctx.lineTo(left + width, plotHeight);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // The badge is the whole point of numbering: the sentence says "2" and
+      // the chart has to show a "2" somewhere findable.
+      const badgeX = left + width / 2;
+      ctx.beginPath();
+      ctx.arc(badgeX, 14, active ? 11 : 9, 0, Math.PI * 2);
+      ctx.fillStyle = active ? 'rgba(124, 77, 255, 1)' : 'rgba(124, 77, 255, 0.75)';
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `${active ? 700 : 600} 11px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(highlight.number), badgeX, 14);
+      ctx.restore();
     }
   }
 
@@ -794,12 +881,6 @@ export class CanvasChartEngine implements ChartEngineAdapter {
   }
   async removeDrawing(): Promise<void> {
     throw new Error('Use setDrawings(): the chart paints the list, it does not own it.');
-  }
-  async highlightRange(): Promise<string> {
-    throw new NotImplementedYet('Highlights', 'Phase 6');
-  }
-  async removeHighlight(): Promise<void> {
-    throw new NotImplementedYet('Highlights', 'Phase 6');
   }
 }
 

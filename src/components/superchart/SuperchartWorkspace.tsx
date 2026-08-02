@@ -51,6 +51,9 @@ import {
   type UndoableState,
 } from '@/lib/superchart/transactions';
 import { saveLayoutAction } from '@/app/actions/superchart';
+import { buildChartContext, type ContextChipId } from '@/lib/superchart/context';
+import type { ChartHighlight } from '@/lib/superchart/chart-engine/types';
+import { VoyagerChartPanel } from './VoyagerChartPanel';
 import styles from './Superchart.module.css';
 
 /**
@@ -127,6 +130,9 @@ export function SuperchartWorkspace({
    */
   const [studyChoices, setStudyChoices] = useState<StudyChoice[]>([]);
   const [history, setHistory] = useState<History>(EMPTY_HISTORY);
+  const [panelTab, setPanelTab] = useState<'objects' | 'voyager'>('objects');
+  /** Which reference the pointer is over on the chart, for the hover that runs back. */
+  const [hoveredHighlight, setHoveredHighlight] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<DrawingTool | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -371,9 +377,20 @@ export function SuperchartWorkspace({
     const drag = dragState.current;
     const engine = engineRef.current;
     const stage = stageRef.current;
-    if (!drag || !engine || !stage) return;
+    if (!engine || !stage) return;
 
     const rect = stage.getBoundingClientRect();
+
+    /*
+     * The hover that runs from the chart back to the answer. Compared before
+     * setting, because this fires on every pointer move and a state write per
+     * pixel would re-render the panel continuously while somebody is only
+     * moving the mouse across the chart.
+     */
+    const over = engine.highlightAt(event.clientX - rect.left)?.id ?? null;
+    setHoveredHighlight((current) => (current === over ? current : over));
+
+    if (!drag) return;
     const point = fromScreen(
       event.clientX - rect.left,
       event.clientY - rect.top,
@@ -411,6 +428,59 @@ export function SuperchartWorkspace({
     }
     dragState.current = null;
   }, [studyChoices, drawings]);
+
+  /*
+   * The context, built at the moment of asking.
+   *
+   * Reads the visible range off the engine rather than off React state because
+   * panning and zooming never enter React — the engine owns them — and a context
+   * built from stale bounds would describe a stretch of chart nobody is looking
+   * at.
+   */
+  const buildContext = useCallback(
+    (excluded: ContextChipId[]) => {
+      const engine = engineRef.current;
+      if (!engine || !bars.length) return null;
+
+      const range = engine.getVisibleRange();
+      const selection = engine.getSelection();
+
+      return buildChartContext({
+        symbol: {
+          id: symbolId,
+          ticker: resolved?.ticker ?? symbolId,
+          name: resolved?.name ?? symbolId,
+          exchange: resolved?.exchange ?? '',
+          currency: resolved?.currency ?? 'USD',
+        },
+        interval,
+        bars,
+        fromIndex: range.from,
+        toIndex: range.to,
+        dataStatus: resolved?.dataStatus ?? 'demo',
+        studies: indicators.map((instance) => ({
+          id: instance.definitionId,
+          label: instance.label,
+          params: instance.params,
+        })),
+        drawings: drawings.map((drawing) => ({
+          id: drawing.id,
+          tool: drawing.tool,
+          from: drawing.points[0]?.barIndex ?? 0,
+          to: drawing.points[drawing.points.length - 1]?.barIndex ?? 0,
+        })),
+        selection: selection
+          ? { fromIndex: selection.fromIndex, toIndex: selection.toIndex }
+          : null,
+        excluded,
+      });
+    },
+    [bars, symbolId, interval, resolved, indicators, drawings]
+  );
+
+  const applyHighlights = useCallback((highlights: ChartHighlight[], activeId: string | null) => {
+    engineRef.current?.setHighlights(highlights, activeId);
+  }, []);
 
   const saveLayout = useCallback(async () => {
     const layout = serializeLayout('current', 'My layout', {
@@ -772,12 +842,34 @@ export function SuperchartWorkspace({
 
         {panelOpen && (
           <aside className={styles.rightPanel} aria-label="Chart panels">
-            <div className={styles.panelTabs}>
-              <span className={`${styles.panelTab} ${styles.panelTabActive}`}>Objects &amp; data</span>
-              <span className={styles.panelTabSoon}>Voyager · Phase 5</span>
+            <div className={styles.panelTabs} role="tablist">
+              <button
+                role="tab"
+                aria-selected={panelTab === 'objects'}
+                className={`${styles.panelTab} ${panelTab === 'objects' ? styles.panelTabActive : ''}`}
+                onClick={() => setPanelTab('objects')}
+              >
+                Objects &amp; data
+              </button>
+              <button
+                role="tab"
+                aria-selected={panelTab === 'voyager'}
+                className={`${styles.panelTab} ${panelTab === 'voyager' ? styles.panelTabActive : ''}`}
+                onClick={() => setPanelTab('voyager')}
+              >
+                Voyager
+              </button>
             </div>
 
-            <div className={styles.objectTree}>
+            {panelTab === 'voyager' && (
+              <VoyagerChartPanel
+                buildContext={buildContext}
+                onHighlights={applyHighlights}
+                hoveredFromChart={hoveredHighlight}
+              />
+            )}
+
+            <div className={styles.objectTree} hidden={panelTab !== 'objects'}>
               <div className={styles.dataTitle}>STUDIES</div>
               {Object.values(INDICATORS).map((definition) => {
                 const on = indicators.some(
@@ -842,7 +934,7 @@ export function SuperchartWorkspace({
               ))}
             </div>
 
-            <div className={styles.dataWindow}>
+            <div className={styles.dataWindow} hidden={panelTab !== 'objects'}>
               <div className={styles.dataTitle}>
                 DATA WINDOW ·{' '}
                 {shown ? new Date(shown.time * 1000).toISOString().slice(0, 10) : '—'} · {interval}

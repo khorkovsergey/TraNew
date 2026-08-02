@@ -515,3 +515,254 @@
 }
 
 .panelToggle:disabled { opacity: 0.4; cursor: default; }
+
+/* ------------------------------------------------------- Voyager panel */
+
+.voyagerPanel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.voyagerContext {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--tn-border-card);
+}
+
+.voyagerSize {
+  float: right;
+  font-weight: 400;
+  color: var(--tn-text-muted);
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/*
+ * A chip is a control, not a label: it says what is being sent and removes it.
+ * Styled as something clickable for that reason.
+ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 999px;
+  background: var(--tn-chip-bg);
+  color: var(--tn-text);
+  font-size: 11.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.chip:hover {
+  border-color: var(--tn-purple);
+}
+
+.chipOff {
+  opacity: 0.55;
+  text-decoration: line-through;
+  border-style: dashed;
+}
+
+.chipOff:hover {
+  opacity: 1;
+  text-decoration: none;
+}
+
+.voyagerBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px;
+}
+
+.voyagerNote,
+.voyagerSources {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--tn-text-muted);
+}
+
+.voyagerSources {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--tn-border-card);
+}
+
+.quickCommand {
+  display: block;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tn-text);
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.quickCommand:hover {
+  border-color: var(--tn-purple);
+  background: var(--tn-chip-bg);
+}
+
+.voyagerThinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--tn-text-muted);
+}
+
+.voyagerDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tn-purple);
+  animation: voyagerPulse 1.1s ease-in-out infinite;
+}
+
+@keyframes voyagerPulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* The animation is the only signal that work is happening; without motion the
+   text alone still reads as a status, so nothing is lost. */
+@media (prefers-reduced-motion: reduce) {
+  .voyagerDot { animation: none; opacity: 1; }
+}
+
+.voyagerError {
+  margin: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--tn-amber-tint);
+  color: var(--tn-amber-text);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.voyagerQuestion {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tn-text);
+}
+
+.voyagerBecause {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: var(--tn-text-muted);
+}
+
+.voyagerAnswer {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--tn-text);
+}
+
+/*
+ * A reference is the link between a sentence and a stretch of bars. Hovering it
+ * lights the zone on the chart, and hovering the zone lights this — the border
+ * is what makes that connection visible in the panel.
+ */
+.reference {
+  display: flex;
+  gap: 9px;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--tn-border-card);
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.referenceOn {
+  border-left-color: var(--tn-purple);
+  background: var(--tn-chip-bg);
+}
+
+.referenceNumber {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--tn-purple);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.referenceTitle {
+  display: block;
+  font-size: 12.5px;
+  color: var(--tn-text);
+}
+
+.referenceDetail {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+.voyagerForm {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--tn-border-card);
+}
+
+.voyagerInput {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 8px;
+  background: var(--tn-bg);
+  color: var(--tn-text);
+  font-size: 12.5px;
+}
+
+.voyagerInput:focus-visible {
+  outline: 2px solid var(--tn-purple);
+  outline-offset: 1px;
+}
+
+.voyagerSend {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--tn-purple);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.voyagerSend:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

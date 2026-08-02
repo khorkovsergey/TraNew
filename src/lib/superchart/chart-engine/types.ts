@@ -46,6 +46,27 @@ export type ChartSelection = {
   toIndex: number;
 };
 
+/**
+ * A range of bars an answer points at.
+ *
+ * Stored in bar indices rather than pixels, like everything else the engine
+ * keeps, so a reference survives panning and zooming — a highlight that drifts
+ * off its bars when the chart moves is worse than no highlight, because it
+ * points confidently at the wrong thing.
+ */
+export type ChartHighlight = {
+  id: string;
+  number: number;
+  fromIndex: number;
+  toIndex: number;
+  /*
+   * A reference to the whole visible window is drawn as brackets rather than a
+   * fill. Filling it tints the entire chart, which hides every other zone and
+   * makes the one thing a highlight has to do — stand out — impossible.
+   */
+  kind?: 'zone' | 'window';
+};
+
 export type DataStatus = 'realtime' | 'delayed' | 'demo';
 
 export type EngineOptions = {
@@ -88,20 +109,6 @@ export type SerializedChartLayout = {
   visibleRange: VisibleRange | null;
 };
 
-/**
- * Methods for a phase that has not arrived reject rather than resolving.
- *
- * An empty implementation that returns successfully is worse than a missing
- * one: the caller believes the indicator was added and nothing says otherwise
- * until someone looks at the chart.
- */
-export class NotImplementedYet extends Error {
-  constructor(what: string, phase: string) {
-    super(`${what} arrives in ${phase} of the Superchart plan and is not built yet.`);
-    this.name = 'NotImplementedYet';
-  }
-}
-
 export interface ChartEngineAdapter {
   initialize(container: HTMLElement, options: EngineOptions): Promise<void>;
   destroy(): void;
@@ -118,19 +125,23 @@ export interface ChartEngineAdapter {
   getCrosshairPosition(): CrosshairContext | null;
   getSelection(): ChartSelection | null;
 
+  setHighlights(highlights: ChartHighlight[], activeId: string | null): void;
+  highlightAt(x: number): ChartHighlight | null;
+
   takeSnapshot(): Promise<ChartSnapshot>;
   serializeLayout(): SerializedChartLayout;
 
   subscribe(event: ChartEngineEvent, handler: (payload: unknown) => void): UnsubscribeFunction;
 
-  /* Later phases. Present so callers can be written against the whole surface,
-     and rejecting so nobody mistakes silence for success. */
+  /* Kept on the interface and rejecting in the implementation. React owns the
+     lists — undo, the object tree and the saved layout all read them from there
+     — so an engine that could also own them would be a second copy that drifts.
+     Rejecting rather than absent, so a caller reaching for the wrong seam is
+     told at once instead of watching nothing happen. */
   addIndicator(definition: unknown): Promise<string>;
   removeIndicator(id: string): Promise<void>;
   addDrawing(definition: unknown): Promise<string>;
   removeDrawing(id: string): Promise<void>;
-  highlightRange(range: VisibleRange, options?: unknown): Promise<string>;
-  removeHighlight(id: string): Promise<void>;
 }
 
 /** How many bars each interval steps by, in seconds. */

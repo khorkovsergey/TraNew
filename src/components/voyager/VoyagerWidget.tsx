@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useRouter } from '@/i18n/navigation';
 import type {
   VoyagerAnswer,
@@ -56,6 +57,19 @@ const STARTERS = [
 
 
 export function VoyagerWidget() {
+  /*
+   * Absent on the chart workspace, which has its own Voyager in the panel.
+   *
+   * Two orbs on one screen is two assistants as far as anyone using it is
+   * concerned, and the one in the corner cannot see the chart — so the more
+   * prominent of the two would be the one that knows less.
+   *
+   * `usePathname` from `next/navigation` rather than the localised one: this
+   * needs the real URL, and matching a suffix keeps it working under every
+   * locale prefix.
+   */
+  const pathname = usePathname();
+  const onChartWorkspace = pathname?.endsWith('/supercharts') ?? false;
   const context = useVoyagerContext();
   const { applyStudy, requestPine } = useChartStudies();
   const router = useRouter();
@@ -238,6 +252,10 @@ export function VoyagerWidget() {
 
   const tierStyle = TIER_STYLE[state?.tier ?? 'basic'];
   const firstRun = turns.length === 0;
+
+  /* ------------------------------------------------- Not on the chart screen */
+
+  if (onChartWorkspace) return null;
 
   /* ------------------------------------------------------------------ Intro */
 
