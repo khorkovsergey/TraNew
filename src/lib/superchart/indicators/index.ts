@@ -67,6 +67,30 @@ function sma(values: number[], length: number): (number | null)[] {
   return out;
 }
 
+/**
+ * An exponential moving average, seeded with a simple one.
+ *
+ * Seeding matters and is where implementations disagree: starting the recursion
+ * from the first close makes the early values a decaying artefact of one bar,
+ * and two charts that seed differently disagree for roughly `length` bars —
+ * long enough to move a crossover onto the wrong day.
+ */
+function ema(values: number[], length: number): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null);
+  if (length < 1 || values.length < length) return out;
+
+  const k = 2 / (length + 1);
+  let previous = values.slice(0, length).reduce((total, value) => total + value, 0) / length;
+  out[length - 1] = previous;
+
+  for (let i = length; i < values.length; i += 1) {
+    previous = values[i] * k + previous * (1 - k);
+    out[i] = previous;
+  }
+
+  return out;
+}
+
 /* --------------------------------------------------------- Definitions */
 
 /**
@@ -150,8 +174,52 @@ const volumeAverage: IndicatorDefinition = {
   label: (params) => `Volume MA ${params.length}`,
 };
 
+/**
+ * Two EMAs and the bars where they cross.
+ *
+ * The crossings are computed here rather than described in prose because a
+ * crossover is a fact about two series, and the moment a model is asked which
+ * day they crossed it will produce a plausible date. The `cross` plot marks
+ * only the bar where the sign of `fast - slow` actually changes.
+ */
+const exponentialMovingAverages: IndicatorDefinition = {
+  id: 'ema',
+  name: 'Exponential moving averages',
+  pane: 'main',
+  defaults: { fast: 20, slow: 50 },
+  ranges: { fast: { min: 2, max: 200 }, slow: { min: 2, max: 400 } },
+  compute: (bars, params) => {
+    const closes = bars.map((bar) => bar.close);
+    const fast = ema(closes, params.fast);
+    const slow = ema(closes, params.slow);
+
+    const crosses: (number | null)[] = new Array(closes.length).fill(null);
+    for (let i = 1; i < closes.length; i += 1) {
+      const now = fast[i];
+      const then = slow[i];
+      const before = fast[i - 1];
+      const beforeSlow = slow[i - 1];
+      if (now === null || then === null || before === null || beforeSlow === null) continue;
+
+      // A crossing is a change of sign, not a touch: equal values on one bar are
+      // not a cross until the difference actually reverses.
+      const wasAbove = before > beforeSlow;
+      const isAbove = now > then;
+      if (wasAbove !== isAbove) crosses[i] = now;
+    }
+
+    return [
+      { key: 'fast', colour: 0, style: 'line', values: fast },
+      { key: 'slow', colour: 1, style: 'line', values: slow },
+      { key: 'cross', colour: 2, style: 'flags', values: crosses },
+    ];
+  },
+  label: (params) => `EMA ${params.fast}/${params.slow}`,
+};
+
 export const INDICATORS: Record<string, IndicatorDefinition> = {
   [movingAverages.id]: movingAverages,
+  [exponentialMovingAverages.id]: exponentialMovingAverages,
   [volumeAverage.id]: volumeAverage,
   [volumeAnomaly.id]: volumeAnomaly,
 };

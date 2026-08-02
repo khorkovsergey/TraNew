@@ -766,3 +766,159 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ------------------------------------------------------ Voyager plan card */
+
+/*
+ * A proposal, styled as one. It has to read as distinct from an answer: an
+ * answer describes the chart, this changes it, and the difference must be
+ * obvious before the Apply button is found.
+ */
+.planCard {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--tn-purple);
+  border-radius: 12px;
+  background: var(--tn-chip-bg);
+}
+
+.planHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.planBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--tn-purple);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.planTitle {
+  font-size: 13px;
+  color: var(--tn-text);
+}
+
+.planStep {
+  display: flex;
+  gap: 9px;
+  margin-bottom: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 8px;
+  background: var(--tn-surface);
+  cursor: pointer;
+}
+
+.planStep input {
+  margin-top: 2px;
+  accent-color: var(--tn-purple);
+}
+
+.planRefusal {
+  margin: 8px 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--tn-amber-tint);
+  color: var(--tn-amber-text);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.planRefusal ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+
+.planToggle {
+  float: right;
+  padding: 2px 8px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tn-text-muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.diffRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--tn-border-card);
+  font-size: 11.5px;
+}
+
+.diffLabel {
+  flex: none;
+  width: 74px;
+  color: var(--tn-text-muted);
+}
+
+.diffBefore {
+  color: var(--tn-text-muted);
+  text-decoration: line-through;
+}
+
+.diffAfter {
+  color: var(--tn-text);
+  font-weight: 600;
+}
+
+.planActions {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 8px;
+}
+
+.planApply {
+  flex: 1;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--tn-purple);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.planApply:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.planCancel {
+  padding: 9px 14px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tn-text);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.activityRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--tn-border-card);
+  font-size: 11.5px;
+  color: var(--tn-text);
+}
+
+.activityTime {
+  color: var(--tn-text-muted);
+  font-variant-numeric: tabular-nums;
+}

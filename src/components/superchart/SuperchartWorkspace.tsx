@@ -52,6 +52,12 @@ import {
 } from '@/lib/superchart/transactions';
 import { saveLayoutAction } from '@/app/actions/superchart';
 import { buildChartContext, type ContextChipId } from '@/lib/superchart/context';
+import {
+  applyCommands,
+  selectedCommands,
+  type CommandPlan,
+  type CommandState,
+} from '@/lib/superchart/commands';
 import type { ChartHighlight } from '@/lib/superchart/chart-engine/types';
 import { VoyagerChartPanel } from './VoyagerChartPanel';
 import styles from './Superchart.module.css';
@@ -133,6 +139,17 @@ export function SuperchartWorkspace({
   const [panelTab, setPanelTab] = useState<'objects' | 'voyager'>('objects');
   /** Which reference the pointer is over on the chart, for the hover that runs back. */
   const [hoveredHighlight, setHoveredHighlight] = useState<string | null>(null);
+  /**
+   * The plan currently being previewed.
+   *
+   * Held here rather than in the panel because the preview has to reach the
+   * chart, and the chart is rendered from this component's state. Nothing in
+   * here is ever committed — `applyPlan` recomputes from the real state.
+   */
+  const [preview, setPreview] = useState<CommandPlan | null>(null);
+  const [showBefore, setShowBefore] = useState(false);
+  /** Applied plans, newest first, for the activity log. */
+  const [activity, setActivity] = useState<Array<{ id: string; title: string; at: string }>>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<DrawingTool | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -228,23 +245,60 @@ export function SuperchartWorkspace({
     );
   }, []);
 
-  useEffect(() => {
-    engineRef.current?.setDrawings(drawings, selectedId);
-  }, [drawings, selectedId]);
+
+  const liveState = useMemo<CommandState>(
+    () => ({ studies: studyChoices, drawings, interval, chartType }),
+    [studyChoices, drawings, interval, chartType]
+  );
+
+  /*
+   * What the chart shows: the real state, or the real state with the plan
+   * applied on top.
+   *
+   * Derived rather than stored, and produced by the same `applyCommands` that
+   * performs the apply. Two paths — one that draws the proposal, one that
+   * performs it — is how a preview ends up showing something other than what
+   * apply does, which is worse than no preview.
+   *
+   * Toggling Before while previewing shows the live state, so the comparison is
+   * one control rather than a memory exercise.
+   */
+  const shownState = useMemo<CommandState>(() => {
+    if (!preview || showBefore) return liveState;
+    return applyCommands(liveState, selectedCommands(preview), { draft: true });
+  }, [liveState, preview, showBefore]);
 
   // Derived, so switching interval keeps the studies a person added and
   // recomputes them against the new bars without an effect in between.
   const indicators = useMemo<IndicatorInstance[]>(
     () =>
-      studyChoices
-        .map((choice) => createIndicator(choice.definitionId, bars, choice.params))
+      shownState.studies
+        .map((choice) => {
+          const instance = createIndicator(choice.definitionId, bars, choice.params);
+          if (!instance) return null;
+
+          // A study that is only in the preview is dashed and marked as
+          // Voyager's, so nothing proposed can be read as already accepted.
+          const proposed =
+            Boolean(preview) &&
+            !showBefore &&
+            !studyChoices.some((live) => live.definitionId === choice.definitionId);
+
+          return proposed
+            ? { ...instance, draft: true, source: 'voyager' as const }
+            : instance;
+        })
         .filter((instance): instance is IndicatorInstance => instance !== null),
-    [studyChoices, bars]
+    [shownState.studies, bars, preview, showBefore, studyChoices]
   );
 
   useEffect(() => {
     engineRef.current?.setIndicators(indicators, studyPalette);
   }, [indicators, studyPalette]);
+
+  useEffect(() => {
+    engineRef.current?.setDrawings(shownState.drawings, selectedId);
+  }, [shownState.drawings, selectedId]);
 
   /*
    * Every undoable change goes through here.
@@ -458,17 +512,27 @@ export function SuperchartWorkspace({
         fromIndex: range.from,
         toIndex: range.to,
         dataStatus: resolved?.dataStatus ?? 'demo',
-        studies: indicators.map((instance) => ({
-          id: instance.definitionId,
-          label: instance.label,
-          params: instance.params,
-        })),
-        drawings: drawings.map((drawing) => ({
-          id: drawing.id,
-          tool: drawing.tool,
-          from: drawing.points[0]?.barIndex ?? 0,
-          to: drawing.points[drawing.points.length - 1]?.barIndex ?? 0,
-        })),
+        /*
+         * Live studies only. A proposal under preview is drawn on the chart but
+         * is not on the chart, and listing it as context would have Voyager
+         * describing a study nobody has accepted — while the chips promise to
+         * be exactly what gets sent.
+         */
+        studies: indicators
+          .filter((instance) => !instance.draft)
+          .map((instance) => ({
+            id: instance.definitionId,
+            label: instance.label,
+            params: instance.params,
+          })),
+        drawings: drawings
+          .filter((drawing) => !drawing.draft)
+          .map((drawing) => ({
+            id: drawing.id,
+            tool: drawing.tool,
+            from: drawing.points[0]?.barIndex ?? 0,
+            to: drawing.points[drawing.points.length - 1]?.barIndex ?? 0,
+          })),
         selection: selection
           ? { fromIndex: selection.fromIndex, toIndex: selection.toIndex }
           : null,
@@ -476,6 +540,48 @@ export function SuperchartWorkspace({
       });
     },
     [bars, symbolId, interval, resolved, indicators, drawings]
+  );
+
+  /*
+   * A plan applied is one transaction.
+   *
+   * `commit` is still the only way the undoable state changes, so a plan that
+   * adds two studies and three markers is one press of undo — a plan is one
+   * thing somebody asked for, and undoing it in five stages would be watching
+   * the chart come apart rather than going back.
+   *
+   * Interval and chart type are set outside the transaction because they are
+   * not part of the undoable state: they are what the chart is showing, not
+   * what is on it, and undo is for objects.
+   */
+  const applyPlan = useCallback(
+    (plan: CommandPlan) => {
+      const commands = selectedCommands(plan);
+      if (!commands.length) return;
+
+      commit('voyager', (state) => {
+        const next = applyCommands(
+          { ...state, interval, chartType },
+          commands,
+          // Applied, so nothing carries the draft flag that keeps an object out
+          // of the saved layout.
+          { draft: false }
+        );
+        return { studies: next.studies, drawings: next.drawings };
+      });
+
+      const after = applyCommands({ ...liveState }, commands, { draft: false });
+      if (after.interval !== interval) setInterval(after.interval);
+      if (after.chartType !== chartType) setChartType(after.chartType);
+
+      setActivity((current) => [
+        { id: plan.id, title: plan.title, at: new Date().toISOString() },
+        ...current,
+      ]);
+      setPreview(null);
+      setShowBefore(false);
+    },
+    [commit, liveState, interval, chartType]
   );
 
   const applyHighlights = useCallback((highlights: ChartHighlight[], activeId: string | null) => {
@@ -866,6 +972,13 @@ export function SuperchartWorkspace({
                 buildContext={buildContext}
                 onHighlights={applyHighlights}
                 hoveredFromChart={hoveredHighlight}
+                plan={preview}
+                onPlan={setPreview}
+                liveState={liveState}
+                showBefore={showBefore}
+                onToggleBefore={setShowBefore}
+                onApply={applyPlan}
+                activity={activity}
               />
             )}
 

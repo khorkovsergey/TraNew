@@ -78,6 +78,8 @@ try {
       'src/lib/superchart/transactions/index.ts',
       'src/lib/superchart/context/index.ts',
       'src/lib/superchart/context/answers.ts',
+      'src/lib/superchart/commands/index.ts',
+      'src/lib/superchart/commands/planner.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -183,6 +185,8 @@ try {
   const tr = await load('index', 'transactions');
   const ctx = await load('index', 'context');
   const ans = await load('answers', 'context');
+  const cmd = await load('index', 'commands');
+  const planner = await load('planner', 'commands');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -2147,6 +2151,300 @@ try {
     );
     assert.equal(choice.mode, 'analyze');
     assert.match(choice.because, /selected/);
+  });
+
+  /* ============================== Command bus ================================ */
+
+  group('Nothing reaches the chart unvalidated');
+
+  const emptyState = { studies: [], drawings: [], interval: '1D', chartType: 'candles' };
+
+  check('an unknown study is refused by name', () => {
+    /*
+     * The one that matters. A model naming a study that does not exist must not
+     * be quietly matched to the nearest one — being handed something you did not
+     * ask for, with nothing said, is worse than being told no.
+     */
+    const result = cmd.parseCommand({ kind: 'add_study', definitionId: 'macd-pro' });
+    assert.ok('refused' in result);
+    assert.match(result.refused, /macd-pro/);
+  });
+
+  check('an unknown command kind is refused, not ignored', () => {
+    const result = cmd.parseCommand({ kind: 'place_order', symbol: 'TSLA' });
+    assert.ok('refused' in result);
+    assert.match(result.refused, /place_order/);
+  });
+
+  check('a parameter out of range is pulled in rather than passed through', () => {
+    // A length of 100000 is not an error to report, it is a number to clamp:
+    // the study would compute nothing and the chart would look empty.
+    const result = cmd.parseCommand({
+      kind: 'add_study',
+      definitionId: 'ema',
+      params: { fast: 100000, slow: -4 },
+    });
+    assert.equal(result.command.params.fast, 200);
+    assert.equal(result.command.params.slow, 2);
+  });
+
+  check('a parameter the study does not have is dropped', () => {
+    const result = cmd.parseCommand({
+      kind: 'add_study',
+      definitionId: 'ema',
+      params: { fast: 12, colour: 7 },
+    });
+    assert.equal(result.command.params.colour, undefined);
+    assert.equal(result.command.params.fast, 12);
+  });
+
+  check('a missing parameter falls back to the study default', () => {
+    const result = cmd.parseCommand({ kind: 'add_study', definitionId: 'ema', params: {} });
+    assert.equal(result.command.params.fast, 20);
+    assert.equal(result.command.params.slow, 50);
+  });
+
+  check('a non-numeric parameter never reaches the chart', () => {
+    const result = cmd.parseCommand({
+      kind: 'add_study',
+      definitionId: 'ema',
+      params: { fast: 'twenty' },
+    });
+    assert.equal(result.command.params.fast, 20);
+  });
+
+  check('an interval the datafeed cannot serve is refused', () => {
+    assert.ok('refused' in cmd.parseCommand({ kind: 'set_interval', interval: '3s' }));
+    assert.ok('command' in cmd.parseCommand({ kind: 'set_interval', interval: '1W' }));
+  });
+
+  check('a drawing with no usable point is refused', () => {
+    const result = cmd.parseCommand({
+      kind: 'add_drawing',
+      tool: 'trendLine',
+      points: [{ barIndex: 'x', price: null }],
+    });
+    assert.ok('refused' in result);
+  });
+
+  check('rubbish is refused rather than half-read', () => {
+    assert.ok('refused' in cmd.parseCommand(null));
+    assert.ok('refused' in cmd.parseCommand('add ema'));
+    assert.ok('refused' in cmd.parseCommand({}));
+  });
+
+  group('A plan keeps what it could not do');
+
+  check('refusals are carried in the plan, not swallowed', () => {
+    /*
+     * Doing four of the five things asked for, silently, is how somebody ends up
+     * trusting a chart that is missing the part they wanted.
+     */
+    const plan = cmd.buildPlan({
+      id: 'p1',
+      question: 'add ema and place a buy order',
+      title: 'Mixed',
+      because: 'test',
+      proposed: [
+        { kind: 'add_study', definitionId: 'ema', params: { fast: 20, slow: 50 } },
+        { kind: 'place_order' },
+      ],
+    });
+    assert.equal(plan.steps.length, 1);
+    assert.equal(plan.refusals.length, 1);
+    assert.equal(plan.status, 'validated');
+  });
+
+  check('a plan where nothing survived is marked refused', () => {
+    const plan = cmd.buildPlan({
+      id: 'p2',
+      question: 'buy',
+      title: 'x',
+      because: 'test',
+      proposed: [{ kind: 'place_order' }],
+    });
+    assert.equal(plan.status, 'refused');
+    assert.equal(plan.steps.length, 0);
+  });
+
+  check('every step starts selected, and deselecting one removes it', () => {
+    const plan = cmd.buildPlan({
+      id: 'p3',
+      question: 'two things',
+      title: 'x',
+      because: 'test',
+      proposed: [
+        { kind: 'add_study', definitionId: 'ema', params: {} },
+        { kind: 'add_study', definitionId: 'volume-ma', params: {} },
+      ],
+    });
+    assert.equal(cmd.selectedCommands(plan).length, 2);
+
+    plan.steps[0].selected = false;
+    assert.equal(cmd.selectedCommands(plan).length, 1);
+    assert.equal(cmd.selectedCommands(plan)[0].definitionId, 'volume-ma');
+  });
+
+  group('Preview and apply are the same function');
+
+  const emaCommand = { kind: 'add_study', definitionId: 'ema', params: { fast: 20, slow: 50 } };
+
+  check('a previewed object is a draft and an applied one is not', () => {
+    /*
+     * The guarantee behind the whole preview: `serializeLayout` strips drafts,
+     * so a proposal cannot reach a saved layout even if the tab is closed while
+     * it is on screen.
+     */
+    const previewed = cmd.applyCommands(
+      emptyState,
+      [{ kind: 'add_drawing', tool: 'verticalLine', points: [{ barIndex: 4, price: 100 }] }],
+      { draft: true }
+    );
+    const applied = cmd.applyCommands(
+      emptyState,
+      [{ kind: 'add_drawing', tool: 'verticalLine', points: [{ barIndex: 4, price: 100 }] }],
+      { draft: false }
+    );
+    assert.equal(previewed.drawings[0].draft, true);
+    assert.equal(applied.drawings[0].draft, false);
+  });
+
+  check('a drawing Voyager made says so, applied or not', () => {
+    const applied = cmd.applyCommands(
+      emptyState,
+      [{ kind: 'add_drawing', tool: 'verticalLine', points: [{ barIndex: 4, price: 100 }] }],
+      { draft: false }
+    );
+    assert.equal(applied.drawings[0].source, 'voyager');
+  });
+
+  check('applying does not mutate the state it was given', () => {
+    // The preview is recomputed on every render from the live state. A mutation
+    // here would accumulate the proposal into reality one frame at a time.
+    const before = { ...emptyState, studies: [] };
+    cmd.applyCommands(before, [emaCommand], { draft: true });
+    assert.equal(before.studies.length, 0);
+  });
+
+  check('adding a study that is already there changes it instead of stacking it', () => {
+    const once = cmd.applyCommands(emptyState, [emaCommand], { draft: false });
+    const twice = cmd.applyCommands(
+      once,
+      [{ kind: 'add_study', definitionId: 'ema', params: { fast: 9, slow: 21 } }],
+      { draft: false }
+    );
+    assert.equal(twice.studies.length, 1);
+    assert.equal(twice.studies[0].params.fast, 9);
+  });
+
+  check('the diff is computed from the two states, not narrated', () => {
+    const after = cmd.applyCommands(emptyState, [emaCommand], { draft: false });
+    const rows = cmd.diffStates(emptyState, after);
+    const studies = rows.find((row) => row.label === 'Studies');
+    assert.equal(studies.changed, true);
+    assert.equal(studies.before, 'none');
+    assert.match(studies.after, /EMA 20\/50/);
+    assert.equal(rows.find((row) => row.label === 'Interval').changed, false);
+  });
+
+  group('The planner proposes only what the chart can do');
+
+  const planContext = ctx.buildChartContext(baseInput);
+
+  check('a request for EMAs plans the EMA study with the lengths asked for', () => {
+    const plan = planner.planFor({ question: 'add EMA 20 and EMA 50', context: planContext });
+    assert.equal(plan.steps.length, 1);
+    assert.equal(plan.steps[0].command.definitionId, 'ema');
+    assert.equal(plan.steps[0].command.params.fast, 20);
+    assert.equal(plan.steps[0].command.params.slow, 50);
+  });
+
+  check('and asking for a simple average plans the simple one', () => {
+    // Substituting one for the other without saying so is exactly the failure
+    // the command bus is here to prevent.
+    const plan = planner.planFor({ question: 'add a 20 and 50 moving average', context: planContext });
+    assert.equal(plan.steps[0].command.definitionId, 'sma');
+  });
+
+  check('one length given fills the second rather than leaving it implicit', () => {
+    const plan = planner.planFor({ question: 'add an EMA 10', context: planContext });
+    assert.equal(plan.steps[0].command.params.fast, 10);
+    assert.equal(plan.steps[0].command.params.slow, 20);
+  });
+
+  check('marking the outliers uses the bars the arithmetic found', () => {
+    /*
+     * The indices come from `summariseVisible`, not from a model. A marker on a
+     * bar a model picked would look exactly as convincing and be wrong.
+     */
+    const plan = planner.planFor({
+      question: 'mark the unusual volume bars',
+      context: planContext,
+    });
+    assert.equal(plan.steps.length, 1);
+    assert.equal(plan.steps[0].command.points[0].barIndex, 300);
+  });
+
+  check('a minute interval is not turned into a month', () => {
+    // "5m" upper-cased is "5M" — five months. The mapping is explicit for this.
+    const plan = planner.planFor({ question: 'switch to 5m', context: planContext });
+    assert.equal(plan.steps[0].command.interval, '5m');
+  });
+
+  check('and a month stays a month', () => {
+    const plan = planner.planFor({ question: 'switch to 1mo', context: planContext });
+    assert.equal(plan.steps[0].command.interval, '1M');
+  });
+
+  check('an order is planned as a refusal, named', () => {
+    const plan = planner.planFor({ question: 'buy 100 shares here', context: planContext });
+    assert.equal(plan.steps.length, 0);
+    assert.equal(plan.refusals.length, 1);
+    assert.match(plan.refusals[0], /place_order/);
+  });
+
+  check('a question that changes nothing produces no plan at all', () => {
+    // Explaining is not building. A plan card in front of an explanation would
+    // ask somebody to approve something that was never a change.
+    assert.equal(
+      planner.planFor({ question: 'what happened in this range?', context: planContext }),
+      null
+    );
+  });
+
+  group('EMA and its crossovers');
+
+  check('the EMA is seeded with a simple average, not with one close', () => {
+    /*
+     * Seeding from the first close makes the early values a decaying artefact of
+     * a single bar, and two charts that seed differently disagree for about
+     * `length` bars — long enough to move a crossover onto the wrong day.
+     */
+    const flat = Array.from({ length: 40 }, (_, i) => ({
+      time: 1_700_000_000 + i * 86_400,
+      open: 100,
+      high: 100,
+      low: 100,
+      close: 100,
+      volume: 1,
+    }));
+    const instance = indicators.createIndicator('ema', flat, { fast: 5, slow: 10 });
+    const fast = instance.plots.find((plot) => plot.key === 'fast');
+    assert.equal(fast.values[3], null);
+    assert.equal(fast.values[4], 100);
+  });
+
+  check('a crossover is marked only where the sign actually changes', () => {
+    const bars = [];
+    for (let i = 0; i < 120; i += 1) {
+      // Down then up, so the fast average crosses the slow one exactly once.
+      const price = i < 60 ? 200 - i : 140 + (i - 60) * 2;
+      bars.push({ time: 1_700_000_000 + i * 86_400, open: price, high: price, low: price, close: price, volume: 1 });
+    }
+    const instance = indicators.createIndicator('ema', bars, { fast: 10, slow: 30 });
+    const crosses = instance.plots.find((plot) => plot.key === 'cross');
+    const marked = crosses.values.filter((value) => value !== null);
+    assert.equal(marked.length, 1, `expected one crossing, got ${marked.length}`);
   });
 
   /* ============================ Superchart layouts ============================ */

@@ -591,6 +591,30 @@ export class CanvasChartEngine implements ChartEngineAdapter {
       if (indicator.hidden || indicator.pane !== 'main') continue;
 
       for (const plot of indicator.plots) {
+        /*
+         * Flags mark individual bars — a crossover, not a series. Drawn as a
+         * ring rather than a filled dot so the lines underneath stay readable
+         * at the exact point somebody is trying to look at.
+         */
+        if (plot.style === 'flags') {
+          ctx.save();
+          ctx.strokeStyle = this.studyPalette[plot.colour % this.studyPalette.length] ?? '#7c4dff';
+          ctx.lineWidth = 2;
+          ctx.setLineDash(indicator.draft ? [3, 3] : []);
+
+          for (let i = 0; i < Math.ceil(this.range.to) - offset; i += 1) {
+            const value = plot.values[offset + i];
+            if (value === null || value === undefined) continue;
+
+            ctx.beginPath();
+            ctx.arc(i * step + step / 2, toY(value), 4.5, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          ctx.restore();
+          continue;
+        }
+
         if (plot.style !== 'line') continue;
 
         ctx.beginPath();

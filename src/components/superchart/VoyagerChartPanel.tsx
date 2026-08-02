@@ -14,6 +14,9 @@ import {
   QUICK_COMMANDS,
   type ChartAnswer,
 } from '@/lib/superchart/context/answers';
+import { planFor } from '@/lib/superchart/commands/planner';
+import type { CommandPlan, CommandState } from '@/lib/superchart/commands';
+import { PlanCard } from './PlanCard';
 import styles from './Superchart.module.css';
 
 /**
@@ -36,15 +39,38 @@ type Props = {
   onHighlights: (highlights: ChartHighlight[], activeId: string | null) => void;
   /** Set by the chart when the pointer crosses a zone, for the reverse hover. */
   hoveredFromChart: string | null;
+  /*
+   * The plan lives in the workspace, not here, because the preview has to reach
+   * the chart. The panel proposes and displays; it never applies.
+   */
+  plan: CommandPlan | null;
+  onPlan: (plan: CommandPlan | null) => void;
+  liveState: CommandState;
+  showBefore: boolean;
+  onToggleBefore: (value: boolean) => void;
+  onApply: (plan: CommandPlan) => void;
+  activity: Array<{ id: string; title: string; at: string }>;
 };
 
 type PanelState =
   | { status: 'idle' }
   | { status: 'thinking'; question: string }
+  | { status: 'planned'; question: string }
   | { status: 'answered'; question: string; answer: ChartAnswer; because: string }
   | { status: 'error'; message: string };
 
-export function VoyagerChartPanel({ buildContext, onHighlights, hoveredFromChart }: Props) {
+export function VoyagerChartPanel({
+  buildContext,
+  onHighlights,
+  hoveredFromChart,
+  plan,
+  onPlan,
+  liveState,
+  showBefore,
+  onToggleBefore,
+  onApply,
+  activity,
+}: Props) {
   const [state, setState] = useState<PanelState>({ status: 'idle' });
   const [question, setQuestion] = useState('');
   const [excluded, setExcluded] = useState<ContextChipId[]>([]);
@@ -90,6 +116,20 @@ export function VoyagerChartPanel({ buildContext, onHighlights, hoveredFromChart
         return;
       }
 
+      /*
+       * A request that would change the chart becomes a plan, not an answer.
+       * Checked before the thinking state so the two paths do not race, and
+       * before anything is applied — which is the rule this whole layer exists
+       * to enforce.
+       */
+      const proposed = planFor({ question: trimmed, context });
+      if (proposed) {
+        onPlan(proposed);
+        setState({ status: 'planned', question: trimmed });
+        setQuestion('');
+        return;
+      }
+
       setState({ status: 'thinking', question: trimmed });
       setQuestion('');
 
@@ -110,7 +150,7 @@ export function VoyagerChartPanel({ buildContext, onHighlights, hoveredFromChart
         });
       }, 450);
     },
-    [buildContext, excluded]
+    [buildContext, excluded, onPlan]
   );
 
   const toggleChip = useCallback((id: ContextChipId) => {
@@ -181,6 +221,34 @@ export function VoyagerChartPanel({ buildContext, onHighlights, hoveredFromChart
           </>
         )}
 
+        {state.status === 'planned' && plan && (
+          <>
+            <p className={styles.voyagerQuestion}>{state.question}</p>
+            <PlanCard
+              plan={plan}
+              liveState={liveState}
+              showBefore={showBefore}
+              onToggleBefore={onToggleBefore}
+              onToggleStep={(index) =>
+                onPlan({
+                  ...plan,
+                  steps: plan.steps.map((step, i) =>
+                    i === index ? { ...step, selected: !step.selected } : step
+                  ),
+                })
+              }
+              onApply={() => {
+                onApply(plan);
+                setState({ status: 'idle' });
+              }}
+              onCancel={() => {
+                onPlan(null);
+                setState({ status: 'idle' });
+              }}
+            />
+          </>
+        )}
+
         {state.status === 'thinking' && (
           <div className={styles.voyagerThinking} role="status">
             <span className={styles.voyagerDot} />
@@ -227,6 +295,22 @@ export function VoyagerChartPanel({ buildContext, onHighlights, hoveredFromChart
                 {followUp}
               </button>
             ))}
+          </>
+        )}
+        {activity.length > 0 && (
+          <>
+            <div className={styles.dataTitle} style={{ marginTop: 14 }}>
+              VOYAGER ACTIVITY
+            </div>
+            {activity.map((entry) => (
+              <div key={`${entry.id}-${entry.at}`} className={styles.activityRow}>
+                <span>{entry.title}</span>
+                <span className={styles.activityTime}>{entry.at.slice(11, 16)}</span>
+              </div>
+            ))}
+            <p className={styles.voyagerNote}>
+              Each of these is one press of undo, in the order they were applied.
+            </p>
           </>
         )}
       </div>

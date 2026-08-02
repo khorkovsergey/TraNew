@@ -33,14 +33,42 @@ function group(title) {
   console.log(`\n${title}`);
 }
 
-/** Pixels differing between two screenshots, as a share of the total. */
-function differenceRatio(a, b) {
-  if (a.length !== b.length) return 1;
-  let differing = 0;
-  for (let i = 0; i < a.length; i += 4) {
-    if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) differing += 1;
-  }
-  return differing / (a.length / 4);
+/*
+ * Real pixel comparison, done inside the page.
+ *
+ * The first version of this compared the bytes of two PNG screenshots. Two
+ * compressed images of the same size have different byte lengths, so the
+ * "different length means completely different" branch fired on images that
+ * were nearly identical — and reported 100%. Comparing compressed bytes is not
+ * comparing pixels.
+ *
+ * So the frames stay in the browser as raw `ImageData` and only the ratio
+ * crosses the bridge. A megabyte of pixels per snapshot never travels.
+ */
+async function snapshot(page, key) {
+  await page.evaluate((name) => {
+    const canvas = document.querySelector('canvas');
+    const context = canvas.getContext('2d');
+    window.__frames = window.__frames || {};
+    window.__frames[name] = context.getImageData(0, 0, canvas.width, canvas.height).data.slice();
+  }, key);
+}
+
+/** Share of pixels whose colour differs between two stored frames. */
+async function pixelDifference(page, first, second) {
+  return page.evaluate(([a, b]) => {
+    const one = window.__frames?.[a];
+    const two = window.__frames?.[b];
+    if (!one || !two || one.length !== two.length) return 1;
+
+    let differing = 0;
+    for (let i = 0; i < one.length; i += 4) {
+      if (one[i] !== two[i] || one[i + 1] !== two[i + 1] || one[i + 2] !== two[i + 2]) {
+        differing += 1;
+      }
+    }
+    return differing / (one.length / 4);
+  }, [first, second]);
 }
 
 const browser = await chromium.launch();
@@ -96,16 +124,17 @@ try {
   const canvas = page.locator('canvas').first();
   const box = await canvas.boundingBox();
 
-  const before = await canvas.screenshot();
+  await snapshot(page, 'restingHover');
 
   await references.first().hover();
   await page.waitForTimeout(350);
-  const afterHover = await canvas.screenshot();
+  await snapshot(page, 'hovered');
 
+  const hoverChange = await pixelDifference(page, 'restingHover', 'hovered');
   check(
     'hovering a sentence changes the chart',
-    differenceRatio(before, afterHover) > 0.0005,
-    `${(differenceRatio(before, afterHover) * 100).toFixed(2)}% of pixels changed`
+    hoverChange > 0.0005,
+    `${(hoverChange * 100).toFixed(2)}% of pixels changed`
   );
 
   // The reverse: the pointer over a zone should light the sentence. The window
