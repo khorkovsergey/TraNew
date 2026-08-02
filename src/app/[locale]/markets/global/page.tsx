@@ -46,9 +46,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 const SCENARIOS: Array<{ title: string; text: string; cta: string; href: StaticPathname }> = [
   {
     title: 'What is happening now?',
-    text: 'Which exchanges are trading at this moment, and what the major indices have done today.',
-    cta: 'See the global overview',
-    href: '/market',
+    text: 'Today’s brief: what moved, by how much, and what is worth watching next.',
+    cta: 'Read today’s market brief',
+    href: '/market/brief',
   },
   {
     title: 'Market news',

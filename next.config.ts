@@ -9,7 +9,7 @@ const withNextIntl = createNextIntlPlugin();
  * left to 404. next.config redirects run before the i18n middleware, so these win.
  */
 const RUSSIAN_SLUG_REDIRECTS: Array<[string, string]> = [
-  ['/ru/rynok/obzor-dnya', '/en/markets/global'],
+  ['/ru/rynok/obzor-dnya', '/en/market/brief'],
   ['/ru/rynok', '/en/market'],
   ['/ru/novosti', '/en/news'],
   ['/ru/idei', '/en/ideas'],
@@ -59,17 +59,16 @@ const nextConfig: NextConfig = {
       /*
        * "Entire World" became "Global Markets" and moved to its own cluster.
        *
-       * `/market/brief` was the destination of that menu item, so it keeps its
-       * traffic by pointing at the new canonical page rather than being deleted.
-       * The brief's own content — top moves, what to watch — was carried into
-       * the global page, so nothing is lost behind the redirect.
+       * Only the bare `/markets` redirects. `/market/brief` deliberately does
+       * not: it was the destination of that menu entry, but it is also a page in
+       * its own right — top moves, what to watch, the quote strip — linked from
+       * seven other places. Redirecting it orphaned that content and made every
+       * one of those links cost a hop. The menu entry moved; the page stayed.
        */
       // 301 rather than `permanent: true`, which emits 308. Search engines treat
       // the two the same for canonicalisation, but 308 preserves the request
       // method and these are plain page moves — 301 is what the brief asks for
       // and what anyone inspecting the migration will expect to see.
-      { source: '/en/market/brief', destination: '/en/markets/global', statusCode: 301 },
-      { source: '/market/brief', destination: '/en/markets/global', statusCode: 301 },
       { source: '/markets', destination: '/en/markets/global', statusCode: 301 },
       { source: '/en/markets', destination: '/en/markets/global', statusCode: 301 },
 
