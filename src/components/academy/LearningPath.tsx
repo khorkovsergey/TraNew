@@ -6,6 +6,7 @@ import { DIAGNOSTIC, FIRST_LESSON, PROFILE_FALLBACKS, STAGES } from '@/content/a
 import { pick, type Localized } from '@/content/types';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
+import { KeepThis } from '@/components/shared/KeepThis';
 import { useAcademy, type AcademyState } from '@/lib/academyProgress';
 import styles from './Academy.module.css';
 
@@ -105,6 +106,23 @@ export function LearningPath() {
           {previewOpen ? t('hidePreview') : t('preview')}
         </button>
       </div>
+
+      {/* The path exists now, so there is finally something to lose. Same offer
+          the research plan makes, for the same reason. */}
+      <KeepThis
+        kind="academy"
+        payload={state?.diag[0]?.[0] ?? null}
+        copy={{
+          title: t('keepTitle'),
+          text: t('keepText'),
+          cta: t('keepCta'),
+          saving: t('keepSaving'),
+          savedTitle: t('keepSavedTitle'),
+          savedText: t('keepSavedText'),
+          savedCta: t('keepSavedCta'),
+          error: t('keepError'),
+        }}
+      />
     </>
   );
 }

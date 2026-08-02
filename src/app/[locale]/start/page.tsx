@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { StartResume } from '@/components/content/StartResume';
 import { Icon } from '@/components/ui/Icon';
 import { Link } from '@/i18n/navigation';
 import type { Locale, StaticPathname } from '@/i18n/routing';
@@ -48,6 +49,14 @@ export default async function StartPage({ params }: Props) {
 
       <h1 className={styles.h1}>{tScreens('start.title')}</h1>
       <p className={styles.lead}>{tScreens('start.subtitle')}</p>
+
+      {/* Above the five choices, and only when there is something to return to. */}
+      <StartResume
+        title={t('resumeTitle')}
+        hint={t('resumeHint')}
+        strategyLabel={t('resumeStrategy')}
+        academyLabel={t('resumeAcademy')}
+      />
 
       <div className={styles.rowLinks}>
         {ROWS.map((row) => (

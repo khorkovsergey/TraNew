@@ -266,7 +266,12 @@
       "strategy": "Build a research plan",
       "charts": "Open professional charts"
     },
-    "note": "You'll be asked to create an account only to save something — a watchlist, an alert, your progress or a portfolio."
+    "note": "You'll be asked to create an account only to save something — a watchlist, an alert, your progress or a portfolio.",
+    "resumeTitle": "Continue where you left off",
+    "resumeStrategy": "Your research plan interview",
+    "resumeAcademy": "Your learning path",
+    "resumeHint": "Kept in this browser. An account keeps it anywhere.",
+    "orStartSomething": "Or start something else"
   },
   "brokers": {
     "filters": {
@@ -443,7 +448,15 @@
     "upsellTitle": "Unlock advanced research with AI Private",
     "upsellText": "Deeper scenario analysis, private research threads and portfolio-aware answers.",
     "upsellCta": "See what's included",
-    "restart": "Restart the interview"
+    "restart": "Restart the interview",
+    "keepTitle": "Keep this plan",
+    "keepText": "This plan lives in this browser only — clearing your history or opening TradingNew somewhere else loses it. A free account keeps it and lets you open it anywhere.",
+    "keepCta": "Keep this plan",
+    "keepSaving": "Saving…",
+    "keepSavedTitle": "Saved to your account",
+    "keepSavedText": "Your plan is in your workspace. Redo the interview any time and it replaces this one.",
+    "keepSavedCta": "Open my workspace",
+    "keepError": "That did not save. Try again in a moment — the plan is still here."
   },
   "academy": {
     "breadcrumb": {
@@ -480,7 +493,15 @@
       "lessonCount": "{count} short lessons",
       "startFirst": "Start my first lesson",
       "preview": "Preview the full path",
-      "hidePreview": "Hide the full path"
+      "hidePreview": "Hide the full path",
+      "keepTitle": "Keep this learning path",
+      "keepText": "Your answers and your progress live in this browser only. A free account keeps them and picks up where you stopped on any device.",
+      "keepCta": "Keep my progress",
+      "keepSaving": "Saving…",
+      "keepSavedTitle": "Saved to your account",
+      "keepSavedText": "Your path and progress are in your workspace, and will follow you to another device.",
+      "keepSavedCta": "Open my workspace",
+      "keepError": "That did not save. Try again in a moment — your progress is still here."
     },
     "dashboard": {
       "welcome": "Welcome back",

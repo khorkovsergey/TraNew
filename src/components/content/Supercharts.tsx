@@ -45,8 +45,14 @@ const ACTIONS: Array<{ key: string; href: StaticPathname; ai?: boolean }> = [
   { key: 'news', href: '/news' },
   { key: 'events', href: '/market/brief' },
   { key: 'compare', href: '/explore' },
-  { key: 'watchlist', href: '/start' },
-  { key: 'alert', href: '/start' },
+  /*
+   * These two ask to keep something specific, so they go where that happens
+   * rather than to the "what would you like to do?" screen. Sending someone who
+   * pressed "Create alert" to a menu of five unrelated choices is the same
+   * broken shape as finishing an interview and being offered nothing.
+   */
+  { key: 'watchlist', href: '/sign-up' },
+  { key: 'alert', href: '/sign-up' },
   { key: 'screener', href: '/explore' },
 ];
 

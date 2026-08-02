@@ -1,0 +1,53 @@
+/* The offer to keep what you just made. Shaped like the onward cards beside it
+   rather than like a banner — it is one more thing you can do next, not an
+   interruption of what you came for. */
+.keep {
+  margin-top: 20px;
+  border: 1px solid var(--tn-blue);
+  border-radius: var(--tn-radius-card);
+  padding: 20px 22px;
+  background: var(--tn-blue-tint);
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tn-text);
+  margin-bottom: 6px;
+}
+
+.text {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--tn-text-nav);
+}
+
+.cta {
+  display: inline-block;
+  border: 0;
+  border-radius: var(--tn-radius-chip);
+  background: var(--tn-blue);
+  padding: 10px 20px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.cta:hover {
+  background: var(--tn-blue-hover);
+}
+
+.cta:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--tn-red);
+}
