@@ -1,0 +1,304 @@
+/* The investment assessment inside the Voyager panel. Uses the panel's own
+   surfaces and spacing — it is a kind of answer, not a second product. */
+
+.card {
+  margin-top: 10px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 14px;
+  background: var(--tn-surface);
+  padding: 16px;
+}
+
+.head {
+  border-bottom: 1px solid var(--tn-border-card);
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.stance {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--tn-text);
+  margin-bottom: 6px;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+  margin-bottom: 10px;
+}
+
+.instrument {
+  font-weight: 600;
+  color: var(--tn-text-nav);
+}
+
+.asOf {
+  color: var(--tn-text-muted);
+}
+
+.confidenceRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.confidence {
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.confidence_high {
+  background: var(--tn-green-tint);
+  color: var(--tn-green);
+}
+
+.confidence_medium {
+  background: var(--tn-amber-tint);
+  color: var(--tn-amber-text);
+}
+
+.confidence_low {
+  background: var(--tn-chip-bg);
+  color: var(--tn-text-muted);
+}
+
+.freshness {
+  font-size: 11px;
+  color: var(--tn-text-muted);
+}
+
+/* ---- Readings ---- */
+
+.readings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.reading {
+  border: 1px solid var(--tn-border-card);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.readingLabel {
+  display: block;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tn-text-muted);
+  margin-bottom: 3px;
+}
+
+.readingValue {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+/* ---- Bull / bear ---- */
+
+.bullBear {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.side {
+  border: 1px solid var(--tn-border-card);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.sideTitle {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tn-text-muted);
+  margin-bottom: 6px;
+}
+
+/* ---- Blocks and lists ---- */
+
+.block {
+  margin-bottom: 14px;
+}
+
+.blockTitle {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+.list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--tn-text-nav);
+}
+
+.list li {
+  margin-bottom: 5px;
+}
+
+.note {
+  color: var(--tn-text-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+/* ---- Drawers ---- */
+
+.drawer {
+  border-top: 1px solid var(--tn-border-card);
+}
+
+.drawerToggle {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 10px 0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tn-blue);
+  cursor: pointer;
+}
+
+.drawerBody {
+  padding-bottom: 12px;
+}
+
+/* ---- Calculations table ---- */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.caption {
+  caption-side: top;
+  text-align: left;
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+  padding-bottom: 8px;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--tn-border-card);
+  vertical-align: top;
+}
+
+.table thead th {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tn-text-muted);
+  font-weight: 700;
+}
+
+.cellName {
+  font-weight: 600;
+  color: var(--tn-text-nav);
+  text-transform: capitalize;
+}
+
+.cellVersion {
+  color: var(--tn-text-muted);
+  font-size: 11px;
+}
+
+.warning {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--tn-amber-text);
+  text-transform: none;
+}
+
+/* ---- Sources ---- */
+
+.sourceList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.source {
+  border-bottom: 1px solid var(--tn-border-card);
+  padding: 8px 0;
+}
+
+.sourceHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.sourceName {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tn-text);
+}
+
+.tier {
+  font-size: 11px;
+  color: var(--tn-text-muted);
+}
+
+.sourceDates {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--tn-text-muted);
+}
+
+.excerpt {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-text-nav);
+}
+
+/* ---- Footer ---- */
+
+.footer {
+  border-top: 1px solid var(--tn-border-card);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.limitation {
+  margin: 0 0 5px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--tn-amber-text);
+}
+
+.disclaimer {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}

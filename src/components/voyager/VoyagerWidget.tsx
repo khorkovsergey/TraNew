@@ -14,6 +14,7 @@ import { hasSeenIntro, markIntroSeen } from '@/lib/voyager/introSeen';
 import { onVoyagerOpenRequest } from '@/lib/voyager/openRequest';
 import { VoyagerIntro } from './VoyagerIntro';
 import { VoyagerOrb, VoyagerWordmark } from './VoyagerOrb';
+import { InvestmentAssessmentCard } from './InvestmentAssessment';
 import { useChartStudies, useVoyagerContext } from './VoyagerProvider';
 import styles from './Voyager.module.css';
 
@@ -452,6 +453,12 @@ export function VoyagerWidget() {
                   {turn.answer.contentType}
                 </span>
                 <div className={styles.botText}>{turn.answer.text}</div>
+
+                {/* An assessment replaces the bullet list rather than sitting
+                    beside it: it is the answer, not a decoration on one. */}
+                {turn.answer.investment && (
+                  <InvestmentAssessmentCard data={turn.answer.investment} />
+                )}
 
                 {turn.answer.bullets.length > 0 && (
                   <div className={styles.bullets}>

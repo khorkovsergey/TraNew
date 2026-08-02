@@ -1,5 +1,7 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
+import { analyze } from '@/lib/investment/graph';
+import { summarise } from '@/lib/investment/summary';
 import { clampSpec } from '@/lib/studies/registry';
 import { ANSWER_SCHEMA, CONTENT_TYPES } from './answerSchema';
 import { scriptedAnswer } from './scenarios';
@@ -289,6 +291,19 @@ export async function askVoyager(options: {
   const scripted = () =>
     withAllowedActions(scriptedAnswer(question, context, tier), allowed, context.screen === 'chart');
 
+  /*
+   * An investment question runs the engine rather than the model.
+   *
+   * The engine computes every figure, cites every claim and refuses the ones it
+   * cannot support — none of which a chat answer does. So when someone asks
+   * whether something is worth holding, the answer is the assessment, and the
+   * model is not asked to produce a second, less careful one alongside it.
+   */
+  if (wantsInvestmentAnalysis(question, context)) {
+    const assessment = await runInvestmentAnalysis(question, context);
+    if (assessment) return withAllowedActions(assessment, allowed, context.screen === 'chart');
+  }
+
   if (!client) {
     return scripted();
   }
@@ -339,5 +354,87 @@ export async function askVoyager(options: {
     // below is honest about being general, and an error toast is not more useful.
     console.error('[voyager] model call failed, falling back to scripted answer', error);
     return scripted();
+  }
+}
+
+/* ------------------------------------------------ Investment analysis */
+
+/**
+ * Whether this question wants an assessment rather than an explanation.
+ *
+ * Substring matching, and deliberately narrow: an assessment is a heavier,
+ * slower and more committing answer than a chat reply, so the bar for producing
+ * one unasked is high. "Explain this chart" is not an investment question;
+ * "is this worth holding" is.
+ */
+function wantsInvestmentAnalysis(question: string, context: VoyagerContext): boolean {
+  if (context.screen !== 'symbol' && context.screen !== 'chart') return false;
+
+  const q = question.toLowerCase();
+  const asks = [
+    'worth holding',
+    'worth buying',
+    'worth considering',
+    'good investment',
+    'should i invest',
+    'long-term portfolio',
+    'long term portfolio',
+    'analyse this company',
+    'analyze this company',
+    'investment analysis',
+    'is it overvalued',
+    'is it undervalued',
+    'fundamentals',
+  ];
+
+  return asks.some((phrase) => q.includes(phrase));
+}
+
+async function runInvestmentAnalysis(
+  question: string,
+  context: VoyagerContext
+): Promise<VoyagerAnswer | null> {
+  try {
+    const assessment = await analyze({
+      runId: `voyager_${Date.now().toString(36)}`,
+      mode: 'standard',
+      asOf: new Date().toISOString().slice(0, 10),
+      pageContext: {
+        pageType: context.screen,
+        pageUrl: null,
+        locale: 'en',
+        country: null,
+        selectedMarket: null,
+        selectedInstrument: context.subject,
+        visibleModules: [],
+        userQuestion: question,
+      },
+      chartContext: null,
+      // No portfolio is passed here: the widget has no consent to share one, so
+      // the assessment says what it cannot judge rather than guessing.
+      user: null,
+    });
+
+    const summary = summarise(assessment);
+
+    return {
+      contentType: 'AI analysis',
+      text: `${summary.instrumentName}: the evidence available leans ${summary.stance.replace(/_/g, ' ')} over ${summary.horizon.replace(/_/g, ' ')}. Every figure below was computed rather than written, and each is traceable to a dated source.`,
+      bullets: [],
+      sources: `${summary.evidence.length} sources · analysis dated ${summary.analysisAsOf}`,
+      confidence: summary.confidenceLabel,
+      actions: [],
+      followUps: [
+        'What would change this assessment?',
+        'Show me the arithmetic',
+        'Mark these levels on the chart',
+      ],
+      investment: summary,
+    };
+  } catch (error) {
+    // A failed analysis falls back to an ordinary answer rather than an error:
+    // the person asked a question, and "the engine broke" is not a reply to it.
+    console.error('[voyager] investment analysis failed', error);
+    return null;
   }
 }

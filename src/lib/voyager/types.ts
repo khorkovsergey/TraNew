@@ -1,3 +1,4 @@
+import type { InvestmentSummary } from '../investment/summary';
 import type { StudySpec } from '../studies/registry';
 
 /**
@@ -135,6 +136,14 @@ export type VoyagerAnswer = {
    * action allowlist is — see `lib/studies/registry.ts`.
    */
   study?: StudySpec;
+  /**
+   * A full investment assessment, on the symbol and chart screens only.
+   *
+   * Gated the same way `study` is: the engine reads filings and produces an
+   * opinion about an instrument, which is meaningless on a screen that is not
+   * about one.
+   */
+  investment?: InvestmentSummary;
 };
 
 export type VoyagerRequest = {
