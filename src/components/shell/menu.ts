@@ -59,10 +59,10 @@ export const MENUS: Record<Exclude<NavKey, 'home'>, MenuGroup[]> = {
       titleKey: 'market.overviewTitle',
       items: [
         {
-          labelKey: 'market.entireWorld',
-          subKey: 'market.entireWorldSub',
+          labelKey: 'market.globalMarkets',
+          subKey: 'market.globalMarketsSub',
           kind: 'route',
-          href: '/market/brief',
+          href: '/markets/global',
         },
         {
           labelKey: 'market.marketNews',
@@ -255,7 +255,7 @@ export const MENUS: Record<Exclude<NavKey, 'home'>, MenuGroup[]> = {
 /** Route prefixes that light up each nav item. */
 export const NAV_ACTIVE_PREFIXES: Record<NavKey, string[]> = {
   home: ['/'],
-  market: ['/market', '/news', '/ideas', '/explore', '/supercharts'],
+  market: ['/market', '/markets', '/news', '/ideas', '/explore', '/supercharts'],
   symbols: ['/symbols', '/research', '/portfolio'],
   economy: ['/economy'],
   community: ['/community', '/brokers'],

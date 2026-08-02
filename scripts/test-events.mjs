@@ -61,6 +61,8 @@ try {
       'src/lib/events/related.ts',
       'src/lib/studies/registry.ts',
       'src/lib/voyager/answerSchema.ts',
+      'src/lib/markets/sessions.ts',
+      'src/content/markets.ts',
       'src/lib/wave.ts',
       '--outDir',
       out,
@@ -132,6 +134,8 @@ try {
   const recommend = await load('recommend');
   const studies = await load('registry');
   const schema = await load('answerSchema');
+  const sessions = await load('sessions');
+  const markets = await load('markets');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -891,6 +895,170 @@ try {
     assert.deepEqual(a, b, 'two calls disagreed — this would be a hydration mismatch');
     assert.equal(a.length, 260);
     assert.ok(Math.min(...a) > 150 && Math.max(...a) < 350, `${Math.min(...a)}..${Math.max(...a)}`);
+  });
+
+  /* ------------------------------------------------------- Market sessions */
+
+  group('Market sessions');
+
+  const NY = {
+    id: 'nyse',
+    name: 'NYSE',
+    city: 'New York',
+    timeZone: 'America/New_York',
+    currency: 'USD',
+    segments: [{ open: '09:30', close: '16:00' }],
+    preMarket: { open: '04:00', close: '09:30' },
+    afterHours: { open: '16:00', close: '20:00' },
+    role: '',
+  };
+
+  const TOKYO = {
+    id: 'tse',
+    name: 'TSE',
+    city: 'Tokyo',
+    timeZone: 'Asia/Tokyo',
+    currency: 'JPY',
+    segments: [
+      { open: '09:00', close: '11:30' },
+      { open: '12:30', close: '15:30' },
+    ],
+    role: '',
+  };
+
+  check('New York is open in the middle of its session', () => {
+    // 15:00 UTC on a Wednesday in January = 10:00 New York, EST.
+    const status = sessions.sessionStatus(NY, new Date('2026-01-14T15:00:00Z'));
+    assert.equal(status.phase, 'open');
+    assert.equal(status.localTime, '10:00');
+  });
+
+  check('the same UTC instant in July is still open, because the offset moved', () => {
+    /*
+     * This is the case a stored UTC offset gets wrong. 15:00 UTC is 10:00 in
+     * New York during EST and 11:00 during EDT — both inside the session, but a
+     * hardcoded -5 would report 10:00 in July, and the same arithmetic applied
+     * near the open would put the exchange on the wrong side of it.
+     */
+    const status = sessions.sessionStatus(NY, new Date('2026-07-15T15:00:00Z'));
+    assert.equal(status.phase, 'open');
+    assert.equal(status.localTime, '11:00');
+  });
+
+  check('13:20 UTC in July is pre-market, and in January it is open', () => {
+    // 13:20 UTC = 09:20 EDT (pre-market) but 08:20 EST — also pre-market. The
+    // discriminating instant is 14:20 UTC: 10:20 EDT, open; 09:20 EST, pre.
+    assert.equal(sessions.sessionStatus(NY, new Date('2026-07-15T14:20:00Z')).phase, 'open');
+    assert.equal(sessions.sessionStatus(NY, new Date('2026-01-14T14:20:00Z')).phase, 'pre-market');
+  });
+
+  check('Saturday is closed whatever the clock says', () => {
+    const status = sessions.sessionStatus(NY, new Date('2026-01-17T15:00:00Z'));
+    assert.equal(status.phase, 'closed');
+    assert.match(status.nextTransition.label, /Monday/);
+  });
+
+  check('Tokyo is closed during its lunch break, not open', () => {
+    // 03:00 UTC = 12:00 Tokyo, between the two segments.
+    const status = sessions.sessionStatus(TOKYO, new Date('2026-01-14T03:00:00Z'));
+    assert.equal(status.phase, 'closed');
+    assert.equal(status.nextTransition.at, '12:30');
+    assert.match(status.nextTransition.label, /break/i);
+  });
+
+  check('Tokyo trades on both sides of the break', () => {
+    // 01:00 UTC = 10:00 Tokyo; 05:00 UTC = 14:00 Tokyo.
+    assert.equal(sessions.sessionStatus(TOKYO, new Date('2026-01-14T01:00:00Z')).phase, 'open');
+    assert.equal(sessions.sessionStatus(TOKYO, new Date('2026-01-14T05:00:00Z')).phase, 'open');
+  });
+
+  check('the regular session names both Tokyo segments', () => {
+    const status = sessions.sessionStatus(TOKYO, new Date('2026-01-14T01:00:00Z'));
+    assert.equal(status.regularSession, '09:00–11:30 and 12:30–15:30');
+  });
+
+  check('after-hours is reported as itself, not as open', () => {
+    // 22:00 UTC = 17:00 EST, inside after-hours.
+    const status = sessions.sessionStatus(NY, new Date('2026-01-14T22:00:00Z'));
+    assert.equal(status.phase, 'after-hours');
+  });
+
+  check('every status admits it does not know about holidays', () => {
+    for (const exchange of [NY, TOKYO]) {
+      const status = sessions.sessionStatus(exchange, new Date('2026-01-14T15:00:00Z'));
+      assert.equal(status.holidaysKnown, false);
+    }
+  });
+
+  /* -------------------------------------------------------- Market registry */
+
+  group('Market registry');
+
+  check('a market that is not configured does not exist', () => {
+    assert.equal(markets.getMarket('atlantis'), null);
+  });
+
+  check('a disabled section is never indexable', () => {
+    for (const market of markets.MARKETS) {
+      for (const [section, state] of Object.entries(market.indexability)) {
+        if (state === 'index') {
+          assert.ok(market.sections[section], `${market.slug}/${section} is indexed but not enabled`);
+        }
+      }
+    }
+  });
+
+  check('nothing is indexed without its own intro and exchanges', () => {
+    // The quality gate, as an assertion: a page may only be offered to a search
+    // engine if it has content of its own to offer.
+    for (const market of markets.MARKETS) {
+      if (markets.sectionState(market, 'overview') !== 'index') continue;
+      assert.ok(market.seo.intro.length >= 3, `${market.slug} has a thin intro`);
+      assert.ok(market.exchanges.length >= 1, `${market.slug} lists no exchange`);
+      assert.ok(market.indices.length >= 2, `${market.slug} lists fewer than two indices`);
+    }
+  });
+
+  check('no two markets share an intro paragraph', () => {
+    // The forbidden approach in one check: the same text with the country name
+    // swapped is what this is here to catch.
+    const seen = new Map();
+    for (const market of markets.MARKETS) {
+      for (const paragraph of market.seo.intro) {
+        const key = paragraph.slice(0, 60).toLowerCase();
+        assert.ok(!seen.has(key), `${market.slug} repeats ${seen.get(key)}`);
+        seen.set(key, market.slug);
+      }
+    }
+  });
+
+  check('no two markets share a title or an H1', () => {
+    const titles = new Set();
+    const h1s = new Set();
+    for (const market of markets.MARKETS) {
+      assert.ok(!titles.has(market.seo.title), `duplicate title: ${market.seo.title}`);
+      assert.ok(!h1s.has(market.seo.h1), `duplicate H1: ${market.seo.h1}`);
+      titles.add(market.seo.title);
+      h1s.add(market.seo.h1);
+    }
+  });
+
+  check('every related market exists and says why', () => {
+    for (const market of markets.MARKETS) {
+      for (const entry of market.related) {
+        assert.ok(markets.getMarket(entry.slug), `${market.slug} → unknown ${entry.slug}`);
+        assert.ok(entry.because.length > 10, `${market.slug} → ${entry.slug} has no reason`);
+      }
+    }
+  });
+
+  check('a market page never recommends buying anything', () => {
+    const forbidden = /\b(buy|sell|should invest|we recommend)\b/i;
+    for (const market of markets.MARKETS) {
+      for (const paragraph of [...market.seo.intro, market.summary, market.seo.description]) {
+        assert.ok(!forbidden.test(paragraph), `${market.slug}: ${paragraph.slice(0, 50)}`);
+      }
+    }
   });
 } catch (error) {
   failed += 1;

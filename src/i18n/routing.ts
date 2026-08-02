@@ -20,6 +20,20 @@ export const routing = defineRouting({
     // Market
     '/market': '/market',
     '/market/brief': '/market/brief',
+
+    /*
+     * The markets cluster. `/markets/global` is the canonical entry — the menu
+     * item that used to say "Entire World" points here, and `/market/brief`
+     * redirects to it.
+     *
+     * Sections are separate routes rather than tabs on one, because each answers
+     * a different question and a person arriving from a search for "US market
+     * hours" should land on the answer, not on a page where it is behind a
+     * click.
+     */
+    '/markets/global': '/markets/global',
+    '/markets/[market]': '/markets/[market]',
+    '/markets/[market]/news': '/markets/[market]/news',
     '/news': '/news',
     '/ideas': '/ideas',
     '/explore': '/explore',

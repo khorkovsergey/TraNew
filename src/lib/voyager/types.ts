@@ -17,6 +17,7 @@ import type { StudySpec } from '../studies/registry';
 /** Which page the person is on. Drives prompts, quick actions and the answer shape. */
 export type VoyagerScreen =
   | 'chart'
+  | 'market'
   | 'symbol'
   | 'economy'
   | 'indicator'

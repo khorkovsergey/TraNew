@@ -47,8 +47,6 @@
       "overviewTitle": "Overview",
       "assetsTitle": "Assets",
       "toolsTitle": "Tools",
-      "entireWorld": "Entire world",
-      "entireWorldSub": "Today's market brief",
       "marketNews": "Market news",
       "marketNewsSub": "What moved and why",
       "tradingIdeas": "Trading ideas",
@@ -63,7 +61,9 @@
       "supercharts": "Supercharts",
       "screeners": "Screeners",
       "calendars": "Calendars",
-      "brokers": "Brokers"
+      "brokers": "Brokers",
+      "globalMarkets": "Global Markets",
+      "globalMarketsSub": "What is happening across the world"
     },
     "symbols": {
       "popularTitle": "Popular",
@@ -739,6 +739,10 @@
     "tools": {
       "title": "Professional tools",
       "subtitle": "Powerful charts, screeners and analysis in one place."
+    },
+    "globalMarkets": {
+      "title": "Global Markets",
+      "subtitle": "What is happening across the world."
     }
   },
   "home": {
@@ -786,5 +790,22 @@
     "bannerTitle": "Already using TradingNew?",
     "bannerSub": "Continue to your personal workspace, charts, watchlists and alerts.",
     "bannerCta": "Log in to your account"
+  },
+  "markets": {
+    "heroLead": "Follow stock markets around the world. See what is moving, understand why it matters and explore the markets that interest you.",
+    "searchPlaceholder": "Search a market, country, exchange, asset or ask a question",
+    "intentHeading": "What would you like to explore?",
+    "chooseMarket": "Choose a market",
+    "openNow": "Markets open now",
+    "pulse": "Global market pulse",
+    "regions": "Explore markets by region",
+    "learnTitle": "Learn how markets work",
+    "faqTitle": "Common questions",
+    "howItWorks": "How global markets work",
+    "relatedMarkets": "Related markets",
+    "holidaysUnknown": "Exchange holidays are not in this calendar yet, so a public holiday will still show as a scheduled session.",
+    "unavailableSection": "This section is not available for the selected market yet.",
+    "disclaimer": "Information is provided for educational and informational purposes and is not investment advice.",
+    "sessionsSource": "Session times are the exchanges’ published regular hours, converted from their local time zone."
   }
 }

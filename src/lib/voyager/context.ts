@@ -23,6 +23,18 @@ const TEMPLATES: Record<VoyagerScreen, Template> = {
       'What is Pine Script?',
     ],
   },
+  market: {
+    subject: 'this market',
+    prompt: 'Ask about this market',
+    // Two of these are answerable from what is on the page, and two lead
+    // somewhere — which is the balance the screen itself is built around.
+    quick: [
+      'Why is this market moving today?',
+      'Which exchanges trade here and when?',
+      'How does this market work?',
+      'What should I look at next?',
+    ],
+  },
   symbol: {
     subject: 'this symbol',
     prompt: 'Ask about this symbol',
