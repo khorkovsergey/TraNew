@@ -55,10 +55,24 @@ export function KeepThis({
     async (fromReturn: boolean) => {
       if (!fromReturn) setState('saving');
 
-      const result =
-        kind === 'strategy'
-          ? await savePlanAction({ answers: payload })
-          : await saveLearningPathAction({ level: payload });
+      /*
+       * A server action that throws rejects this promise, and an uncaught
+       * rejection here leaves the button saying "Saving…" for ever with no way
+       * back. The person's plan is still on screen and still in their browser,
+       * so the honest state is "that did not save, try again" rather than a
+       * spinner that never resolves.
+       */
+      let result: { status: string };
+      try {
+        result =
+          kind === 'strategy'
+            ? await savePlanAction({ answers: payload })
+            : await saveLearningPathAction({ level: payload });
+      } catch (error) {
+        console.error('[keep] saving failed', error);
+        setState('error');
+        return;
+      }
 
       if (result.status === 'saved') {
         // The claim is spent. Left set, it would re-save on every later visit,
