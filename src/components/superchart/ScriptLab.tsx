@@ -17,6 +17,7 @@ import {
   type ScriptDocument,
 } from '@/lib/superchart/scripts/document';
 import type { StudyChoice } from '@/lib/superchart/layouts/schema';
+import { track } from '@/lib/events/analytics';
 import styles from './Superchart.module.css';
 
 /**
@@ -143,6 +144,7 @@ export function ScriptLab({ studies, symbolTicker, bars, onPreview }: Props) {
   }, [notice]);
 
   const generate = useCallback(() => {
+    track({ name: 'superchart_script_generated', studies: studies.length });
     const source = pineForStudies(studies);
     const name = `${symbolTicker} studies`;
 
@@ -192,6 +194,12 @@ export function ScriptLab({ studies, symbolTicker, bars, onPreview }: Props) {
         volume: bars.map((bar) => bar.volume ?? 0),
         time: bars.map((bar) => bar.time),
       },
+    });
+
+    track({
+      name: 'superchart_preview_run',
+      outcome: result.status,
+      plots: result.status === 'ok' ? result.result.plots.length : 0,
     });
 
     setOutcome(result);
@@ -265,6 +273,8 @@ export function ScriptLab({ studies, symbolTicker, bars, onPreview }: Props) {
     link.click();
 
     URL.revokeObjectURL(url);
+    // The script itself is never in the payload: it is the person's work.
+    track({ name: 'superchart_script_exported' });
     setNotice('Exported as Pine v6.');
   }, [document]);
 

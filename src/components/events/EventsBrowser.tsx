@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { usePathname, useRouter } from '@/i18n/navigation';
 import { track } from '@/lib/events/analytics';
 import {
   activeChips,
   clearFilters,
+  countActive,
   DATE_LABEL,
   filtersToSearchString,
   withoutChip,
@@ -78,6 +79,27 @@ export function EventsBrowser(props: EventsBrowserProps) {
     },
     [pathname, router]
   );
+
+  /*
+   * The view, counted once per set of results.
+   *
+   * Keyed on what was actually shown rather than fired on mount, so filtering
+   * and paging each count and two renders of the same results do not.
+   */
+  const viewed = useRef('');
+  useEffect(() => {
+    const active = countActive(filters);
+    const key = `${filters.view}:${active}:${total}`;
+    if (viewed.current === key) return;
+    viewed.current = key;
+
+    track({
+      name: 'events_discovery_viewed',
+      view: filters.view,
+      filterCount: active,
+      resultCount: total,
+    });
+  }, [filters, total]);
 
   const toggleIn = <T extends string>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((entry) => entry !== value) : [...list, value];

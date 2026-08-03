@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run test",
     "test": "node scripts/test-events.mjs",
-    "check:db": "node scripts/ops/check-schema-drift.mjs"
+    "check:db": "node scripts/ops/check-schema-drift.mjs",
+    "check:analytics": "node scripts/check-analytics.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

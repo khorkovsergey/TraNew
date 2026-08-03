@@ -17,8 +17,15 @@ export type AnalyticsEvent =
   | { name: 'events_filter_applied'; filter: string; valueCount: number }
   | { name: 'events_search_performed'; queryLength: number; resultCount: number }
   | { name: 'events_view_mode_changed'; view: string }
-  | { name: 'event_card_viewed'; eventId: string; position: number; section: string }
-  | { name: 'event_viewed'; eventId: string; sourceType: string }
+  /*
+   * `event_card_viewed` was declared here and never emitted. Counting card
+   * impressions needs an IntersectionObserver per card and a definition of what
+   * counts as seen; none of that is built, and a schema that promises
+   * impression data nobody collects reads later as "the section is unused"
+   * rather than "the section is uninstrumented". It comes back with the
+   * observer.
+   */
+  | { name: 'event_viewed'; eventId: string }
   | { name: 'event_saved'; eventId: string; saved: boolean }
   | { name: 'event_shared'; eventId: string; channel: string }
   | { name: 'event_registration_started'; eventId: string }
@@ -30,7 +37,23 @@ export type AnalyticsEvent =
   | { name: 'event_creation_started' }
   | { name: 'event_creation_step_completed'; step: number }
   | { name: 'event_creation_submitted'; eventId: string }
-  | { name: 'event_reported'; eventId: string; reason: string };
+  | { name: 'event_reported'; eventId: string; reason: string }
+  /*
+   * Superchart. No symbol names and no script text: a ticker somebody looks at
+   * is a position they may hold, and a script is their work. Shapes and counts
+   * answer every question the product actually has of this data.
+   */
+  | { name: 'superchart_opened'; interval: string; dataStatus: string }
+  | { name: 'superchart_study_toggled'; studyId: string; on: boolean }
+  | { name: 'superchart_drawing_created'; tool: string }
+  | { name: 'superchart_layout_saved'; destination: 'browser' | 'account' }
+  | { name: 'superchart_voyager_asked'; mode: string; contextKb: number; chipsRemoved: number }
+  | { name: 'superchart_plan_proposed'; steps: number; refusals: number }
+  | { name: 'superchart_plan_applied'; steps: number; ofSteps: number }
+  | { name: 'superchart_undo'; source: 'keyboard' | 'button' | 'toast' }
+  | { name: 'superchart_script_generated'; studies: number }
+  | { name: 'superchart_script_exported' }
+  | { name: 'superchart_preview_run'; outcome: 'ok' | 'failed' | 'unavailable'; plots: number };
 
 export interface AnalyticsSink {
   track(event: AnalyticsEvent): void;

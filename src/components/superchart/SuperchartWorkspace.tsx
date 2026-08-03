@@ -61,6 +61,8 @@ import {
 import type { ChartHighlight } from '@/lib/superchart/chart-engine/types';
 import { VoyagerChartPanel } from './VoyagerChartPanel';
 import { ScriptLab } from './ScriptLab';
+import { SeriesDescription } from './SeriesDescription';
+import { track } from '@/lib/events/analytics';
 import styles from './Superchart.module.css';
 
 /**
@@ -138,8 +140,24 @@ export function SuperchartWorkspace({
   const [studyChoices, setStudyChoices] = useState<StudyChoice[]>([]);
   const [history, setHistory] = useState<History>(EMPTY_HISTORY);
   const [panelTab, setPanelTab] = useState<'objects' | 'voyager'>('objects');
+  /*
+   * Which pane is showing on a phone.
+   *
+   * One at a time, because a 390-pixel screen holding a chart, a tool rail and
+   * a panel gives all three too little to be usable. On a wide screen this is
+   * ignored entirely and the CSS shows everything.
+   */
+  const [mobilePane, setMobilePane] = useState<'chart' | 'tools' | 'objects' | 'voyager'>('chart');
   /** Which reference the pointer is over on the chart, for the hover that runs back. */
   const [hoveredHighlight, setHoveredHighlight] = useState<string | null>(null);
+  /*
+   * A copy of the engine's range, only for the text description.
+   *
+   * Bars stay out of React and so does panning; this is updated from the
+   * engine's own subscription, which fires once a frame at most, and is read by
+   * nothing that paints.
+   */
+  const [describedRange, setDescribedRange] = useState({ from: 0, to: 0 });
   /**
    * The plan currently being previewed.
    *
@@ -232,6 +250,21 @@ export function SuperchartWorkspace({
     // Created once: chartType and bars are pushed in below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Counted once the series is actually loaded, not on mount: a workspace that
+  // failed to fetch anything was never opened as far as the product is
+  // concerned.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!opened.current && bars.length) {
+      opened.current = true;
+      track({
+        name: 'superchart_opened',
+        interval,
+        dataStatus: resolved?.dataStatus ?? 'demo',
+      });
+    }
+  }, [bars.length, interval, resolved]);
 
   useEffect(() => {
     engineRef.current?.setBars(bars);
@@ -370,7 +403,8 @@ export function SuperchartWorkspace({
     [studyChoices, drawings]
   );
 
-  const applyUndo = useCallback(() => {
+  const applyUndo = useCallback((source: 'keyboard' | 'button' | 'toast' = 'button') => {
+    track({ name: 'superchart_undo', source });
     setHistory((current) => {
       const step = undo(current);
       if (!step) return current;
@@ -393,6 +427,12 @@ export function SuperchartWorkspace({
 
   const toggleIndicator = useCallback(
     (definitionId: string) => {
+      track({
+        name: 'superchart_study_toggled',
+        studyId: definitionId,
+        on: !studyChoices.some((choice) => choice.definitionId === definitionId),
+      });
+
       commit('user', (state) => {
         const existing = state.studies.find((choice) => choice.definitionId === definitionId);
         return {
@@ -403,7 +443,7 @@ export function SuperchartWorkspace({
         };
       });
     },
-    [commit]
+    [commit, studyChoices]
   );
 
   /*
@@ -429,6 +469,7 @@ export function SuperchartWorkspace({
 
         if (pending.current.length >= TOOL_POINTS[activeTool]) {
           const now = new Date().toISOString();
+          track({ name: 'superchart_drawing_created', tool: activeTool });
           commit('user', (state) => ({
             ...state,
             drawings: [
@@ -611,6 +652,12 @@ export function SuperchartWorkspace({
       if (after.interval !== interval) setInterval(after.interval);
       if (after.chartType !== chartType) setChartType(after.chartType);
 
+      track({
+        name: 'superchart_plan_applied',
+        steps: commands.length,
+        ofSteps: plan.steps.length,
+      });
+
       setActivity((current) => [
         { id: plan.id, title: plan.title, at: new Date().toISOString() },
         ...current,
@@ -646,6 +693,11 @@ export function SuperchartWorkspace({
     }
 
     const result = await saveLayoutAction({ name: 'My layout', layout }).catch(() => null);
+
+    track({
+      name: 'superchart_layout_saved',
+      destination: result?.status === 'saved' ? 'account' : 'browser',
+    });
 
     setToast(
       result?.status === 'saved'
@@ -733,13 +785,23 @@ export function SuperchartWorkspace({
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         if (event.shiftKey) applyRedo();
-        else applyUndo();
+        else applyUndo('keyboard');
         return;
       }
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
         void saveLayout();
+        return;
+      }
+
+      // ⌥V opens Voyager. `event.code` rather than `event.key`, because Alt
+      // rewrites the character on several layouts — on a Mac ⌥V produces "√".
+      if (event.altKey && event.code === 'KeyV') {
+        event.preventDefault();
+        setPanelOpen(true);
+        setPanelTab('voyager');
+        setMobilePane('voyager');
         return;
       }
 
@@ -875,7 +937,7 @@ export function SuperchartWorkspace({
         <button
           className={styles.panelToggle}
           disabled={!canUndo(history)}
-          onClick={applyUndo}
+          onClick={() => applyUndo('button')}
           title={canUndo(history) ? `Undo: ${lastTitle(history)}` : 'Nothing to undo'}
         >
           Undo
@@ -909,7 +971,10 @@ export function SuperchartWorkspace({
       </div>
 
       <div className={styles.body}>
-        <nav className={styles.toolRail} aria-label="Chart tools">
+        <nav
+          className={`${styles.toolRail} ${mobilePane === 'tools' ? styles.paneOnMobile : ''}`}
+          aria-label="Chart tools"
+        >
           <button
             className={`${styles.tool} ${activeTool === null ? styles.toolOn : ''}`}
             title="Select"
@@ -965,12 +1030,21 @@ export function SuperchartWorkspace({
 
           {/* The canvas is aria-hidden; this is the series a screen reader gets. */}
           <div
-            className={styles.stage}
+            className={`${styles.stage} ${mobilePane === 'chart' ? styles.paneOnMobile : ''}`}
             ref={stageRef}
             onPointerDown={onStagePointerDown}
             onPointerMove={onStagePointerMove}
             onPointerUp={onStagePointerUp}
           />
+          <SeriesDescription
+            bars={bars}
+            symbol={resolved?.ticker ?? symbolId}
+            interval={interval}
+            dataStatus={resolved?.dataStatus ?? 'demo'}
+            fromIndex={describedRange.from}
+            toIndex={describedRange.to || bars.length}
+          />
+
           {activeTool && (
             <div className={styles.toolHint} role="status">
               {TOOL_LABEL[activeTool]}: click {TOOL_POINTS[activeTool]} point
@@ -984,7 +1058,12 @@ export function SuperchartWorkspace({
         </div>
 
         {panelOpen && (
-          <aside className={styles.rightPanel} aria-label="Chart panels">
+          <aside
+            className={`${styles.rightPanel} ${
+              mobilePane === 'objects' || mobilePane === 'voyager' ? styles.paneOnMobile : ''
+            }`}
+            aria-label="Chart panels"
+          >
             <div className={styles.panelTabs} role="tablist">
               <button
                 role="tab"
@@ -1037,6 +1116,28 @@ export function SuperchartWorkspace({
                   </button>
                 );
               })}
+
+              {/*
+                The two things a person can keep from a chart.
+                *
+                * Present because the screen this workspace replaces had them,
+                * and losing them behind the flag would be a regression dressed
+                * as a new feature. They link straight to registration rather
+                * than to a menu: somebody who pressed "Create alert" asked for
+                * one thing, and the account is the only reason they are being
+                * stopped.
+              */}
+              <div className={styles.dataTitle} style={{ marginTop: 14 }}>
+                KEEP THIS
+              </div>
+              <Link className={styles.objectRow} href="/sign-up" prefetch={false}>
+                <span className={styles.objectName}>Add {resolved?.ticker ?? symbolId} to a watchlist</span>
+                <span className={styles.objectMeta}>Free account</span>
+              </Link>
+              <Link className={styles.objectRow} href="/sign-up" prefetch={false}>
+                <span className={styles.objectName}>Create a price alert</span>
+                <span className={styles.objectMeta}>Free account</span>
+              </Link>
 
               <div className={styles.dataTitle} style={{ marginTop: 14 }}>
                 DRAWINGS ({drawings.length})
@@ -1109,11 +1210,35 @@ export function SuperchartWorkspace({
         )}
       </div>
 
+      {/*
+        The phone tab bar. Hidden above the breakpoint by CSS rather than by a
+        media query in JavaScript: a width read during render is a width the
+        server does not have, and the markup would not match on hydration.
+      */}
+      <nav className={styles.mobileTabs} aria-label="Workspace sections">
+        {(['chart', 'tools', 'objects', 'voyager'] as const).map((pane) => (
+          <button
+            key={pane}
+            className={`${styles.mobileTab} ${mobilePane === pane ? styles.mobileTabOn : ''}`}
+            aria-pressed={mobilePane === pane}
+            onClick={() => {
+              setMobilePane(pane);
+              if (pane === 'objects' || pane === 'voyager') {
+                setPanelOpen(true);
+                setPanelTab(pane === 'voyager' ? 'voyager' : 'objects');
+              }
+            }}
+          >
+            {pane === 'chart' ? 'Chart' : pane === 'tools' ? 'Tools' : pane === 'objects' ? 'Objects' : 'Voyager'}
+          </button>
+        ))}
+      </nav>
+
       {toast && (
         <div className={styles.toast} role="status">
           <span>{toast}</span>
           {canUndo(history) && (
-            <button className={styles.toastUndo} onClick={applyUndo}>
+            <button className={styles.toastUndo} onClick={() => applyUndo('toast')}>
               Undo
             </button>
           )}

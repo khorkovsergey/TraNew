@@ -17,6 +17,7 @@ import {
 import { planFor } from '@/lib/superchart/commands/planner';
 import type { CommandPlan, CommandState } from '@/lib/superchart/commands';
 import { PlanCard } from './PlanCard';
+import { track } from '@/lib/events/analytics';
 import styles from './Superchart.module.css';
 
 /**
@@ -122,8 +123,24 @@ export function VoyagerChartPanel({
        * before anything is applied — which is the rule this whole layer exists
        * to enforce.
        */
+      /*
+       * Counted with the shape of the request, never its text. What somebody
+       * asks about a chart names the position they hold.
+       */
+      track({
+        name: 'superchart_voyager_asked',
+        mode: chooseMode(trimmed, context).mode,
+        contextKb: Math.round(contextSize(context) / 1024),
+        chipsRemoved: excluded.length,
+      });
+
       const proposed = planFor({ question: trimmed, context });
       if (proposed) {
+        track({
+          name: 'superchart_plan_proposed',
+          steps: proposed.steps.length,
+          refusals: proposed.refusals.length,
+        });
         onPlan(proposed);
         setState({ status: 'planned', question: trimmed });
         setQuestion('');

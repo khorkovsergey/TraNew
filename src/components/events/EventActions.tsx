@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { reportEventAction } from '@/app/actions/events';
 import { track } from '@/lib/events/analytics';
 import { googleCalendarUrl, type CalendarEvent } from '@/lib/events/calendar';
@@ -31,6 +31,18 @@ export function EventActions({
   saved: boolean;
   calendar: CalendarEvent;
 }) {
+  /*
+   * The detail view, counted once. This component is the only client code that
+   * every event page renders, which makes it the one place a view can be
+   * counted without adding a component whose sole job is to fire an event.
+   */
+  const counted = useRef(false);
+  useEffect(() => {
+    if (counted.current) return;
+    counted.current = true;
+    track({ name: 'event_viewed', eventId });
+  }, [eventId]);
+
   const [menu, setMenu] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [shared, setShared] = useState<string | null>(null);
