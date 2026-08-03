@@ -229,3 +229,90 @@
   color: var(--tn-text-muted);
   vertical-align: 1px;
 }
+
+/* ---- AI Voyager ---- */
+
+/*
+ * A destination, not a dropdown, so it sits outside the nav row and is styled
+ * as its own thing. Differentiated but quiet: no glow, no animation, no "AI"
+ * sticker. The orb is the only AI imagery the design allows anywhere.
+ */
+.voyagerPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  margin-left: 10px;
+  padding: 6px 13px 6px 8px;
+  border: 1px solid var(--tn-purple-border);
+  border-radius: 20px;
+  background: var(--tn-purple-tint-soft);
+  color: var(--tn-purple-deep);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 140ms ease;
+}
+
+.voyagerPill:hover {
+  border-color: var(--tn-purple);
+}
+
+.voyagerPill:focus-visible {
+  outline: 2px solid var(--tn-purple);
+  outline-offset: 2px;
+}
+
+/*
+ * Below 1080 the label goes and the orb stays. The name lives on the link
+ * itself, so hiding this text costs nothing a screen reader needed.
+ */
+@media (max-width: 1080px) {
+  .voyagerLabel {
+    display: none;
+  }
+
+  .voyagerPill {
+    padding: 6px 8px;
+  }
+}
+
+/*
+ * Phones.
+ *
+ * The header had no mobile treatment at all — one media query in the whole file,
+ * and it was for the Voyager label. The full desktop row rendered at 390px and
+ * pushed the document 15px wide, so every page on the site scrolled sideways a
+ * little. The symptom was small; the cause is that this row was never designed
+ * for a narrow screen.
+ *
+ * This is the contained fix, not that design: the navigation scrolls inside
+ * itself so every item stays reachable, and the action group is allowed to
+ * shrink instead of forcing the page wider. A proper phone header — a drawer,
+ * or a reduced set — is its own piece of work and is not invented here.
+ */
+@media (max-width: 760px) {
+  .nav {
+    overflow-x: auto;
+    justify-content: flex-start;
+    scrollbar-width: none;
+    /* Room for a focus ring on the first and last item. */
+    padding: 2px;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .actions {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  .openButton {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

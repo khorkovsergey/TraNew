@@ -42,6 +42,7 @@ export const routing = defineRouting({
     '/symbols/[ticker]': '/symbols/[ticker]',
     '/research': '/research',
     '/supercharts': '/supercharts',
+    '/voyager': '/voyager',
     '/portfolio': '/portfolio',
 
     // Economy & community

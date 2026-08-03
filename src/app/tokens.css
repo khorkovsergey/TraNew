@@ -31,6 +31,10 @@
   --tn-purple-hover: #6a3de8;
   --tn-purple-tint: #efe9fd;
   --tn-purple-tint-soft: #f6f2fe;
+  /* The Voyager entry point. Hex values from the workspace handoff, which is
+     specific about them on purpose. */
+  --tn-purple-border: #e6dcfb;
+  --tn-purple-deep: #4a3a7a;
 
   --tn-green: #1aa966;
   --tn-green-hover: #159056;

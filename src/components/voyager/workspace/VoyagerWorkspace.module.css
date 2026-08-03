@@ -1,0 +1,472 @@
+/*
+ * The AI Voyager workspace.
+ *
+ * Geometry and colour follow the handoff, matched wherever it gave a number.
+ * The one rule the whole file serves: with no request in flight this is a
+ * centred column on a quiet background and nothing else — no panels, no
+ * toolbar, no floating card. Anything that would compete with the question is
+ * not here.
+ */
+
+.landing {
+  min-height: calc(100vh - 64px);
+  background: var(--tn-bg);
+  display: flex;
+  justify-content: center;
+}
+
+.column {
+  width: 100%;
+  max-width: 720px;
+  padding: 9vh 20px 80px;
+  transition: max-width 260ms ease;
+}
+
+/* Widens only once the categories are open, so the five starters keep the
+   narrow measure that lets them read as sentences. */
+.columnWide {
+  max-width: 900px;
+}
+
+.headline {
+  margin: 0 0 10px;
+  font-size: clamp(24px, 4vw, 32px);
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1.2;
+  color: var(--tn-text);
+}
+
+.greeting {
+  margin: 14px 0 8px;
+  font-size: clamp(21px, 3.4vw, 26px);
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: var(--tn-text);
+}
+
+.supporting {
+  margin: 0 0 22px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--tn-text-nav);
+}
+
+/* ---- The returning person's briefing ---- */
+
+.briefingGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.briefingCard {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 15px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 14px;
+  background: var(--tn-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.briefingCard:hover {
+  border-color: var(--tn-purple);
+}
+
+.briefingKind {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}
+
+.briefingTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+/* The reason the card is on screen. Muted, but never absent. */
+.briefingWhy {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--tn-text-muted);
+}
+
+/* ---- Composer ---- */
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 12px 12px 12px 20px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 20px;
+  background: var(--tn-surface);
+  box-shadow: 0 8px 26px rgba(19, 23, 34, 0.07);
+}
+
+.composer:focus-within {
+  border-color: var(--tn-purple);
+}
+
+.composerInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  resize: none;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--tn-text);
+  outline: none;
+  padding: 6px 0;
+  max-height: 160px;
+}
+
+.composerIcon,
+.composerSend {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 0;
+  cursor: pointer;
+}
+
+.composerIcon {
+  background: transparent;
+  color: var(--tn-text-muted);
+}
+
+.composerIcon:hover:not(:disabled) {
+  background: var(--tn-chip-bg);
+  color: var(--tn-text);
+}
+
+/*
+ * Disabled and labelled as not built, rather than absent. The affordance is
+ * part of the design, and a control that pretends to be ready is worse than one
+ * that says it is coming.
+ */
+.composerIcon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.composerSend {
+  background: var(--tn-purple);
+  color: #fff;
+}
+
+.composerSend:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ---- Starters ---- */
+
+.starters {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 14px;
+}
+
+.starter {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  /* Clears the 44px minimum target at the default text size. */
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.starter:hover {
+  background: var(--tn-chip-bg);
+}
+
+.starterIcon {
+  flex: none;
+  color: var(--tn-text-muted);
+}
+
+.starterText {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tn-text);
+}
+
+/* Rotated, so the chevron points the way the row goes rather than down. */
+.starterChevron {
+  flex: none;
+  color: var(--tn-text-muted);
+  transform: rotate(-90deg);
+}
+
+/* ---- The two quiet links ---- */
+
+.quietRow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 0 12px;
+}
+
+.quietLink,
+.quietSignup {
+  border: 0;
+  background: none;
+  padding: 6px 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tn-purple);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.quietLink:hover,
+.quietSignup:hover {
+  text-decoration: underline;
+}
+
+.quietSignup {
+  color: var(--tn-text-muted);
+}
+
+.quietSignup strong {
+  color: var(--tn-text);
+}
+
+/* ---- Prompt categories ---- */
+
+.categories {
+  margin-top: 20px;
+  padding-top: 22px;
+  border-top: 1px solid var(--tn-border-card);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.categoryHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.categoryIcon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple);
+}
+
+.categoryTitle {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.categorySubtitle {
+  margin: 1px 0 0;
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+}
+
+.categoryCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 8px;
+}
+
+.promptCard {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 13px;
+  background: var(--tn-surface);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--tn-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.promptCard:hover {
+  border-color: var(--tn-purple);
+}
+
+/* Said before the click, never after. */
+.proBadge {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+/* ---- Once a request exists ---- */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 64px);
+  background: var(--tn-surface);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
+  flex: 0 0 56px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--tn-border-card);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wordmark {
+  font-size: 15.5px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--tn-text);
+}
+
+.workspaceTitle {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+.namedBadge {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.topAction {
+  padding: 7px 13px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 10px;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tn-text);
+  cursor: pointer;
+}
+
+.topAction:hover {
+  border-color: var(--tn-purple);
+}
+
+.stagePlaceholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 40px 20px;
+  background: var(--tn-bg);
+  text-align: center;
+}
+
+.requestEcho {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+.placeholderNote {
+  margin: 0;
+  max-width: 58ch;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--tn-text-nav);
+}
+
+.primaryAction {
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--tn-purple);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ---- Motion ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .column,
+  .starter,
+  .promptCard,
+  .briefingCard {
+    transition: none;
+  }
+}
+
+/* ---- Phone ---- */
+
+@media (max-width: 760px) {
+  .column {
+    padding: 28px 16px 60px;
+  }
+
+  .briefingGrid,
+  .categoryCards {
+    grid-template-columns: 1fr;
+  }
+}

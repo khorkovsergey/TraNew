@@ -7,6 +7,7 @@ import { requestSearchFocus } from '@/lib/searchFocus';
 import { AuthedActions } from './AuthedActions';
 import { useLoginModal } from './LoginModalProvider';
 import { MENUS, NAV_ACTIVE_PREFIXES, type MenuEntry, type NavKey } from './menu';
+import { VoyagerOrb } from '@/components/voyager/VoyagerOrb';
 import styles from './Header.module.css';
 
 const NAV_KEYS: NavKey[] = ['home', 'market', 'symbols', 'economy', 'community', 'marketplace'];
@@ -178,6 +179,23 @@ export function Header() {
               TN
             </span>
             <span className={styles.wordmark}>TradingNew</span>
+          </Link>
+
+          <Link
+            className={styles.voyagerPill}
+            href="/voyager"
+            onClick={closeAll}
+            title="AI Voyager"
+            /*
+             * The accessible name is on the link and stays there when the label
+             * is hidden below 1080px — a control that loses its name at a
+             * breakpoint is a control a screen reader stops being able to
+             * describe exactly when it becomes icon-only.
+             */
+            aria-label="AI Voyager"
+          >
+            <VoyagerOrb size={19} />
+            <span className={styles.voyagerLabel}>AI Voyager</span>
           </Link>
 
           <nav className={styles.nav} aria-label={t('nav.home')}>

@@ -73,7 +73,17 @@ export function VoyagerWidget({ chartWorkspaceLive = false }: { chartWorkspaceLi
    * locale prefix.
    */
   const pathname = usePathname();
-  const onChartWorkspace = chartWorkspaceLive && (pathname?.endsWith('/supercharts') ?? false);
+
+  /*
+   * `/supercharts` only counts when the flag is on, because that route serves
+   * either the new workspace or the screen it will replace. `/voyager` always
+   * counts: that page *is* Voyager, and an orb in the corner offering to help
+   * would be a second assistant standing beside the first — the one in the
+   * corner knowing less than the one filling the screen.
+   */
+  const onChartWorkspace =
+    (pathname?.endsWith('/voyager') ?? false) ||
+    (chartWorkspaceLive && (pathname?.endsWith('/supercharts') ?? false));
   const context = useVoyagerContext();
   const { applyStudy, requestPine } = useChartStudies();
   const router = useRouter();

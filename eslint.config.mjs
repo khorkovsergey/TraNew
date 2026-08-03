@@ -8,11 +8,13 @@ import typescript from 'eslint-config-next/typescript';
  * bridge is needed.
  *
  * The ignores are build output, the verification scripts (plain Node, not part
- * of the application) and `.claude`, which holds vendored design prototypes
- * rather than anything this project ships.
+ * of the application), `.claude`, and the design handoffs under `docs/design`.
+ * Those last two hold vendored prototypes — the Voyager handoff ships a runtime
+ * it explicitly tells us not to port — so linting them reports on code nobody
+ * here will ever edit.
  */
 const config = [
-  { ignores: ['.next/**', 'node_modules/**', 'scripts/**', 'drizzle/**', '.claude/**'] },
+  { ignores: ['.next/**', 'node_modules/**', 'scripts/**', 'drizzle/**', '.claude/**', 'docs/**'] },
   ...coreWebVitals,
   ...typescript,
 ];

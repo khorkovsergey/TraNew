@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#f4f6fb;}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#131722;-webkit-font-smoothing:antialiased;}
+a{color:#2962ff;text-decoration:none;}
+a:hover{color:#1848d6;}
+input,textarea,button{font-family:inherit;}
+*{scrollbar-width:thin;scrollbar-color:#dde2ec transparent;}
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-thumb{background:#dde2ec;border-radius:6px;}
+@keyframes vwPulse{0%,100%{opacity:.3;}50%{opacity:1;}}
+@keyframes vwSpin{to{transform:rotate(360deg);}}
+@keyframes vwIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important;}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#f4f6fb;display:flex;justify-content:center">
+<div style="width:100%;max-width:{{ frameW }};height:100vh;display:flex;flex-direction:column;background:#ffffff;overflow:hidden;box-shadow:0 0 0 1px #eceff4">
+
+  <div style="display:flex;align-items:center;gap:12px;height:56px;flex-shrink:0;padding:0 14px;border-bottom:1px solid #eceff4;background:#ffffff">
+    <a href="Home.dc.html" style="display:flex;align-items:center;gap:9px;flex-shrink:0;color:inherit">
+      <span style="width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,#2962ff,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#ffffff;font-size:11.5px;font-weight:800;letter-spacing:-0.4px">TN</span>
+      <span style="display:flex;align-items:center;gap:7px">
+        <span style="width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffffff 0%,#f2f3f8 55%,#dde1ec 100%);box-shadow:inset -2px -3px 5px rgba(120,130,160,0.26),inset 2px 2px 4px rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="11" height="7" viewBox="0 0 22 11" fill="none"><defs><linearGradient id="vwEye" x1="0" y1="0" x2="22" y2="0" gradientUnits="userSpaceOnUse"><stop stop-color="#8b5cf6"></stop><stop offset="1" stop-color="#2962ff"></stop></linearGradient></defs><path d="M3 8.5a3 3 0 0 1 6 0M13 8.5a3 3 0 0 1 6 0" stroke="url(#vwEye)" stroke-width="2.8" stroke-linecap="round"></path></svg>
+        </span>
+        <span style="font-size:15.5px;font-weight:800;letter-spacing:-0.3px;white-space:nowrap">AI Voyager</span>
+      </span>
+    </a>
+    <span style="width:1px;height:22px;background:#eceff4;flex-shrink:0"></span>
+    <div style="min-width:0;flex:1">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ wsName }}</span>
+        <sc-if value="{{ wsNameAuto }}" hint-placeholder-val="{{ false }}">
+          <span style="font-size:9.5px;font-weight:800;letter-spacing:0.4px;background:#efe9fd;color:#7c4dff;border-radius:5px;padding:2px 6px;flex-shrink:0">NAMED BY VOYAGER</span>
+        </sc-if>
+      </div>
+      <div style="font-size:11px;color:#9aa3b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ wsMeta }}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:3px;background:#f7f9fc;border:1px solid #e6eaf2;border-radius:10px;padding:3px;flex-shrink:0">
+      <sc-for list="{{ personas }}" as="pr" hint-placeholder-count="2">
+        <button onClick="{{ pr.pick }}" title="{{ pr.title }}" style="background:{{ pr.bg }};border:none;border-radius:7px;padding:5px 10px;font-size:11.5px;font-weight:700;color:{{ pr.fg }};cursor:pointer;white-space:nowrap">{{ pr.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;align-items:center;gap:3px;background:#f7f9fc;border:1px solid #e6eaf2;border-radius:10px;padding:3px;flex-shrink:0">
+      <sc-for list="{{ devices }}" as="dv2" hint-placeholder-count="3">
+        <button onClick="{{ dv2.pick }}" title="{{ dv2.title }}" aria-label="{{ dv2.title }}" style="background:{{ dv2.bg }};border:none;border-radius:7px;padding:5px 9px;font-size:11.5px;font-weight:700;color:{{ dv2.fg }};cursor:pointer">{{ dv2.label }}</button>
+      </sc-for>
+    </div>
+    <button onClick="{{ libOpen }}" aria-label="Workspaces" title="Workspaces" style="display:flex;align-items:center;gap:7px;background:#ffffff;border:1px solid #e2e6ee;border-radius:20px;padding:8px 13px;font-size:12.5px;font-weight:700;color:#131722;cursor:pointer;flex-shrink:0" style-hover="border-color:#7c4dff">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 5h6v14H4zM14 5h6v14h-6"></path></svg>
+      <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">Workspaces</sc-if>
+    </button>
+    <sc-if value="{{ zoneCHidden }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ toggleC }}" style="background:#ffffff;border:1px solid #e2e6ee;border-radius:20px;padding:8px 13px;font-size:12.5px;font-weight:700;color:#131722;cursor:pointer;flex-shrink:0" style-hover="border-color:#7c4dff">Context</button>
+    </sc-if>
+    <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ wsSave }}" style="background:#ffffff;border:1px solid #e2e6ee;border-radius:20px;padding:8px 13px;font-size:12.5px;font-weight:700;color:#131722;cursor:pointer;flex-shrink:0" style-hover="border-color:#7c4dff">Save</button>
+      <button onClick="{{ wsShare }}" style="background:#ffffff;border:1px solid #e2e6ee;border-radius:20px;padding:8px 13px;font-size:12.5px;font-weight:700;color:#131722;cursor:pointer;flex-shrink:0" style-hover="border-color:#7c4dff">Share</button>
+    </sc-if>
+    <sc-if value="{{ narrowBar }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ wsSave }}" title="Save workspace" aria-label="Save workspace" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #e2e6ee;border-radius:50%;color:#5a6376;cursor:pointer;flex-shrink:0" style-hover="border-color:#7c4dff;color:#131722">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5zM8 4v6h8V4M8 20v-6h8v6"></path></svg>
+      </button>
+      <button onClick="{{ wsShare }}" title="Share workspace" aria-label="Share workspace" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #e2e6ee;border-radius:50%;color:#5a6376;cursor:pointer;flex-shrink:0" style-hover="border-color:#7c4dff;color:#131722">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5"></path></svg>
+      </button>
+    </sc-if>
+    <a href="Home.dc.html" aria-label="Back to the portal" title="Back to the portal" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:50%;color:#5a6376;flex-shrink:0" style-hover="background:#f0f3f8;color:#131722">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+    </a>
+  </div>
+
+  <div style="flex:1;display:flex;min-height:0;position:relative">
+
+    <sc-if value="{{ zoneA }}" hint-placeholder-val="{{ true }}">
+      <div style="{{ zoneAStyle }}">
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;padding:11px 14px;border-bottom:1px solid #eceff4">
+          <span style="font-size:10.5px;font-weight:800;letter-spacing:0.9px;color:#9aa3b5">CONVERSATION</span>
+          <div style="flex:1"></div>
+          <button onClick="{{ newWs }}" title="New workspace" style="display:flex;align-items:center;gap:6px;background:#ffffff;border:1px solid #e2e6ee;border-radius:16px;padding:5px 11px;font-size:11.5px;font-weight:700;color:#131722;cursor:pointer" style-hover="border-color:#7c4dff">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            New
+          </button>
+          <sc-if value="{{ notMobile }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ toggleA }}" title="Collapse conversation" aria-label="Collapse conversation" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:8px;color:#8a93a6;cursor:pointer" style-hover="background:#f0f3f8;color:#131722">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"></path></svg>
+            </button>
+          </sc-if>
+        </div>
+
+        <div style="flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;padding:14px;display:flex;flex-direction:column;gap:16px">
+          <sc-if value="{{ chatEmpty }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;gap:11px">
+              <span style="width:28px;height:28px;border-radius:50%;flex-shrink:0;background:radial-gradient(circle at 35% 30%,#ffffff 0%,#f2f3f8 55%,#dde1ec 100%);box-shadow:inset -2px -3px 5px rgba(120,130,160,0.26);display:flex;align-items:center;justify-content:center">
+                <svg width="15" height="8" viewBox="0 0 22 11" fill="none"><path d="M3 8.5a3 3 0 0 1 6 0M13 8.5a3 3 0 0 1 6 0" stroke="url(#vwEye)" stroke-width="2.8" stroke-linecap="round"></path></svg>
+              </span>
+              <div style="min-width:0">
+                <div style="font-size:13px;font-weight:800">{{ chatGreeting }}</div>
+                <div style="font-size:12.5px;color:#5a6376;line-height:1.6;margin-top:5px">{{ chatIntro }}</div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;font-weight:800;letter-spacing:0.9px;color:#9aa3b5">SHORTCUTS</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:9px">
+                <sc-for list="{{ shortcuts }}" as="sh" hint-placeholder-count="4">
+                  <button onClick="{{ sh.go }}" style="background:#ffffff;border:1px solid #e6eaf2;border-radius:16px;padding:7px 12px;font-size:11.5px;font-weight:700;color:#3a4254;cursor:pointer" style-hover="border-color:#7c4dff;color:#131722">{{ sh.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-for list="{{ turns }}" as="tn" hint-placeholder-count="0">
+            <div style="display:flex;flex-direction:column;gap:11px">
+              <div style="align-self:flex-end;max-width:90%;background:#f2f4f9;border-radius:14px 14px 4px 14px;padding:10px 13px;font-size:13px;line-height:1.55">{{ tn.q }}</div>
+
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:0.4px;background:{{ tn.mBg }};color:{{ tn.mFg }};border-radius:5px;padding:2px 7px">{{ tn.modeLabel }}</span>
+                <sc-if value="{{ tn.running }}" hint-placeholder-val="{{ false }}">
+                  <span style="width:12px;height:12px;border-radius:50%;border:2px solid #e6dcfb;border-top-color:#7c4dff;animation:vwSpin .8s linear infinite;flex-shrink:0"></span>
+                </sc-if>
+                <span style="font-size:11.5px;font-weight:600;color:#5a6376">{{ tn.statusText }}</span>
+              </div>
+
+              <sc-if value="{{ tn.hasPlan }}" hint-placeholder-val="{{ false }}">
+                <div style="background:#fbfcfe;border:1px solid #eceff4;border-radius:14px;padding:12px 13px">
+                  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.5px;color:#9aa3b5">WHAT I WILL DO</div>
+                  <div style="display:flex;flex-direction:column;gap:7px;margin-top:9px">
+                    <sc-for list="{{ tn.plan }}" as="pl" hint-placeholder-count="4">
+                      <div style="display:flex;align-items:flex-start;gap:9px">
+                        <span style="width:15px;height:15px;border-radius:50%;flex-shrink:0;margin-top:2px;background:{{ pl.dotBg }};border:1.5px solid {{ pl.dotBorder }};display:flex;align-items:center;justify-content:center">
+                          <sc-if value="{{ pl.done }}" hint-placeholder-val="{{ false }}">
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                          </sc-if>
+                        </span>
+                        <span style="font-size:12.5px;color:{{ pl.fg }};line-height:1.5">{{ pl.text }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ tn.running }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ tn.stop }}" style="width:100%;background:#ffffff;border:1px solid #e2e6ee;border-radius:10px;padding:8px 0;margin-top:11px;font-size:11.5px;font-weight:700;color:#5a6376;cursor:pointer" style-hover="border-color:#e0492f;color:#e0492f">Stop and keep what is ready</button>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ tn.hasSummary }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:13px;line-height:1.65;color:#131722">{{ tn.summary }}</div>
+              </sc-if>
+
+              <sc-if value="{{ tn.hasNext }}" hint-placeholder-val="{{ false }}">
+                <div>
+                  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.9px;color:#9aa3b5">SUGGESTED NEXT</div>
+                  <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+                    <sc-for list="{{ tn.next }}" as="nx" hint-placeholder-count="3">
+                      <button onClick="{{ nx.go }}" style="text-align:left;background:#ffffff;border:1px solid #e6eaf2;border-radius:12px;padding:9px 11px;font-size:12.5px;font-weight:600;color:#131722;cursor:pointer;line-height:1.45" style-hover="border-color:#7c4dff;background:#fdfcff">{{ nx.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="flex-shrink:0;padding:10px 14px 14px;border-top:1px solid #eceff4">
+          <div style="background:#ffffff;border:1px solid #e2e6ee;border-radius:18px;padding:10px 12px 8px 14px">
+            <textarea ref="{{ inputRef }}" onKeyDown="{{ inputKey }}" placeholder="Ask about a market, symbol, chart or your portfolio…" rows="2" style="display:block;width:100%;box-sizing:border-box;border:none;outline:none;resize:none;overflow:hidden;background:transparent;font-size:13px;line-height:1.6;min-height:42px;color:#131722;padding:0"></textarea>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+            <div style="flex:1"></div>
+            <button onClick="{{ voiceGo }}" title="Voice input" aria-label="Voice input" style="width:34px;height:34px;border-radius:50%;background:transparent;border:none;color:#8a93a6;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" style-hover="background:#f0f3f8;color:#131722">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 4a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V7a3 3 0 0 1 3-3M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+            </button>
+            <button onClick="{{ fileGo }}" title="Attach a file or portfolio export" aria-label="Attach a file" style="width:34px;height:34px;border-radius:50%;background:transparent;border:none;color:#8a93a6;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" style-hover="background:#f0f3f8;color:#131722">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M21 12.5 12.5 21a4.5 4.5 0 0 1-6.4-6.4l8-8a3 3 0 0 1 4.3 4.3l-8 8a1.5 1.5 0 0 1-2.2-2.2l7-7"></path></svg>
+            </button>
+            <button onClick="{{ sendGo }}" aria-label="Send to Voyager" style="width:34px;height:34px;border-radius:50%;background:#7c4dff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" style-hover="background:#6a3de8">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"></path></svg>
+            </button>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:9px;margin-top:8px">
+            <span style="font-size:10.5px;font-weight:700;color:{{ creditFg }}">{{ creditLabel }}</span>
+            <div style="flex:1;height:4px;border-radius:3px;background:#eceff4;overflow:hidden"><div style="height:4px;width:{{ creditPct }};background:{{ creditFg }}"></div></div>
+            <button onClick="{{ planOpen }}" style="background:transparent;border:none;font-size:10.5px;font-weight:800;color:#7c4dff;cursor:pointer;padding:0">{{ planLabel }}</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ zoneACollapsed }}" hint-placeholder-val="{{ false }}">
+      <div style="width:46px;flex-shrink:0;border-right:1px solid #eceff4;background:#fbfcfe;display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0">
+        <button onClick="{{ toggleA }}" title="Open conversation" aria-label="Open conversation" style="width:34px;height:34px;border-radius:11px;background:#efe9fd;border:none;color:#7c4dff;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#e6dcfb">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-5A8 8 0 0 1 13 4a8 8 0 0 1 8 8"></path></svg>
+        </button>
+        <button onClick="{{ newWs }}" title="New workspace" aria-label="New workspace" style="width:34px;height:34px;border-radius:11px;background:transparent;border:none;color:#5a6376;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#f0f3f8;color:#131722">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+        </button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ zoneB }}" hint-placeholder-val="{{ true }}">
+      <div style="{{ zoneBStyle }}">
+
+        <sc-if value="{{ canvasBar }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:9px;flex-shrink:0;padding:10px 16px;border-bottom:1px solid #eceff4;background:#ffffff;flex-wrap:wrap">
+            <span style="font-size:9.5px;font-weight:800;letter-spacing:0.4px;background:{{ modeBg }};color:{{ modeFg }};border-radius:5px;padding:3px 8px">{{ modeName }}</span>
+            <span style="font-size:12.5px;font-weight:700">{{ canvasTitle }}</span>
+            <span style="font-size:11.5px;color:#9aa3b5">{{ canvasMeta }}</span>
+            <div style="flex:1"></div>
+            <sc-for list="{{ canvasViews }}" as="cv" hint-placeholder-count="3">
+              <button onClick="{{ cv.pick }}" style="background:{{ cv.bg }};border:1px solid {{ cv.border }};border-radius:15px;padding:5px 11px;font-size:11.5px;font-weight:700;color:{{ cv.fg }};cursor:pointer">{{ cv.label }}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <div style="flex:1;overflow-y:auto;overflow-x:hidden;min-height:0">
+
+          <sc-if value="{{ landing }}" hint-placeholder-val="{{ true }}">
+            <div style="max-width:{{ landingW }};margin:0 auto;padding:{{ landingPad }} 24px 40px">
+
+              <sc-if value="{{ isNewUser }}" hint-placeholder-val="{{ true }}">
+                <div style="text-align:center">
+                  <h1 style="font-size:32px;font-weight:800;letter-spacing:-1px;line-height:1.15;margin:0">What would you like to understand, build or monitor?</h1>
+                  <div style="font-size:15px;color:#5a6376;line-height:1.6;margin-top:12px;max-width:620px;margin-left:auto;margin-right:auto">Ask a question, build a chart, analyse an asset or create a financial workspace. Voyager shows the data it used and asks before it changes anything.</div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ isReturning }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:flex-start;gap:14px">
+                  <span style="width:42px;height:42px;border-radius:50%;flex-shrink:0;background:radial-gradient(circle at 35% 30%,#ffffff 0%,#f2f3f8 55%,#dde1ec 100%);box-shadow:inset -3px -4px 8px rgba(120,130,160,0.26),inset 3px 3px 6px rgba(255,255,255,0.95);display:flex;align-items:center;justify-content:center">
+                    <svg width="22" height="12" viewBox="0 0 22 11" fill="none"><path d="M3 8.5a3 3 0 0 1 6 0M13 8.5a3 3 0 0 1 6 0" stroke="url(#vwEye)" stroke-width="2.7" stroke-linecap="round"></path></svg>
+                  </span>
+                  <div style="min-width:0">
+                    <h1 style="font-size:26px;font-weight:800;letter-spacing:-0.7px;line-height:1.2;margin:0">Good morning, Alex.</h1>
+                    <div style="font-size:14.5px;color:#3a4254;line-height:1.6;margin-top:8px">Technology stocks are falling, two companies in your watchlist report earnings this week, and one monitoring rule is close to its threshold.</div>
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));gap:10px;margin-top:20px">
+                  <sc-for list="{{ personalCards }}" as="pc" hint-placeholder-count="4">
+                    <button onClick="{{ pc.go }}" style="text-align:left;background:#ffffff;border:1px solid #e6eaf2;border-radius:16px;padding:14px 15px;cursor:pointer;display:flex;flex-direction:column;gap:7px" style-hover="border-color:#7c4dff">
+                      <span style="display:flex;align-items:center;gap:7px">
+                        <span style="font-size:9.5px;font-weight:800;letter-spacing:0.4px;background:{{ pc.kBg }};color:{{ pc.kFg }};border-radius:5px;padding:2px 7px">{{ pc.kind }}</span>
+                        <span style="font-size:10.5px;color:#9aa3b5">{{ pc.meta }}</span>
+                      </span>
+                      <span style="font-size:13.5px;font-weight:700;color:#131722;line-height:1.4">{{ pc.title }}</span>
+                      <span style="font-size:11.5px;color:#8a93a6;line-height:1.5">{{ pc.why }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <div style="display:flex;align-items:flex-end;gap:10px;background:#ffffff;border:1px solid #e2e6ee;border-radius:20px;padding:12px 12px 12px 20px;margin-top:26px;box-shadow:0 8px 26px rgba(19,23,34,0.07)">
+                <textarea ref="{{ inputRef }}" onKeyDown="{{ inputKey }}" placeholder="Ask about a market, symbol, chart or your portfolio…" rows="1" style="flex:1;border:none;outline:none;resize:none;overflow:hidden;background:transparent;font-size:15px;line-height:1.5;min-height:28px;color:#131722;padding:4px 0"></textarea>
+                <button onClick="{{ voiceGo }}" title="Voice input" aria-label="Voice input" style="width:38px;height:38px;border-radius:50%;background:transparent;border:none;color:#8a93a6;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" style-hover="background:#f0f3f8;color:#131722">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 4a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V7a3 3 0 0 1 3-3M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+                </button>
+                <button onClick="{{ fileGo }}" title="Attach a file" aria-label="Attach a file" style="width:38px;height:38px;border-radius:50%;background:transparent;border:none;color:#8a93a6;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" style-hover="background:#f0f3f8;color:#131722">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M21 12.5 12.5 21a4.5 4.5 0 0 1-6.4-6.4l8-8a3 3 0 0 1 4.3 4.3l-8 8a1.5 1.5 0 0 1-2.2-2.2l7-7"></path></svg>
+                </button>
+                <button onClick="{{ sendGo }}" aria-label="Ask Voyager" style="width:38px;height:38px;border-radius:50%;background:#7c4dff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" style-hover="background:#6a3de8">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"></path></svg>
+                </button>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:1px;margin-top:16px">
+                <sc-for list="{{ starters }}" as="st2" hint-placeholder-count="5">
+                  <button onClick="{{ st2.go }}" style="display:flex;align-items:center;gap:11px;text-align:left;background:transparent;border:none;border-radius:12px;padding:11px 12px;cursor:pointer" style-hover="background:#f2f4f9">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa3b5" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="{{ st2.icon }}"></path></svg>
+                    <span style="font-size:13.5px;font-weight:600;color:#3a4254;line-height:1.45">{{ st2.q }}</span>
+                    <span style="flex:1"></span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c3cad8" stroke-width="2" stroke-linecap="round" style="flex-shrink:0"><path d="M9 6l6 6-6 6"></path></svg>
+                  </button>
+                </sc-for>
+              </div>
+
+              <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:18px;flex-wrap:wrap">
+                <button onClick="{{ toggleMore }}" style="background:transparent;border:none;font-family:inherit;font-size:12.5px;font-weight:700;color:#7c4dff;cursor:pointer;padding:0">{{ moreLabel }}</button>
+                <sc-if value="{{ signupInline }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ signupGo }}" style="display:flex;align-items:center;gap:7px;background:transparent;border:none;font-family:inherit;font-size:12.5px;font-weight:600;color:#8a93a6;cursor:pointer;padding:0" style-hover="color:#131722">
+                    Sign up and get <span style="font-weight:800;color:#131722">3 000</span> free tokens
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f0722a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"></path></svg>
+                  </button>
+                </sc-if>
+              </div>
+
+              <sc-if value="{{ moreOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:22px;margin-top:26px;padding-top:24px;border-top:1px solid #eceff4">
+                <sc-for list="{{ categories }}" as="cat" hint-placeholder-count="5">
+                  <div>
+                    <div style="display:flex;align-items:baseline;gap:10px">
+                      <span style="font-size:15px;font-weight:800;letter-spacing:-0.2px">{{ cat.title }}</span>
+                      <span style="font-size:12px;color:#9aa3b5">{{ cat.sub }}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(252px,1fr));gap:9px;margin-top:11px">
+                      <sc-for list="{{ cat.items }}" as="ci" hint-placeholder-count="3">
+                        <button onClick="{{ ci.go }}" style="display:flex;align-items:flex-start;gap:10px;text-align:left;background:#ffffff;border:1px solid #e6eaf2;border-radius:14px;padding:12px 13px;cursor:pointer" style-hover="border-color:#7c4dff;background:#fdfcff">
+                          <span style="width:24px;height:24px;border-radius:8px;flex-shrink:0;background:{{ ci.iBg }};display:flex;align-items:center;justify-content:center">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ ci.iFg }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ ci.icon }}"></path></svg>
+                          </span>
+                          <span style="min-width:0">
+                            <span style="display:block;font-size:12.5px;font-weight:600;color:#131722;line-height:1.45">{{ ci.q }}</span>
+                            <sc-if value="{{ ci.locked }}" hint-placeholder-val="{{ false }}">
+                              <span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:0.3px;color:#b07708;background:#fdf3e3;border-radius:5px;padding:2px 6px;margin-top:6px">PRO</span>
+                            </sc-if>
+                          </span>
+                        </button>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <div style="max-width:1100px;margin:0 auto;padding:16px 16px 26px;display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ modules }}" as="md" hint-placeholder-count="0">
+              <div style="background:{{ md.bg }};border:1px solid {{ md.border }};border-radius:18px;padding:16px 18px;animation:vwIn .28s ease-out">
+
+                <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                  <span style="font-size:14px;font-weight:800;letter-spacing:-0.2px;color:{{ md.titleFg }}">{{ md.title }}</span>
+                  <sc-if value="{{ md.tag }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:9.5px;font-weight:800;letter-spacing:0.4px;background:{{ md.tagBg }};color:{{ md.tagFg }};border-radius:5px;padding:2px 7px">{{ md.tag }}</span>
+                  </sc-if>
+                  <div style="flex:1"></div>
+                  <sc-for list="{{ md.actions }}" as="ma" hint-placeholder-count="0">
+                    <button onClick="{{ ma.go }}" style="background:{{ ma.bg }};border:1px solid {{ ma.border }};border-radius:15px;padding:5px 11px;font-size:11px;font-weight:700;color:{{ ma.fg }};cursor:pointer" style-hover="border-color:#7c4dff">{{ ma.label }}</button>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ md.sub }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:12px;color:#8a93a6;line-height:1.5;margin-top:5px">{{ md.sub }}</div>
+                </sc-if>
+
+                <sc-if value="{{ md.isText }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-direction:column;gap:9px;margin-top:11px">
+                    <sc-for list="{{ md.paras }}" as="pa" hint-placeholder-count="2">
+                      <div style="font-size:13.5px;line-height:1.68;color:#131722;text-wrap:pretty">{{ pa.text }}</div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isMetrics }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:9px;margin-top:12px">
+                    <sc-for list="{{ md.metrics }}" as="mt" hint-placeholder-count="4">
+                      <div style="background:#ffffff;border:1px solid #eceff4;border-radius:13px;padding:11px 13px">
+                        <div style="font-size:10.5px;font-weight:700;color:#9aa3b5">{{ mt.k }}</div>
+                        <div style="font-size:18px;font-weight:800;letter-spacing:-0.4px;margin-top:4px;font-variant-numeric:tabular-nums">{{ mt.v }}</div>
+                        <div style="display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:{{ mt.fg }};margin-top:3px;font-variant-numeric:tabular-nums">{{ mt.sign }} {{ mt.d }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isChart }}" hint-placeholder-val="{{ false }}">
+                  <sc-if value="{{ md.hasTfs }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;align-items:center;gap:3px;background:#ffffff;border:1px solid #e6eaf2;border-radius:10px;padding:3px;margin-top:12px;width:max-content">
+                      <sc-for list="{{ md.tfs }}" as="tf" hint-placeholder-count="4">
+                        <button onClick="{{ tf.pick }}" style="background:{{ tf.bg }};border:none;border-radius:7px;padding:4px 10px;font-size:11.5px;font-weight:700;color:{{ tf.fg }};cursor:pointer">{{ tf.label }}</button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <div style="position:relative;height:{{ md.chartH }};margin-top:12px">{{ md.svg }}</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:9px">
+                    <sc-for list="{{ md.legend }}" as="lg" hint-placeholder-count="2">
+                      <span style="display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:#5a6376">
+                        <span style="width:11px;height:3px;border-radius:2px;background:{{ lg.color }}"></span>{{ lg.label }}
+                      </span>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isHeat }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:7px;margin-top:12px">
+                    <sc-for list="{{ md.tiles }}" as="hl" hint-placeholder-count="8">
+                      <div style="background:{{ hl.bg }};border:1px solid {{ hl.border }};border-radius:11px;padding:10px 11px">
+                        <div style="font-size:11px;font-weight:700;color:#3a4254;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ hl.name }}</div>
+                        <div style="display:flex;align-items:baseline;gap:5px;margin-top:4px">
+                          <span style="font-size:13.5px;font-weight:800;color:{{ hl.fg }};font-variant-numeric:tabular-nums">{{ hl.v }}</span>
+                          <span style="font-size:11px;font-weight:800;color:{{ hl.fg }}">{{ hl.sign }}</span>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isRows }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-direction:column;gap:1px;margin-top:12px">
+                    <sc-for list="{{ md.rows }}" as="rw" hint-placeholder-count="4">
+                      <button onClick="{{ rw.go }}" style="display:flex;align-items:center;gap:12px;text-align:left;background:{{ rw.bg }};border:none;border-radius:11px;padding:10px 12px;cursor:pointer" style-hover="background:#f0f3f8">
+                        <sc-if value="{{ rw.rank }}" hint-placeholder-val="{{ false }}">
+                          <span style="width:22px;height:22px;border-radius:7px;flex-shrink:0;background:#f2f4f9;color:#5a6376;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center">{{ rw.rank }}</span>
+                        </sc-if>
+                        <span style="min-width:0;flex:1">
+                          <span style="display:block;font-size:13px;font-weight:700;color:#131722">{{ rw.name }}</span>
+                          <span style="display:block;font-size:11.5px;color:#8a93a6;line-height:1.45;margin-top:2px">{{ rw.sub }}</span>
+                        </span>
+                        <span style="text-align:right;flex-shrink:0">
+                          <span style="display:block;font-size:13px;font-weight:800;color:{{ rw.fg }};font-variant-numeric:tabular-nums">{{ rw.v }}</span>
+                          <span style="display:block;font-size:11px;font-weight:700;color:#9aa3b5;margin-top:2px">{{ rw.v2 }}</span>
+                        </span>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isTable }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top:12px;overflow-x:auto">
+                    <div style="display:grid;grid-template-columns:{{ md.grid }};min-width:520px">
+                      <sc-for list="{{ md.cells }}" as="cl" hint-placeholder-count="16">
+                        <div style="padding:9px 12px;border-bottom:1px solid #eceff4;background:{{ cl.bg }};font-size:12.5px;font-weight:{{ cl.w }};color:{{ cl.fg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ cl.v }}</div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isFilters }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:12px">
+                    <sc-for list="{{ md.filters }}" as="fl" hint-placeholder-count="4">
+                      <span style="display:flex;align-items:center;gap:8px;background:#ffffff;border:1px solid {{ fl.border }};border-radius:11px;padding:7px 9px 7px 11px">
+                        <span style="font-size:11.5px;font-weight:700;color:#131722">{{ fl.label }}</span>
+                        <span style="font-size:11.5px;font-weight:800;color:#2962ff;font-variant-numeric:tabular-nums">{{ fl.value }}</span>
+                        <button onClick="{{ fl.edit }}" title="Edit condition" aria-label="Edit condition" style="background:transparent;border:none;color:#9aa3b5;cursor:pointer;padding:0;display:flex" style-hover="color:#7c4dff">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z"></path></svg>
+                        </button>
+                        <button onClick="{{ fl.off }}" title="Remove condition" aria-label="Remove condition" style="background:transparent;border:none;color:#9aa3b5;cursor:pointer;padding:0;display:flex" style-hover="color:#e0492f">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+                        </button>
+                      </span>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px;margin-top:11px;flex-wrap:wrap">
+                    <span style="font-size:11.5px;color:#8a93a6">{{ md.filterNote }}</span>
+                    <button onClick="{{ md.fixInterp }}" style="background:transparent;border:none;font-size:11.5px;font-weight:800;color:#7c4dff;cursor:pointer;padding:0">This is not what I meant</button>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isCode }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap">
+                    <span style="font-size:9.5px;font-weight:800;letter-spacing:0.4px;background:{{ md.stBg }};color:{{ md.stFg }};border-radius:5px;padding:2px 8px">{{ md.status }}</span>
+                    <span style="font-size:11.5px;color:#8a93a6">{{ md.codeMeta }}</span>
+                  </div>
+                  <div style="background:#ffffff;border:1px solid #eceff4;border-radius:13px;padding:11px 0;margin-top:10px;overflow-x:auto">
+                    <sc-for list="{{ md.lines }}" as="cd" hint-placeholder-count="8">
+                      <div style="display:flex;gap:12px;padding:0 14px;background:{{ cd.bg }};font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;line-height:1.75;white-space:pre">
+                        <span style="width:18px;flex-shrink:0;text-align:right;color:#8a93a6">{{ cd.n }}</span>
+                        <span style="color:{{ cd.fg }}">{{ cd.t }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <sc-for list="{{ md.diags }}" as="dg" hint-placeholder-count="1">
+                    <div style="background:{{ dg.bg }};border:1px solid {{ dg.border }};border-radius:12px;padding:11px 13px;margin-top:10px">
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <span style="font-size:9.5px;font-weight:800;letter-spacing:0.4px;color:{{ dg.fg }}">{{ dg.kind }}</span>
+                        <span style="font-size:11px;font-weight:700;color:#8a93a6">{{ dg.where }}</span>
+                      </div>
+                      <div style="font-size:12.5px;color:#3a4254;line-height:1.55;margin-top:5px">{{ dg.msg }}</div>
+                      <sc-if value="{{ dg.cta }}" hint-placeholder-val="{{ false }}">
+                        <button onClick="{{ dg.go }}" style="background:#7c4dff;border:none;border-radius:10px;padding:8px 15px;margin-top:10px;font-size:12px;font-weight:700;color:#ffffff;cursor:pointer" style-hover="background:#6a3de8">{{ dg.cta }}</button>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                  <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:12px">
+                    <sc-for list="{{ md.params }}" as="pm" hint-placeholder-count="3">
+                      <div>
+                        <div style="font-size:10.5px;font-weight:700;color:#9aa3b5">{{ pm.k }}</div>
+                        <div style="display:flex;align-items:center;gap:7px;margin-top:5px">
+                          <button onClick="{{ pm.dec }}" aria-label="Decrease" style="width:26px;height:26px;border-radius:8px;background:#ffffff;border:1px solid #e2e6ee;font-size:14px;font-weight:700;color:#5a6376;cursor:pointer">−</button>
+                          <span style="font-size:13px;font-weight:800;min-width:34px;text-align:center;font-variant-numeric:tabular-nums">{{ pm.v }}</span>
+                          <button onClick="{{ pm.inc }}" aria-label="Increase" style="width:26px;height:26px;border-radius:8px;background:#ffffff;border:1px solid #e2e6ee;font-size:14px;font-weight:700;color:#5a6376;cursor:pointer">+</button>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:13px">
+                    <sc-for list="{{ md.versions }}" as="vs" hint-placeholder-count="2">
+                      <button onClick="{{ vs.go }}" style="background:{{ vs.bg }};border:1px solid #e6eaf2;border-radius:14px;padding:6px 11px;font-size:11px;font-weight:700;color:#5a6376;cursor:pointer" style-hover="border-color:#7c4dff">{{ vs.label }}</button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isConsent }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+                    <sc-for list="{{ md.scopes }}" as="sp" hint-placeholder-count="4">
+                      <button onClick="{{ sp.toggle }}" style="display:flex;align-items:flex-start;gap:11px;text-align:left;background:#ffffff;border:1px solid {{ sp.border }};border-radius:12px;padding:11px 12px;cursor:pointer" style-hover="border-color:#7c4dff">
+                        <span style="width:18px;height:18px;border-radius:6px;flex-shrink:0;margin-top:1px;background:{{ sp.boxBg }};border:1.5px solid {{ sp.boxBorder }};display:flex;align-items:center;justify-content:center">
+                          <sc-if value="{{ sp.on }}" hint-placeholder-val="{{ false }}">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                          </sc-if>
+                        </span>
+                        <span style="min-width:0">
+                          <span style="display:block;font-size:12.5px;font-weight:700;color:#131722">{{ sp.label }}</span>
+                          <span style="display:block;font-size:11.5px;color:#8a93a6;line-height:1.5;margin-top:3px">{{ sp.why }}</span>
+                        </span>
+                      </button>
+                    </sc-for>
+                  </div>
+                  <div style="background:#ffffff;border:1px solid #eceff4;border-radius:12px;padding:11px 13px;margin-top:11px">
+                    <div style="display:flex;flex-direction:column;gap:6px">
+                      <sc-for list="{{ md.privacyRows }}" as="pv" hint-placeholder-count="3">
+                        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:11.5px">
+                          <span style="color:#8a93a6">{{ pv.k }}</span>
+                          <span style="font-weight:700;color:#131722;text-align:right">{{ pv.v }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:13px">
+                    <button onClick="{{ md.grant }}" style="background:#7c4dff;border:none;border-radius:20px;padding:10px 19px;font-size:13px;font-weight:700;color:#ffffff;cursor:pointer" style-hover="background:#6a3de8">Allow for this analysis</button>
+                    <button onClick="{{ md.deny }}" style="background:#ffffff;border:1px solid #e2e6ee;border-radius:20px;padding:10px 17px;font-size:13px;font-weight:700;color:#131722;cursor:pointer" style-hover="border-color:#7c4dff">Continue without my data</button>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isMonitor }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:9px;margin-top:12px">
+                    <sc-for list="{{ md.ruleRows }}" as="rr" hint-placeholder-count="4">
+                      <div style="background:#ffffff;border:1px solid #eceff4;border-radius:12px;padding:11px 12px">
+                        <div style="font-size:10.5px;font-weight:700;color:#9aa3b5">{{ rr.k }}</div>
+                        <div style="font-size:13px;font-weight:700;margin-top:4px">{{ rr.v }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="position:relative;height:120px;margin-top:12px">{{ md.svg }}</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+                    <button onClick="{{ md.enable }}" style="background:{{ md.enableBg }};border:none;border-radius:20px;padding:10px 19px;font-size:13px;font-weight:700;color:#ffffff;cursor:pointer">{{ md.enableLabel }}</button>
+                    <button onClick="{{ md.editRule }}" style="background:#ffffff;border:1px solid #e2e6ee;border-radius:20px;padding:10px 17px;font-size:13px;font-weight:700;color:#131722;cursor:pointer" style-hover="border-color:#7c4dff">Edit condition</button>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isSteps }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+                    <sc-for list="{{ md.qs }}" as="qq" hint-placeholder-count="3">
+                      <div style="background:#ffffff;border:1px solid {{ qq.border }};border-radius:14px;padding:12px 13px">
+                        <div style="display:flex;align-items:center;gap:9px">
+                          <span style="width:19px;height:19px;border-radius:50%;flex-shrink:0;background:{{ qq.nBg }};color:{{ qq.nFg }};font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center">{{ qq.n }}</span>
+                          <span style="font-size:13px;font-weight:700">{{ qq.q }}</span>
+                        </div>
+                        <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px">
+                          <sc-for list="{{ qq.opts }}" as="op" hint-placeholder-count="3">
+                            <button onClick="{{ op.pick }}" style="background:{{ op.bg }};border:1px solid {{ op.border }};border-radius:16px;padding:7px 13px;font-size:12px;font-weight:700;color:{{ op.fg }};cursor:pointer" style-hover="border-color:#7c4dff">{{ op.label }}</button>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isNext }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px;margin-top:12px">
+                    <sc-for list="{{ md.nexts }}" as="nn" hint-placeholder-count="3">
+                      <button onClick="{{ nn.go }}" style="display:flex;flex-direction:column;gap:5px;text-align:left;background:#ffffff;border:1px solid #e6eaf2;border-radius:13px;padding:12px 13px;cursor:pointer" style-hover="border-color:#7c4dff;background:#fdfcff">
+                        <span style="font-size:12.5px;font-weight:700;color:#131722;line-height:1.4">{{ nn.label }}</span>
+                        <span style="font-size:11px;color:#8a93a6;line-height:1.45">{{ nn.why }}</span>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.isError }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-direction:column;gap:9px;margin-top:12px">
+                    <sc-for list="{{ md.paras }}" as="ep" hint-placeholder-count="1">
+                      <div style="font-size:13px;line-height:1.6;color:#3a4254">{{ ep.text }}</div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+                    <sc-for list="{{ md.fixes }}" as="fx" hint-placeholder-count="2">
+                      <button onClick="{{ fx.go }}" style="background:{{ fx.bg }};border:1px solid {{ fx.border }};border-radius:18px;padding:9px 16px;font-size:12.5px;font-weight:700;color:{{ fx.fg }};cursor:pointer" style-hover="border-color:#7c4dff">{{ fx.label }}</button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.hasLabels }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;padding-top:11px;border-top:1px solid #eceff4">
+                    <sc-for list="{{ md.labels }}" as="lb" hint-placeholder-count="2">
+                      <span style="display:flex;align-items:center;gap:6px;background:{{ lb.bg }};border-radius:7px;padding:3px 8px;font-size:10.5px;font-weight:700;color:{{ lb.fg }}">
+                        <span style="width:5px;height:5px;border-radius:50%;background:{{ lb.fg }}"></span>{{ lb.label }}
+                      </span>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ md.note }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:11.5px;color:#8a93a6;line-height:1.55;margin-top:11px">{{ md.note }}</div>
+                </sc-if>
+              </div>
+            </sc-for>
+
+            <sc-if value="{{ working }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#ffffff;border:1px solid #eceff4;border-radius:18px;padding:16px 18px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <span style="width:14px;height:14px;border-radius:50%;border:2px solid #e6dcfb;border-top-color:#7c4dff;animation:vwSpin .8s linear infinite;flex-shrink:0"></span>
+                  <span style="font-size:13px;font-weight:700">{{ workingText }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+                  <sc-for list="{{ workRows }}" as="wr" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:9px">
+                      <span style="width:13px;height:13px;border-radius:50%;flex-shrink:0;background:{{ wr.dotBg }};border:1.5px solid {{ wr.dotBorder }}"></span>
+                      <span style="font-size:12px;color:{{ wr.fg }}">{{ wr.text }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="height:5px;border-radius:3px;background:#f2f4f9;margin-top:13px;overflow:hidden"><div style="height:5px;width:{{ workPct }};background:#7c4dff;transition:width .3s"></div></div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ zoneCScrim }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ toggleC }}" style="position:absolute;inset:0;z-index:6;background:rgba(19,23,34,0.16)"></div>
+    </sc-if>
+
+    <sc-if value="{{ zoneC }}" hint-placeholder-val="{{ true }}">
+      <div style="{{ zoneCStyle }}">
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;padding:11px 14px;border-bottom:1px solid #eceff4">
+          <span style="font-size:10.5px;font-weight:800;letter-spacing:0.9px;color:#9aa3b5">WORKSPACE INSPECTOR</span>
+          <div style="flex:1"></div>
+          <sc-if value="{{ notMobile }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ toggleC }}" title="Collapse inspector" aria-label="Collapse inspector" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:8px;color:#8a93a6;cursor:pointer" style-hover="background:#f0f3f8;color:#131722">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+            </button>
+          </sc-if>
+        </div>
+        <div style="flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;padding:14px;display:flex;flex-direction:column;gap:18px">
+
+          <div>
+            <div style="font-size:10.5px;font-weight:800;letter-spacing:0.9px;color:#9aa3b5">CONTEXT IN USE</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:9px">
+              <sc-for list="{{ ctxRows }}" as="cr" hint-placeholder-count="5">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                  <span style="font-size:11.5px;color:#8a93a6;flex-shrink:0">{{ cr.k }}</span>
+                  <span style="display:flex;align-items:center;gap:6px;min-width:0">
+                    <span style="font-size:11.5px;font-weight:700;color:{{ cr.fg }};text-align:right">{{ cr.v }}</span>
+                    <sc-if value="{{ cr.editable }}" hint-placeholder-val="{{ false }}">
+                      <button onClick="{{ cr.edit }}" title="Change" aria-label="Change {{ cr.k }}" style="background:transparent;border:none;color:#9aa3b5;cursor:pointer;padding:0;display:flex;flex-shrink:0" style-hover="color:#7c4dff">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z"></path></svg>
+                      </button>
+                    </sc-if>
+                  </span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:10.5px;font-weight:800;letter-spacing:0.9px;color:#9aa3b5">WEALTH HUB</span>
+              <span style="font-size:9.5px;font-weight:800;letter-spacing:0.3px;background:{{ whBg }};color:{{ whFg }};border-radius:5px;padding:2px 7px">{{ whStatus }}</span>
+            </div>
+            <div style="font-size:11.5px;color:#8a93a6;line-height:1.55;margin-top:8px">{{ whText }}</div>
+            <button onClick="{{ whToggle }}" style="width:100%;background:#ffffff;border:1px solid #e2e6ee;border-radius:11px;padding:8px 0;margin-top:9px;font-size:11.5px;font-weight:700;color:{{ whCtaFg }};cursor:pointer" style-hover="border-color:#7c4dff">{{ whCta }}</button>
+          </div>
+
+          <div>
+            <div style="font-size:10.5px;font-weight:800;letter-spacing:0.9px;color:#9aa3b5">SOURCES &amp; TIMESTAMPS</div>
+            <sc-if value="{{ noSources }}" hint-placeholder-val="{{ true }}">
+              <div style="font-size:11.5px;color:#8a93a6;line-height:1.55;margin-top:9px">Every number Voyager shows will be listed here with its provider and the moment it was read.</div>
+            </sc-if>
+            <div style="display:flex;flex-direction:column;gap:7px;margin-top:9px">
+              <sc-for list="{{ sources }}" as="sr" hint-placeholder-count="0">
+                <div style="background:#ffffff;border:1px solid #eceff4;border-radius:12px;padding:10px 12px">
+                  <div style="display:flex;align-items:center;gap:7px">
+                    <span style="font-size:9.5px;font-weight:800;letter-spacing:0.3px;background:{{ sr.kBg }};color:{{ sr.kFg }};border-radius:5px;padding:2px 6px">{{ sr.kind }}</span>
+                    <span style="font-size:10.5px;color:#9aa3b5">{{ sr.when }}</span>
+                  </div>
+                  <div style="font-size:12px;font-weight:600;color:#131722;line-height:1.45;margin-top:6px">{{ sr.name }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <sc-if value="{{ hasAssumptions }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="font-size:10.5px;font-weight:800;letter-spacing:0.9px;color:#9aa3b5">ASSUMPTIONS</div>
+              <div style="display:flex;flex-direction:column;gap:7px;margin-top:9px">
+                <sc-for list="{{ assumptions }}" as="asm" hint-placeholder-count="2">
+                  <button onClick="{{ asm.edit }}" style="display:flex;align-items:flex-start;gap:8px;text-align:left;background:#fdf3e3;border:1px solid #f0dcb0;border-radius:11px;padding:9px 11px;cursor:pointer" style-hover="border-color:#b07708">
+                    <span style="font-size:11.5px;color:#7a5308;line-height:1.5">{{ asm.text }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ hasRules }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="font-size:10.5px;font-weight:800;letter-spacing:0.9px;color:#9aa3b5">MONITORING RULES</div>
+              <div style="display:flex;flex-direction:column;gap:7px;margin-top:9px">
+                <sc-for list="{{ rules }}" as="ru" hint-placeholder-count="1">
+                  <div style="background:#ffffff;border:1px solid #eceff4;border-radius:12px;padding:10px 12px">
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ ru.dot }}"></span>
+                      <span style="font-size:12px;font-weight:700">{{ ru.name }}</span>
+                    </div>
+                    <div style="font-size:11px;color:#8a93a6;line-height:1.5;margin-top:5px">{{ ru.cond }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <div>
+            <div style="font-size:10.5px;font-weight:800;letter-spacing:0.9px;color:#9aa3b5">WORKSPACE HISTORY</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:9px">
+              <sc-for list="{{ history }}" as="hi" hint-placeholder-count="2">
+                <div style="display:flex;align-items:baseline;gap:9px">
+                  <span style="font-size:10.5px;font-weight:700;color:#9aa3b5;flex-shrink:0;font-variant-numeric:tabular-nums">{{ hi.t }}</span>
+                  <span style="font-size:11.5px;color:#3a4254;line-height:1.5">{{ hi.text }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="background:#f7f9fc;border:1px solid #eceff4;border-radius:14px;padding:12px 13px">
+            <div style="font-size:11.5px;font-weight:800">Educational analysis, not personalised advice</div>
+            <div style="font-size:11px;color:#8a93a6;line-height:1.6;margin-top:5px">Voyager separates data, its own inference and educational context, and never presents a projection as a promised result.</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ tabSources }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;min-width:0;overflow-y:auto;background:#fbfcfe;padding:14px;display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:15px;font-weight:800">Sources and data</div>
+          <sc-for list="{{ sources }}" as="ms" hint-placeholder-count="2">
+            <div style="background:#ffffff;border:1px solid #eceff4;border-radius:14px;padding:13px 14px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:0.3px;background:{{ ms.kBg }};color:{{ ms.kFg }};border-radius:5px;padding:2px 7px">{{ ms.kind }}</span>
+                <span style="font-size:11px;color:#9aa3b5">{{ ms.when }}</span>
+              </div>
+              <div style="font-size:13px;font-weight:600;line-height:1.5;margin-top:7px">{{ ms.name }}</div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noSources }}" hint-placeholder-val="{{ true }}">
+            <div style="font-size:13px;color:#8a93a6;line-height:1.6">Ask something first — every number Voyager uses will be listed here with its provider and timestamp.</div>
+          </sc-if>
+        </div>
+      </sc-if>
+      <div style="position:absolute;left:0;right:0;bottom:0;display:flex;background:#ffffff;border-top:1px solid #eceff4">
+        <sc-for list="{{ mTabs }}" as="mt" hint-placeholder-count="4">
+          <button onClick="{{ mt.go }}" style="flex:1;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:transparent;border:none;color:{{ mt.fg }};cursor:pointer">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ mt.icon }}"></path></svg>
+            <span style="font-size:10.5px;font-weight:700">{{ mt.label }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ libraryOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ libClose }}" style="position:absolute;inset:0;z-index:20;background:rgba(19,23,34,0.22)"></div>
+      <div style="position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:21;width:min(760px,calc(100% - 28px));max-height:calc(100% - 28px);overflow-y:auto;background:#ffffff;border:1px solid #e6eaf2;border-radius:20px;box-shadow:0 26px 70px rgba(19,23,34,0.2);padding:18px 20px 22px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:18px;font-weight:800;letter-spacing:-0.4px">Workspaces</span>
+          <span style="font-size:11.5px;color:#9aa3b5">{{ libMeta }}</span>
+          <div style="flex:1"></div>
+          <button onClick="{{ libClose }}" aria-label="Close" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:50%;color:#5a6376;cursor:pointer" style-hover="background:#f0f3f8">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;background:#f7f9fc;border:1px solid #e6eaf2;border-radius:14px;padding:9px 13px;margin-top:14px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa3b5" stroke-width="2" stroke-linecap="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14M21 21l-4.35-4.35"></path></svg>
+          <input placeholder="Search workspaces, symbols, scripts…" style="flex:1;border:none;outline:none;background:transparent;font-size:13px;color:#131722">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+          <sc-for list="{{ libFilters }}" as="lf" hint-placeholder-count="4">
+            <button onClick="{{ lf.pick }}" style="background:{{ lf.bg }};border:1px solid {{ lf.border }};border-radius:16px;padding:6px 13px;font-size:12px;font-weight:700;color:{{ lf.fg }};cursor:pointer">{{ lf.label }}</button>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+          <sc-for list="{{ libItems }}" as="li2" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:12px;background:#ffffff;border:1px solid #e6eaf2;border-radius:14px;padding:12px 14px">
+              <button onClick="{{ li2.open }}" style="display:flex;flex-direction:column;gap:4px;text-align:left;background:transparent;border:none;cursor:pointer;flex:1;min-width:0;padding:0">
+                <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="font-size:13.5px;font-weight:700;color:#131722">{{ li2.name }}</span>
+                  <sc-if value="{{ li2.pinned }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:9.5px;font-weight:800;letter-spacing:0.3px;background:#fdf3e3;color:#b07708;border-radius:5px;padding:2px 6px">PINNED</span>
+                  </sc-if>
+                </span>
+                <span style="font-size:11.5px;color:#8a93a6">{{ li2.meta }}</span>
+              </button>
+              <div style="display:flex;gap:5px;flex-shrink:0">
+                <sc-for list="{{ li2.acts }}" as="la" hint-placeholder-count="3">
+                  <button onClick="{{ la.go }}" title="{{ la.label }}" aria-label="{{ la.label }}" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:#ffffff;border:1px solid #e6eaf2;border-radius:9px;color:#5a6376;cursor:pointer" style-hover="border-color:#7c4dff;color:#131722">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ la.icon }}"></path></svg>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ planModal }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ planClose }}" style="position:absolute;inset:0;z-index:20;background:rgba(19,23,34,0.22)"></div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:21;width:min(660px,calc(100% - 28px));max-height:calc(100% - 28px);overflow-y:auto;background:#ffffff;border:1px solid #e6eaf2;border-radius:20px;box-shadow:0 26px 70px rgba(19,23,34,0.2);padding:20px 22px 24px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:18px;font-weight:800;letter-spacing:-0.4px">{{ planTitle }}</span>
+          <div style="flex:1"></div>
+          <button onClick="{{ planClose }}" aria-label="Close" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:50%;color:#5a6376;cursor:pointer" style-hover="background:#f0f3f8">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div style="font-size:13.5px;color:#5a6376;line-height:1.6;margin-top:8px">{{ planWhy }}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:16px">
+          <sc-for list="{{ plans }}" as="pn" hint-placeholder-count="3">
+            <div style="background:{{ pn.bg }};border:1px solid {{ pn.border }};border-radius:16px;padding:15px 16px;display:flex;flex-direction:column;gap:9px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:14px;font-weight:800">{{ pn.name }}</span>
+                <sc-if value="{{ pn.current }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:9.5px;font-weight:800;letter-spacing:0.3px;background:#e8edfd;color:#2962ff;border-radius:5px;padding:2px 6px">CURRENT</span>
+                </sc-if>
+              </div>
+              <div style="font-size:12px;color:#8a93a6">{{ pn.price }}</div>
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <sc-for list="{{ pn.feats }}" as="pf" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:flex-start;gap:7px">
+                    <span style="width:4px;height:4px;border-radius:50%;background:#7c4dff;flex-shrink:0;margin-top:6px"></span>
+                    <span style="font-size:11.5px;color:#3a4254;line-height:1.5">{{ pf.text }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <button onClick="{{ pn.go }}" style="background:{{ pn.ctaBg }};border:1px solid {{ pn.ctaBorder }};border-radius:20px;padding:9px 0;margin-top:2px;font-size:12.5px;font-weight:700;color:{{ pn.ctaFg }};cursor:pointer">{{ pn.cta }}</button>
+            </div>
+          </sc-for>
+        </div>
+        <div style="font-size:11.5px;color:#9aa3b5;line-height:1.6;margin-top:14px">Your first requests are never interrupted — limits only apply to deep research, screeners, Pine Script and Wealth Hub analysis.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ signupOn }}" hint-placeholder-val="{{ true }}">
+      <div style="{{ signupWrap }}">
+        <span style="width:30px;height:30px;border-radius:10px;flex-shrink:0;background:linear-gradient(135deg,#f9b23a,#f0722a);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(240,114,42,0.28)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6z"></path></svg>
+        </span>
+        <div style="min-width:0;flex:1">
+          <div style="font-size:12.5px;font-weight:800;letter-spacing:-0.2px;color:#131722">3 000 free tokens</div>
+          <div style="font-size:11px;color:#8a93a6;line-height:1.4;margin-top:2px">≈ 40 questions · no card required</div>
+        </div>
+        <button onClick="{{ signupGo }}" style="display:flex;align-items:center;gap:7px;flex-shrink:0;background:linear-gradient(100deg,#f9b23a,#f0722a);border:none;border-radius:20px;padding:10px 16px;font-family:inherit;font-size:12.5px;font-weight:800;letter-spacing:-0.1px;color:#ffffff;cursor:pointer;box-shadow:0 6px 16px rgba(240,114,42,0.26)" style-hover="box-shadow:0 8px 20px rgba(240,114,42,0.36)">
+          Sign up free
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"></path></svg>
+        </button>
+        <button onClick="{{ signupHide }}" aria-label="Hide the sign-up offer" title="Hide" style="width:24px;height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:50%;color:#b6bdcc;cursor:pointer" style-hover="background:#f0f3f8;color:#131722">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+        </button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ signupModal }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ signupClose }}" style="position:absolute;inset:0;z-index:24;background:rgba(19,23,34,0.24)"></div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:25;width:min(440px,calc(100% - 28px));background:#ffffff;border:1px solid #e6eaf2;border-radius:20px;box-shadow:0 26px 70px rgba(19,23,34,0.22);padding:22px 24px 24px">
+        <div style="display:flex;align-items:center;gap:11px">
+          <span style="width:38px;height:38px;border-radius:50%;flex-shrink:0;background:radial-gradient(circle at 35% 30%,#ffffff 0%,#f2f3f8 55%,#dde1ec 100%);box-shadow:inset -3px -4px 8px rgba(120,130,160,0.26);display:flex;align-items:center;justify-content:center">
+            <svg width="20" height="11" viewBox="0 0 22 11" fill="none"><path d="M3 8.5a3 3 0 0 1 6 0M13 8.5a3 3 0 0 1 6 0" stroke="url(#vwEye)" stroke-width="2.8" stroke-linecap="round"></path></svg>
+          </span>
+          <div style="min-width:0">
+            <div style="font-size:17px;font-weight:800;letter-spacing:-0.4px">3 000 free tokens</div>
+            <div style="font-size:12px;color:#8a93a6">Added to your account the moment you sign up</div>
+          </div>
+          <div style="flex:1"></div>
+          <button onClick="{{ signupClose }}" aria-label="Close" title="Close" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:50%;color:#5a6376;cursor:pointer" style-hover="background:#f0f3f8">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-top:16px">
+          <sc-for list="{{ signupPerks }}" as="sp2" hint-placeholder-count="4">
+            <div style="display:flex;align-items:flex-start;gap:9px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1aa966" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><path d="M20 6 9 17l-5-5"></path></svg>
+              <span style="font-size:13px;color:#131722;line-height:1.55">{{ sp2.text }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:18px">
+          <button onClick="{{ signupDone }}" style="display:flex;align-items:center;justify-content:center;gap:9px;background:linear-gradient(100deg,#f9b23a,#f0722a);border:none;border-radius:14px;padding:13px 0;font-family:inherit;font-size:14.5px;font-weight:800;color:#ffffff;cursor:pointer;box-shadow:0 8px 22px rgba(240,114,42,0.28)">Create a free account</button>
+          <button onClick="{{ signupClose }}" style="background:#ffffff;border:1px solid #e2e6ee;border-radius:14px;padding:12px 0;font-family:inherit;font-size:13.5px;font-weight:700;color:#131722;cursor:pointer" style-hover="border-color:#7c4dff">I already have an account</button>
+        </div>
+        <div style="font-size:11px;color:#9aa3b5;line-height:1.55;margin-top:12px">Tokens cover Voyager answers, charts and screeners. No card required, and nothing is charged when they run out — deep research simply pauses until you choose a plan.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;bottom:22px;left:50%;transform:translateX(-50%);z-index:22;display:flex;align-items:center;gap:12px;background:#131722;border-radius:14px;padding:12px 17px;box-shadow:0 18px 44px rgba(19,23,34,0.24)">
+        <span style="font-size:12.5px;font-weight:700;color:#ffffff">{{ toast }}</span>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;defaultPersona&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;new&quot;,&quot;returning&quot;],&quot;default&quot;:&quot;new&quot;,&quot;tsType&quot;:&quot;'new' | 'returning'&quot;,&quot;section&quot;:&quot;Landing&quot;},&quot;conversationWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:348,&quot;min&quot;:300,&quot;max&quot;:460,&quot;step&quot;:4,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;inspectorOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot;}}">
+class Component extends DCLogic {
+  state = {
+    device: 'desktop', persona: 'new', zoneA: true, zoneC: true, zoneCNarrow: false,
+    scn: null, stage: 'idle', rev: 0, work: 0, stopped: false,
+    turns: [], mods: [], srcs: [], asmp: [], rules: [], hist: [], ctx: {},
+    wsName: 'New workspace', wsAuto: false, view: 'canvas', tf: '1Y',
+    wh: 'off', scopes: { pf: true, cash: true, prop: false, liab: true },
+    codeState: 'error', codeParams: { len: 14, sens: 3 }, monitorOn: false,
+    beginner: {}, filters: { rev: true, fcf: true, val: true, reg: true },
+    library: false, plan: false, planWhy: '', libFilter: 'All', toast: null,
+    signup: true, signupModal: false, signedUp: false, more: false,
+    mTab: 'canvas', credits: 37, winW: typeof window === 'undefined' ? 1440 : window.innerWidth
+  };
+  inputRef = React.createRef();
+
+  componentDidMount() {
+    this._rs = () => { if (window.innerWidth !== this.state.winW) this.setState({ winW: window.innerWidth }); };
+    window.addEventListener('resize', this._rs);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this._rs); this._clear(); }
+  _clear() { (this._timers || []).forEach(clearTimeout); this._timers = []; }
+  toast(text) { clearTimeout(this._tt); this.setState({ toast: text }); this._tt = setTimeout(() => this.setState({ toast: null }), 3000); }
+
+  rnd(seed) { let x = seed; return () => { x = (x * 1103515245 + 12345) & 0x7fffffff; return x / 0x7fffffff; }; }
+  series(seed, n, drift, vol, start) { const r = this.rnd(seed); let p = start || 100; const a = []; for (let i = 0; i < n; i++) { p = Math.max(1, p * (1 + drift + (r() - 0.5) * vol)); a.push(p); } return a; }
+  candles(seed, n) {
+    if (this._cds && this._cds[seed]) return this._cds[seed];
+    const r = this.rnd(seed), out = []; let p = 320;
+    for (let i = 0; i < n; i++) {
+      const ph = i < 22 ? 1.1 : i < 40 ? -0.9 : i < 62 ? 0.8 : -0.4;
+      const o = p, c = Math.max(40, o + ph + (r() - 0.5) * 7);
+      out.push({ i, o, c, h: Math.max(o, c) + r() * 4, l: Math.min(o, c) - r() * 4 });
+      p = c;
+    }
+    const rsi = []; let g = 0, l2 = 0;
+    out.forEach((b, i) => { const ch = i ? b.c - out[i - 1].c : 0; g = (g * 13 + Math.max(0, ch)) / 14; l2 = (l2 * 13 + Math.max(0, -ch)) / 14; rsi.push(l2 === 0 ? 70 : 100 - 100 / (1 + g / l2)); });
+    out.forEach((b, i) => { b.rsi = Math.max(8, Math.min(92, rsi[i])); });
+    this._cds = this._cds || {}; this._cds[seed] = out; return out;
+  }
+
+  svg(kind, h2) {
+    const h = React.createElement, W = 1000, H = h2 || 220;
+    const wrap = (kids) => h('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', style: { position: 'absolute', inset: 0, width: '100%', height: '100%' } }, kids);
+    const grid = (n) => Array.from({ length: n }, (_, i) => h('line', { key: 'g' + i, x1: 0, x2: W, y1: (H / n) * (i + 1) - 0.5, y2: (H / n) * (i + 1) - 0.5, stroke: '#f2f4f9', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' }));
+    const line = (arr, col, lo, hi, dash, w2) => h('polyline', { key: col + (dash || ''), points: arr.map((v, i) => (i / (arr.length - 1) * W).toFixed(1) + ',' + (H - 8 - ((v - lo) / (hi - lo)) * (H - 20)).toFixed(1)).join(' '), fill: 'none', stroke: col, strokeWidth: w2 || 2.2, strokeDasharray: dash || 'none', vectorEffect: 'non-scaling-stroke' });
+
+    if (kind === 'index') {
+      const a = this.series(4211, 70, 0.0012, 0.011), b = this.series(7717, 70, -0.0006, 0.014), c = this.series(9931, 70, 0.0004, 0.009);
+      const all = a.concat(b, c), lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+      return wrap([].concat(grid(4), [line(a, '#2962ff', lo, hi), line(b, '#e0492f', lo, hi), line(c, '#1aa966', lo, hi)]));
+    }
+    if (kind === 'norm3') {
+      const a = this.series(1301, 80, 0.0068, 0.019), b = this.series(2402, 80, 0.0031, 0.021), c = this.series(3503, 80, 0.0044, 0.014);
+      const all = a.concat(b, c), lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+      return wrap([].concat(grid(4), [line(a, '#1aa966', lo, hi), line(b, '#e0492f', lo, hi), line(c, '#2962ff', lo, hi)]));
+    }
+    if (kind === 'gold') {
+      const a = this.series(771, 66, 0.0062, 0.013);
+      const lo = Math.min.apply(null, a), hi = Math.max.apply(null, a);
+      return wrap([].concat(grid(4), [line(a, '#f4a71f', lo, hi)]));
+    }
+    if (kind === 'scatter') {
+      const r = this.rnd(6161), pts = [];
+      for (let i = 0; i < 34; i++) { const x = 0.08 + r() * 0.86, y = 0.12 + r() * 0.76; pts.push([x, y, i < 6]); }
+      return wrap([].concat(grid(4),
+        pts.map((p, i) => h('circle', { key: 'p' + i, cx: p[0] * W, cy: (1 - p[1]) * (H - 16) + 8, r: p[2] ? 8 : 5.5, fill: p[2] ? '#7c4dff' : '#c9d4f5', stroke: p[2] ? '#ffffff' : 'none', strokeWidth: 2 }))));
+    }
+    if (kind === 'alloc') {
+      const segs = [['#2962ff', 0.42], ['#7c4dff', 0.18], ['#1aa966', 0.16], ['#f4a71f', 0.13], ['#8a93a6', 0.11]];
+      let x = 0; const kids = [];
+      segs.forEach((sg, i) => { const w2 = sg[1] * W; kids.push(h('rect', { key: 'a' + i, x: x + 1, y: H * 0.3, width: Math.max(2, w2 - 2), height: H * 0.4, rx: 6, fill: sg[0] })); x += w2; });
+      return wrap(kids);
+    }
+    if (kind === 'scen') {
+      const base = this.series(818, 60, 0.004, 0.006), bad = base.map((v, i) => v * (1 - i * 0.0028)), good = base.map((v, i) => v * (1 + i * 0.0022));
+      const all = base.concat(bad, good), lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+      return wrap([].concat(grid(4), [line(base, '#2962ff', lo, hi), line(good, '#1aa966', lo, hi, '5 4', 1.8), line(bad, '#e0492f', lo, hi, '5 4', 1.8)]));
+    }
+    if (kind === 'monitor') {
+      const a = this.series(5150, 60, -0.0018, 0.012, 34);
+      const lo = 22, hi = 40;
+      return wrap([].concat(grid(3), [
+        h('line', { key: 'th', x1: 0, x2: W, y1: H - 8 - ((27 - lo) / (hi - lo)) * (H - 20), y2: H - 8 - ((27 - lo) / (hi - lo)) * (H - 20), stroke: '#e0492f', strokeWidth: 1.8, strokeDasharray: '6 5', vectorEffect: 'non-scaling-stroke' }),
+        line(a, '#2962ff', lo, hi)]));
+    }
+    const b = this.candles(kind === 'rsi' ? 3131 : 2727, 78);
+    const hi = Math.max.apply(null, b.map(x => x.h)), lo = Math.min.apply(null, b.map(x => x.l));
+    const pad = (hi - lo) * 0.09, top = hi + pad, bot = lo - pad, step = W / b.length;
+    const priceH = kind === 'rsi' ? H * 0.7 : H;
+    const X = (i) => (i + 0.5) * step, Y = (p) => priceH - ((p - bot) / (top - bot)) * priceH;
+    const kids = grid(4);
+    if (kind === 'rsi') {
+      [[0.62, '#1aa966', 'support 318'], [0.28, '#e0492f', 'resistance 402']].forEach((lv, n) => {
+        const y = priceH - lv[0] * priceH;
+        kids.push(h('rect', { key: 'z' + n, x: 0, y: y - 7, width: W, height: 14, fill: lv[1], opacity: 0.09 }));
+        kids.push(h('line', { key: 'zl' + n, x1: 0, x2: W, y1: y, y2: y, stroke: lv[1], strokeWidth: 1.4, strokeDasharray: '7 5', vectorEffect: 'non-scaling-stroke' }));
+      });
+    }
+    b.forEach(bar => {
+      const up = bar.c >= bar.o, col = up ? '#1aa966' : '#e0492f', bw = step * 0.56;
+      kids.push(h('line', { key: 'w' + bar.i, x1: X(bar.i), x2: X(bar.i), y1: Y(bar.h), y2: Y(bar.l), stroke: col, strokeWidth: 1, vectorEffect: 'non-scaling-stroke' }));
+      kids.push(h('rect', { key: 'c' + bar.i, x: X(bar.i) - bw / 2, y: Math.min(Y(bar.o), Y(bar.c)), width: bw, height: Math.max(1.3, Math.abs(Y(bar.c) - Y(bar.o))), fill: col }));
+    });
+    if (kind === 'rsi') {
+      const rTop = H * 0.76, rH = H * 0.24;
+      kids.push(h('line', { key: 'sep', x1: 0, x2: W, y1: rTop - 6, y2: rTop - 6, stroke: '#eceff4', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' }));
+      [30, 70].forEach((lv, i) => kids.push(h('line', { key: 'r' + i, x1: 0, x2: W, y1: rTop + rH - (lv / 100) * rH, y2: rTop + rH - (lv / 100) * rH, stroke: '#dde2ec', strokeWidth: 1, strokeDasharray: '4 4', vectorEffect: 'non-scaling-stroke' })));
+      kids.push(h('polyline', { key: 'rsi', points: b.map(x => X(x.i) + ',' + (rTop + rH - (x.rsi / 100) * rH)).join(' '), fill: 'none', stroke: '#7c4dff', strokeWidth: 1.8, vectorEffect: 'non-scaling-stroke' }));
+    }
+    return wrap(kids);
+  }
+
+  L(kind) {
+    const m = { data: ['#e8edfd', '#2962ff', 'Market data'], user: ['#f6f2fe', '#7c4dff', 'Your data'],
+      inf: ['#fdf3e3', '#b07708', 'Voyager inference'], edu: ['#e3f6ec', '#1aa966', 'Educational'] };
+    return m[kind];
+  }
+
+  scenarios() {
+    return {
+      market: { name: 'US Market · 3 August', mode: 'EXPLORE', modeName: 'Analysing market',
+        q: 'What is happening in the US market today?',
+        plan: ['Read index and sector performance.', 'Find the biggest movers and why.', 'Check today\'s news and events.', 'Summarise the risks.'],
+        work: ['Loading market data', 'Reading 11 sector groups', 'Scanning 240 headlines', 'Checking the economic calendar'],
+        ctx: { Market: 'United States', Session: 'Regular hours · 14:32 UTC', Breadth: '38% advancing', Asset: 'Equities · indices' },
+        srcs: [['MARKET DATA', 'Consolidated tape · delayed 15 min', '14:32 UTC'], ['NEWS', '240 headlines from 18 publishers', 'today'], ['CALENDAR', 'Economic release schedule', 'this week']],
+        summary: 'Indices are lower, led by technology. Breadth is weak but not panicked — 38% of listed names are advancing, and defensive sectors are up.',
+        mods: [
+          { k: 'text', title: 'What is happening', labels: ['data', 'inf'],
+            paras: ['US equities are lower for the second session. The move is concentrated: technology and semiconductors carry almost all of the index decline, while utilities and healthcare are positive.',
+              'The trigger was this morning\'s producer-price release, which came in above expectations and pushed the market\'s expected rate-cut date further out. That hits long-duration, high-multiple stocks first.'] },
+          { k: 'metrics', title: 'Indices', metrics: [['S&P 500', '6 388.20', '−0.61%', 0], ['Nasdaq 100', '23 104.60', '−1.24%', 0], ['Dow Jones', '44 902.10', '−0.18%', 0], ['Russell 2000', '2 284.40', '+0.22%', 1], ['VIX', '17.80', '+8.10%', 0], ['10Y yield', '4.28%', '+6 bp', 0]] },
+          { k: 'chart', title: 'Index performance today', sub: 'Intraday, rebased to the open', chart: 'index', chartH: '210px',
+            legend: [['#2962ff', 'S&P 500'], ['#e0492f', 'Nasdaq 100'], ['#1aa966', 'Dow Jones']], actions: [['Open in Supercharts', 'chart'], ['Save', 'save']] },
+          { k: 'heat', title: 'Sector heatmap', sub: 'Sign and label carry the direction — not colour alone',
+            tiles: [['Technology', '−1.9%', 0], ['Semis', '−2.4%', 0], ['Comm. services', '−0.9%', 0], ['Consumer disc.', '−0.6%', 0], ['Financials', '−0.1%', 0], ['Industrials', '+0.1%', 1], ['Materials', '+0.3%', 1], ['Energy', '+0.5%', 1], ['Healthcare', '+0.6%', 1], ['Utilities', '+0.9%', 1], ['Staples', '+0.4%', 1]] },
+          { k: 'rows', title: 'Biggest movers', sub: 'Ranked by contribution to the index move',
+            rows: [['NVIDIA', 'Semiconductors · guidance concerns from a supplier', '−4.1%', '−38 index pts', 0],
+              ['Broadcom', 'Semiconductors · sector move', '−3.2%', '−14 index pts', 0],
+              ['Apple', 'Hardware · no company news', '−1.1%', '−9 index pts', 0],
+              ['UnitedHealth', 'Healthcare · defensive rotation', '+2.2%', '+6 index pts', 1],
+              ['NextEra', 'Utilities · yield-sensitive buying', '+2.8%', '+3 index pts', 1]] },
+          { k: 'news', title: 'Today\'s news that moved prices',
+            rows: [['14:05 UTC', 'Reuters', 'Producer prices rise 0.4% month-on-month, above the 0.2% consensus', 'HIGH IMPACT'],
+              ['12:40 UTC', 'Company filing', 'Semiconductor supplier cuts full-year guidance on data-centre orders', 'HIGH IMPACT'],
+              ['09:15 UTC', 'Bloomberg', 'Two Fed speakers repeat that policy will stay restrictive until inflation is durably lower', 'MEDIUM'],
+              ['08:00 UTC', 'Exchange notice', 'Index rebalance effective at the close on Friday', 'LOW']] },
+          { k: 'text', title: 'Risks to watch', labels: ['inf', 'edu'],
+            paras: ['Two things would change this picture: Thursday\'s CPI release, and whether semiconductor guidance cuts spread beyond one supplier. Until then this looks like a rate-expectation move, not a growth scare — but that distinction is an interpretation, not a fact.'] },
+          { k: 'next', title: 'Where to go next',
+            nexts: [['Why are technology stocks falling?', 'Drill into the sector that caused most of the move'],
+              ['Compare NVIDIA, AMD and Broadcom', 'See whether this is company-specific or sector-wide'],
+              ['Which events could affect markets this week?', 'Calendar and expected impact']] }
+        ] },
+
+      compare: { name: 'AI Infrastructure Research', mode: 'ANALYZE', modeName: 'Comparing symbols',
+        q: 'Compare NVIDIA, AMD and Broadcom as long-term investments',
+        plan: ['Align three price series from the same date.', 'Compare the businesses and their revenue mix.', 'Compare valuation and profitability.', 'List catalysts and risks for each.'],
+        work: ['Loading 3 price series', 'Reading last 8 quarterly reports', 'Computing valuation multiples', 'Collecting recent catalysts'],
+        ctx: { Symbols: 'NVDA · AMD · AVGO', Timeframe: '1Y · daily', Basis: 'Total return, rebased', Horizon: 'Long term (3–5 years)' },
+        srcs: [['MARKET DATA', 'End-of-day prices, 1 Aug close', 'yesterday'], ['FILINGS', 'Latest annual and quarterly reports', 'last 90 days'], ['ESTIMATES', 'Consensus revenue growth, 12 analysts', 'this week']],
+        asmp: ['Valuation uses forward earnings, which depend on estimates that can change.', 'Currency effects are ignored — all three report in USD.'],
+        summary: 'All three benefit from the same demand, but they are different businesses: NVIDIA sells the accelerator platform, AMD competes across CPU and GPU, Broadcom is the most diversified and the most dividend-oriented.',
+        mods: [
+          { k: 'chart', title: 'Rebased performance', sub: '1 year · rebased to 100 at the start', chart: 'norm3', chartH: '230px', tfs: true,
+            legend: [['#1aa966', 'NVDA'], ['#e0492f', 'AMD'], ['#2962ff', 'AVGO']], actions: [['Add a company', 'addco'], ['Remove AMD', 'rmco'], ['Open in Supercharts', 'chart']] },
+          { k: 'table', title: 'Business and financials', grid: '1.5fr 1fr 1fr 1fr',
+            cols: ['', 'NVDA', 'AMD', 'AVGO'],
+            rows: [['Revenue (LTM)', '$148.5B', '$31.2B', '$57.8B'], ['Revenue growth', '+64%', '+21%', '+38%'],
+              ['Gross margin', '74.6%', '52.1%', '68.9%'], ['Operating margin', '61.2%', '11.4%', '43.7%'],
+              ['Free cash flow', '$71.4B', '$3.1B', '$22.6B'], ['Dividend yield', '0.03%', 'none', '1.42%'],
+              ['Forward P/E', '38.4', '31.2', '29.8'], ['Net cash / (debt)', '+$34B', '+$4B', '−$58B']] },
+          { k: 'rows', title: 'What each business actually is', sub: 'Voyager summary of the segment disclosures',
+            rows: [['NVIDIA', 'Data-centre accelerators plus the software stack around them. Highly concentrated demand from a few hyperscale buyers.', '88% data centre', 'platform', 1],
+              ['AMD', 'CPUs and GPUs across data centre, client and embedded. Competes on price-performance rather than platform lock-in.', '52% data centre', 'challenger', 0],
+              ['Broadcom', 'Custom silicon and networking plus a large infrastructure-software business acquired over the last decade.', '41% software', 'diversified', 1]] },
+          { k: 'text', title: 'Catalysts and risks', labels: ['inf', 'data'],
+            paras: ['Shared risk: all three depend on data-centre capital spending by a small number of buyers. If that spending slows, the multiples compress together — the diversification between them is smaller than it looks.',
+              'Distinct risks: NVIDIA is the most exposed to competition arriving at its margins; AMD is the most exposed to execution; Broadcom carries the most debt from its software acquisitions.'] },
+          { k: 'text', title: 'Comparison summary', labels: ['inf', 'edu'],
+            paras: ['For a long horizon these are three different bets on the same theme: platform economics (NVDA), price-performance competition (AMD), and diversified cash generation with a dividend (AVGO). Which fits depends on your risk tolerance and horizon, not on which chart looks best over one year.'],
+            note: 'Educational comparison, not a recommendation to buy or sell any of these companies.' },
+          { k: 'next', title: 'Continue',
+            nexts: [['Build a Tesla chart with RSI and support levels', 'Switch to chart construction'],
+              ['Monitor NVIDIA and alert me below its five-year average valuation', 'Turn this research into monitoring'],
+              ['Find undervalued US technology companies', 'Widen the search with a screener']] }
+        ] },
+
+      chart: { name: 'Tesla Chart · RSI and levels', mode: 'CHART', modeName: 'Building chart',
+        q: 'Build a Tesla chart with RSI, volume and support levels',
+        plan: ['Open TSLA daily.', 'Add RSI (14) in its own pane.', 'Detect and draw support and resistance zones.', 'Leave everything editable.'],
+        work: ['Loading TSLA daily history', 'Applying RSI (14)', 'Detecting repeated price reactions', 'Drawing 2 zones'],
+        ctx: { Symbol: 'TSLA · NASDAQ', Timeframe: '1D', Studies: 'RSI (14) · volume', Drawings: '2 zones by Voyager' },
+        srcs: [['MARKET DATA', 'Consolidated tape · live', '14:32 UTC'], ['DETECTION', 'Voyager level detection over 78 sessions', 'just now']],
+        summary: 'Chart is built. RSI is in its own pane and the two zones come from repeated reactions in price, not from a fixed formula — you can drag or delete either of them.',
+        mods: [
+          { k: 'chart', title: 'TSLA · 1D · RSI (14) and detected zones', sub: 'Shaded bands are Voyager-detected zones · dashed lines are their midpoints',
+            chart: 'rsi', chartH: '320px', tfs: true, legend: [['#1aa966', 'Support 318'], ['#e0492f', 'Resistance 402'], ['#7c4dff', 'RSI (14)']],
+            actions: [['Open in Supercharts', 'chart'], ['Create alert', 'alert'], ['Save chart', 'save']] },
+          { k: 'text', title: 'How to read it', labels: ['data', 'edu'],
+            paras: ['Price has reacted three times near 318 and twice near 402. RSI is at 44 — neither stretched nor washed out, so it is not giving a signal here; it mostly tells you the recent selling has not been extreme.'] },
+          { k: 'next', title: 'Keep changing it in plain language',
+            nexts: [['Add a 50-day moving average', 'Voyager applies it and shows the diff'], ['Explain the last big drop', 'Answer anchored to the bars on screen'], ['Alert me if price closes below 318', 'Creates a monitoring rule']] }
+        ] },
+
+      pine: { name: 'Tesla Trend Reversal Indicator', mode: 'BUILD', modeName: 'Generating Pine Script',
+        q: 'Create a Pine Script indicator that shows a possible trend reversal',
+        plan: ['Define what counts as a reversal.', 'Write it in Pine Script v6.', 'Validate it against the chart.', 'Let you tune the parameters before applying.'],
+        work: ['Drafting the logic', 'Writing Pine Script v6', 'Validating against 78 bars', 'Preparing the preview'],
+        ctx: { Symbol: 'TSLA · 1D', Script: 'trend_reversal.pine', Language: 'Pine Script v6', Status: 'Draft · not applied' },
+        srcs: [['MARKET DATA', 'TSLA daily history, 78 bars', '14:32 UTC'], ['VALIDATION', 'Voyager runtime check', 'just now']],
+        summary: 'Here is a first version. It marks a possible reversal when momentum turns while price is stretched away from its average — in plain words: the move is running out of strength.',
+        mods: [
+          { k: 'code', title: 'trend_reversal.pine', sub: 'You own this script — tune it, export it, or ask for changes in plain language' },
+          { k: 'text', title: 'What the code does, in plain words', labels: ['edu', 'inf'],
+            paras: ['Three conditions have to line up: price is far from its moving average, RSI turns back from an extreme, and the current candle closes against the previous direction. When all three happen the script draws a marker — it is a hint to look closer, not a signal to trade.'] },
+          { k: 'chart', title: 'Preview on the chart', sub: 'Draft preview · nothing is applied to your saved layout yet', chart: 'rsi', chartH: '280px',
+            legend: [['#7c4dff', 'RSI (14)'], ['#1aa966', 'Support'], ['#e0492f', 'Resistance']],
+            actions: [['Apply to chart', 'applypine'], ['Open in Supercharts', 'chart']] },
+          { k: 'next', title: 'Iterate in plain language',
+            nexts: [['Only signal when volume is above average', 'Adds one condition and shows the diff'], ['Make it less sensitive', 'Raises the thresholds'], ['Backtest it over five years', 'PRO · runs a historical test']] }
+        ] },
+
+      screener: { name: 'US Dividend & Quality Screen', mode: 'SCREEN', modeName: 'Running screen',
+        q: 'Find US technology companies with growing revenue, positive free cash flow and reasonable valuation',
+        plan: ['Turn your sentence into explicit filters.', 'Show you the filters before running.', 'Screen the US technology universe.', 'Rank and explain the ranking.'],
+        work: ['Interpreting your request', 'Screening 4 218 companies', 'Reading the latest four quarters', 'Ranking 34 matches'],
+        ctx: { Universe: 'US listed · technology', Matches: '34 of 4 218', Ranking: 'Growth + cash generation', Completeness: '92% of fields available' },
+        srcs: [['FUNDAMENTALS', 'Last four reported quarters', 'as filed'], ['MARKET DATA', 'Prices for valuation, 1 Aug close', 'yesterday'], ['COVERAGE', '8% of matches missing one field', 'noted per row']],
+        asmp: ['“Reasonable valuation” was read as forward P/E below the sector median.', 'Companies with less than 8 quarters of history are excluded.'],
+        summary: '34 companies match. I read “reasonable valuation” as below the sector median forward P/E — if you meant something else, change that filter and I will re-run.',
+        mods: [
+          { k: 'filters', title: 'How I read your request', tag: 'EDITABLE',
+            filterNote: 'These are the actual conditions being applied.' },
+          { k: 'rows', title: 'Ranked results', sub: 'Ranked by revenue growth and free-cash-flow margin, then valuation',
+            rows: [['Arista Networks', 'Revenue +19% · FCF margin 31% · fwd P/E 28.4', '1', 'all fields', 1],
+              ['Fortinet', 'Revenue +14% · FCF margin 34% · fwd P/E 26.1', '2', 'all fields', 1],
+              ['Manhattan Associates', 'Revenue +12% · FCF margin 24% · fwd P/E 29.7', '3', 'all fields', 1],
+              ['Qualys', 'Revenue +10% · FCF margin 37% · fwd P/E 22.3', '4', 'all fields', 1],
+              ['Dropbox', 'Revenue +2% · FCF margin 32% · fwd P/E 12.8', '5', 'growth below filter', 0]] },
+          { k: 'chart', title: 'Growth versus valuation', sub: 'Violet points are the top 6 by rank · one point per matching company', chart: 'scatter', chartH: '230px',
+            legend: [['#7c4dff', 'Top ranked'], ['#c9d4f5', 'Other matches']], actions: [['Save screen', 'save'], ['Create watchlist', 'watchlist'], ['Monitor matches', 'monitor']] },
+          { k: 'text', title: 'Why this ranking', labels: ['inf', 'data'],
+            paras: ['Rank is a weighted score: revenue growth 40%, free-cash-flow margin 40%, valuation 20%. One row is shown despite failing the growth filter because it passes everything else by a wide margin — you can hide near-misses if you prefer a strict list.'] },
+          { k: 'next', title: 'Turn this into something',
+            nexts: [['Create a watchlist from the top 10', 'Saved to your workspace'], ['Monitor these for valuation changes', 'One rule per company'], ['Compare the top three', 'Full side-by-side research']] }
+        ] },
+
+      portfolio: { name: 'Family Wealth Review', mode: 'PORTFOLIO', modeName: 'Using portfolio context',
+        q: 'What are the main risks in my portfolio?',
+        plan: ['Ask permission for the data I need.', 'Map what you hold and where.', 'Find concentration, currency and liquidity risks.', 'Model one scenario and suggest next steps.'],
+        work: ['Reading the categories you allowed', 'Mapping 34 positions', 'Computing exposures', 'Modelling one scenario'],
+        ctx: { Source: 'Wealth Hub · allowed categories', Positions: '34 across 4 accounts', 'Net worth': '€1.24M', Currency: 'EUR base' },
+        srcs: [['YOUR DATA', 'Wealth Hub · positions and balances you entered', 'as of today'], ['MARKET DATA', 'Prices and FX, 1 Aug close', 'yesterday'], ['EDUCATIONAL', 'Diversification concepts from Academy', 'reference']],
+        asmp: ['Scenario assumes exchange rates stay where they are today.', 'Property value is your own estimate, not a market valuation.'],
+        summary: 'Three risks stand out: almost half of your liquid assets sit in one sector, your currency exposure is more USD than your spending, and a quarter of your net worth cannot be sold quickly.',
+        mods: [
+          { k: 'metrics', title: 'Wealth summary', tag: 'YOUR DATA', metrics: [['Net worth', '€1.24M', 'you provided', 2], ['Liquid assets', '€612K', '49% of total', 2], ['Liabilities', '€184K', 'mortgage', 2], ['Monthly surplus', '€2 100', 'you provided', 2]] },
+          { k: 'chart', title: 'Composition', sub: 'Equities · funds · property · cash · other', chart: 'alloc', chartH: '120px',
+            legend: [['#2962ff', 'Equities 42%'], ['#7c4dff', 'Funds 18%'], ['#1aa966', 'Property 16%'], ['#f4a71f', 'Cash 13%'], ['#8a93a6', 'Other 11%']] },
+          { k: 'rows', title: 'Risks found', sub: 'Ordered by how much of your wealth they affect',
+            rows: [['Sector concentration', '46% of liquid assets are in technology — three positions account for most of it.', 'HIGH', 'affects €282K', 0],
+              ['Currency mismatch', '61% of assets are USD-denominated while your spending is in EUR.', 'MEDIUM', 'affects €373K', 0],
+              ['Liquidity', '27% of net worth is property and cannot be sold in a short window.', 'MEDIUM', 'affects €335K', 0],
+              ['Cash drag', '13% in cash beyond your stated emergency buffer.', 'LOW', 'affects €81K', 1]] },
+          { k: 'chart', title: 'Scenario: rates stay high for another year', sub: 'Solid line is the base path · dashed lines are the two cases', chart: 'scen', chartH: '210px',
+            legend: [['#2962ff', 'Base'], ['#1aa966', 'Better case'], ['#e0492f', 'Worse case']],
+            actions: [['Edit assumptions', 'asm'], ['Save scenario', 'save']] },
+          { k: 'text', title: 'Suggested next steps', labels: ['inf', 'edu'],
+            paras: ['The concentration is the one worth addressing first, because it is the largest and the easiest to change gradually. Reducing it does not require selling — new monthly contributions can go elsewhere until the share falls.'],
+            note: 'This is educational analysis of data you provided, not personalised investment advice.' },
+          { k: 'next', title: 'Continue',
+            nexts: [['Model reducing technology to 25%', 'Same scenario, different allocation'], ['Which of my holdings overlap?', 'Fund look-through analysis'], ['Save this as a recommendation', 'Stored in the workspace with its assumptions']] }
+        ] },
+
+      beginner: { name: 'Investing €500 a month', mode: 'EXPLORE', modeName: 'Guided journey',
+        q: 'I am a beginner and want to invest €500 every month',
+        plan: ['Ask four short questions.', 'Explain the main options in plain words.', 'Build one educational example.', 'Offer to save it as a goal.'],
+        work: ['Preparing the questions'],
+        ctx: { Mode: 'Beginner guidance', Contribution: '€500 monthly', Country: 'not set', Horizon: 'not set' },
+        srcs: [['EDUCATIONAL', 'Academy · Stage 1 and Stage 4 material', 'reference'], ['MARKET DATA', 'Long-run index statistics', 'for illustration']],
+        asmp: ['The example uses a fixed average return purely to illustrate compounding — real returns vary and can be negative.'],
+        summary: 'Before showing anything, four things change the answer completely. Answer what you can — you can change any of them later.',
+        mods: [
+          { k: 'steps', title: 'Four questions' },
+          { k: 'text', title: 'What your options actually are', labels: ['edu'],
+            paras: ['With €500 a month there are three realistic building blocks: a broad index fund for the growth part, a short-duration bond fund for stability, and cash for the money you might need soon. Everything else is a variation on those three.',
+              'The part that matters most is not which fund you pick — it is that the contribution keeps happening and that you do not need the money at short notice.'] },
+          { k: 'chart', title: 'Educational example, not a projection', sub: 'What €500 a month looks like over 15 years at three different average returns', chart: 'scen', chartH: '200px',
+            legend: [['#2962ff', '5% average'], ['#1aa966', '7% average'], ['#e0492f', '3% average']],
+            note: 'Illustration of compounding only. Nobody can promise a return, and real paths are far less smooth than these lines.' },
+          { k: 'next', title: 'Next steps',
+            nexts: [['Save this as a goal in Wealth Hub', 'Tracks contributions against the plan'], ['Start Academy Stage 1', 'Five short lessons on the basics'], ['Explain what a broad index fund is', 'Plain-language explanation']] }
+        ] },
+
+      monitor: { name: 'NVIDIA Valuation Monitor', mode: 'MONITOR', modeName: 'Creating monitoring rule',
+        q: 'Monitor NVIDIA and tell me if its valuation falls below its five-year average',
+        plan: ['Turn the sentence into a measurable condition.', 'Show the threshold against history.', 'Let you edit it.', 'Enable it when you confirm.'],
+        work: ['Reading five years of valuation history', 'Computing the average', 'Preparing the condition'],
+        ctx: { Symbol: 'NVDA · NASDAQ', Metric: 'Forward P/E', Threshold: '27.4 (5y average)', Status: 'Draft rule' },
+        srcs: [['MARKET DATA', 'Daily prices, five years', 'to 1 Aug'], ['ESTIMATES', 'Forward earnings consensus history', 'monthly']],
+        summary: '“Valuation below its five-year average” becomes: forward P/E below 27.4, checked at every daily close. It is at 38.4 today, so the rule would not fire yet.',
+        mods: [
+          { k: 'monitor', title: 'Monitoring rule', sub: 'Nothing is watched until you enable it' },
+          { k: 'text', title: 'What will actually happen', labels: ['data', 'inf'],
+            paras: ['At every daily close Voyager compares forward P/E with 27.4. When it crosses below, you get one notification — not a repeat every day — and the rule keeps watching in case it crosses back.'] },
+          { k: 'next', title: 'Related',
+            nexts: [['Also alert me on a 20% price drawdown', 'Second rule on the same symbol'], ['Monitor the whole screener result', 'One rule per company'], ['Show my active rules', 'Opens the inspector list']] }
+        ] },
+
+      handoff: { name: 'Gold Macro Analysis', mode: 'ANALYZE', modeName: 'Continued from the symbol page',
+        q: 'Continue in Voyager Workspace — why has gold risen over the last three months?',
+        plan: ['Carry over the chart and conversation from the symbol page.', 'Keep the same timeframe and studies.', 'Explain the move with the data behind it.', 'Offer to keep the workspace.'],
+        work: ['Transferring context from the symbol page', 'Loading the same chart state', 'Reading real rates and flows'],
+        ctx: { 'Carried over': 'Gold page · 3 messages', Symbol: 'GOLD · spot', Timeframe: '3M · daily', Studies: 'kept from the page' },
+        srcs: [['CARRIED CONTEXT', 'Conversation and chart state from the Gold page', 'seconds ago'], ['MARKET DATA', 'Spot fixings and real yields', '14:32 UTC'], ['FLOWS', 'Reported ETF holdings', 'weekly']],
+        summary: 'Everything you had open on the Gold page came with you: the same three months, the same chart, the same conversation. Here is the fuller answer with the data behind it.',
+        mods: [
+          { k: 'text', title: 'Context transferred', tag: 'FROM SYMBOL PAGE', labels: ['user', 'data'],
+            paras: ['You asked two questions on the Gold page and had a three-month daily chart open. That state is now this workspace — nothing was re-asked and nothing was lost.'] },
+          { k: 'chart', title: 'Gold · 3 months', sub: 'Same chart state you had on the symbol page', chart: 'gold', chartH: '230px',
+            legend: [['#f4a71f', 'Gold spot']], actions: [['Open in Supercharts', 'chart'], ['Create alert', 'alert']] },
+          { k: 'text', title: 'Why it moved', labels: ['data', 'inf'],
+            paras: ['Two measurable drivers: real yields fell about 40 basis points over the period, which historically supports gold, and reported ETF holdings rose for eleven straight weeks after two years of outflows.',
+              'A third driver is often cited — central-bank buying — but the published data lags by a quarter, so for the most recent weeks that part is inference rather than fact.'] },
+          { k: 'next', title: 'Continue here',
+            nexts: [['Compare gold with the S&P 500 this year', 'Adds a second series'], ['Alert me if real yields rise above 2%', 'Macro monitoring rule'], ['Save as Gold Macro Analysis', 'Keeps the whole workspace']] }
+        ] },
+
+      techfall: { name: 'Technology Sell-off', mode: 'ANALYZE', modeName: 'Analysing sector',
+        q: 'Why are technology stocks falling?',
+        plan: ['Separate the sector move from the index move.', 'Find what is common to the fallers.', 'Check whether earnings expectations changed.', 'State what would change the picture.'],
+        work: ['Loading sector constituents', 'Grouping by driver', 'Reading estimate revisions'],
+        ctx: { Sector: 'Technology · US', Constituents: '78 names', Window: 'Today · intraday', Breadth: '11 of 78 advancing' },
+        srcs: [['MARKET DATA', 'Sector constituents, delayed 15 min', '14:32 UTC'], ['ESTIMATES', 'Revision data, last 30 days', 'weekly'], ['NEWS', '46 sector headlines', 'today']],
+        summary: 'It is a rate-expectation move amplified by one company-specific guidance cut, not a broad deterioration in earnings expectations.',
+        mods: [
+          { k: 'text', title: 'The short answer', labels: ['data', 'inf'],
+            paras: ['Two things happened at once. Producer prices came in hot, which pushed expected rate cuts further out and hits the highest-multiple stocks hardest. Separately, one semiconductor supplier cut guidance, which the market read as a signal about data-centre orders in general.',
+              'Earnings estimates for the sector have not fallen — the median revision over the last 30 days is still slightly positive. That is what separates a re-rating from a downgrade cycle.'] },
+          { k: 'metrics', title: 'Sector snapshot', metrics: [['Technology', '−1.9%', 'vs index −0.61%', 0], ['Semiconductors', '−2.4%', 'worst subgroup', 0], ['Advancing', '11 of 78', 'weak breadth', 0], ['Est. revisions', '+0.4%', 'still positive', 1]] },
+          { k: 'rows', title: 'Grouped by driver', sub: 'Voyager grouping of today\'s fallers',
+            rows: [['Rate-sensitive high multiples', '34 names · unprofitable or above 40× forward earnings', '−3.1% avg', 'driver: rates', 0],
+              ['Data-centre supply chain', '12 names · direct exposure to the guidance cut', '−2.8% avg', 'driver: news', 0],
+              ['Everything else in the sector', '32 names · no clear common driver', '−0.7% avg', 'driver: drift', 0]] },
+          { k: 'next', title: 'Next',
+            nexts: [['Compare NVIDIA, AMD and Broadcom', 'Is this company-specific or sector-wide?'], ['Which of my holdings are in the first group?', 'Needs Wealth Hub access'], ['Alert me if estimates start falling', 'Monitoring on revisions']] }
+        ] },
+
+      unavailable: { name: 'Market data unavailable', mode: 'EXPLORE', modeName: 'Could not finish',
+        q: 'Show me the intraday move for a symbol that is not trading',
+        plan: ['Load the symbol.', 'Read intraday data.'],
+        work: ['Loading symbol'],
+        ctx: { Symbol: 'Requested symbol', Venue: 'Closed', Data: 'Unavailable' },
+        srcs: [['MARKET DATA', 'Venue reported no quotes', '14:32 UTC']],
+        summary: '',
+        mods: [
+          { k: 'error', title: 'I could not finish this one', tag: 'PARTIAL',
+            paras: ['The venue is not reporting quotes for this symbol right now, so there is no intraday series to show. Everything else in this workspace is unaffected, and the last known daily close is still available.'],
+            fixes: [['Show the daily chart instead', 'chartfix'], ['Try again', 'retry'], ['Pick another symbol', 'symfix']] }
+        ] }
+    };
+  }
+
+  _send() {
+    const el = this.inputRef.current, v = el ? el.value.trim() : '';
+    if (!v) return;
+    el.value = '';
+    const q = v.toLowerCase();
+    const id = /market|today|happening/.test(q) ? 'market' : /technolog|tech/.test(q) ? 'techfall'
+      : /compare|nvidia|amd|broadcom/.test(q) ? 'compare' : /pine|script/.test(q) ? 'pine'
+      : /chart|rsi|support/.test(q) ? 'chart' : /screen|find|undervalued|dividend/.test(q) ? 'screener'
+      : /portfolio|risk|wealth/.test(q) ? 'portfolio' : /beginner|500|month/.test(q) ? 'beginner'
+      : /monitor|alert|notify/.test(q) ? 'monitor' : /gold/.test(q) ? 'handoff' : /not trading|unavailable/.test(q) ? 'unavailable' : null;
+    if (id) this.ask(id, v);
+    else this.toast('This prototype answers the example requests in full — try one of them, or a keyword like chart, screen, portfolio, monitor');
+  }
+  ask(id, qText) {
+    const SC = this.scenarios()[id];
+    if (!SC) { this.toast('Pick one of the example requests — this prototype answers those in full'); return; }
+    this._clear();
+    const q = qText || SC.q;
+    this.setState({ scn: id, stage: 'understanding', rev: 0, work: 0, stopped: false, mods: [], srcs: [], asmp: [],
+      turns: [{ q: q }], wsName: SC.name, wsAuto: true, ctx: SC.ctx, view: 'canvas',
+      hist: [['now', 'Workspace created from your request']], mTab: 'canvas',
+      credits: Math.min(100, this.state.credits + 3) });
+    const T = [];
+    T.push(setTimeout(() => this.setState({ stage: 'planning' }), 520));
+    T.push(setTimeout(() => this.setState({ stage: 'working', srcs: SC.srcs }), 1150));
+    SC.work.forEach((w, i) => T.push(setTimeout(() => { if (!this.state.stopped) this.setState({ work: i + 1 }); }, 1400 + i * 520)));
+    const t0 = 1400 + SC.work.length * 520;
+    SC.mods.forEach((m, i) => T.push(setTimeout(() => { if (!this.state.stopped) this.setState({ rev: i + 1, stage: i === SC.mods.length - 1 ? 'complete' : 'partial' }); }, t0 + i * 430)));
+    T.push(setTimeout(() => { if (!this.state.stopped) this.setState({ asmp: SC.asmp || [], hist: [['now', 'Result complete · ' + SC.mods.length + ' modules'], ['now', 'Workspace created from your request']] }); }, t0 + SC.mods.length * 430));
+    this._timers = T;
+  }
+
+  renderVals() {
+    const s = this.state, SCN = this.scenarios(), SC = s.scn ? SCN[s.scn] : null;
+    const W = s.device === 'desktop' ? s.winW : s.device === 'tablet' ? 1024 : 430;
+    const isMobile = s.device === 'mobile', isTablet = s.device === 'tablet';
+    const wide = W >= 1280;
+    const cNarrow = !isMobile && W < 1180;
+    const modeMeta = { EXPLORE: ['#e8edfd', '#2962ff'], ANALYZE: ['#e3f6ec', '#1aa966'], CHART: ['#e8edfd', '#2962ff'], SCREEN: ['#fdf3e3', '#b07708'], BUILD: ['#efe9fd', '#7c4dff'], PORTFOLIO: ['#f6f2fe', '#7c4dff'], MONITOR: ['#fdecea', '#e0492f'] };
+    const mm = SC ? (modeMeta[SC.mode] || ['#f0f2f7', '#8a93a6']) : ['#f0f2f7', '#8a93a6'];
+    const goAsk = (id) => () => this.ask(id);
+
+    const icons = { chart: 'M4 19V5M4 19h16M8 15l3-4 3 3 4-7', search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14M21 21l-4.35-4.35',
+      build: 'M14 7l3 3-9 9H5v-3zM16 3l5 5', wealth: 'M3 20h18M6 20V10M11 20V5M16 20v-8M21 20v-4',
+      bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0', chat: 'M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-5A8 8 0 0 1 13 4a8 8 0 0 1 8 8',
+      grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', info: 'M12 8h0M11 12h1v5h1M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18',
+      book: 'M4 5h6v14H4zM14 5h6v14h-6', open: 'M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5',
+      copy: 'M9 9h10v11H9zM5 15V4h10', trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13', pin: 'M12 3v9M8 12h8l-4 9z' };
+
+    const catDefs = [
+      ['Understand the market', 'Start here if you want the picture', [
+        ['What is happening in the US market today?', 'market', icons.chart, '#e8edfd', '#2962ff', 0],
+        ['Why are technology stocks falling?', 'techfall', icons.chart, '#e8edfd', '#2962ff', 0],
+        ['Why has gold risen over the last three months?', 'handoff', icons.chart, '#e8edfd', '#2962ff', 0]]],
+      ['Find an opportunity', 'Screens built from a sentence', [
+        ['Find US technology companies with growing revenue and positive free cash flow', 'screener', icons.search, '#fdf3e3', '#b07708', 1],
+        ['Show strong dividend payers I could research', 'screener', icons.search, '#fdf3e3', '#b07708', 1]]],
+      ['Analyse and compare', 'Company research in one workspace', [
+        ['Compare NVIDIA, AMD and Broadcom as long-term investments', 'compare', icons.grid, '#e3f6ec', '#1aa966', 0]]],
+      ['Build and test', 'Charts, indicators and scripts', [
+        ['Build a Tesla chart with RSI, volume and support levels', 'chart', icons.build, '#efe9fd', '#7c4dff', 0],
+        ['Create a Pine Script indicator that shows a possible trend reversal', 'pine', icons.build, '#efe9fd', '#7c4dff', 1]]],
+      ['Manage my wealth and watch the market', 'Uses your data only with permission', [
+        ['What are the main risks in my portfolio?', 'portfolio', icons.wealth, '#f6f2fe', '#7c4dff', 1],
+        ['I am a beginner and want to invest €500 every month', 'beginner', icons.book, '#e3f6ec', '#1aa966', 0],
+        ['Monitor NVIDIA and tell me if its valuation falls below its five-year average', 'monitor', icons.bell, '#fdecea', '#e0492f', 1]]]
+    ];
+    const categories = catDefs.map(([title, sub, items]) => ({ title, sub,
+      items: items.map(([q, id, icon, iBg, iFg, locked]) => ({ q, icon, iBg, iFg, locked: !!locked, go: goAsk(id) })) }));
+
+    const ctaOn = !!SC && s.signup && !s.signedUp && !s.library && !s.plan;
+    const gated = s.scn === 'portfolio' && s.wh === 'off';
+    const modSrc = gated
+      ? [{ k: 'consent', title: 'I need permission before I can answer this', tag: 'PERMISSION REQUEST',
+          sub: 'Choose what Voyager may read. You can change this at any time.' }]
+      : (SC ? SC.mods : []);
+    const mods = SC ? modSrc.slice(0, gated ? 1 : s.rev).map((m) => {
+      const M = { title: m.title, sub: m.sub || '', tag: m.tag || '', note: m.note || '',
+        bg: '#ffffff', border: '#e6eaf2', titleFg: '#131722', tagBg: '#efe9fd', tagFg: '#7c4dff',
+        isText: false, isMetrics: false, isChart: false, isHeat: false, isRows: false, isTable: false,
+        isFilters: false, isCode: false, isConsent: false, isMonitor: false, isSteps: false, isNext: false, isError: false,
+        paras: [], metrics: [], legend: [], tiles: [], rows: [], cells: [], filters: [], lines: [], diags: [], params: [], versions: [],
+        scopes: [], privacyRows: [], ruleRows: [], qs: [], nexts: [], fixes: [], labels: [], actions: [], tfs: [], hasTfs: false,
+        grid: '1fr', svg: null, chartH: '220px', hasLabels: !!(m.labels && m.labels.length), filterNote: m.filterNote || '',
+        status: '', stBg: '#efe9fd', stFg: '#7c4dff', codeMeta: '', enableLabel: '', enableBg: '#7c4dff',
+        fixInterp: () => this.toast('Tell me in the chat what I got wrong and I will re-read the request'),
+        grant: () => {}, deny: () => {}, enable: () => {}, editRule: () => {} };
+      if (m.labels) M.labels = m.labels.map(k => { const L = this.L(k); return { bg: L[0], fg: L[1], label: L[2] }; });
+      const actMap = {
+        chart: 'Open in Supercharts', save: 'Save', alert: 'Create alert', watchlist: 'Create watchlist',
+        monitor: 'Monitor matches', addco: 'Add a company', rmco: 'Remove AMD', applypine: 'Apply to chart', asm: 'Edit assumptions'
+      };
+      M.actions = (m.actions || []).map(([label, kind]) => ({ label, bg: kind === 'applypine' ? '#7c4dff' : '#ffffff',
+        border: kind === 'applypine' ? '#7c4dff' : '#e2e6ee', fg: kind === 'applypine' ? '#ffffff' : '#131722',
+        go: () => {
+          if (kind === 'chart') this.toast('Opens in Supercharts with every study and drawing intact');
+          else if (kind === 'save') { this.setState({ wsAuto: false }); this.toast('Saved to Workspaces · ' + s.wsName); }
+          else if (kind === 'alert') this.ask('monitor');
+          else if (kind === 'watchlist') this.toast('Watchlist created from the top 10 · saved to My Workspace');
+          else if (kind === 'monitor') this.ask('monitor');
+          else if (kind === 'addco') this.toast('Type a ticker in the chat and I will add it to the comparison');
+          else if (kind === 'rmco') this.toast('AMD removed — the chart and every table re-computed');
+          else if (kind === 'applypine') { this.setState({ hist: [['now', 'Indicator applied to the TSLA layout']].concat(s.hist) }); this.toast('Indicator applied · undo available in the workspace history'); }
+          else if (kind === 'asm') this.toast('Assumptions are editable in the inspector — change one and the scenario re-runs');
+          else this.toast(actMap[kind] || label);
+        } }));
+
+      if (m.k === 'text' || m.k === 'error') {
+        M.paras = m.paras.map(text => ({ text }));
+        if (m.k === 'error') {
+          M.isError = true; M.bg = '#fdecea'; M.border = '#f5cdbd'; M.titleFg = '#8c2f1c'; M.tagBg = '#f5cdbd'; M.tagFg = '#8c2f1c';
+          M.fixes = m.fixes.map(([label, kind]) => ({ label, bg: kind === 'chartfix' ? '#7c4dff' : '#ffffff',
+            border: kind === 'chartfix' ? '#7c4dff' : '#e2e6ee', fg: kind === 'chartfix' ? '#ffffff' : '#131722',
+            go: () => { if (kind === 'chartfix') this.ask('chart'); else if (kind === 'retry') this.toast('Retrying — the venue is still not quoting'); else this.toast('Type a ticker in the chat'); } }));
+        } else M.isText = true;
+      } else if (m.k === 'metrics') {
+        M.isMetrics = true;
+        M.metrics = m.metrics.map(([k, v, d, dir]) => ({ k, v, d, sign: dir === 1 ? '▲' : dir === 0 ? '▼' : '·',
+          fg: dir === 1 ? '#1aa966' : dir === 0 ? '#e0492f' : '#8a93a6' }));
+      } else if (m.k === 'chart') {
+        M.isChart = true; M.svg = this.svg(m.chart, parseInt(m.chartH, 10)); M.chartH = m.chartH || '220px';
+        M.legend = (m.legend || []).map(([color, label]) => ({ color, label }));
+        M.hasTfs = !!m.tfs;
+        M.tfs = ['3M', '1Y', '5Y', 'Max'].map(label => ({ label, bg: s.tf === label ? '#e8edfd' : 'transparent',
+          fg: s.tf === label ? '#2962ff' : '#5a6376', pick: () => this.setState({ tf: label }) }));
+      } else if (m.k === 'heat') {
+        M.isHeat = true;
+        M.tiles = m.tiles.map(([name, v, dir]) => ({ name, v, sign: dir ? '▲' : '▼',
+          bg: dir ? '#f2fbf6' : '#fdf1ee', border: dir ? '#cdeddd' : '#f6d5cb', fg: dir ? '#127a4b' : '#c33c22' }));
+      } else if (m.k === 'rows') {
+        M.isRows = true;
+        M.rows = m.rows.map(([name, sub, v, v2, dir], i) => ({ name, sub, v, v2, rank: '', bg: i % 2 ? '#ffffff' : '#fbfcfe',
+          fg: dir === 1 ? '#1aa966' : dir === 0 ? '#e0492f' : '#131722',
+          go: () => this.toast(name + ' · opens the symbol page in a new workspace tab') }));
+        if (s.scn === 'screener') M.rows.forEach((r, i) => { r.rank = String(i + 1); r.v = m.rows[i][3]; r.v2 = m.rows[i][2]; r.fg = '#131722'; });
+      } else if (m.k === 'news') {
+        M.isRows = true;
+        M.rows = m.rows.map(([t, src, head, imp], i) => ({ name: head, sub: src + ' · ' + t, v: imp, v2: '', rank: '',
+          bg: i % 2 ? '#ffffff' : '#fbfcfe', fg: imp === 'HIGH IMPACT' ? '#e0492f' : imp === 'MEDIUM' ? '#b07708' : '#8a93a6',
+          go: () => this.toast('Opens the source article') }));
+      } else if (m.k === 'table') {
+        M.isTable = true; M.grid = m.grid;
+        M.cells = m.cols.map(v => ({ v, bg: '#fbfcfe', fg: '#8a93a6', w: '800' }));
+        m.rows.forEach((row, ri) => row.forEach((v, ci) => M.cells.push({ v, bg: ri % 2 ? '#ffffff' : '#fbfcfe',
+          w: ci === 0 ? '700' : '600', fg: ci === 0 ? '#131722' : /^\+/.test(v) ? '#1aa966' : /^(−|none)/.test(v) ? '#e0492f' : '#131722' })));
+      } else if (m.k === 'filters') {
+        M.isFilters = true;
+        const fdefs = [['rev', 'Revenue growth', '> 8% YoY'], ['fcf', 'Free cash flow', 'positive, 4 quarters'], ['val', 'Forward P/E', '< sector median'], ['reg', 'Listing', 'US · technology']];
+        M.filters = fdefs.filter(f => s.filters[f[0]]).map(([k, label, value]) => ({ label, value, border: '#c9d4f5',
+          edit: () => this.toast('Condition editor: change the operator, the value or the period'),
+          off: () => this.setState({ filters: { ...s.filters, [k]: false } }) }));
+      } else if (m.k === 'code') {
+        M.isCode = true;
+        const err = s.codeState === 'error';
+        M.status = err ? 'ERROR' : 'VALID';
+        M.stBg = err ? '#fdecea' : '#e3f6ec'; M.stFg = err ? '#e0492f' : '#1aa966';
+        M.codeMeta = err ? 'Pine Script v6 · 1 problem found before anything was applied' : 'Pine Script v6 · compiles clean · ran over 78 bars in 38 ms';
+        const C = { c: '#9aa3b5', k: '#7c4dff', f: '#2962ff', n: '#b07708', s: '#14603c', t: '#131722', e: '#e0492f' };
+        const src = [
+          ['// Trend reversal — momentum turns while price is stretched from its average', C.c],
+          ['//@version=6', C.c],
+          ['indicator("Trend Reversal", overlay = true)', C.t],
+          ['', C.t],
+          ['length = input.int(' + s.codeParams.len + ', "RSI length", minval = 2)', C.t],
+          ['sens   = input.int(' + s.codeParams.sens + ', "Sensitivity", minval = 1, maxval = 5)', C.t],
+          ['', C.t],
+          ['ma      = ta.sma(close, 50)', C.t],
+          ['stretch = math.abs(close - ma) / ma > 0.04 * sens', C.t],
+          [err ? 'r       = ta.rsi(clos, length)' : 'r       = ta.rsi(close, length)', err ? C.e : C.t],
+          ['turnDn  = r[1] > 70 and r < r[1] and close < open', C.t],
+          ['turnUp  = r[1] < 30 and r > r[1] and close > open', C.t],
+          ['', C.t],
+          ['plotshape(stretch and turnDn, style = shape.triangledown, location = location.abovebar)', C.t],
+          ['plotshape(stretch and turnUp, style = shape.triangleup,   location = location.belowbar)', C.t]
+        ];
+        M.lines = src.map(([t, fg], i) => ({ n: i + 1, t, fg, bg: err && i === 9 ? '#fdf1ee' : 'transparent' }));
+        M.diags = err
+          ? [{ kind: 'ERROR', where: 'line 10', bg: '#fdecea', border: '#f5cdbd', fg: '#e0492f',
+              msg: 'Undeclared identifier “clos”. The built-in series is spelled “close” — I mistyped it. I will show you the change before applying anything.',
+              cta: 'Fix it and show me the change', go: () => { this.setState({ codeState: 'valid', hist: [['now', 'Script fixed · line 10, clos → close']].concat(s.hist) }); this.toast('Fixed line 10 · clos → close · version v2'); } }]
+          : [{ kind: 'VALIDATED', where: '78 bars', bg: '#e3f6ec', border: '#c8ecd8', fg: '#127a4b',
+              msg: 'Compiles clean and produced 6 markers over the visible history. Two Pine functions used here cannot be previewed inside TradingNew, but the exported script is complete.', cta: '', go: () => {} }];
+        M.params = [['RSI length', 'len'], ['Sensitivity', 'sens']].map(([k, key]) => ({ k, v: s.codeParams[key],
+          dec: () => this.setState({ codeParams: { ...s.codeParams, [key]: Math.max(1, s.codeParams[key] - 1) } }),
+          inc: () => this.setState({ codeParams: { ...s.codeParams, [key]: s.codeParams[key] + 1 } }) }));
+        M.versions = [['v1 · first draft', 1], ['v2 · after the fix', s.codeState === 'valid']].map(([label, cur]) => ({ label,
+          bg: cur ? '#f0f3f8' : '#ffffff', go: () => this.toast('Loaded ' + label + ' · diff available') }));
+      } else if (m.k === 'consent') {
+        M.isConsent = true; M.bg = '#f9f6ff'; M.border = '#e6dcfb'; M.titleFg = '#4a3a7a';
+        const sdefs = [['pf', 'Investment positions', 'What you hold and in what size — needed for concentration and currency risk.'],
+          ['cash', 'Cash balances', 'Needed to separate your emergency buffer from investable cash.'],
+          ['liab', 'Liabilities', 'Mortgage and loans — needed for net worth and liquidity.'],
+          ['prop', 'Property values', 'Optional. Only affects the illiquid share of your net worth.']];
+        M.scopes = sdefs.map(([k, label, why]) => { const on = !!s.scopes[k];
+          return { label, why, on, border: on ? '#c9d4f5' : '#eceff4', boxBg: on ? '#7c4dff' : '#ffffff', boxBorder: on ? '#7c4dff' : '#dde2ec',
+            toggle: () => this.setState({ scopes: { ...s.scopes, [k]: !on } }) }; });
+        M.privacyRows = [['Used for', 'This analysis only'], ['Stored', 'No — results are saved, raw balances are not'],
+          ['Processing', 'Private mode · not used to train models'], ['Revoke', 'One click in the inspector, any time']].map(([k, v]) => ({ k, v }));
+        M.grant = () => { this.setState({ wh: 'on' }); this.toast('Access granted for this analysis'); setTimeout(() => this.ask('portfolio'), 260); };
+        M.deny = () => { this.setState({ wh: 'off' }); this.toast('Continuing without your data — the answer will be generic'); };
+        M.note = 'Voyager asks every time a new category is needed. Nothing is read before you allow it.';
+      } else if (m.k === 'monitor') {
+        M.isMonitor = true; M.svg = this.svg('monitor', 120);
+        M.ruleRows = [['Symbol', 'NVDA · NASDAQ'], ['Metric', 'Forward P/E'], ['Condition', 'falls below 27.4'], ['Checked', 'every daily close'], ['Notify', 'Email + in-app'], ['Active until', 'you turn it off']].map(([k, v]) => ({ k, v }));
+        M.enableLabel = s.monitorOn ? 'Monitoring is active — turn off' : 'Enable monitoring';
+        M.enableBg = s.monitorOn ? '#1aa966' : '#7c4dff';
+        M.enable = () => { const on = !s.monitorOn; this.setState({ monitorOn: on, hist: [['now', on ? 'Monitoring rule enabled' : 'Monitoring rule turned off']].concat(s.hist) }); this.toast(on ? 'Rule active · forward P/E below 27.4 at every close' : 'Rule turned off'); };
+        M.editRule = () => this.toast('Change the metric, the threshold, the frequency or the channel');
+        M.note = 'Today forward P/E is 38.4, so this rule would not fire yet. Voyager notifies once per crossing, not once per day.';
+      } else if (m.k === 'steps') {
+        M.isSteps = true;
+        const qs = [['Where do you pay tax?', ['Cyprus', 'Germany', 'Other']], ['For how long can this money stay invested?', ['3–5 years', '10 years', '20+ years']],
+          ['If it fell 20% in a year, what would you do?', ['Sell', 'Wait', 'Add more']], ['What is the money for?', ['A home', 'Retirement', 'No specific goal']]];
+        M.qs = qs.map(([q, opts], i) => ({ n: i + 1, q,
+          border: s.beginner[i] !== undefined ? '#c8ecd8' : '#eceff4',
+          nBg: s.beginner[i] !== undefined ? '#e3f6ec' : '#f2f4f9', nFg: s.beginner[i] !== undefined ? '#127a4b' : '#8a93a6',
+          opts: opts.map((label, j) => ({ label, bg: s.beginner[i] === j ? '#efe9fd' : '#ffffff',
+            border: s.beginner[i] === j ? '#7c4dff' : '#e6eaf2', fg: s.beginner[i] === j ? '#4a3a7a' : '#3a4254',
+            pick: () => this.setState({ beginner: { ...s.beginner, [i]: j } }) })) }));
+        M.note = 'Four answers change the example below. Nothing here is a recommendation, and no return is promised.';
+      } else if (m.k === 'next') {
+        M.isNext = true;
+        const map = { 'Why are technology stocks falling?': 'techfall', 'Compare NVIDIA, AMD and Broadcom': 'compare',
+          'Compare NVIDIA, AMD and Broadcom as long-term investments': 'compare', 'Build a Tesla chart with RSI and support levels': 'chart',
+          'Monitor NVIDIA and alert me below its five-year average valuation': 'monitor', 'Find undervalued US technology companies': 'screener',
+          'Monitor these for valuation changes': 'monitor', 'Compare the top three': 'compare', 'Compare gold with the S&P 500 this year': 'compare',
+          'Show my active rules': null, 'Monitor the whole screener result': 'monitor' };
+        M.nexts = m.nexts.map(([label, why]) => ({ label, why, go: () => { const t = map[label]; if (t) this.ask(t); else this.toast(label + ' — continued in this workspace'); } }));
+      }
+      return M;
+    }) : [];
+
+    const running = s.stage === 'working' || s.stage === 'partial' || s.stage === 'understanding' || s.stage === 'planning';
+    const statusText = { understanding: 'Understanding your request…', planning: 'Here is what I will do', working: SC ? 'Working · ' + (SC.work[Math.min(s.work, SC.work.length - 1)] || '') : '', partial: 'Building the result…', complete: 'Done', idle: '' }[s.stage] || '';
+    const turns = s.turns.map(t => ({ q: t.q, mBg: mm[0], mFg: mm[1], modeLabel: SC ? SC.modeName : '',
+      running, statusText: s.stopped ? 'Stopped — everything already built is kept' : statusText,
+      hasPlan: !!SC && s.stage !== 'understanding',
+      plan: SC ? SC.plan.map((text, i) => { const done = s.stage === 'complete' || i < s.work;
+        return { text, done, fg: done ? '#131722' : '#8a93a6', dotBg: done ? '#1aa966' : '#ffffff', dotBorder: done ? '#1aa966' : '#dde2ec' }; }) : [],
+      stop: () => { this._clear(); this.setState({ stopped: true, stage: 'complete' }); this.toast('Stopped — partial result kept, ask a follow-up any time'); },
+      hasSummary: s.stage === 'complete' && !!(SC && SC.summary), summary: SC ? SC.summary : '',
+      hasNext: s.stage === 'complete' && !!SC,
+      next: SC && SC.mods.filter(m => m.k === 'next').length
+        ? SC.mods.filter(m => m.k === 'next')[0].nexts.map(([label]) => ({ label, go: () => this.toast('Ask it in the canvas card, or type it here') }))
+        : [] }));
+
+    const srcKind = { 'MARKET DATA': ['#e8edfd', '#2962ff'], NEWS: ['#f2f4f9', '#5a6376'], CALENDAR: ['#f2f4f9', '#5a6376'],
+      FILINGS: ['#e8edfd', '#2962ff'], ESTIMATES: ['#fdf3e3', '#b07708'], COVERAGE: ['#fdf3e3', '#b07708'],
+      FUNDAMENTALS: ['#e8edfd', '#2962ff'], 'YOUR DATA': ['#f6f2fe', '#7c4dff'], EDUCATIONAL: ['#e3f6ec', '#1aa966'],
+      DETECTION: ['#efe9fd', '#7c4dff'], VALIDATION: ['#efe9fd', '#7c4dff'], FLOWS: ['#e8edfd', '#2962ff'], 'CARRIED CONTEXT': ['#f6f2fe', '#7c4dff'] };
+    const sources = s.srcs.map(([kind, name, when]) => { const k = srcKind[kind] || ['#f2f4f9', '#5a6376']; return { kind, name, when, kBg: k[0], kFg: k[1] }; });
+
+    const whMeta = { off: ['NOT CONNECTED', '#f2f4f9', '#5a6376', 'Voyager cannot see any of your financial data. Portfolio questions will be answered generically until you connect it.', 'Connect Wealth Hub', '#7c4dff'],
+      on: ['CONNECTED', '#e3f6ec', '#127a4b', 'Three categories are shared for this analysis: positions, cash balances and liabilities. Property values stay private.', 'Manage or revoke access', '#e0492f'] }[s.wh];
+
+    const libItems = [['AI Infrastructure Research', 'NVDA · AMD · AVGO · 2 charts · 1 table', 1], ['Gold Macro Analysis', 'Gold · 3 messages · carried from the symbol page', 0],
+      ['US Dividend Opportunities', 'Screener · 34 matches · watchlist created', 0], ['Family Wealth Plan', 'Wealth Hub · 1 scenario · private', 1],
+      ['Tesla Trend Reversal Indicator', 'Pine Script v6 · v2 · applied to a layout', 0], ['US Market · 1 August', 'Market summary · archived', 0]]
+      .map(([name, meta, pinned]) => ({ name, meta, pinned: !!pinned,
+        open: () => { this.setState({ library: false }); this.toast('Opened “' + name + '” — conversation, canvas and sources restored'); },
+        acts: [['Open', icons.open], ['Duplicate', icons.copy], ['Pin', icons.pin], ['Delete', icons.trash]]
+          .map(([label, icon]) => ({ label, icon, go: () => this.toast(label + ' · ' + name) })) }));
+
+    const mTabs = [['chat', 'Chat', icons.chat], ['canvas', 'Canvas', icons.chart], ['context', 'Context', icons.info], ['sources', 'Sources', icons.book]]
+      .map(([k, label, icon]) => ({ label, icon, fg: s.mTab === k ? '#7c4dff' : '#8a93a6', go: () => this.setState({ mTab: k }) }));
+
+    const zoneAOn = isMobile ? s.mTab === 'chat' : (!!SC && s.zoneA);
+    const zoneBOn = isMobile ? (s.mTab === 'canvas') : true;
+    const zoneCOn = isMobile ? s.mTab === 'context' : (!!SC && (cNarrow ? s.zoneCNarrow : s.zoneC));
+
+    return {
+      frameW: isTablet ? '1024px' : isMobile ? '430px' : '100%', wide, narrowBar: !wide, notMobile: !isMobile, isMobile,
+      personas: [['new', 'New'], ['returning', 'Returning']].map(([k, label]) => ({ label, title: k === 'new' ? 'First-time user landing' : 'Personalised landing for a returning user',
+        bg: s.persona === k ? '#e8edfd' : 'transparent', fg: s.persona === k ? '#2962ff' : '#5a6376',
+        pick: () => this.setState({ persona: k, scn: null, stage: 'idle', mods: [], turns: [], srcs: [], asmp: [], wsName: 'New workspace', wsAuto: false }) })),
+      devices: [['desktop', 'Desktop'], ['tablet', 'Tablet'], ['mobile', 'Mobile']].map(([k, label]) => ({ label: isMobile || isTablet || W < 1400 ? label.slice(0, 1) : label, title: label,
+        bg: s.device === k ? '#e8edfd' : 'transparent', fg: s.device === k ? '#2962ff' : '#5a6376',
+        pick: () => this.setState({ device: k, mTab: 'canvas', zoneCNarrow: false }) })),
+      wsName: s.wsName, wsNameAuto: s.wsAuto,
+      wsMeta: SC ? (mods.length + ' modules · ' + sources.length + ' sources · autosaved') : 'Nothing saved yet · your first request creates a workspace',
+      wsSave: () => { this.setState({ wsAuto: false }); this.toast('Workspace saved · you can rename it any time'); },
+      wsShare: () => this.toast('Share a read-only copy — your Wealth Hub data is never included'),
+      libOpen: () => this.setState({ library: true }), libClose: () => this.setState({ library: false }), libraryOpen: s.library,
+      libMeta: '6 saved · 2 pinned', libItems,
+      libFilters: ['All', 'Pinned', 'Charts', 'Screeners', 'Scripts', 'Wealth'].map(label => ({ label,
+        bg: s.libFilter === label ? '#131722' : '#ffffff', border: s.libFilter === label ? '#131722' : '#e6eaf2',
+        fg: s.libFilter === label ? '#ffffff' : '#3a4254', pick: () => this.setState({ libFilter: label }) })),
+
+      zoneA: zoneAOn, zoneACollapsed: !isMobile && !!SC && !s.zoneA,
+      zoneAStyle: (isMobile ? 'flex:1;min-width:0;padding-bottom:56px;' : 'width:348px;flex-shrink:0;border-right:1px solid #eceff4;')
+        + 'display:flex;flex-direction:column;min-height:0;background:#ffffff',
+      toggleA: () => this.setState({ zoneA: !s.zoneA }),
+      zoneBStyle: 'flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;background:#fbfcfe'
+        + (isMobile ? ';padding-bottom:' + (ctaOn ? 130 : 56) + 'px' : ctaOn ? ';padding-bottom:74px' : ''),
+      zoneB: zoneBOn, zoneC: zoneCOn, zoneCHidden: !isMobile && !!SC && cNarrow && !s.zoneCNarrow,
+      zoneCScrim: !isMobile && !!SC && cNarrow && s.zoneCNarrow,
+      zoneCStyle: (isMobile ? 'flex:1;min-width:0;padding-bottom:56px;'
+        : cNarrow ? 'position:absolute;top:0;right:0;bottom:0;width:min(330px,86vw);z-index:7;border-left:1px solid #e6eaf2;box-shadow:-18px 0 44px rgba(19,23,34,0.12);'
+        : 'width:312px;flex-shrink:0;border-left:1px solid #eceff4;') + 'display:flex;flex-direction:column;min-height:0;background:#fbfcfe',
+      toggleC: () => (cNarrow || isMobile ? this.setState({ zoneCNarrow: !s.zoneCNarrow }) : this.setState({ zoneC: !s.zoneC })),
+
+      canvasBar: !!SC, modeName: SC ? SC.modeName : '', modeBg: mm[0], modeFg: mm[1],
+      canvasTitle: SC ? SC.name : '', canvasMeta: SC ? (s.stage === 'complete' ? 'Complete' : 'Building…') : '',
+      canvasViews: ['Canvas', 'Split', 'Full chart'].map(label => ({ label, bg: s.view === label.toLowerCase() ? '#e8edfd' : '#ffffff',
+        border: s.view === label.toLowerCase() ? '#c9d4f5' : '#e2e6ee', fg: s.view === label.toLowerCase() ? '#2962ff' : '#3a4254',
+        pick: () => { this.setState({ view: label.toLowerCase() }); this.toast(label + ' layout · modules rearrange, nothing is lost'); } })),
+
+      landing: !SC && (!isMobile || s.mTab === 'canvas'),
+      landingW: s.more ? '900px' : '720px', landingPad: isMobile ? '28px' : '9vh',
+      isNewUser: s.persona === 'new', isReturning: s.persona === 'returning',
+      starters: [['What is happening in the US market today?', 'market', icons.chart],
+        ['Compare NVIDIA, AMD and Broadcom', 'compare', icons.grid],
+        ['Build a Tesla chart with RSI and support levels', 'chart', icons.build],
+        ['Find US technology companies with growing revenue', 'screener', icons.search],
+        ['What are the main risks in my portfolio?', 'portfolio', icons.wealth]]
+        .map(([q, id, icon]) => ({ q, icon, go: goAsk(id) })),
+      moreOpen: s.more, moreLabel: s.more ? 'Hide examples' : 'More things I can do',
+      toggleMore: () => this.setState({ more: !s.more }),
+      signupInline: !s.signedUp,
+      personalCards: [['WATCHLIST', 'Two of your names report earnings this week', 'NVDA on Wednesday, AVGO on Thursday', '#e8edfd', '#2962ff', 'compare'],
+        ['MONITORING', 'NVDA valuation is 12% above your threshold', 'Rule you created on 24 July', '#fdecea', '#e0492f', 'monitor'],
+        ['CONTINUE', 'AI Infrastructure Research', 'You left a comparison half-finished yesterday', '#efe9fd', '#7c4dff', 'compare'],
+        ['PORTFOLIO', 'Technology is now 46% of your liquid assets', 'Up from 39% three months ago', '#f6f2fe', '#7c4dff', 'portfolio']]
+        .map(([kind, title, why, kBg, kFg, id]) => ({ kind, title, why, kBg, kFg, go: goAsk(id) })),
+      categories,
+
+      modules: mods,
+      working: running && s.stage !== 'understanding' && s.stage !== 'planning' && !s.stopped,
+      workingText: SC ? (SC.work[Math.min(s.work, SC.work.length - 1)] || 'Working…') : 'Working…',
+      workRows: SC ? SC.work.map((text, i) => ({ text, fg: i < s.work ? '#131722' : '#9aa3b5',
+        dotBg: i < s.work ? '#1aa966' : '#ffffff', dotBorder: i < s.work ? '#1aa966' : '#dde2ec' })) : [],
+      workPct: SC ? Math.round((s.work / SC.work.length) * 100) + '%' : '0%',
+
+      chatEmpty: !SC, chatGreeting: s.persona === 'returning' ? 'Welcome back, Alex.' : 'I can operate the platform for you.',
+      chatIntro: s.persona === 'returning'
+        ? 'Pick up where you left off, or ask something new. I keep the sources and assumptions of every answer in the inspector.'
+        : 'Describe what you want to understand, build or watch. I choose the tools, build the workspace and show you the data behind every number.',
+      shortcuts: [['/chart', 'chart'], ['/screen', 'screener'], ['/compare', 'compare'], ['/script', 'pine'], ['/portfolio', 'portfolio'], ['/monitor', 'monitor']]
+        .map(([label, id]) => ({ label, go: goAsk(id) })),
+      turns,
+      inputRef: this.inputRef,
+      sendGo: () => this._send(),
+      inputKey: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this._send(); } },
+      voiceGo: () => this.toast('Voice input · dictate the request, Voyager transcribes it into the prompt'),
+      fileGo: () => this.toast('Attach a statement, a portfolio export or a screenshot as context'),
+      newWs: () => { this._clear(); this.setState({ scn: null, stage: 'idle', mods: [], turns: [], srcs: [], asmp: [], rev: 0, work: 0, wsName: 'New workspace', wsAuto: false, mTab: 'canvas' }); },
+
+      creditLabel: s.signedUp ? (3000 - s.credits * 26) + ' of 3 000 tokens left' : (s.credits >= 85 ? 'Almost out of free messages' : s.credits + ' / 100 free messages'),
+      creditPct: (s.signedUp ? Math.max(0, 100 - s.credits) : s.credits) + '%',
+      creditFg: !s.signedUp && s.credits >= 85 ? '#b07708' : '#7c4dff',
+      planLabel: s.signedUp ? 'Free account' : 'Guest',
+      planOpen: () => this.setState({ plan: true, planWhy: 'Deep research, screeners, Pine Script and Wealth Hub analysis use AI credits. Everything else stays free.' }),
+      planClose: () => this.setState({ plan: false }), planModal: s.plan,
+      planTitle: 'Plans and limits', planWhy: s.planWhy,
+      plans: [['Free', '€0', 1, ['Questions and market summaries', 'Simple charts', '3 saved workspaces', '100 AI messages a month']],
+        ['Pro', '€19 / month', 0, ['Deep research and screeners', 'Pine Script generation', 'Unlimited workspaces', 'Monitoring rules']],
+        ['Private AI', '€49 / month', 0, ['Wealth Hub context', 'Private document analysis', 'Scenario modelling', 'Extended memory and private processing']]]
+        .map(([name, price, cur, feats]) => ({ name, price, current: !!cur, feats: feats.map(text => ({ text })),
+          bg: cur ? '#f7f9fc' : '#ffffff', border: cur ? '#c9d4f5' : '#e6eaf2',
+          ctaBg: cur ? '#ffffff' : '#7c4dff', ctaBorder: cur ? '#e2e6ee' : '#7c4dff', ctaFg: cur ? '#5a6376' : '#ffffff',
+          cta: cur ? 'Current plan' : 'Choose ' + name, go: () => { this.setState({ plan: false }); this.toast(cur ? 'You are on the Free plan' : name + ' selected · nothing charged in this prototype'); } })),
+
+      ctxRows: Object.keys(s.ctx).length
+        ? Object.keys(s.ctx).map(k => ({ k, v: s.ctx[k], fg: '#131722', editable: /timeframe|horizon|symbol|market|metric|threshold/i.test(k),
+            edit: () => this.toast('Change ' + k + ' — the whole workspace re-computes') }))
+        : [['Market', 'United States'], ['Asset class', 'Equities'], ['Horizon', 'Long term (3–5 years)'], ['Risk profile', 'Balanced'], ['Currency', 'EUR base']]
+            .map(([k, v]) => ({ k, v, fg: '#131722', editable: true, edit: () => this.toast('Change ' + k + ' — it applies to every future answer') })),
+      whStatus: whMeta[0], whBg: whMeta[1], whFg: whMeta[2], whText: whMeta[3], whCta: whMeta[4], whCtaFg: whMeta[5],
+      whToggle: () => { const on = s.wh === 'off'; this.setState({ wh: on ? 'on' : 'off' }); this.toast(on ? 'Wealth Hub connected · three categories shared, property stays private' : 'Access revoked · Voyager can no longer see your data'); },
+      sources, noSources: sources.length === 0,
+      hasAssumptions: s.asmp.length > 0,
+      assumptions: s.asmp.map(text => ({ text, edit: () => this.toast('Edit the assumption and the result re-computes with it') })),
+      hasRules: s.monitorOn, rules: s.monitorOn ? [{ name: 'NVDA valuation', cond: 'Forward P/E below 27.4 · checked at every daily close · email and in-app', dot: '#1aa966' }] : [],
+      history: (s.hist.length ? s.hist : [['—', 'Nothing yet — your first request starts the history']]).map(([t, text]) => ({ t, text })),
+
+      signupOn: ctaOn,
+      signupWrap: 'position:absolute;z-index:12;display:flex;align-items:center;gap:11px;background:#ffffff;border:1px solid #e6eaf2;border-radius:16px;box-shadow:0 12px 34px rgba(19,23,34,0.13);padding:10px 12px 10px 13px;'
+        + (isMobile ? 'left:12px;right:12px;bottom:64px;' : 'right:16px;bottom:16px;max-width:calc(100% - 32px);'),
+      signupGo: () => this.setState({ signupModal: true }),
+      signupHide: () => { this.setState({ signup: false }); this.toast('Hidden — the offer stays in the plans dialog'); },
+      signupModal: s.signupModal, signupClose: () => this.setState({ signupModal: false }),
+      signupPerks: ['3 000 tokens on sign-up — about 40 questions or 6 research workspaces.',
+        'Saved workspaces, charts and scripts stay in your account.',
+        'Monitoring rules keep watching after you close the tab.',
+        'Your financial data is only ever read with permission.'].map(text => ({ text })),
+      signupDone: () => { this.setState({ signedUp: true, signupModal: false, credits: 0 }); this.toast('Welcome — 3 000 tokens added to your account'); },
+      mTabs, tabSources: isMobile && s.mTab === 'sources',
+      toast: s.toast || ''
+    };
+  }
+}
+</script>
+</body>
+</html>
