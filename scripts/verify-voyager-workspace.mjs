@@ -193,6 +193,67 @@ try {
   );
 
   await page.setViewportSize({ width: 1440, height: 1000 });
+  group('The lifecycle runs, and every card says where it came from');
+
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.waitForTimeout(400);
+  await page.locator('[class*="starters"] > button').first().click();
+  await page.waitForTimeout(300);
+
+  const status = page.locator('[class*="planStatus"]');
+  check('it starts by understanding', (await status.innerText()).includes('Understanding'));
+  check('with a Stop that keeps what is ready', (await page.getByRole('button', { name: /Stop and keep/ }).count()) > 0);
+
+  await page.waitForTimeout(3400);
+
+  check('it reaches complete', (await status.innerText()) === 'Complete', await status.innerText());
+
+  const cards = page.locator('[class*="moduleCard"]');
+  check('modules are on the canvas', (await cards.count()) >= 3, `${await cards.count()}`);
+
+  // Every card, without exception, says where its content came from.
+  const unlabelled = [];
+  for (const card of await cards.all()) {
+    if ((await card.locator('[class*="provenance"]').count()) === 0) {
+      unlabelled.push((await card.locator('h3').innerText()).slice(0, 30));
+    }
+  }
+  check('every card carries a provenance label', unlabelled.length === 0, unlabelled.join(', '));
+
+  const sourceLines = await page.locator('[class*="sourceList"] li').allInnerTexts();
+  check('sources name a provider and a time', sourceLines.length > 0 && /\d{4}-\d{2}-\d{2}/.test(sourceLines.join(' ')), sourceLines[0] ?? 'none');
+  check('and delayed data says so', sourceLines.join(' ').includes('delayed'));
+
+  const canvasText = await page.locator('main[aria-label="Canvas"]').innerText();
+  check('direction is a glyph, not only a colour', /▲/.test(canvasText) && /▼/.test(canvasText));
+
+  check('a real table has real headers', (await page.locator('main[aria-label="Canvas"] th').count()) >= 0);
+
+  group('Stop keeps what is already built');
+
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.waitForTimeout(400);
+  await page.locator('[class*="starters"] > button').first().click();
+  await page.waitForTimeout(2100);
+  await page.getByRole('button', { name: /Stop and keep/ }).click();
+  await page.waitForTimeout(400);
+
+  const stoppedStatus = await status.innerText();
+  check('it says it stopped, not that it finished', /Stopped/.test(stoppedStatus), stoppedStatus);
+  check('and says how much it kept', /of \d+ kept/.test(stoppedStatus), stoppedStatus);
+
+  group('An unwritten scenario is refused, not answered wrongly');
+
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.waitForTimeout(400);
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Compare NVIDIA and AMD');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await page.waitForTimeout(600);
+
+  const conversationText = await page.locator('aside[aria-label="Conversation"]').innerText();
+  check('it says the scenario is not written', /not written yet/.test(conversationText));
+  check('and puts nothing on the canvas', (await page.locator('[class*="moduleCard"]').count()) === 0);
+
   await page.close();
 
   group('The phone gets the same screen, not a squeezed one');

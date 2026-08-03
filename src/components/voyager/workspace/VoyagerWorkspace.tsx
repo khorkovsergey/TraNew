@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Link } from '@/i18n/navigation';
 import { VoyagerOrb } from '@/components/voyager/VoyagerOrb';
@@ -10,6 +10,17 @@ import {
   STARTERS,
   type Briefing,
 } from '@/lib/voyager/workspace/landing';
+import { parsePlan, type VoyagerModule, type VoyagerPlan } from '@/lib/voyager/workspace/contract';
+import {
+  advance,
+  isRunning,
+  START,
+  statusFor,
+  stop as stopRun,
+  type Run,
+} from '@/lib/voyager/workspace/lifecycle';
+import { responseFor } from '@/lib/voyager/workspace/scenarios';
+import { ModuleCard } from './ModuleCard';
 import { WorkspaceShell } from './WorkspaceShell';
 import styles from './VoyagerWorkspace.module.css';
 
@@ -41,6 +52,9 @@ export function VoyagerWorkspace({ personName }: Props) {
   const [request, setRequest] = useState('');
   const [draft, setDraft] = useState('');
   const [showCategories, setShowCategories] = useState(false);
+  const [plan, setPlan] = useState<VoyagerPlan | null>(null);
+  const [refusals, setRefusals] = useState<string[]>([]);
+  const [run, setRun] = useState<Run>(START);
   const composer = useRef<HTMLTextAreaElement>(null);
 
   /*
@@ -59,10 +73,35 @@ export function VoyagerWorkspace({ personName }: Props) {
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    /*
+     * The response goes through `parsePlan` here, exactly as a model response
+     * will. Nothing downstream sees a shape that has not been through the gate,
+     * and a scenario that produced something unrenderable is refused rather
+     * than half-drawn.
+     */
+    const parsed = parsePlan(responseFor(trimmed));
+
     setRequest(trimmed);
     setStage('requested');
     setDraft('');
+    setPlan(parsed?.plan ?? null);
+    setRefusals(parsed?.refusals ?? []);
+    setRun(START);
   }, []);
+
+  /*
+   * The clock lives here and the rules live in `lifecycle.ts`.
+   *
+   * Splitting them is what lets the sequence be tested without waiting: the
+   * component decides when to step, the module decides what stepping means.
+   */
+  useEffect(() => {
+    if (!plan || !isRunning(run)) return;
+
+    const pause = run.stage === 'understanding' ? 500 : run.stage === 'planning' ? 420 : 320;
+    const timer = setTimeout(() => setRun((current) => advance(current, plan)), pause);
+    return () => clearTimeout(timer);
+  }, [plan, run]);
 
   /** "New" returns to the bare screen, which is the other half of the rule. */
   const reset = useCallback(() => {
@@ -70,6 +109,25 @@ export function VoyagerWorkspace({ personName }: Props) {
     setRequest('');
     setDraft('');
     setShowCategories(false);
+    setPlan(null);
+    setRefusals([]);
+    setRun(START);
+  }, []);
+
+  /** Actions are declared by the module; nothing is inferred from its label. */
+  const onAction = useCallback((module: VoyagerModule, actionId: string) => {
+    const action = module.actions.find((item) => item.id === actionId);
+    if (!action) return;
+
+    // Applying a change is phase 5, through the command bus that already
+    // confirms and records and undoes. Until then the button says so rather
+    // than doing nothing quietly.
+    setRefusals((current) => [
+      ...current,
+      action.mutates
+        ? `"${action.label}" changes something outside this canvas, and that path — confirm, record, undo — arrives in phase 5.`
+        : `"${action.label}" opens another part of the portal, which is wired in phase 5.`,
+    ]);
   }, []);
 
   if (stage === 'requested') {
@@ -81,34 +139,149 @@ export function VoyagerWorkspace({ personName }: Props) {
      */
     return (
       <WorkspaceShell
-        workspaceName="New workspace"
+        workspaceName={plan ? `${request.slice(0, 40)}${request.length > 40 ? '…' : ''}` : 'New workspace'}
         autoNamed
         onNew={reset}
         conversation={
-          <div className={styles.zoneStub}>
-            <p className={styles.zoneStubRequest}>{request}</p>
-            <p className={styles.zoneStubNote}>
-              The turn — mode chip, plan card with its steps ticking off, and the summary —
-              arrives with the execution lifecycle in phase 3.
-            </p>
+          <div className={styles.turn}>
+            <p className={styles.userBubble}>{request}</p>
+
+            {plan ? (
+              <>
+                <span className={styles.modeChip}>
+                  {plan.mode} — {plan.because}
+                </span>
+
+                <div className={styles.planCard}>
+                  <div className={styles.planHead}>
+                    <span className={styles.planStatus}>{statusFor(run, plan)}</span>
+                    {isRunning(run) && <span className={styles.spinner} aria-hidden="true" />}
+                  </div>
+
+                  <ol className={styles.planSteps}>
+                    {plan.steps.map((step, index) => (
+                      <li
+                        key={step}
+                        className={`${styles.planStep} ${
+                          run.revealed > 0 || run.stage === 'complete' || index < 2
+                            ? styles.planStepDone
+                            : ''
+                        }`}
+                      >
+                        {step}
+                      </li>
+                    ))}
+                  </ol>
+
+                  {/* Work items, named. What was done — never the reasoning
+                      that chose to do it. */}
+                  {run.stage === 'working' && (
+                    <ul className={styles.workList}>
+                      {plan.work.map((item, index) => (
+                        <li
+                          key={item.id}
+                          className={index <= run.workIndex ? styles.workDone : styles.workPending}
+                        >
+                          {item.label}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {isRunning(run) && (
+                    <button
+                      className={styles.stopButton}
+                      onClick={() => setRun((current) => stopRun(current))}
+                    >
+                      Stop and keep what is ready
+                    </button>
+                  )}
+                </div>
+
+                {refusals.length > 0 && (
+                  <div className={styles.refusalCard} role="status">
+                    {refusals.map((refusal, index) => (
+                      <p key={index}>{refusal}</p>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className={styles.refusalCard} role="status">
+                <p>
+                  That scenario is not written yet. Seven of the ten arrive in phase 4; this one
+                  returns nothing rather than answering confidently about the wrong subject.
+                </p>
+              </div>
+            )}
           </div>
         }
         canvas={
-          <div className={styles.zoneStub}>
-            <p className={styles.zoneStubNote}>
-              Modules appear here one at a time as the work completes. The card family and the
-              lifecycle that reveals them are phase 3; the ten scenarios that fill them are
-              phase 4.
-            </p>
-          </div>
+          plan ? (
+            <>
+              {plan.modules.slice(0, run.revealed).map((module) => (
+                <ModuleCard
+                  key={module.id}
+                  module={module}
+                  sources={plan.sources}
+                  onAction={onAction}
+                />
+              ))}
+
+              {run.revealed === 0 && (
+                <p className={styles.zoneStubNote}>{statusFor(run, plan)}</p>
+              )}
+            </>
+          ) : (
+            <p className={styles.zoneStubNote}>Nothing to build for this request yet.</p>
+          )
         }
         inspector={
-          <div className={styles.zoneStub}>
-            <p className={styles.zoneStubNote}>
-              Context in use, Wealth Hub status, sources with timestamps and editable
-              assumptions. Sources arrive with the modules that cite them, in phase 3.
-            </p>
-          </div>
+          plan ? (
+            <>
+              <div className={styles.inspectorSection}>
+                <h4 className={styles.inspectorLabel}>Context in use</h4>
+                <p className={styles.zoneStubNote}>
+                  {request}
+                </p>
+              </div>
+
+              <div className={styles.inspectorSection}>
+                <h4 className={styles.inspectorLabel}>Sources and timestamps</h4>
+                <ul className={styles.sourceList}>
+                  {plan.sources.map((source) => (
+                    <li key={source.id}>
+                      <span>
+                        <strong>{source.kind}</strong> · {source.provider} ·{' '}
+                        {source.at.slice(0, 16).replace('T', ' ')} UTC
+                        {source.delayed && ' · delayed'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className={styles.inspectorSection}>
+                <h4 className={styles.inspectorLabel}>Assumptions</h4>
+                {plan.assumptions.map((assumption) => (
+                  <div key={assumption.id} className={styles.assumptionRow}>
+                    <span>{assumption.label}</span>
+                    <span className={styles.assumptionValue}>{assumption.value}</span>
+                  </div>
+                ))}
+                <p className={styles.zoneStubNote}>
+                  Editing these re-runs the result. The editing itself is phase 4.
+                </p>
+              </div>
+
+              {/* Standing, on every workspace, not shown once and dismissed. */}
+              <p className={styles.standingNote}>
+                This is educational analysis, not personalised advice.
+              </p>
+            </>
+          ) : (
+            <p className={styles.zoneStubNote}>No context yet.</p>
+          )
         }
       />
     );

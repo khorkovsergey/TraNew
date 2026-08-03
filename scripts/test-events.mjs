@@ -89,6 +89,9 @@ try {
       'src/lib/market/newsShape.ts',
       'src/lib/voyager/workspace/state.ts',
       'src/lib/voyager/workspace/landing.ts',
+      'src/lib/voyager/workspace/contract.ts',
+      'src/lib/voyager/workspace/lifecycle.ts',
+      'src/lib/voyager/workspace/scenarios.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -204,6 +207,9 @@ try {
   const news = await load('newsShape', 'market');
   const zones = await load('state', 'workspace');
   const landing = await load('landing', 'workspace');
+  const contract = await load('contract', 'workspace');
+  const life = await load('lifecycle', 'workspace');
+  const scenarios = await load('scenarios', 'workspace');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -3286,6 +3292,335 @@ try {
     assert.match(landing.briefingFor('Alex', 9).greeting, /morning/);
     assert.match(landing.briefingFor('Alex', 14).greeting, /afternoon/);
     assert.match(landing.briefingFor('Alex', 20).greeting, /evening/);
+  });
+
+  /* ========================= The structured output contract ================== */
+
+  group('Only declared modules reach the canvas');
+
+  const goodSource = {
+    id: 's1',
+    kind: 'MARKET DATA',
+    provider: 'Twelve Data',
+    at: '2026-08-03T09:00:00Z',
+  };
+
+  const goodPlan = {
+    mode: 'analyse',
+    because: 'you asked what the visible bars did',
+    steps: ['Read the request', 'Fetch the data', 'Summarise'],
+    work: [{ id: 'w1', label: 'Screening 4 218 companies', done: true }],
+    modules: [
+      {
+        id: 'm1',
+        kind: 'text-insight',
+        title: 'What moved today',
+        data: { body: 'Technology fell.' },
+        provenance: ['market-data'],
+        sourceIds: ['s1'],
+        actions: [{ id: 'open', label: 'Open in Supercharts', mutates: false }],
+      },
+    ],
+    sources: [goodSource],
+    assumptions: [{ id: 'a1', label: 'Horizon', value: '5 years', editable: true }],
+  };
+
+  check('a sound plan parses', () => {
+    const out = contract.parsePlan(JSON.parse(JSON.stringify(goodPlan)));
+    assert.equal(out.plan.modules.length, 1);
+    assert.equal(out.plan.sources.length, 1);
+    assert.equal(out.refusals.length, 0);
+  });
+
+  check('an unknown module kind is refused by name, not rendered', () => {
+    /*
+     * The rule the whole file exists for. A model naming a module type this
+     * canvas does not have must not get a nearest-match; there is no path from
+     * a string it invented to something on screen.
+     */
+    const out = contract.parsePlan({
+      ...goodPlan,
+      modules: [...goodPlan.modules, { ...goodPlan.modules[0], id: 'm2', kind: 'trade-ticket' }],
+    });
+    assert.equal(out.plan.modules.length, 1);
+    assert.match(out.refusals[0], /trade-ticket/);
+  });
+
+  check('an undated source is dropped', () => {
+    // It cannot be checked and cannot be aged: it is an assertion with a name
+    // attached, not a source.
+    const out = contract.parsePlan({
+      ...goodPlan,
+      sources: [{ ...goodSource, at: 'recently' }],
+      modules: [{ ...goodPlan.modules[0], sourceIds: [] }],
+    });
+    assert.equal(out.plan.sources.length, 0);
+    assert.match(out.refusals.join(' '), /timestamp/);
+  });
+
+  check('a source with no provider is dropped', () => {
+    const out = contract.parsePlan({
+      ...goodPlan,
+      sources: [{ ...goodSource, provider: '' }],
+      modules: [{ ...goodPlan.modules[0], sourceIds: [] }],
+    });
+    assert.equal(out.plan.sources.length, 0);
+  });
+
+  check('a module citing sources that do not exist is refused, not shown bare', () => {
+    /*
+     * Worse than citing none, because it looks evidenced. Dropping the citation
+     * and rendering the card anyway would leave a claim wearing a footnote to
+     * nowhere.
+     */
+    const out = contract.parsePlan({
+      ...goodPlan,
+      sources: [],
+      modules: [{ ...goodPlan.modules[0], sourceIds: ['s9'] }],
+    });
+    assert.equal(out.plan.modules.length, 0);
+    assert.match(out.refusals.join(' '), /cited sources that are not in the response/);
+  });
+
+  check('a module that will not say where its content came from is refused', () => {
+    const out = contract.parsePlan({
+      ...goodPlan,
+      modules: [{ ...goodPlan.modules[0], provenance: [] }],
+    });
+    assert.equal(out.plan.modules.length, 0);
+    assert.match(out.refusals.join(' '), /where its content came from/);
+  });
+
+  check('an unknown provenance label is discarded rather than displayed', () => {
+    const out = contract.parsePlan({
+      ...goodPlan,
+      modules: [{ ...goodPlan.modules[0], provenance: ['market-data', 'vibes'] }],
+    });
+    assert.deepEqual(out.plan.modules[0].provenance, ['market-data']);
+  });
+
+  check('an action with no mutation flag is treated as mutating', () => {
+    /*
+     * A missing flag costs a confirmation. The other default would skip one,
+     * and the thing being skipped is the guarantee that nothing changes the
+     * chart without being asked.
+     */
+    const out = contract.parsePlan({
+      ...goodPlan,
+      modules: [
+        { ...goodPlan.modules[0], actions: [{ id: 'apply', label: 'Apply to chart' }] },
+      ],
+    });
+    assert.equal(out.plan.modules[0].actions[0].mutates, true);
+  });
+
+  check('an unknown mode makes the whole plan unusable', () => {
+    // The mode drives what the interface offers; guessing it would offer the
+    // wrong thing confidently.
+    assert.equal(contract.parsePlan({ ...goodPlan, mode: 'trade' }), null);
+  });
+
+  check('refusals are collected, not thrown', () => {
+    // Four sound modules and one broken should render four and say what went.
+    const many = [1, 2, 3, 4].map((n) => ({ ...goodPlan.modules[0], id: `m${n}` }));
+    const out = contract.parsePlan({
+      ...goodPlan,
+      modules: [...many, { ...goodPlan.modules[0], id: 'bad', kind: 'nope' }],
+    });
+    assert.equal(out.plan.modules.length, 4);
+    assert.equal(out.refusals.length, 1);
+  });
+
+  check('rubbish is null rather than an empty canvas that looks finished', () => {
+    assert.equal(contract.parsePlan(null), null);
+    assert.equal(contract.parsePlan('analyse it'), null);
+    assert.equal(contract.parsePlan({}), null);
+  });
+
+  check('a delayed source keeps its label', () => {
+    const out = contract.parsePlan({
+      ...goodPlan,
+      sources: [{ ...goodSource, delayed: true }],
+    });
+    assert.equal(out.plan.sources[0].delayed, true);
+  });
+
+  check('sourcesFor returns only what the module actually cites', () => {
+    const out = contract.parsePlan({
+      ...goodPlan,
+      sources: [goodSource, { ...goodSource, id: 's2', provider: 'FRED' }],
+    });
+    const cited = contract.sourcesFor(out.plan.modules[0], out.plan.sources);
+    assert.equal(cited.length, 1);
+    assert.equal(cited[0].id, 's1');
+  });
+
+  group('The execution lifecycle');
+
+  const runPlan = {
+    ...goodPlan,
+    work: [
+      { id: 'w1', label: 'Reading the request', done: false },
+      { id: 'w2', label: 'Screening 4 218 companies', done: false },
+    ],
+    modules: [1, 2, 3].map((n) => ({ ...goodPlan.modules[0], id: `m${n}` })),
+  };
+  const parsed = contract.parsePlan(runPlan).plan;
+
+  const drive = (from, times) => {
+    let run = from;
+    for (let i = 0; i < times; i += 1) run = life.advance(run, parsed);
+    return run;
+  };
+
+  check('it starts by understanding, not by working', () => {
+    assert.equal(life.START.stage, 'understanding');
+    assert.equal(life.START.revealed, 0);
+  });
+
+  check('the stages run in the order the handoff gives', () => {
+    assert.equal(drive(life.START, 1).stage, 'planning');
+    assert.equal(drive(life.START, 2).stage, 'working');
+    assert.equal(drive(life.START, 4).stage, 'partial');
+  });
+
+  check('every work item is named before the modules start', () => {
+    /*
+     * The checklist finishes first, so the first card lands on a canvas whose
+     * plan is already visible rather than beside a list still moving.
+     */
+    assert.equal(drive(life.START, 2).workIndex, 0);
+    assert.equal(drive(life.START, 3).workIndex, 1);
+    assert.equal(drive(life.START, 4).revealed, 0);
+  });
+
+  check('modules appear one at a time', () => {
+    assert.equal(drive(life.START, 5).revealed, 1);
+    assert.equal(drive(life.START, 6).revealed, 2);
+  });
+
+  check('and the run completes when the last one lands', () => {
+    const done = drive(life.START, 7);
+    assert.equal(done.stage, 'complete');
+    assert.equal(done.revealed, 3);
+  });
+
+  check('advancing past complete does nothing', () => {
+    // A terminal state that keeps counting would reveal modules that do not
+    // exist.
+    const done = drive(life.START, 12);
+    assert.equal(done.stage, 'complete');
+    assert.equal(done.revealed, 3);
+  });
+
+  check('Stop keeps what is already built', () => {
+    /*
+     * The decision that matters most here. The modules that finished are real
+     * work; discarding them because somebody stopped the rest punishes
+     * impatience with lost output.
+     */
+    const midway = drive(life.START, 6);
+    const stopped = life.stop(midway);
+    assert.equal(stopped.stage, 'stopped');
+    assert.equal(stopped.revealed, 2);
+  });
+
+  check('and stopped is not complete', () => {
+    // The answer is genuinely partial; calling it complete claims work nobody
+    // did.
+    const stopped = life.stop(drive(life.START, 6));
+    assert.notEqual(stopped.stage, 'complete');
+    assert.match(life.statusFor(stopped, parsed), /2 of 3 kept/);
+  });
+
+  check('a failure keeps what was revealed too', () => {
+    const failed = life.fail(drive(life.START, 6), life.FAILURES.provider);
+    assert.equal(failed.stage, 'failed');
+    assert.equal(failed.revealed, 2);
+  });
+
+  check('every failure names a cause and a way forward', () => {
+    /*
+     * A named cause with no recovery leaves somebody stuck with an accurate
+     * description of being stuck.
+     */
+    const failures = Object.values(life.FAILURES);
+    assert.ok(failures.length >= 3, `${failures.length} failure states`);
+    for (const failure of failures) {
+      assert.ok(failure.cause.length > 0);
+      assert.ok(failure.recovery.length > 0);
+      assert.ok(['retry', 'narrow', 'connect', 'sign-in'].includes(failure.action));
+    }
+  });
+
+  check('the status line says something true at every stage', () => {
+    assert.match(life.statusFor(life.START, parsed), /Understanding/);
+    assert.match(life.statusFor(drive(life.START, 2), parsed), /Reading the request/);
+    assert.match(life.statusFor(drive(life.START, 5), parsed), /1 of 3/);
+    assert.equal(life.statusFor(drive(life.START, 7), parsed), 'Complete');
+  });
+
+  check('running is true while there is work and false once there is not', () => {
+    assert.equal(life.isRunning(life.START), true);
+    assert.equal(life.isRunning(drive(life.START, 7)), false);
+    assert.equal(life.isRunning(life.stop(life.START)), false);
+    assert.equal(life.isRunning(life.fail(life.START, life.FAILURES.provider)), false);
+  });
+
+  group('Scripted responses go through the same gate a model would');
+
+  check('the market scenario parses with nothing refused', () => {
+    /*
+     * The point of scripting them behind the contract: a scenario that forgets
+     * a source or invents a module kind is caught here, in a test, rather than
+     * in production once a model is producing the same shape.
+     */
+    const out = contract.parsePlan(scenarios.responseFor('What is happening in the US market today?'));
+    assert.ok(out, 'the scenario did not parse at all');
+    assert.deepEqual(out.refusals, []);
+    assert.ok(out.plan.modules.length >= 3);
+  });
+
+  check('every module in it cites a source or declares none', () => {
+    const out = contract.parsePlan(scenarios.responseFor('market today'));
+    for (const module of out.plan.modules) {
+      assert.ok(module.provenance.length > 0, `${module.id} has no provenance`);
+    }
+  });
+
+  check('measurement and interpretation are not the same card', () => {
+    // The difference between "the market did this" and "Voyager thinks this" is
+    // the one a reader most needs, so they carry different labels.
+    const out = contract.parsePlan(scenarios.responseFor('market today'));
+    const measured = out.plan.modules.filter((m) => m.provenance.includes('market-data'));
+    const inferred = out.plan.modules.filter((m) => m.provenance.includes('inference'));
+    assert.ok(measured.length > 0 && inferred.length > 0);
+    assert.equal(measured.some((m) => inferred.includes(m)), false);
+  });
+
+  check('the delayed source says it is delayed', () => {
+    const out = contract.parsePlan(scenarios.responseFor('market today'));
+    assert.ok(out.plan.sources.some((source) => source.delayed));
+  });
+
+  check('an action that changes something is marked as mutating', () => {
+    const out = contract.parsePlan(scenarios.responseFor('market today'));
+    const actions = out.plan.modules.flatMap((m) => m.actions);
+    assert.ok(actions.some((a) => a.mutates), 'no mutating action found');
+    assert.ok(actions.some((a) => !a.mutates), 'no read-only action found');
+  });
+
+  check('routing picks a scenario from the words used', () => {
+    assert.equal(scenarios.scenarioFor('Compare NVIDIA and AMD'), 'compare');
+    assert.equal(scenarios.scenarioFor('Build a Tesla chart with RSI'), 'chart');
+    assert.equal(scenarios.scenarioFor('What are the main risks in my portfolio?'), 'portfolio');
+    assert.equal(scenarios.scenarioFor('What is happening today?'), 'market');
+  });
+
+  check('a scenario that is not written yet returns nothing rather than the wrong one', () => {
+    // Falling back to the market summary for a portfolio question would answer
+    // confidently about the wrong subject.
+    assert.equal(scenarios.responseFor('Compare NVIDIA and AMD'), null);
   });
 
   /* ============================ Superchart layouts ============================ */
