@@ -820,10 +820,23 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     ctx.font = '10px "Plus Jakarta Sans", sans-serif';
     ctx.textAlign = 'center';
 
+    /*
+     * The label follows the spacing of the data, not a fixed format.
+     *
+     * Every label was a date, so a minute chart printed the same day eight
+     * times across the axis and told you nothing about where you were in it.
+     * The gap between bars is what decides: inside a day, the time is the only
+     * part that varies.
+     */
+    const gap = bars.length > 1 ? bars[1].time - bars[0].time : 86_400;
+    const intraday = gap < 86_400;
+
     const every = Math.max(1, Math.floor(bars.length / 8));
     bars.forEach((bar, index) => {
       if (index % every !== 0) return;
-      const label = new Date(bar.time * 1000).toISOString().slice(5, 10);
+
+      const at = new Date(bar.time * 1000).toISOString();
+      const label = intraday ? at.slice(11, 16) : at.slice(5, 10);
       ctx.fillText(label, index * step + step / 2, layout.height - 8);
     });
 

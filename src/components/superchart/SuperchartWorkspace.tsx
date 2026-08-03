@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Icon } from '@/components/ui/Icon';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Link } from '@/i18n/navigation';
 import { CanvasChartEngine } from '@/lib/superchart/chart-engine/canvas';
 import {
@@ -112,6 +112,23 @@ export type SuperchartWorkspaceProps = {
   symbol: string;
   companyName: string;
   exchange: string;
+};
+
+/**
+ * Which glyph each drawing tool wears.
+ *
+ * Typed against `DrawingTool`, so adding a tool without giving it an icon fails
+ * the build rather than quietly producing another button that looks like the
+ * four beside it.
+ */
+const TOOL_ICON: Record<DrawingTool, IconName> = {
+  trendLine: 'toolTrendLine',
+  horizontalLine: 'toolHorizontalLine',
+  verticalLine: 'toolVerticalLine',
+  rectangle: 'toolRectangle',
+  text: 'toolText',
+  priceLabel: 'toolHorizontalLine',
+  fibonacci: 'toolRectangle',
 };
 
 export function SuperchartWorkspace({
@@ -242,8 +259,25 @@ export function SuperchartWorkspace({
       setCrosshair(payload as CrosshairContext | null);
     });
 
+    /*
+     * React follows the visible range.
+     *
+     * Panning and zooming live entirely in the engine, which is what keeps the
+     * chart fast — but it meant the "Voyager sees" chips went on describing the
+     * window as it was when the component last rendered. Zoom in and they still
+     * read "173 bars, +1.8%" beside an answer computed from the 54 bars now on
+     * screen. The chips promise to be what gets sent, so they have to move.
+     *
+     * Bars still never enter React; this is two numbers, and the engine emits
+     * them at most once a frame.
+     */
+    const offRange = engine.subscribe('visibleRange', (payload) => {
+      setDescribedRange(payload as { from: number; to: number });
+    });
+
     return () => {
       off();
+      offRange();
       engine.destroy();
       engineRef.current = null;
     };
@@ -617,7 +651,7 @@ export function SuperchartWorkspace({
         excluded,
       });
     },
-    [bars, symbolId, interval, resolved, indicators, drawings]
+    [bars, symbolId, interval, resolved, indicators, drawings, describedRange]
   );
 
   /*
@@ -666,6 +700,29 @@ export function SuperchartWorkspace({
       setShowBefore(false);
     },
     [commit, liveState, interval, chartType]
+  );
+
+  /**
+   * Puts a range of bars on screen.
+   *
+   * Padded, so the bars sit inside the view rather than against its edges, and
+   * clamped to the series — a single-bar reference asks for a one-bar window,
+   * which is not a chart.
+   */
+  const focusReference = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      const engine = engineRef.current;
+      if (!engine || !bars.length) return;
+
+      const span = Math.max(toIndex - fromIndex + 1, 1);
+      const padding = Math.max(10, Math.round(span * 0.35));
+
+      engine.setVisibleRange({
+        from: Math.max(0, fromIndex - padding),
+        to: Math.min(bars.length, toIndex + padding + 1),
+      });
+    },
+    [bars.length]
   );
 
   const applyHighlights = useCallback((highlights: ChartHighlight[], activeId: string | null) => {
@@ -1001,7 +1058,7 @@ export function SuperchartWorkspace({
                   pending.current = [];
                 }}
               >
-                <Icon name="chart" size={17} />
+                <Icon name={TOOL_ICON[tool]} size={17} />
               </button>
             )
           )}
@@ -1030,7 +1087,9 @@ export function SuperchartWorkspace({
 
           {/* The canvas is aria-hidden; this is the series a screen reader gets. */}
           <div
-            className={`${styles.stage} ${mobilePane === 'chart' ? styles.paneOnMobile : ''}`}
+            className={`${styles.stage} ${mobilePane === 'chart' ? styles.paneOnMobile : ''} ${
+              activeTool ? styles.stageDrawing : ''
+            }`}
             ref={stageRef}
             onPointerDown={onStagePointerDown}
             onPointerMove={onStagePointerMove}
@@ -1094,6 +1153,7 @@ export function SuperchartWorkspace({
                 showBefore={showBefore}
                 onToggleBefore={setShowBefore}
                 onApply={applyPlan}
+                onFocusReference={focusReference}
                 activity={activity}
               />
             )}

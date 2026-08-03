@@ -450,10 +450,18 @@
 
 .toolOn { background: var(--tn-blue-tint); color: var(--tn-blue); }
 
+/*
+ * Beside the rail, not at the far end of the pane.
+ *
+ * It used to sit at the bottom-left: you pressed a button in the top-left
+ * corner and the only response appeared seven hundred pixels below it, off the
+ * top of most screenshots and out of the corner of the eye that just moved.
+ * Feedback belongs next to the thing that caused it.
+ */
 .toolHint {
   position: absolute;
   left: 64px;
-  bottom: 16px;
+  top: 52px;
   z-index: 5;
   background: var(--tn-surface);
   border: 1px solid var(--tn-purple);
@@ -1393,4 +1401,10 @@
   .change {
     font-size: 11.5px;
   }
+}
+
+/* A crosshair says "click here" without a sentence. The hint says how many
+   clicks; between them, choosing a tool has a visible consequence. */
+.stageDrawing {
+  cursor: crosshair;
 }

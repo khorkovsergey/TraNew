@@ -146,6 +146,54 @@ try {
   const lit = await page.locator('[class*="referenceOn"]').count();
   check('and hovering the chart lights a sentence', lit > 0, `${lit} lit`);
 
+  group('The chips describe the chart in front of you');
+
+  /*
+   * Panning and zooming live in the engine, so React had no idea the window had
+   * changed: the chips went on reading "173 bars, +1.8%" beside an answer
+   * computed from the 54 bars actually on screen. Two numbers for one chart,
+   * and the one labelled "Voyager sees" was the wrong one.
+   */
+  const barsInChip = async () =>
+    Number(
+      ((await page.locator('button:has-text("bars in view")').innerText()) ?? '').match(/\d+/)?.[0] ?? 0
+    );
+
+  const beforeZoom = await barsInChip();
+  for (let i = 0; i < 10; i += 1) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, -240);
+  }
+  await page.waitForTimeout(600);
+  const afterZoom = await barsInChip();
+
+  check('zooming changes what Voyager says it sees', afterZoom < beforeZoom, `${beforeZoom} -> ${afterZoom}`);
+
+  await page.getByRole('textbox', { name: /Ask Voyager/ }).fill('explain the visible range');
+  await page.getByRole('button', { name: 'Ask', exact: true }).click();
+  await page.waitForTimeout(900);
+
+  const zoomedAnswer = (await page.locator('[class*="voyagerAnswer"]').first().textContent()) ?? '';
+  const answerBars = Number(zoomedAnswer.match(/Over the (\d+) bars/)?.[1] ?? 0);
+  check(
+    'and the answer counts the same bars the chip does',
+    answerBars === (await barsInChip()),
+    `answer ${answerBars}, chip ${await barsInChip()}`
+  );
+
+  group('A reference is a control, not a label');
+
+  const beforeClick = await page.evaluate(() => document.querySelector('canvas').toDataURL().length);
+  await page.locator('[class*="reference"]').first().click();
+  await page.waitForTimeout(700);
+  const afterClick = await page.evaluate(() => document.querySelector('canvas').toDataURL().length);
+
+  check(
+    'clicking a reference moves the chart onto its bars',
+    beforeClick !== afterClick,
+    'the chart did not move — the button looked live and did nothing'
+  );
+
   group('Removing a chip changes the answer, not just the panel');
 
   await page.getByRole('button', { name: /Which of these had unusual volume/ }).click();

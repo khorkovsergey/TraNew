@@ -50,6 +50,8 @@ type Props = {
   showBefore: boolean;
   onToggleBefore: (value: boolean) => void;
   onApply: (plan: CommandPlan) => void;
+  /** Clicking a reference moves the chart to the bars it names. */
+  onFocusReference: (fromIndex: number, toIndex: number) => void;
   activity: Array<{ id: string; title: string; at: string }>;
 };
 
@@ -70,6 +72,7 @@ export function VoyagerChartPanel({
   showBefore,
   onToggleBefore,
   onApply,
+  onFocusReference,
   activity,
 }: Props) {
   const [state, setState] = useState<PanelState>({ status: 'idle' });
@@ -293,6 +296,15 @@ export function VoyagerChartPanel({
                 onMouseLeave={() => setHovered(null)}
                 onFocus={() => setHovered(reference.id)}
                 onBlur={() => setHovered(null)}
+                /*
+                 * It looked like a button, highlighted on hover, and did
+                 * nothing when pressed — so pressing it read as the whole
+                 * answer being stuck. Clicking now moves the chart onto the
+                 * bars the sentence is about, which is what somebody reaching
+                 * for a numbered reference is asking for.
+                 */
+                onClick={() => onFocusReference(reference.fromIndex, reference.toIndex)}
+                title="Show these bars on the chart"
               >
                 <span className={styles.referenceNumber}>{reference.number}</span>
                 <span>

@@ -26,6 +26,17 @@ const PATHS = {
   chevronDown: 'm6 9 6 6 6-6',
   close: 'M18 6 6 18M6 6l12 12',
   sparkle: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18',
+
+  /*
+   * Drawing tools. Each glyph is the shape the tool makes, with its handles
+   * shown as small circles — the rail is a row of near-identical buttons
+   * otherwise, and a tooltip you have to hover to read is not a label.
+   */
+  toolTrendLine: 'M4 18 20 6M4.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M19.5 8.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3',
+  toolHorizontalLine: 'M3 12h18M5.5 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M18.5 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3',
+  toolVerticalLine: 'M12 3v18M13.5 5.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0M13.5 18.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0',
+  toolRectangle: 'M4 6h16v12H4zM5.5 7.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M18.5 20.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3',
+  toolText: 'M5 6V4h14v2M12 4v16M9 20h6',
 } as const;
 
 export type IconName = keyof typeof PATHS;
