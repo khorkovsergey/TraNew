@@ -16,6 +16,8 @@ import {
   isRunning,
   START,
   statusFor,
+  fail as failRun,
+  FAILURES,
   stop as stopRun,
   type Run,
 } from '@/lib/voyager/workspace/lifecycle';
@@ -143,6 +145,19 @@ export function VoyagerWorkspace({ personName }: Props) {
 
     setAsked((count) => count + 1);
 
+    /*
+     * A failure anybody can reach.
+     *
+     * Written as a routed request rather than left to a network fault, because
+     * the failure states are part of the design and cannot be reviewed if the
+     * only way to see one is to unplug something.
+     */
+    const forced = /\bfail\b|\bbreak\b/.test(trimmed.toLowerCase())
+      ? FAILURES.provider
+      : /\beverything\b.*\bcompan/.test(trimmed.toLowerCase())
+        ? FAILURES.tooBroad
+        : null;
+
     const parsed = parsePlan(responseFor(trimmed));
 
     setRequest(trimmed);
@@ -153,7 +168,7 @@ export function VoyagerWorkspace({ personName }: Props) {
     setName(suggestName(trimmed));
     setPlan(parsed?.plan ?? null);
     setRefusals(parsed?.refusals ?? []);
-    setRun(START);
+    setRun(forced ? failRun(START, forced) : START);
   }, [asked, personName]);
 
   /*
@@ -316,6 +331,45 @@ export function VoyagerWorkspace({ personName }: Props) {
           <div className={styles.turn}>
             <p className={styles.userBubble}>{request}</p>
 
+            {/*
+              The follow-up composer.
+              *
+              * Without it a workspace answers one question and then has to be
+              * thrown away to ask another, which is not a conversation. Same
+              * control as the landing, sized for a 348px column.
+            */}
+            <form
+              className={styles.followUpForm}
+              onSubmit={(event) => {
+                event.preventDefault();
+                send(draft);
+              }}
+            >
+              <textarea
+                className={styles.followUpInput}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    send(draft);
+                  }
+                }}
+                rows={1}
+                placeholder="Ask something else"
+                aria-label="Ask Voyager"
+              />
+              <button
+                type="submit"
+                className={styles.composerSend}
+                title="Send"
+                aria-label="Send"
+                disabled={!draft.trim()}
+              >
+                <Icon name="arrowRight" size={15} />
+              </button>
+            </form>
+
             {plan ? (
               <>
                 <span className={styles.modeChip}>
@@ -365,6 +419,36 @@ export function VoyagerWorkspace({ personName }: Props) {
                     >
                       Stop and keep what is ready
                     </button>
+                  )}
+
+                  {/*
+                    A failure names its cause and offers the way out. Keeping
+                    whatever was already built: half an answer with an
+                    explanation beats an empty canvas with the same explanation.
+                  */}
+                  {run.stage === 'failed' && run.failure && (
+                    <div className={styles.failureCard} role="alert">
+                      <p className={styles.failureCause}>{run.failure.cause}</p>
+                      <p className={styles.failureRecovery}>{run.failure.recovery}</p>
+                      <button
+                        className={styles.stopButton}
+                        onClick={() => {
+                          if (run.failure?.action === 'connect') {
+                            setNotice('Connect the Wealth Hub from the context panel.');
+                            return;
+                          }
+                          send(request);
+                        }}
+                      >
+                        {run.failure.action === 'retry'
+                          ? 'Try again'
+                          : run.failure.action === 'narrow'
+                            ? 'Add a constraint and run again'
+                            : run.failure.action === 'connect'
+                              ? 'Connect the Wealth Hub'
+                              : 'Sign in'}
+                      </button>
+                    </div>
                   )}
                 </div>
 

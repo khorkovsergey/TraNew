@@ -328,12 +328,23 @@ function Body({ module, scopeState }: { module: VoyagerModule; scopeState?: Prop
 
     case 'chart':
       return (
-        <p className={styles.cardNote}>
+        <>
+          {/*
+            The text summary the accessibility rules require beside every chart.
+            A canvas is one opaque element; without this the module is missing
+            rather than merely unlabelled, and it has to be here whether or not
+            the drawing is.
+          */}
+          <p className={styles.cardBody}>
+            {String(data.summary ?? '')}
+          </p>
+          <p className={styles.cardNote}>
           The chart renders through the Supercharts engine rather than a second one, so this card
           is wired when the two are joined in phase 5. Its parameters —{' '}
           <strong>{String(data.symbol ?? '')} {String(data.interval ?? '')}</strong> — are already
-          decided and shown in the assumptions.
-        </p>
+            decided and shown in the assumptions.
+          </p>
+        </>
       );
 
     default:

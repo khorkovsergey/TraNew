@@ -463,6 +463,115 @@ try {
   check('a beginner is asked questions, not given a portfolio', /How long can the money/.test(beginnerText));
   check('and told this is educational', /Educational/.test(beginnerText));
 
+  group('Failure states name a cause and a way out');
+
+  const failContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const failPage = await failContext.newPage();
+  await failPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await failPage.waitForTimeout(600);
+
+  await failPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('make this fail');
+  await failPage.getByRole('button', { name: 'Send' }).click();
+  await failPage.waitForTimeout(900);
+
+  const failureCard = failPage.locator('[class*="failureCard"]');
+  check('a failure is shown', (await failureCard.count()) === 1);
+
+  const failureText = await failureCard.innerText();
+  check('it names the cause', /did not answer in time/i.test(failureText), failureText.slice(0, 90));
+  check('says nothing was changed', /Nothing was changed/i.test(failureText));
+  check('and offers a way forward', (await failPage.getByRole('button', { name: 'Try again' }).count()) === 1);
+  check('announced as an alert', (await failPage.getByRole('alert').count()) >= 1);
+
+  await failPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('find everything about every company');
+  await failPage.getByRole('button', { name: 'Send' }).click();
+  await failPage.waitForTimeout(900);
+
+  const secondFailure = await failPage.locator('[class*="failureCard"]').innerText();
+  check('a different cause reads differently', /more than 4 000 companies/i.test(secondFailure), secondFailure.slice(0, 90));
+  check(
+    'with its own recovery',
+    (await failPage.getByRole('button', { name: /Add a constraint/ }).count()) === 1
+  );
+
+  await failContext.close();
+
+  group('Accessibility');
+
+  const a11yContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const a11yPage = await a11yContext.newPage();
+  await a11yPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await a11yPage.waitForTimeout(600);
+  await a11yPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('Build a Tesla chart with RSI and support levels');
+  await a11yPage.getByRole('button', { name: 'Send' }).click();
+  await a11yPage.waitForTimeout(3400);
+
+  const chartCard = a11yPage.locator('[class*="moduleCard"]').first();
+  check(
+    'a chart carries a text summary beside it',
+    /RSI is currently mid-range/.test(await chartCard.innerText()),
+    'the chart module was unreadable without seeing it'
+  );
+
+  check('the canvas is a labelled region', (await a11yPage.locator('main[aria-label="Canvas"]').count()) === 1);
+  check('the conversation is too', (await a11yPage.locator('aside[aria-label="Conversation"]').count()) === 1);
+
+  const headings = await a11yPage.locator('main[aria-label="Canvas"] h3').count();
+  check('module cards are headings, not decorative divs', headings > 0, `${headings}`);
+
+  const unnamed = await a11yPage.evaluate(() =>
+    [...document.querySelectorAll('button')].filter((button) => {
+      const text = (button.textContent ?? '').trim();
+      return !text && !button.getAttribute('aria-label') && !button.getAttribute('title');
+    }).length
+  );
+  check('no icon control is nameless', unnamed === 0, `${unnamed} unnamed`);
+
+  // The keyboard path: top bar → conversation → canvas → inspector.
+  let reached = 0;
+  for (let i = 0; i < 40; i += 1) {
+    await a11yPage.keyboard.press('Tab');
+    const inside = await a11yPage.evaluate(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body) return false;
+      return Boolean(active.closest('[class*="shell"]'));
+    });
+    if (inside) reached += 1;
+  }
+  check('the keyboard reaches into the workspace', reached > 5, `${reached} of 40 stops`);
+
+  await a11yContext.close();
+
+  group('The tablet keeps the panel rather than losing it');
+
+  const tabletContext = await browser.newContext({ viewport: { width: 1024, height: 900 } });
+  const tabletPage = await tabletContext.newPage();
+  await tabletPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await tabletPage.waitForTimeout(600);
+  await tabletPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('What is happening in the US market today?');
+  await tabletPage.getByRole('button', { name: 'Send' }).click();
+  await tabletPage.waitForTimeout(3200);
+
+  check('the conversation is still a column', await tabletPage.locator('aside[aria-label="Conversation"]').isVisible());
+  check('and the canvas has room', ((await tabletPage.locator('main[aria-label="Canvas"]').boundingBox())?.width ?? 0) > 500);
+
+  await tabletPage.locator('header').getByRole('button', { name: 'Context', exact: true }).click();
+  await tabletPage.waitForTimeout(500);
+
+  check('the inspector opens as an overlay', await tabletPage.locator('[class*="inspectorOverlay"]').isVisible());
+  check(
+    'with a scrim behind it',
+    (await tabletPage.locator('[class*="scrim"]').count()) === 1,
+    `${await tabletPage.locator('[class*="scrim"]').count()} scrims`
+  );
+
+  const tabletOverflow = await tabletPage.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  check('and no sideways scroll', tabletOverflow <= 1, `${tabletOverflow}px`);
+
+  await tabletContext.close();
+
   group('Sign-up, tokens and plans');
 
   const moneyContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });

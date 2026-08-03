@@ -167,7 +167,19 @@ export const CHART = {
       subtitle: 'Nothing is applied to your chart until you say so',
       provenance: ['market-data', 'inference'],
       sourceIds: ['src_quotes', 'src_detect'],
-      data: { symbol: 'TSLA', interval: '1D', studies: ['rsi'], zones: 3 },
+      data: {
+        symbol: 'TSLA',
+        interval: '1D',
+        studies: ['rsi'],
+        zones: 3,
+        /*
+         * The chart in words. Required, not optional: a canvas is opaque to a
+         * screen reader, and the accessibility rules put a text summary beside
+         * every chart rather than leaving the module unreadable.
+         */
+        summary:
+          'Tesla daily bars over the last year, with a 14-period RSI below and three horizontal levels the detector found. Price fell from roughly 372 in February to a low near 252 in late May, then recovered to about 311. RSI is currently mid-range at 54 — neither stretched nor washed out.',
+      },
       actions: [{ id: 'apply_chart', label: 'Apply to chart', mutates: true }],
     },
     {

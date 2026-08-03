@@ -1818,3 +1818,64 @@
     padding-bottom: 130px;
   }
 }
+
+/* ---- Failure ---- */
+
+.failureCard {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--tn-red);
+  border-radius: 10px;
+  background: var(--tn-red-tint);
+}
+
+.failureCause {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--tn-text);
+}
+
+/* The way forward, given the same weight as the cause. */
+.failureRecovery {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--tn-text-nav);
+}
+
+/* The follow-up composer, sized for the 348px column. */
+.followUpForm {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 8px 8px 8px 14px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 16px;
+  background: var(--tn-surface);
+}
+
+.followUpForm:focus-within {
+  border-color: var(--tn-purple);
+}
+
+.followUpInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  resize: none;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tn-text);
+  outline: none;
+  padding: 6px 0;
+  max-height: 120px;
+}
+
+.followUpForm .composerSend {
+  width: 32px;
+  height: 32px;
+}
