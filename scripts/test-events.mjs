@@ -91,6 +91,7 @@ try {
       'src/lib/voyager/workspace/landing.ts',
       'src/lib/voyager/workspace/contract.ts',
       'src/lib/voyager/workspace/lifecycle.ts',
+      'src/lib/voyager/workspace/scenarioData.ts',
       'src/lib/voyager/workspace/scenarios.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
@@ -3617,10 +3618,95 @@ try {
     assert.equal(scenarios.scenarioFor('What is happening today?'), 'market');
   });
 
-  check('a scenario that is not written yet returns nothing rather than the wrong one', () => {
-    // Falling back to the market summary for a portfolio question would answer
-    // confidently about the wrong subject.
-    assert.equal(scenarios.responseFor('Compare NVIDIA and AMD'), null);
+  check('every scenario parses, with nothing refused', () => {
+    /*
+     * The whole reason they are written behind the contract. Ten hand-written
+     * responses is ten chances to forget a source or a provenance label, and
+     * this is where that is caught rather than on somebody's screen.
+     */
+    const broken = [];
+    for (const id of scenarios.SCENARIO_IDS) {
+      const raw = scenarios.responseFor(
+        { selloff: 'why are technology stocks falling', compare: 'compare NVDA and AMD',
+          chart: 'build a chart with RSI', screen: 'find companies with growth',
+          portfolio: 'risks in my portfolio', monitor: 'monitor NVDA and tell me if it falls',
+          beginner: 'I am a beginner investing every month', gold: 'why has gold risen',
+          pine: 'create a Pine Script indicator', market: 'what is happening today' }[id]
+      );
+      const out = contract.parsePlan(raw);
+      if (!out) broken.push(`${id}: did not parse`);
+      else if (out.refusals.length) broken.push(`${id}: ${out.refusals.join('; ')}`);
+    }
+    assert.deepEqual(broken, [], broken.join(' | '));
+  });
+
+  check('all ten are routable from a sentence somebody would type', () => {
+    const routed = new Set([
+      'What is happening in the US market today?',
+      'Why are technology stocks falling?',
+      'Compare NVIDIA, AMD and Broadcom',
+      'Build a Tesla chart with RSI and support levels',
+      'Find US technology companies with growing revenue',
+      'What are the main risks in my portfolio?',
+      'Monitor NVIDIA and tell me if its valuation falls',
+      'I am a beginner and want to invest 500 every month',
+      'Why has gold risen over the last three months?',
+      'Create a Pine Script indicator that shows a trend reversal',
+    ].map((q) => scenarios.scenarioFor(q)));
+
+    assert.equal(routed.size, 10, [...routed].join(', '));
+  });
+
+  check('the Pine request routes to Pine, not to the chart', () => {
+    // "Create a Pine Script indicator" and "build a chart with RSI" both sound
+    // like building; the more specific test has to come first.
+    assert.equal(scenarios.scenarioFor('Create a Pine Script indicator'), 'pine');
+    assert.equal(scenarios.scenarioFor('Build a Tesla chart with RSI'), 'chart');
+  });
+
+  check('the portfolio scenario answers with a permission request and nothing else', () => {
+    /*
+     * The shape of the answer is part of the answer: it must not show holdings
+     * beside the request to read them.
+     */
+    const out = contract.parsePlan(scenarios.responseFor('what are the risks in my portfolio'));
+    assert.equal(out.plan.modules.length, 1);
+    assert.equal(out.plan.modules[0].kind, 'permission-request');
+    assert.equal(out.plan.sources.length, 0, 'it read something before asking');
+  });
+
+  check('the beginner scenario asks questions rather than answering', () => {
+    const out = contract.parsePlan(scenarios.responseFor('I am a beginner investing every month'));
+    assert.ok(out.plan.modules.some((m) => m.kind === 'guided-questions'));
+    assert.ok(
+      out.plan.modules.every((m) => m.provenance.includes('educational')),
+      'a beginner was given something that was not labelled educational'
+    );
+  });
+
+  check('the screener shows its filters before its results', () => {
+    const out = contract.parsePlan(scenarios.responseFor('find companies with growing revenue'));
+    const kinds = out.plan.modules.map((m) => m.kind);
+    assert.ok(kinds.indexOf('interpreted-filters') < kinds.indexOf('ranked-rows'));
+  });
+
+  check('every mutating action belongs to a module that has a source or is a permission ask', () => {
+    // A button that changes something on the strength of nothing is the one
+    // combination this contract must never allow through.
+    for (const id of scenarios.SCENARIO_IDS) {
+      const out = contract.parsePlan(
+        scenarios.responseFor({ selloff: 'why are technology stocks falling', compare: 'compare NVDA and AMD',
+          chart: 'build a chart with RSI', screen: 'find companies with growth',
+          portfolio: 'risks in my portfolio', monitor: 'monitor NVDA and tell me if it falls',
+          beginner: 'I am a beginner investing every month', gold: 'why has gold risen',
+          pine: 'create a Pine Script indicator', market: 'what is happening today' }[id])
+      );
+      for (const module of out.plan.modules) {
+        if (!module.actions.some((a) => a.mutates)) continue;
+        const grounded = module.sourceIds.length > 0 || module.kind === 'permission-request';
+        assert.ok(grounded, `${id}/${module.id} can change something and cites nothing`);
+      }
+    }
   });
 
   /* ============================ Superchart layouts ============================ */

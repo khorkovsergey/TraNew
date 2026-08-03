@@ -189,6 +189,129 @@ function Body({ module }: { module: VoyagerModule }) {
         </>
       );
 
+    case 'heatmap': {
+      const cells = Array.isArray(data.cells) ? data.cells : [];
+      return (
+        <div className={styles.heatGrid}>
+          {cells.map((item, index) => {
+            const cell = (item ?? {}) as Record<string, unknown>;
+            const sign = typeof cell.sign === 'number' ? cell.sign : 0;
+            return (
+              /* Sign and label, never colour alone: the tile is tinted, but the
+                 arrow and the signed number carry the same fact. */
+              <div
+                key={index}
+                className={`${styles.heatCell} ${sign >= 0 ? styles.heatUp : styles.heatDown}`}
+              >
+                <span className={styles.heatLabel}>{String(cell.label ?? '')}</span>
+                <span className={styles.heatValue}>
+                  <span aria-hidden="true">{sign >= 0 ? '▲' : '▼'} </span>
+                  {String(cell.value ?? '')}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    case 'monitoring-rule': {
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      return (
+        <dl className={styles.ruleGrid}>
+          {rows.map((item, index) => {
+            const row = (item ?? {}) as Record<string, unknown>;
+            return (
+              <div key={index} className={styles.ruleRow}>
+                <dt className={styles.ruleLabel}>{String(row.label ?? '')}</dt>
+                <dd className={styles.ruleValue}>{String(row.value ?? '')}</dd>
+              </div>
+            );
+          })}
+        </dl>
+      );
+    }
+
+    case 'permission-request': {
+      const scopes = Array.isArray(data.scopes) ? data.scopes : [];
+      return (
+        <>
+          <ul className={styles.scopeList}>
+            {scopes.map((item, index) => {
+              const scope = (item ?? {}) as Record<string, unknown>;
+              return (
+                <li key={index} className={styles.scopeRow}>
+                  {/* Checked and disabled where the analysis genuinely cannot
+                      run without it; optional otherwise, and the note says what
+                      is still possible when it is withheld. */}
+                  <input
+                    type="checkbox"
+                    defaultChecked={scope.required === true}
+                    disabled={scope.required === true}
+                    aria-label={String(scope.label ?? '')}
+                  />
+                  <span>{String(scope.label ?? '')}</span>
+                  {scope.required === true && <span className={styles.scopeTag}>Needed</span>}
+                </li>
+              );
+            })}
+          </ul>
+          {data.note ? <p className={styles.cardNote}>{String(data.note)}</p> : null}
+        </>
+      );
+    }
+
+    case 'guided-questions': {
+      const questions = Array.isArray(data.questions) ? data.questions : [];
+      return (
+        <ol className={styles.questionList}>
+          {questions.map((item, index) => {
+            const question = (item ?? {}) as Record<string, unknown>;
+            return <li key={index}>{String(question.text ?? '')}</li>;
+          })}
+        </ol>
+      );
+    }
+
+    case 'news-timeline': {
+      const items = Array.isArray(data.items) ? data.items : [];
+      return (
+        <ol className={styles.timeline}>
+          {items.map((item, index) => {
+            const entry = (item ?? {}) as Record<string, unknown>;
+            return (
+              <li key={index}>
+                <span className={styles.timelineWhen}>{String(entry.when ?? '')}</span>
+                <span>{String(entry.headline ?? '')}</span>
+              </li>
+            );
+          })}
+        </ol>
+      );
+    }
+
+    case 'pine-editor':
+      return (
+        <>
+          <pre className={styles.codeBlock}>{String(data.source ?? '')}</pre>
+          <p className={styles.cardNote}>
+            Checked, not executed — these checks read the source. Opening it in Script Lab gives
+            the diagnostics, the version history and the restricted preview runtime that are
+            already built there.
+          </p>
+        </>
+      );
+
+    case 'chart':
+      return (
+        <p className={styles.cardNote}>
+          The chart renders through the Supercharts engine rather than a second one, so this card
+          is wired when the two are joined in phase 5. Its parameters —{' '}
+          <strong>{String(data.symbol ?? '')} {String(data.interval ?? '')}</strong> — are already
+          decided and shown in the assumptions.
+        </p>
+      );
+
     default:
       return (
         <p className={styles.cardNote}>

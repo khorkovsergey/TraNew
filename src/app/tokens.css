@@ -50,6 +50,9 @@
   /* The counterpart to --tn-green-tint, at the same lightness, so an added and
      a removed line in a diff read as a pair rather than as two intensities. */
   --tn-red-tint: #fce8e4;
+  /* Heatmap borders, so a tinted tile still has an edge on a white card. */
+  --tn-heat-up-border: #c8ecd8;
+  --tn-heat-down-border: #f5cdbd;
 
   /* Study lines. Indexed rather than named, because a study says "colour 0",
      not "blue" — which line gets which colour is the registry's business. */

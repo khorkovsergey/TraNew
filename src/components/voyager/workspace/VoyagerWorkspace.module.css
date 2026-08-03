@@ -1139,3 +1139,157 @@
   line-height: 1.5;
   color: var(--tn-text-muted);
 }
+
+/* ---- Heatmap ---- */
+
+.heatGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px;
+}
+
+.heatCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.heatUp {
+  background: var(--tn-green-tint);
+  border: 1px solid var(--tn-heat-up-border);
+}
+
+.heatDown {
+  background: var(--tn-red-tint);
+  border: 1px solid var(--tn-heat-down-border);
+}
+
+.heatLabel {
+  font-size: 11px;
+  color: var(--tn-text-muted);
+}
+
+.heatValue {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+/* ---- Monitoring rule ---- */
+
+.ruleGrid {
+  margin: 0;
+  display: grid;
+  gap: 0;
+}
+
+.ruleRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--tn-border-card);
+}
+
+.ruleRow:last-child {
+  border-bottom: 0;
+}
+
+.ruleLabel {
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+}
+
+.ruleValue {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Permission scopes ---- */
+
+.scopeList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scopeRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--tn-text);
+}
+
+.scopeRow input {
+  accent-color: var(--tn-purple);
+  width: 16px;
+  height: 16px;
+}
+
+.scopeTag {
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: var(--tn-chip-bg);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}
+
+/* ---- Guided questions and timeline ---- */
+
+.questionList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--tn-text);
+}
+
+.timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+
+.timeline li {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--tn-border-card);
+}
+
+.timelineWhen {
+  flex: none;
+  width: 78px;
+  color: var(--tn-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Code ---- */
+
+.codeBlock {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 10px;
+  background: var(--tn-bg);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.75;
+  color: var(--tn-text);
+  overflow-x: auto;
+  white-space: pre;
+}

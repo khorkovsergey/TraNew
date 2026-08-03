@@ -1,4 +1,15 @@
 import type { VoyagerPlan } from './contract';
+import {
+  BEGINNER,
+  CHART,
+  COMPARE,
+  GOLD,
+  MONITOR,
+  PINE,
+  PORTFOLIO,
+  SCREEN,
+  SELLOFF,
+} from './scenarioData';
 
 /**
  * Scripted responses, behind the structured contract.
@@ -22,14 +33,42 @@ const NOW = '2026-08-03T09:15:00Z';
 export function scenarioFor(question: string): string {
   const q = question.toLowerCase();
 
-  if (/\bcompare\b|\bversus\b|\bvs\b/.test(q)) return 'compare';
-  if (/\bchart\b|\brsi\b|\bsupport\b/.test(q)) return 'chart';
-  if (/\bscreen|\bfind\b.*\bcompan/.test(q)) return 'screen';
-  if (/\bportfolio\b|\brisk/.test(q)) return 'portfolio';
-  if (/\bmonitor\b|\balert\b/.test(q)) return 'monitor';
-  if (/\bpine\b|\bscript\b|\bindicator\b/.test(q)) return 'pine';
+  /*
+   * Order matters, and the specific tests come first.
+   *
+   * "Create a Pine Script indicator" and "Build a Tesla chart with RSI" both
+   * read as building; "What are the risks in my portfolio" and "Find companies
+   * with growing revenue" both read as searching. Whichever test runs first
+   * wins, so the narrowest go at the top and the market summary is the fallback
+   * rather than a match.
+   */
+  /*
+   * Matched on whole words through a padded string rather than with regular
+   * expressions.
+   *
+   * Two reasons. Substring matching sends the wrong request to the wrong
+   * scenario in ways that are hard to spot: "vs" lives inside "investing"
+   * and "risk" inside "brisk", so a beginner asking about investing would
+   * have been handed a comparison. And the escaping is a trap on its own —
+   * the first version of this went in with real control characters where
+   * the word boundaries were meant, so every question routed to the market
+   * summary and the only thing that noticed was a test.
+   */
+  const padded = ` ${q.replace(/[^a-z]+/g, " ").trim()} `;
+  const has = (...words: string[]) => words.some((word) => padded.includes(` ${word} `));
+
+  if (has('pine', 'script', 'indicator')) return 'pine';
+  if (has('beginner') || padded.includes(' every month ')) return 'beginner';
+  if (has('monitor', 'alert') || padded.includes(' tell me if ')) return 'monitor';
+  if (has('portfolio', 'risk', 'risks')) return 'portfolio';
+  if (has('screen', 'screener') || (has('find') && has('companies', 'company'))) return 'screen';
+  if (has('compare', 'versus', 'vs')) return 'compare';
+  if (has('chart', 'rsi', 'support')) return 'chart';
+  if (has('gold')) return 'gold';
+  if (padded.includes(' technology stocks ') || has('falling', 'fell', 'selloff')) return 'selloff';
   return 'market';
 }
+
 
 /**
  * The market summary, written as the response a model would have to produce.
@@ -143,7 +182,21 @@ const MARKET: unknown = {
   ],
 };
 
-const SCENARIOS: Record<string, unknown> = { market: MARKET };
+const SCENARIOS: Record<string, unknown> = {
+  market: MARKET,
+  selloff: SELLOFF,
+  compare: COMPARE,
+  chart: CHART,
+  screen: SCREEN,
+  portfolio: PORTFOLIO,
+  monitor: MONITOR,
+  beginner: BEGINNER,
+  gold: GOLD,
+  pine: PINE,
+};
+
+/** Every scenario the workspace can answer, for the tests that check them all. */
+export const SCENARIO_IDS = Object.keys(SCENARIOS);
 
 /** The raw response for a question, or null where the scenario is not written yet. */
 export function responseFor(question: string): unknown | null {

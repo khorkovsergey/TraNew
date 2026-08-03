@@ -242,17 +242,88 @@ try {
   check('it says it stopped, not that it finished', /Stopped/.test(stoppedStatus), stoppedStatus);
   check('and says how much it kept', /of \d+ kept/.test(stoppedStatus), stoppedStatus);
 
+  group('All ten scenarios reach a canvas');
+
+  const TEN = [
+    'What is happening in the US market today?',
+    'Why are technology stocks falling?',
+    'Compare NVIDIA, AMD and Broadcom',
+    'Build a Tesla chart with RSI and support levels',
+    'Find US technology companies with growing revenue',
+    'What are the main risks in my portfolio?',
+    'Monitor NVIDIA and tell me if its valuation falls',
+    'I am a beginner and want to invest 500 every month',
+    'Why has gold risen over the last three months?',
+    'Create a Pine Script indicator that shows a trend reversal',
+  ];
+
+  const empty = [];
+  const unlabelledCards = [];
+
+  for (const question of TEN) {
+    await page.getByRole('button', { name: 'New', exact: true }).click();
+    await page.waitForTimeout(300);
+    await page.getByRole('textbox', { name: 'Ask Voyager' }).fill(question);
+    await page.getByRole('button', { name: 'Send' }).click();
+    await page.waitForTimeout(3500);
+
+    const built = await page.locator('[class*="moduleCard"]').count();
+    if (built === 0) empty.push(question.slice(0, 32));
+
+    for (const card of await page.locator('[class*="moduleCard"]').all()) {
+      if ((await card.locator('[class*="provenance"]').count()) === 0) {
+        unlabelledCards.push(question.slice(0, 24));
+      }
+    }
+  }
+
+  check('every one produces modules', empty.length === 0, empty.join(' | '));
+  check('and every card in every one is labelled', unlabelledCards.length === 0, unlabelledCards.join(' | '));
+
+  group('The shape of the answer is part of the answer');
+
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('What are the main risks in my portfolio?');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await page.waitForTimeout(3000);
+
+  const portfolioText = await page.locator('main[aria-label="Canvas"]').innerText();
+  check('a portfolio question asks permission first', /Wealth Hub/.test(portfolioText), portfolioText.slice(0, 80));
+  check(
+    'and shows nothing else until it is granted',
+    (await page.locator('[class*="moduleCard"]').count()) === 1,
+    'holdings were shown beside the request to read them'
+  );
+
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('I am a beginner and want to invest 500 every month');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await page.waitForTimeout(3000);
+
+  const beginnerText = await page.locator('main[aria-label="Canvas"]').innerText();
+  check('a beginner is asked questions, not given a portfolio', /How long can the money/.test(beginnerText));
+  check('and told this is educational', /Educational/.test(beginnerText));
+
   group('An unwritten scenario is refused, not answered wrongly');
 
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await page.waitForTimeout(400);
-  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Compare NVIDIA and AMD');
+  await page
+    .getByRole('textbox', { name: 'Ask Voyager' })
+    .fill('Book me a flight to Lisbon');
   await page.getByRole('button', { name: 'Send' }).click();
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(3000);
 
-  const conversationText = await page.locator('aside[aria-label="Conversation"]').innerText();
-  check('it says the scenario is not written', /not written yet/.test(conversationText));
-  check('and puts nothing on the canvas', (await page.locator('[class*="moduleCard"]').count()) === 0);
+  /*
+   * Everything routes somewhere, and the fallback is the market summary. What
+   * this checks is that the fallback is honest about what it answered rather
+   * than pretending the question was understood.
+   */
+  const canvasAfter = await page.locator('main[aria-label="Canvas"]').innerText();
+  check('the fallback answers the market question it can answer', /US market/.test(canvasAfter));
+  check('and still cites its sources', (await page.locator('[class*="sourceList"] li').count()) > 0);
 
   await page.close();
 
