@@ -10,6 +10,8 @@ import {
 } from '@/components/markets/MarketShell';
 import { getMarket, listMarkets, sectionState } from '@/content/markets';
 import { NEWS } from '@/content/market';
+import { LiveNews } from '@/components/content/LiveNews';
+import { getMarketNews, liveNewsConfigured } from '@/lib/market/news';
 import { pick } from '@/content/types';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
@@ -95,6 +97,10 @@ export default async function MarketNewsPage({ params }: Props) {
   const why = WHY_IT_MATTERS[market.slug] ?? {};
   const stories = NEWS.slice(0, 6);
 
+  // Server-side, so the vendor key stays on the server and the page ships with
+  // the headlines already rendered.
+  const feed = await getMarketNews('markets');
+
   return (
     <div className={content.wrap}>
       <VoyagerPageContext context={buildContext('market', `${market.name} news`)} />
@@ -121,6 +127,14 @@ export default async function MarketNewsPage({ params }: Props) {
 
       <MarketSelector current={market.slug} />
       <MarketContextNavigation market={market} active="news" />
+
+      <LiveNews feed={feed} configured={liveNewsConfigured()} title="Live wire" />
+
+      <h2 className={content.h2}>What moved this market</h2>
+      <p className={content.lead}>
+        Written against reporting. The wire above is what came in; these are the moves somebody
+        looked at, with the consequence spelled out.
+      </p>
 
       <div className={styles.storyList}>
         {stories.map((story) => (

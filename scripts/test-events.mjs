@@ -86,6 +86,7 @@ try {
       'src/lib/superchart/pine/lexer.ts',
       'src/lib/superchart/pine/parser.ts',
       'src/lib/superchart/pine/evaluate.ts',
+      'src/lib/market/newsShape.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -198,6 +199,7 @@ try {
   const fix = await load('fixes', 'scripts');
   const pine = await load('evaluate', 'pine');
   const pineParser = await load('parser', 'pine');
+  const news = await load('newsShape', 'market');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -3079,6 +3081,104 @@ try {
       }
     };
     program.statements.forEach(walk);
+  });
+
+  /* ============================== Live news feed ============================= */
+
+  group('A story from a vendor is untrusted input');
+
+  const article = {
+    id: 7,
+    headline: 'Fed holds rates steady',
+    summary: 'The committee left the target range unchanged.',
+    source: 'Reuters',
+    url: 'https://example.com/story',
+    datetime: 1_760_000_000,
+    related: 'AAPL,MSFT',
+  };
+
+  check('a well-formed story survives', () => {
+    const story = news.toStory(article);
+    assert.equal(story.title, 'Fed holds rates steady');
+    assert.equal(story.source, 'Reuters');
+    assert.deepEqual(story.related, ['AAPL', 'MSFT']);
+  });
+
+  check('a javascript: url is refused, not rendered', () => {
+    /*
+     * The whole reason `safeUrl` allow-lists rather than blocks. This string
+     * reaches an href; a scheme check is the only version of this that cannot
+     * be talked around with casing or whitespace.
+     */
+    assert.equal(news.safeUrl('javascript:alert(1)'), null);
+    assert.equal(news.safeUrl('JavaScript:alert(1)'), null);
+    assert.equal(news.safeUrl('data:text/html,<script>x</script>'), null);
+    assert.equal(news.safeUrl('  javascript:alert(1)'), null);
+  });
+
+  check('plain http is refused too', () => {
+    // A demo portal served over https must not link out over plain http.
+    assert.equal(news.safeUrl('http://example.com/story'), null);
+    assert.ok(news.safeUrl('https://example.com/story'));
+  });
+
+  check('a story with an unusable link is dropped whole', () => {
+    // A headline nobody can open is not a story.
+    assert.equal(news.toStory({ ...article, url: 'javascript:alert(1)' }), null);
+    assert.equal(news.toStory({ ...article, url: undefined }), null);
+  });
+
+  check('a story with no headline is dropped', () => {
+    assert.equal(news.toStory({ ...article, headline: '' }), null);
+    assert.equal(news.toStory({ ...article, headline: 42 }), null);
+  });
+
+  check('a story with no timestamp is dropped', () => {
+    // Undated news is not news; it is a claim about now that may be a year old.
+    assert.equal(news.toStory({ ...article, datetime: undefined }), null);
+  });
+
+  check('control and invisible characters are stripped from the headline', () => {
+    const story = news.toStory({
+      ...article,
+      headline: 'Fed\u200b holds\u0007 rates\u202e steady',
+    });
+    assert.ok(!/[\u0000-\u001f\u200b\u202e]/.test(story.title), JSON.stringify(story.title));
+  });
+
+  check('an over-long headline is cut rather than let through', () => {
+    const story = news.toStory({ ...article, headline: 'x'.repeat(5000) });
+    assert.ok(story.title.length <= 200, `${story.title.length}`);
+  });
+
+  check('a missing source says so instead of showing nothing', () => {
+    const story = news.toStory({ ...article, source: undefined });
+    assert.equal(story.source, 'Unknown source');
+  });
+
+  check('the id falls back to the url so two stories cannot collide', () => {
+    const story = news.toStory({ ...article, id: undefined });
+    assert.equal(story.id, 'https://example.com/story');
+  });
+
+  check('related tickers are capped and normalised', () => {
+    const story = news.toStory({ ...article, related: 'aapl,msft,goog,amzn,nvda,tsla' });
+    assert.equal(story.related.length, 4);
+    assert.equal(story.related[0], 'AAPL');
+  });
+
+  check('a non-string related field is not assumed to be a list', () => {
+    assert.deepEqual(news.toStory({ ...article, related: 12345 }).related, []);
+  });
+
+  check('the summary is text, never markup', () => {
+    /*
+     * The body is rendered as a React child, so it is escaped — but the string
+     * is also cleaned, so nothing arrives carrying control characters that
+     * disguise what it says.
+     */
+    const story = news.toStory({ ...article, summary: 'Rates <b>held</b>\u0000 steady' });
+    assert.ok(!story.summary.includes('\u0000'));
   });
 
   /* ============================ Superchart layouts ============================ */

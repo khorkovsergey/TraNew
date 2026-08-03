@@ -12,6 +12,7 @@ import { pick } from '@/content/types';
 import { Link } from '@/i18n/navigation';
 import { routing, type Locale } from '@/i18n/routing';
 import { getQuote } from '@/lib/market/client';
+import { getCompanyNews } from '@/lib/market/news';
 import { pageMetadata } from '@/lib/metadata';
 import { isTicker, TICKERS, type Ticker } from '@/lib/symbolSearch';
 import styles from '@/components/screens/Symbol.module.css';
@@ -59,6 +60,13 @@ export default async function SymbolPage({ params }: Props) {
   const t = await getTranslations('symbol');
   const tCommon = await getTranslations('common');
   const name = pick(symbol.name, locale);
+
+  /*
+   * Live headlines for this instrument. Null when the key is absent or the
+   * vendor is quiet, and the page renders the written stories alone — a news
+   * feed that fails should cost a section, not a page.
+   */
+  const companyFeed = await getCompanyNews(key);
 
   /*
    * A live quote when the vendor answers, the authored figure when it does not.
@@ -139,6 +147,35 @@ export default async function SymbolPage({ params }: Props) {
 
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>{t('newsTitle')}</h2>
+
+            {/*
+              Live headlines for this instrument, above the written ones. Kept
+              in the same card rather than given its own, because a reader
+              looking for "news about this company" wants one place — but each
+              live item links out and says which publisher it belongs to.
+            */}
+            {companyFeed && (
+              <div className={styles.newsList}>
+                {companyFeed.stories.map((story) => (
+                  <a
+                    className={styles.newsItem}
+                    key={story.id}
+                    href={story.url}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                  >
+                    <span className={styles.newsMeta}>
+                      <TrustLabel kind="fact" small />
+                      <span>
+                        {story.source} · {story.publishedAt.slice(0, 10)}
+                      </span>
+                    </span>
+                    <span className={styles.newsTitle}>{story.title} ↗</span>
+                  </a>
+                ))}
+              </div>
+            )}
+
             <div className={styles.newsList}>
               {symbol.news.map((item) => (
                 <Link className={styles.newsItem} href="/news" key={item.title.en}>
