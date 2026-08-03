@@ -56,20 +56,24 @@ const STARTERS = [
 ];
 
 
-export function VoyagerWidget() {
+export function VoyagerWidget({ chartWorkspaceLive = false }: { chartWorkspaceLive?: boolean }) {
   /*
    * Absent on the chart workspace, which has its own Voyager in the panel.
-   *
    * Two orbs on one screen is two assistants as far as anyone using it is
-   * concerned, and the one in the corner cannot see the chart — so the more
-   * prominent of the two would be the one that knows less.
+   * concerned, and the one in the corner cannot see the chart.
+   *
+   * The route alone is not enough to decide that. `/supercharts` serves either
+   * the workspace or the screen it will replace, depending on a flag read on
+   * the server — and hiding the orb on the route hid it from the old screen
+   * too, which has no Voyager of its own. So the layout passes in whether the
+   * workspace is what is actually being rendered.
    *
    * `usePathname` from `next/navigation` rather than the localised one: this
    * needs the real URL, and matching a suffix keeps it working under every
    * locale prefix.
    */
   const pathname = usePathname();
-  const onChartWorkspace = pathname?.endsWith('/supercharts') ?? false;
+  const onChartWorkspace = chartWorkspaceLive && (pathname?.endsWith('/supercharts') ?? false);
   const context = useVoyagerContext();
   const { applyStudy, requestPine } = useChartStudies();
   const router = useRouter();

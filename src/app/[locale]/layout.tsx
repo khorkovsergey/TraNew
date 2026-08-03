@@ -7,6 +7,7 @@ import { Header } from '@/components/shell/Header';
 import { LoginModalProvider } from '@/components/shell/LoginModalProvider';
 import { VoyagerProvider } from '@/components/voyager/VoyagerProvider';
 import { VoyagerWidget } from '@/components/voyager/VoyagerWidget';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { routing } from '@/i18n/routing';
 import { SITE_URL } from '@/lib/metadata';
 import '../globals.css';
@@ -78,7 +79,7 @@ export default async function LocaleLayout(props: {
                 <Header />
                 <main id="main">{props.children}</main>
               </div>
-              <VoyagerWidget />
+              <VoyagerWidget chartWorkspaceLive={FEATURE_FLAGS.superchartEnabled} />
             </VoyagerProvider>
           </LoginModalProvider>
         </NextIntlClientProvider>
