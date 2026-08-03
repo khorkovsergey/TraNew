@@ -38,6 +38,10 @@ type Props = {
   canvas: ReactNode;
   inspector: ReactNode;
   onNew: () => void;
+  /** The confirmation gate, when one is open. Rendered above everything. */
+  confirmation?: ReactNode;
+  notice?: string | null;
+  onDismissNotice?: () => void;
 };
 
 export function WorkspaceShell({
@@ -47,6 +51,9 @@ export function WorkspaceShell({
   canvas,
   inspector,
   onNew,
+  confirmation,
+  notice,
+  onDismissNotice,
 }: Props) {
   const [zones, setZones] = useState<ZoneState>(DEFAULT_ZONES);
   const [narrow, setNarrow] = useState(false);
@@ -231,6 +238,26 @@ export function WorkspaceShell({
           <div className={styles.zoneBody}>{inspector}</div>
         </aside>
       </div>
+
+      {confirmation}
+
+      {/*
+        A notice, not a toast that vanishes: it says what was applied and how to
+        reverse it, which somebody may want to read twice.
+      */}
+      {notice && (
+        <div className={styles.notice} role="status">
+          <span>{notice}</span>
+          <button
+            className={styles.noticeClose}
+            onClick={onDismissNotice}
+            aria-label="Dismiss"
+            title="Dismiss"
+          >
+            <Icon name="close" size={13} />
+          </button>
+        </div>
+      )}
 
       {/*
         The phone tab bar. Rendered at every width and hidden above the

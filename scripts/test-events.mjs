@@ -93,6 +93,7 @@ try {
       'src/lib/voyager/workspace/lifecycle.ts',
       'src/lib/voyager/workspace/scenarioData.ts',
       'src/lib/voyager/workspace/scenarios.ts',
+      'src/lib/voyager/workspace/actions.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -211,6 +212,7 @@ try {
   const contract = await load('contract', 'workspace');
   const life = await load('lifecycle', 'workspace');
   const scenarios = await load('scenarios', 'workspace');
+  const actions = await load('actions', 'workspace');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -3707,6 +3709,134 @@ try {
         assert.ok(grounded, `${id}/${module.id} can change something and cites nothing`);
       }
     }
+  });
+
+  group('Nothing reaches the platform without a confirmation');
+
+  const mutatingModule = {
+    id: 'm1',
+    kind: 'ranked-rows',
+    title: 'What moved most',
+    actions: [
+      { id: 'watchlist', label: 'Create a watchlist', mutates: true },
+      { id: 'open_chart', label: 'Open in Supercharts', mutates: false },
+    ],
+  };
+
+  check('a mutating action produces a confirmation, not an effect', () => {
+    const out = actions.confirmationFor(mutatingModule, 'watchlist');
+    assert.ok(out.confirmation, JSON.stringify(out));
+    assert.equal(out.confirmation.action.target, 'watchlist');
+  });
+
+  check('and the confirmation says what it costs, not only what it does', () => {
+    /*
+     * Built from the action rather than written by whatever proposed it, so a
+     * button cannot describe itself more kindly than it behaves.
+     */
+    for (const action of Object.values(actions.ACTIONS)) {
+      assert.ok(action.where.length > 0, `${action.id} does not say where`);
+      assert.ok(action.caveat.length > 0, `${action.id} does not say what it costs`);
+      assert.ok(action.undo.length > 0, `${action.id} does not say how to undo it`);
+    }
+  });
+
+  check('a read-only action navigates without a confirmation', () => {
+    // Making somebody confirm before a link teaches them to click through
+    // confirmations, which is how the real ones stop working.
+    const out = actions.confirmationFor(mutatingModule, 'open_chart');
+    assert.ok(out.navigate);
+    assert.equal(out.confirmation, undefined);
+  });
+
+  check('an action the card never offered is refused', () => {
+    const out = actions.confirmationFor(mutatingModule, 'delete_everything');
+    assert.ok(out.refused);
+  });
+
+  check('an action the workspace does not know is refused by name', () => {
+    /*
+     * There is no path from a label a model wrote to a change in somebody's
+     * account: the id has to be in a closed set written here.
+     */
+    const out = actions.confirmationFor(
+      { ...mutatingModule, actions: [{ id: 'wire_funds', label: 'Wire funds', mutates: true }] },
+      'wire_funds'
+    );
+    assert.ok(out.refused);
+    assert.match(out.refused, /Wire funds/);
+  });
+
+  check('every known action can be undone', () => {
+    // An action whose inverse cannot be described is not accepted at all, which
+    // is why there is no delete among them.
+    for (const action of Object.values(actions.ACTIONS)) {
+      assert.ok(action.undo.length > 0, `${action.id} has no inverse`);
+    }
+  });
+
+  group('Applying is recorded, and undoing keeps the record');
+
+  const confirmed = actions.confirmationFor(mutatingModule, 'watchlist').confirmation;
+
+  check('applying appends an entry with where it came from', () => {
+    const history = actions.applyAction([], confirmed, '2026-08-03T10:00:00Z');
+    assert.equal(history.length, 1);
+    assert.equal(history[0].moduleTitle, 'What moved most');
+    assert.equal(history[0].active, true);
+  });
+
+  check('newest first, so the last thing done is the first thing seen', () => {
+    let history = actions.applyAction([], confirmed, '2026-08-03T10:00:00Z');
+    history = actions.applyAction(history, confirmed, '2026-08-03T10:05:00Z');
+    assert.equal(history[0].at, '2026-08-03T10:05:00Z');
+  });
+
+  check('undoing marks the entry rather than deleting it', () => {
+    /*
+     * A history that removes what was reversed answers "what is true now" and
+     * loses "what did this thing do" — and the second is the question somebody
+     * asks when their chart looks wrong.
+     */
+    const history = actions.applyAction([], confirmed, '2026-08-03T10:00:00Z');
+    const after = actions.undoAction(history, history[0].id);
+    assert.equal(after.length, 1);
+    assert.equal(after[0].active, false);
+  });
+
+  check('and what is in effect is only what has not been undone', () => {
+    let history = actions.applyAction([], confirmed, '2026-08-03T10:00:00Z');
+    history = actions.applyAction(history, confirmed, '2026-08-03T10:05:00Z');
+    history = actions.undoAction(history, history[0].id);
+    assert.equal(actions.activeEntries(history).length, 1);
+  });
+
+  check('undoing something that is not there changes nothing', () => {
+    const history = actions.applyAction([], confirmed, '2026-08-03T10:00:00Z');
+    assert.deepEqual(actions.undoAction(history, 'act_99'), history);
+  });
+
+  check('every mutating action in every scenario is one the workspace knows', () => {
+    /*
+     * The join between the two halves: a scenario can only offer a button that
+     * this file knows how to perform, confirm and reverse.
+     */
+    const unknown = [];
+    for (const id of scenarios.SCENARIO_IDS) {
+      const question = { selloff: 'why are technology stocks falling', compare: 'compare NVDA and AMD',
+        chart: 'build a chart with RSI', screen: 'find companies with growth',
+        portfolio: 'risks in my portfolio', monitor: 'monitor NVDA and tell me if it falls',
+        beginner: 'I am a beginner investing every month', gold: 'why has gold risen',
+        pine: 'create a Pine Script indicator', market: 'what is happening today' }[id];
+
+      const out = contract.parsePlan(scenarios.responseFor(question));
+      for (const module of out.plan.modules) {
+        for (const action of module.actions) {
+          if (action.mutates && !actions.ACTIONS[action.id]) unknown.push(`${id}/${action.id}`);
+        }
+      }
+    }
+    assert.deepEqual(unknown, [], unknown.join(', '));
   });
 
   /* ============================ Superchart layouts ============================ */

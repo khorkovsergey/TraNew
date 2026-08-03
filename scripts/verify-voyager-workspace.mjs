@@ -280,6 +280,68 @@ try {
   check('every one produces modules', empty.length === 0, empty.join(' | '));
   check('and every card in every one is labelled', unlabelledCards.length === 0, unlabelledCards.join(' | '));
 
+  group('No change reaches the platform without a confirmation');
+
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('What is happening in the US market today?');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await page.waitForTimeout(3400);
+
+  await page.getByRole('button', { name: /Create a watchlist/ }).click();
+  await page.waitForTimeout(400);
+
+  const dialog = page.getByRole('dialog', { name: 'Confirm this change' });
+  check('a mutating action opens a confirmation', await dialog.isVisible());
+
+  const dialogText = await dialog.innerText();
+  check('it says where the change lands', /My Workspace/.test(dialogText), dialogText.slice(0, 90));
+  check('and what it costs, not only what it does', /nothing you already have/.test(dialogText));
+  check('and how to undo it', /Deleting the list/.test(dialogText));
+
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.waitForTimeout(300);
+
+  await page.getByRole('button', { name: 'Context' }).click();
+  await page.waitForTimeout(400);
+  const historyBefore = await page.locator('aside[aria-label="Context and sources"]').innerText();
+  check(
+    'cancelling changes nothing and records nothing',
+    /Nothing has been changed outside this canvas/.test(historyBefore),
+    historyBefore.slice(0, 120)
+  );
+
+  group('Applying is recorded, and undoing keeps the record');
+
+  await page.getByRole('button', { name: /Create a watchlist/ }).click();
+  await page.waitForTimeout(400);
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+  await page.waitForTimeout(500);
+
+  const inspector = page.locator('aside[aria-label="Context and sources"]');
+  check('the history lists it', /Create a watchlist/.test(await inspector.innerText()));
+  check('with where it landed', /My Workspace/.test(await inspector.innerText()));
+
+  const undoButton = inspector.getByRole('button', { name: 'Undo' }).first();
+  check('and it can be undone', (await undoButton.count()) > 0);
+
+  await undoButton.click();
+  await page.waitForTimeout(400);
+
+  const afterUndo = await inspector.innerText();
+  check('undoing marks it rather than deleting it', /undone/.test(afterUndo), afterUndo.slice(0, 140));
+  check('so the record of what happened survives', /Create a watchlist/.test(afterUndo));
+
+  group('A read-only action does not ask');
+
+  await page.getByRole('button', { name: /Open in Supercharts/ }).first().click();
+  await page.waitForTimeout(400);
+  check(
+    'it navigates without a dialog',
+    (await page.getByRole('dialog', { name: 'Confirm this change' }).count()) === 0,
+    'a link asked for confirmation, which teaches people to click through them'
+  );
+
   group('The shape of the answer is part of the answer');
 
   await page.getByRole('button', { name: 'New', exact: true }).click();

@@ -1293,3 +1293,145 @@
   overflow-x: auto;
   white-space: pre;
 }
+
+/* ---- The confirmation gate ---- */
+
+.confirmScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(19, 23, 34, 0.32);
+}
+
+.confirmCard {
+  width: min(460px, 100%);
+  padding: 22px 24px;
+  border-radius: 20px;
+  background: var(--tn-surface);
+  box-shadow: 0 26px 70px rgba(19, 23, 34, 0.2);
+}
+
+.confirmTitle {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.confirmWhere {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tn-purple);
+}
+
+/* What it costs, given the same weight as what it does. A dialog that only
+   argues for itself is a dialog people learn to dismiss. */
+.confirmCaveat {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--tn-text);
+}
+
+.confirmUndo {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--tn-chip-bg);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ---- Notice ---- */
+
+.notice {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 11px 12px 11px 16px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 12px;
+  background: var(--tn-surface);
+  box-shadow: 0 18px 44px rgba(19, 23, 34, 0.14);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tn-text);
+}
+
+.noticeClose {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--tn-text-muted);
+  cursor: pointer;
+}
+
+.noticeClose:hover {
+  background: var(--tn-chip-bg);
+}
+
+/* ---- Workspace history ---- */
+
+.historyRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--tn-border-card);
+}
+
+.historyTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+/* Kept, struck through rather than removed: the record is of what happened. */
+.historyUndone {
+  font-weight: 600;
+  color: var(--tn-text-muted);
+}
+
+.historyWhere {
+  font-size: 10.5px;
+  color: var(--tn-text-muted);
+}
+
+.historyUndo {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 3px 9px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--tn-text);
+  cursor: pointer;
+}
+
+.historyUndo:hover {
+  border-color: var(--tn-purple);
+}

@@ -20,6 +20,13 @@ import {
   type Run,
 } from '@/lib/voyager/workspace/lifecycle';
 import { responseFor } from '@/lib/voyager/workspace/scenarios';
+import {
+  applyAction,
+  confirmationFor,
+  undoAction,
+  type Confirmation,
+  type HistoryEntry,
+} from '@/lib/voyager/workspace/actions';
 import { ModuleCard } from './ModuleCard';
 import { WorkspaceShell } from './WorkspaceShell';
 import styles from './VoyagerWorkspace.module.css';
@@ -55,6 +62,10 @@ export function VoyagerWorkspace({ personName }: Props) {
   const [plan, setPlan] = useState<VoyagerPlan | null>(null);
   const [refusals, setRefusals] = useState<string[]>([]);
   const [run, setRun] = useState<Run>(START);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  /** The change waiting to be accepted. Nothing happens while this is set. */
+  const [pending, setPending] = useState<Confirmation | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
 
   /*
@@ -112,22 +123,43 @@ export function VoyagerWorkspace({ personName }: Props) {
     setPlan(null);
     setRefusals([]);
     setRun(START);
+    setHistory([]);
+    setPending(null);
+    setNotice(null);
   }, []);
 
-  /** Actions are declared by the module; nothing is inferred from its label. */
+  /*
+   * Actions are declared by the module and resolved against a closed set.
+   *
+   * Nothing is inferred from a label, and a mutating action stops here for a
+   * confirmation rather than doing anything.
+   */
   const onAction = useCallback((module: VoyagerModule, actionId: string) => {
-    const action = module.actions.find((item) => item.id === actionId);
-    if (!action) return;
+    const outcome = confirmationFor(module, actionId);
 
-    // Applying a change is phase 5, through the command bus that already
-    // confirms and records and undoes. Until then the button says so rather
-    // than doing nothing quietly.
-    setRefusals((current) => [
-      ...current,
-      action.mutates
-        ? `"${action.label}" changes something outside this canvas, and that path — confirm, record, undo — arrives in phase 5.`
-        : `"${action.label}" opens another part of the portal, which is wired in phase 5.`,
-    ]);
+    if ('refused' in outcome) {
+      setNotice(outcome.refused);
+      return;
+    }
+
+    if ('navigate' in outcome) {
+      setNotice(`${outcome.navigate.title} — ${outcome.navigate.where}.`);
+      return;
+    }
+
+    setPending(outcome.confirmation);
+  }, []);
+
+  const accept = useCallback(() => {
+    if (!pending) return;
+    setHistory((current) => applyAction(current, pending, new Date().toISOString()));
+    setNotice(`Applied. ${pending.action.undo}`);
+    setPending(null);
+  }, [pending]);
+
+  const undo = useCallback((entryId: string) => {
+    setHistory((current) => undoAction(current, entryId));
+    setNotice('Undone. The record of it stays in the history.');
   }, []);
 
   if (stage === 'requested') {
@@ -274,6 +306,32 @@ export function VoyagerWorkspace({ personName }: Props) {
                 </p>
               </div>
 
+              <div className={styles.inspectorSection}>
+                <h4 className={styles.inspectorLabel}>Workspace history</h4>
+                {history.length === 0 ? (
+                  <p className={styles.zoneStubNote}>
+                    Nothing has been changed outside this canvas.
+                  </p>
+                ) : (
+                  history.map((entry) => (
+                    <div key={entry.id} className={styles.historyRow}>
+                      <span className={styles.historyTitle}>
+                        {entry.title}
+                        {!entry.active && <span className={styles.historyUndone}> · undone</span>}
+                      </span>
+                      <span className={styles.historyWhere}>
+                        {entry.where} · {entry.at.slice(11, 16)} UTC
+                      </span>
+                      {entry.active && (
+                        <button className={styles.historyUndo} onClick={() => undo(entry.id)}>
+                          Undo
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
               {/* Standing, on every workspace, not shown once and dismissed. */}
               <p className={styles.standingNote}>
                 This is educational analysis, not personalised advice.
@@ -283,6 +341,34 @@ export function VoyagerWorkspace({ personName }: Props) {
             <p className={styles.zoneStubNote}>No context yet.</p>
           )
         }
+        confirmation={
+          pending && (
+            /*
+             * The gate. It states what changes, where, and what it costs —
+             * built from the action rather than from the label that offered it,
+             * so a button cannot describe itself more kindly than it behaves.
+             */
+            <div className={styles.confirmScrim} role="dialog" aria-modal="true" aria-label="Confirm this change">
+              <div className={styles.confirmCard}>
+                <h3 className={styles.confirmTitle}>{pending.action.title}</h3>
+                <p className={styles.confirmWhere}>{pending.action.where}</p>
+                <p className={styles.confirmCaveat}>{pending.action.caveat}</p>
+                <p className={styles.confirmUndo}>{pending.action.undo}</p>
+
+                <div className={styles.confirmActions}>
+                  <button className={styles.primaryAction} onClick={accept}>
+                    Apply
+                  </button>
+                  <button className={styles.topAction} onClick={() => setPending(null)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        }
+        notice={notice}
+        onDismissNotice={() => setNotice(null)}
       />
     );
   }
