@@ -83,6 +83,9 @@ try {
       'src/lib/superchart/scripts/document.ts',
       'src/lib/superchart/scripts/diagnostics.ts',
       'src/lib/superchart/scripts/fixes.ts',
+      'src/lib/superchart/pine/lexer.ts',
+      'src/lib/superchart/pine/parser.ts',
+      'src/lib/superchart/pine/evaluate.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -193,6 +196,8 @@ try {
   const doc = await load('document', 'scripts');
   const diag = await load('diagnostics', 'scripts');
   const fix = await load('fixes', 'scripts');
+  const pine = await load('evaluate', 'pine');
+  const pineParser = await load('parser', 'pine');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -2797,6 +2802,283 @@ try {
      */
     const source = '//@version=6\nindicator("x")\nplot(ta.vwap(close))';
     assert.equal(fix.fixesFor(source, diag.diagnose(source)).length, 0);
+  });
+
+  /* ============================= Pine preview runtime ======================== */
+
+  group('The runtime interprets; it never becomes JavaScript');
+
+  /*
+   * A ramp with a known shape, so every assertion below is against a value that
+   * can be worked out by hand rather than against whatever the code happens to
+   * produce.
+   */
+  const pineBars = {
+    open: [], high: [], low: [], close: [], volume: [], time: [],
+  };
+  for (let i = 0; i < 100; i += 1) {
+    pineBars.open.push(100 + i);
+    pineBars.high.push(101 + i);
+    pineBars.low.push(99 + i);
+    pineBars.close.push(100 + i);
+    pineBars.volume.push(1000 + i);
+    pineBars.time.push(1_700_000_000 + i * 86_400);
+  }
+
+  const runScript = (source) => pine.runPine(source, pineBars);
+
+  check('a plot of close is the closes', () => {
+    const result = runScript('//@version=6\nindicator("x")\nplot(close)');
+    assert.equal(result.plots.length, 1);
+    assert.equal(result.plots[0].values[0], 100);
+    assert.equal(result.plots[0].values[99], 199);
+  });
+
+  check('arithmetic on a series is elementwise', () => {
+    const result = runScript('//@version=6\nindicator("x")\nplot(close * 2 + 1)');
+    assert.equal(result.plots[0].values[0], 201);
+    assert.equal(result.plots[0].values[10], 221);
+  });
+
+  check('precedence is arithmetic, not left to right', () => {
+    // 2 + 3 * 4 is 14. A parser that just folded left would say 20.
+    const result = runScript('//@version=6\nindicator("x")\nplot(2 + 3 * 4)');
+    assert.equal(result.plots[0].values[0], 14);
+  });
+
+  check('subtraction groups to the left', () => {
+    const result = runScript('//@version=6\nindicator("x")\nplot(10 - 3 - 2)');
+    assert.equal(result.plots[0].values[0], 5);
+  });
+
+  check('brackets override precedence', () => {
+    const result = runScript('//@version=6\nindicator("x")\nplot((2 + 3) * 4)');
+    assert.equal(result.plots[0].values[0], 20);
+  });
+
+  check('history looks back the number of bars asked for', () => {
+    const result = runScript('//@version=6\nindicator("x")\nplot(close[3])');
+    assert.equal(result.plots[0].values[10], pineBars.close[7]);
+  });
+
+  check('and before the start there is nothing, not the first bar', () => {
+    // Repeating bar zero would invent history the instrument does not have.
+    const result = runScript('//@version=6\nindicator("x")\nplot(close[3])');
+    assert.equal(result.plots[0].values[0], null);
+    assert.equal(result.plots[0].values[2], null);
+  });
+
+  check('a moving average matches the arithmetic', () => {
+    // Closes are 100..199, so the 10-bar average at index 9 is the mean of
+    // 100..109 = 104.5.
+    const result = runScript('//@version=6\nindicator("x")\nplot(ta.sma(close, 10))');
+    assert.equal(result.plots[0].values[8], null);
+    assert.equal(result.plots[0].values[9], 104.5);
+  });
+
+  check('an EMA is seeded with a simple average', () => {
+    const result = runScript('//@version=6\nindicator("x")\nplot(ta.ema(close, 10))');
+    assert.equal(result.plots[0].values[8], null);
+    assert.equal(result.plots[0].values[9], 104.5);
+  });
+
+  check('a variable holds a series', () => {
+    const result = runScript('//@version=6\nindicator("x")\nfast = ta.sma(close, 10)\nplot(fast)');
+    assert.equal(result.plots[0].values[9], 104.5);
+  });
+
+  check('an input evaluates to its default, not to something invented', () => {
+    /*
+     * The preview has no settings dialog. Using anything other than what is
+     * written in the script would preview something the author did not write.
+     */
+    const result = runScript(
+      '//@version=6\nindicator("x")\nlength = input.int(10, "Length")\nplot(ta.sma(close, length))'
+    );
+    assert.equal(result.plots[0].values[9], 104.5);
+  });
+
+  check('a ternary picks per bar', () => {
+    const result = runScript('//@version=6\nindicator("x")\nplot(close > 150 ? 1 : 0)');
+    assert.equal(result.plots[0].values[0], 0);
+    assert.equal(result.plots[0].values[99], 1);
+  });
+
+  check('named arguments are the same as positional ones', () => {
+    const a = runScript('//@version=6\nindicator("x")\nplot(ta.sma(close, 10))');
+    const b = runScript('//@version=6\nindicator("x")\nplot(ta.sma(source = close, length = 10))');
+    assert.deepEqual(a.plots[0].values, b.plots[0].values);
+  });
+
+  check('the declared title and overlay are read', () => {
+    const result = runScript('//@version=6\nindicator("My study", overlay = true)\nplot(close)');
+    assert.equal(result.title, 'My study');
+    assert.equal(result.overlay, true);
+  });
+
+  check('a call wrapped across lines is one call', () => {
+    const result = runScript('//@version=6\nindicator("x")\nplot(ta.sma(\n  close,\n  10\n))');
+    assert.equal(result.plots[0].values[9], 104.5);
+  });
+
+  check('comments are not code', () => {
+    const result = runScript('//@version=6\nindicator("x")\n// plot(close * 999)\nplot(close)');
+    assert.equal(result.plots.length, 1);
+    assert.equal(result.plots[0].values[0], 100);
+  });
+
+  group('Missing values stay missing');
+
+  check('division by zero is not plotted as infinity', () => {
+    /*
+     * JavaScript says Infinity; Pine says na. `na` is the honest one — the
+     * result is not a number anybody can draw, and drawing it would rescale the
+     * whole chart.
+     */
+    const result = runScript('//@version=6\nindicator("x")\nplot(close / 0)');
+    assert.equal(result.plots[0].values[0], null);
+  });
+
+  check('arithmetic on a missing value produces a missing value', () => {
+    const result = runScript('//@version=6\nindicator("x")\nplot(close[5] + 1)');
+    assert.equal(result.plots[0].values[0], null);
+    assert.equal(result.plots[0].values[5], pineBars.close[0] + 1);
+  });
+
+  check('nz replaces the gaps, and only the gaps', () => {
+    const result = runScript('//@version=6\nindicator("x")\nplot(nz(close[5], 0))');
+    assert.equal(result.plots[0].values[0], 0);
+    assert.equal(result.plots[0].values[5], pineBars.close[0]);
+  });
+
+  group('Everything outside the subset says so, by name');
+
+  const failure = (source) => {
+    try {
+      runScript(source);
+      return null;
+    } catch (error) {
+      return error;
+    }
+  };
+
+  check('an unsupported function is named, with its line', () => {
+    const error = failure(
+      '//@version=6\nindicator("x")\nspx = request.security("SPX", "D", close)\nplot(spx)'
+    );
+    assert.match(error.message, /request\.security/);
+    assert.equal(error.line, 3);
+  });
+
+  check('and it says the script is unchanged and can be exported', () => {
+    // The design requires the sentence. Somebody hitting the edge of the subset
+    // needs a way forward, not only a refusal.
+    const error = failure('//@version=6\nindicator("x")\nplot(ta.vwap(close))');
+    assert.match(error.message, /export it to run it in full/i);
+  });
+
+  check('reassignment is refused rather than computed wrongly', () => {
+    /*
+     * `:=` accumulates bar by bar. This evaluator computes whole series, which
+     * genuinely cannot express that — so it declines instead of producing a
+     * plausible line that is not what the script says.
+     */
+    const error = failure('//@version=6\nindicator("x")\ntotal = 0\ntotal := total + close\nplot(total)');
+    assert.match(error.message, /bar by bar|cannot express/);
+    assert.equal(error.line, 4);
+  });
+
+  check('an undefined name is refused, not treated as zero', () => {
+    const error = failure('//@version=6\nindicator("x")\nplot(myVariable)');
+    assert.match(error.message, /not defined/);
+  });
+
+  check('a forward-looking history offset is refused', () => {
+    // Looking ahead is the one bug that makes a backtest look brilliant.
+    const error = failure('//@version=6\nindicator("x")\nplot(close[-1])');
+    assert.match(error.message, /cannot look forward/);
+  });
+
+  check('a script that plots nothing says so', () => {
+    const error = failure('//@version=6\nindicator("x")\nvalue = close * 2');
+    assert.match(error.message, /Nothing is plotted/);
+  });
+
+  check('an unclosed string is a syntax error with a line', () => {
+    const error = failure('//@version=6\nindicator("x\nplot(close)');
+    assert.match(error.message, /left open/);
+    assert.equal(error.line, 2);
+  });
+
+  check('an unbalanced bracket is caught by the parser', () => {
+    const error = failure('//@version=6\nindicator("x")\nplot(ta.sma(close, 10)');
+    assert.ok(error);
+    assert.match(error.message, /Expected|ends in the middle/);
+  });
+
+  group('The budget is real');
+
+  check('operations are counted and reported', () => {
+    const result = runScript('//@version=6\nindicator("x")\nplot(ta.sma(close, 10))');
+    assert.ok(result.operations > 0);
+    assert.ok(result.operations < pine.MAX_OPERATIONS);
+  });
+
+  check('too many series is refused before memory runs out', () => {
+    let source = '//@version=6\nindicator("x")\n';
+    for (let i = 0; i < pine.MAX_SERIES + 5; i += 1) source += `v${i} = close + ${i}\n`;
+    source += 'plot(v1)';
+
+    const error = failure(source);
+    assert.match(error.message, /series/);
+  });
+
+  check('a length outside the range is refused', () => {
+    const error = failure('//@version=6\nindicator("x")\nplot(ta.sma(close, 0))');
+    assert.match(error.message, /outside what the preview computes/);
+  });
+
+  check('a length that changes per bar is refused', () => {
+    // A window that changes every bar is not a window. Pine refuses this too.
+    const error = failure('//@version=6\nindicator("x")\nplot(ta.sma(close, bar_index))');
+    assert.match(error.message, /same on every bar/);
+  });
+
+  group('The parser produces a tree, not a string');
+
+  check('an assignment parses as an assignment', () => {
+    const program = pineParser.parse('//@version=6\nx = close + 1');
+    const assignment = program.statements.find((statement) => statement.type === 'assignment');
+    assert.equal(assignment.name, 'x');
+    assert.equal(assignment.value.type, 'binary');
+    assert.equal(assignment.value.operator, '+');
+  });
+
+  check('a call parses with its arguments', () => {
+    const program = pineParser.parse('plot(ta.sma(close, 10), "MA")');
+    const call = program.statements[0].value;
+    assert.equal(call.type, 'call');
+    assert.equal(call.callee, 'plot');
+    assert.equal(call.args.length, 2);
+    assert.equal(call.args[0].value.callee, 'ta.sma');
+  });
+
+  check('nothing in the tree carries executable text', () => {
+    /*
+     * The architectural constraint, asserted rather than assumed: the AST holds
+     * numbers, names and strings from the source. It is walked, never compiled,
+     * and `eval` and `new Function` appear nowhere in this project.
+     */
+    const program = pineParser.parse('//@version=6\nindicator("x")\nplot(ta.sma(close, 10))');
+    const walk = (node) => {
+      if (!node || typeof node !== 'object') return;
+      assert.ok(typeof node !== 'function', 'a function reached the AST');
+      for (const value of Object.values(node)) {
+        if (Array.isArray(value)) value.forEach(walk);
+        else walk(value);
+      }
+    };
+    program.statements.forEach(walk);
   });
 
   /* ============================ Superchart layouts ============================ */

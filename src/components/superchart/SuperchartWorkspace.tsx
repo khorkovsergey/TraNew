@@ -151,6 +151,11 @@ export function SuperchartWorkspace({
   const [showBefore, setShowBefore] = useState(false);
   /** Applied plans, newest first, for the activity log. */
   const [activity, setActivity] = useState<Array<{ id: string; title: string; at: string }>>([]);
+  /** Plots returned by the Pine preview worker, drawn as drafts. */
+  const [scriptPlots, setScriptPlots] = useState<Array<{
+    title: string;
+    values: (number | null)[];
+  }> | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<DrawingTool | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -293,9 +298,40 @@ export function SuperchartWorkspace({
     [shownState.studies, bars, preview, showBefore, studyChoices]
   );
 
+  /*
+   * The script preview joins the studies rather than replacing them.
+   *
+   * It is an `IndicatorInstance` like any other so the engine needs no special
+   * case, and it carries `draft` and `source: 'voyager'` so it is dashed and
+   * excluded from a saved layout — the same guarantee the command preview has.
+   */
+  const withScriptPreview = useMemo<IndicatorInstance[]>(() => {
+    if (!scriptPlots?.length) return indicators;
+
+    return [
+      ...indicators,
+      {
+        id: 'script_preview',
+        definitionId: 'script',
+        label: 'Script preview',
+        pane: 'main',
+        params: {},
+        plots: scriptPlots.map((plot, index) => ({
+          key: plot.title,
+          colour: index,
+          values: plot.values,
+          style: 'line' as const,
+        })),
+        hidden: false,
+        source: 'voyager',
+        draft: true,
+      },
+    ];
+  }, [indicators, scriptPlots]);
+
   useEffect(() => {
-    engineRef.current?.setIndicators(indicators, studyPalette);
-  }, [indicators, studyPalette]);
+    engineRef.current?.setIndicators(withScriptPreview, studyPalette);
+  }, [withScriptPreview, studyPalette]);
 
   useEffect(() => {
     engineRef.current?.setDrawings(shownState.drawings, selectedId);
@@ -1090,7 +1126,12 @@ export function SuperchartWorkspace({
             <span className={`${styles.dockTab} ${styles.dockTabActive}`}>Script Lab</span>
             <span className={styles.dockTabSoon}>Strategy Tester · Coming next</span>
           </div>
-          <ScriptLab studies={studyChoices} symbolTicker={resolved?.ticker ?? symbolId} />
+          <ScriptLab
+            studies={studyChoices}
+            symbolTicker={resolved?.ticker ?? symbolId}
+            bars={bars}
+            onPreview={setScriptPlots}
+          />
         </div>
       )}
     </div>

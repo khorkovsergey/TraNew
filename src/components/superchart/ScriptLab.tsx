@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { saveScriptAction } from '@/app/actions/scripts';
 import { diagnose, statusFor, statusLabel } from '@/lib/superchart/scripts/diagnostics';
 import { fixesFor, type ScriptFix } from '@/lib/superchart/scripts/fixes';
+import { runPreview, type PreviewOutcome } from '@/lib/superchart/pine/client';
+import type { Bar } from '@/lib/superchart/chart-engine/types';
 import {
   commitVersion,
   createDocument,
@@ -38,14 +40,19 @@ import styles from './Superchart.module.css';
 type Props = {
   studies: StudyChoice[];
   symbolTicker: string;
+  /** The series the preview runs against — the same bars the chart is drawing. */
+  bars: Bar[];
+  onPreview: (plots: Array<{ title: string; values: (number | null)[] }> | null) => void;
 };
 
-export function ScriptLab({ studies, symbolTicker }: Props) {
+export function ScriptLab({ studies, symbolTicker, bars, onPreview }: Props) {
   const [document, setDocument] = useState<ScriptDocument | null>(null);
   const [compareTo, setCompareTo] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   /** A repair being considered. Never applied without its diff on screen. */
   const [proposedFix, setProposedFix] = useState<ScriptFix | null>(null);
+  const [outcome, setOutcome] = useState<PreviewOutcome | null>(null);
+  const [running, setRunning] = useState(false);
   const autosave = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const diagnostics = useMemo(
@@ -161,6 +168,46 @@ export function ScriptLab({ studies, symbolTicker }: Props) {
     setDocument((current) => (current ? { ...current, source } : current));
   }, []);
 
+  /*
+   * Runs the script in the worker and puts the result on the chart.
+   *
+   * The plots are drawn as drafts — dashed, and stripped from any saved layout
+   * — because a preview is a proposal about what the script does, not a study
+   * somebody added. Pressing Run twice replaces the previous result rather than
+   * stacking two.
+   */
+  const run = useCallback(async () => {
+    if (!document || running) return;
+
+    setRunning(true);
+    setOutcome(null);
+
+    const result = await runPreview({
+      source: document.source,
+      bars: {
+        open: bars.map((bar) => bar.open),
+        high: bars.map((bar) => bar.high),
+        low: bars.map((bar) => bar.low),
+        close: bars.map((bar) => bar.close),
+        volume: bars.map((bar) => bar.volume ?? 0),
+        time: bars.map((bar) => bar.time),
+      },
+    });
+
+    setOutcome(result);
+    setRunning(false);
+
+    // A failed run clears whatever the last successful one left on the chart.
+    // Leaving old lines up beside a new error is how somebody reads the wrong
+    // result as the current one.
+    onPreview(result.status === 'ok' ? result.result.plots : null);
+  }, [document, bars, running, onPreview]);
+
+  const clearPreview = useCallback(() => {
+    setOutcome(null);
+    onPreview(null);
+  }, [onPreview]);
+
   /** Applying a repair writes a version, so it can be walked back like any edit. */
   const acceptFix = useCallback(() => {
     if (!fixPreview || !proposedFix) return;
@@ -253,6 +300,14 @@ export function ScriptLab({ studies, symbolTicker }: Props) {
           <button className={styles.labButton} onClick={() => void saveToAccount()}>
             Save
           </button>
+          <button className={styles.labButton} onClick={() => void run()} disabled={running}>
+            {running ? 'Running…' : 'Run preview'}
+          </button>
+          {outcome && (
+            <button className={styles.labButton} onClick={clearPreview}>
+              Clear
+            </button>
+          )}
           <button className={styles.labButton} onClick={exportScript}>
             Export .pine
           </button>
@@ -269,6 +324,27 @@ export function ScriptLab({ studies, symbolTicker }: Props) {
         {notice && (
           <p className={styles.labNotice} role="status">
             {notice}
+          </p>
+        )}
+
+        {outcome?.status === 'ok' && (
+          <p className={styles.labNotice} role="status">
+            Previewing {outcome.result.plots.length} plot
+            {outcome.result.plots.length === 1 ? '' : 's'} on the chart, dashed.{' '}
+            {outcome.result.operations.toLocaleString('en-US')} operations. Nothing was saved and
+            the script was not executed as code — it was interpreted.
+          </p>
+        )}
+
+        {outcome?.status === 'failed' && (
+          <p className={styles.labFailure} role="status">
+            <strong>Line {outcome.line}:</strong> {outcome.message}
+          </p>
+        )}
+
+        {outcome?.status === 'unavailable' && (
+          <p className={styles.labFailure} role="status">
+            {outcome.message} The script is unchanged, and Export still works.
           </p>
         )}
       </div>
