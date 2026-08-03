@@ -463,6 +463,79 @@ try {
   check('a beginner is asked questions, not given a portfolio', /How long can the money/.test(beginnerText));
   check('and told this is educational', /Educational/.test(beginnerText));
 
+  group('Sign-up, tokens and plans');
+
+  const moneyContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const moneyPage = await moneyContext.newPage();
+  await moneyPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await moneyPage.waitForTimeout(600);
+
+  check(
+    'the landing carries the quiet offer',
+    (await moneyPage.getByRole('link', { name: /free tokens/ }).count()) > 0
+  );
+  check(
+    'and no floating card, because nothing has been asked yet',
+    (await moneyPage.locator('[class*="ctaTile"]').count()) === 0
+  );
+
+  await moneyPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('What is happening in the US market today?');
+  await moneyPage.getByRole('button', { name: 'Send' }).click();
+  await moneyPage.waitForTimeout(3400);
+
+  check('the card appears once the workspace exists', (await moneyPage.locator('[class*="ctaTile"]').count()) === 1);
+
+  /*
+   * The rule the handoff states plainly: nothing floats over content without a
+   * matching allowance. Measured rather than trusted.
+   */
+  const reserved = await moneyPage.evaluate(() => {
+    const canvas = document.querySelector('main[aria-label="Canvas"]');
+    return canvas ? parseInt(getComputedStyle(canvas).paddingBottom, 10) : 0;
+  });
+  check('the canvas reserves room for it', reserved >= 74, `${reserved}px reserved`);
+
+  const meterText = await moneyPage.locator('[class*="meter"]').first().innerText();
+  check('the meter counts messages for a guest', /free messages/i.test(meterText), meterText);
+  check('and says they are a guest', /guest/i.test(meterText));
+
+  await moneyPage.locator('[class*="meter"]').first().click();
+  await moneyPage.waitForTimeout(400);
+
+  const plansDialog = moneyPage.getByRole('dialog', { name: 'Plans' });
+  check('the meter opens the plans', await plansDialog.isVisible());
+
+  const plansText = await plansDialog.innerText();
+  check('three plans', /Free/.test(plansText) && /Pro/.test(plansText) && /Private AI/.test(plansText));
+  check(
+    'each saying what it is for rather than only what it has',
+    /Enough to work with/.test(plansText) && /reads a lot of data/.test(plansText)
+  );
+
+  await plansDialog.getByRole('button', { name: 'Close' }).click();
+  await moneyPage.waitForTimeout(300);
+
+  await moneyPage.getByRole('button', { name: 'Sign up free' }).click();
+  await moneyPage.waitForTimeout(400);
+
+  const signupDialog = moneyPage.getByRole('dialog', { name: 'Free account' });
+  check('the card opens the offer', await signupDialog.isVisible());
+  check('with four things that happen', (await signupDialog.locator('li').count()) === 4);
+  check(
+    'and both ways in',
+    (await signupDialog.getByRole('link', { name: /Create a free account/ }).count()) === 1 &&
+      (await signupDialog.getByRole('link', { name: /already have an account/ }).count()) === 1
+  );
+
+  await signupDialog.getByRole('button', { name: 'Close' }).click();
+  await moneyPage.waitForTimeout(300);
+
+  await moneyPage.getByRole('button', { name: 'Dismiss' }).first().click();
+  await moneyPage.waitForTimeout(300);
+  check('the card can be dismissed', (await moneyPage.locator('[class*="ctaTile"]').count()) === 0);
+
+  await moneyContext.close();
+
   group('Wealth Hub: nothing before consent, revocable in one click');
 
   /*

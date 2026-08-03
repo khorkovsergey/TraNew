@@ -96,6 +96,7 @@ try {
       'src/lib/voyager/workspace/actions.ts',
       'src/lib/voyager/workspace/record.ts',
       'src/lib/voyager/workspace/scopes.ts',
+      'src/lib/voyager/workspace/credits.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -217,6 +218,7 @@ try {
   const actions = await load('actions', 'workspace');
   const library = await load('record', 'workspace');
   const scopes = await load('scopes', 'workspace');
+  const credits = await load('credits', 'workspace');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -4074,6 +4076,88 @@ try {
     const labels = ['not-connected', 'connected', 'granted', 'revoked'].map(scopes.statusLabel);
     assert.equal(new Set(labels).size, 4, labels.join(' | '));
     assert.match(scopes.statusLabel('revoked'), /nothing is being read/i);
+  });
+
+  group('The first request is never blocked');
+
+  check('even with nothing left', () => {
+    /*
+     * A workspace that asks for a card before it has shown what it does is
+     * asking somebody to buy something they have not seen.
+     */
+    const spent = credits.allowanceFor('guest', credits.GUEST_MESSAGES);
+    assert.equal(credits.meterState(spent), 'spent');
+    assert.equal(credits.canAsk(spent, true), true);
+  });
+
+  check('but the second one is', () => {
+    const spent = credits.allowanceFor('guest', credits.GUEST_MESSAGES);
+    assert.equal(credits.canAsk(spent, false), false);
+  });
+
+  group('The meter warns before it stops');
+
+  check('amber arrives with room left to act on it', () => {
+    // A limit somebody meets at the moment it stops them feels like a trick.
+    const low = credits.allowanceFor('guest', Math.ceil(credits.GUEST_MESSAGES * 0.9));
+    assert.equal(credits.meterState(low), 'low');
+    assert.equal(credits.canAsk(low, false), true);
+  });
+
+  check('and not before there is anything to warn about', () => {
+    assert.equal(credits.meterState(credits.allowanceFor('guest', 10)), 'ok');
+  });
+
+  check('an unmetered plan says so rather than showing a fake bar', () => {
+    const pro = credits.allowanceFor('pro', 4000);
+    assert.equal(credits.meterState(pro), 'unmetered');
+    assert.match(credits.meterLabel(pro), /no message limit/);
+  });
+
+  group('Guests and accounts are counted in different units, and it says which');
+
+  check('a guest sees messages', () => {
+    assert.match(credits.meterLabel(credits.allowanceFor('guest', 37)), /37 \/ 100 free messages/);
+    assert.match(credits.meterLabel(credits.allowanceFor('guest', 37)), /Guest/);
+  });
+
+  check('an account sees tokens left, not tokens used', () => {
+    // "3 000 tokens left" answers what somebody wants to know; "12 used" does not.
+    const label = credits.meterLabel(credits.allowanceFor('free', 0));
+    assert.match(label, /3,000 tokens left/);
+    assert.match(label, /Free account/);
+  });
+
+  check('and never a negative number', () => {
+    const label = credits.meterLabel(credits.allowanceFor('free', credits.SIGNUP_TOKENS + 500));
+    assert.match(label, /^0 tokens left/);
+  });
+
+  group('A gated feature says why, in terms of cost');
+
+  check('every gate names a plan and a reason', () => {
+    /*
+     * "Because Pro" tells nobody anything. "Each run reads four thousand
+     * filings" is a fact somebody can weigh against the price.
+     */
+    for (const [feature, gate] of Object.entries(credits.FEATURE_PLAN)) {
+      assert.ok(gate.plan !== 'guest' && gate.plan !== 'free', `${feature} gates on a free plan`);
+      assert.ok(gate.because.length > 20, `${feature} has no real reason`);
+    }
+  });
+
+  check('the three plans each say what they are for', () => {
+    assert.equal(credits.PLANS.length, 3);
+    for (const plan of credits.PLANS) {
+      assert.ok(plan.summary.length > 0, `${plan.id} has no summary`);
+      assert.ok(plan.points.length >= 3, `${plan.id} has too little to judge`);
+    }
+  });
+
+  check('the sign-up offer is four things that happen', () => {
+    assert.equal(credits.SIGNUP_PERKS.length, 4);
+    assert.ok(credits.SIGNUP_PERKS.some((perk) => /3,000/.test(perk)));
+    assert.ok(credits.SIGNUP_PERKS.some((perk) => /permission/.test(perk)));
   });
 
   /* ============================ Superchart layouts ============================ */

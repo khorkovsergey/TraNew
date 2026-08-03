@@ -45,6 +45,15 @@ import {
   statusLabel as wealthStatusLabel,
   type Grant,
 } from '@/lib/voyager/workspace/scopes';
+import {
+  allowanceFor,
+  canAsk,
+  meterLabel,
+  meterState,
+  PLANS,
+  SIGNUP_PERKS,
+  SIGNUP_TOKENS,
+} from '@/lib/voyager/workspace/credits';
 import { ModuleCard } from './ModuleCard';
 import { WorkspaceShell } from './WorkspaceShell';
 import styles from './VoyagerWorkspace.module.css';
@@ -93,6 +102,9 @@ export function VoyagerWorkspace({ personName }: Props) {
    */
   const [grant, setGrant] = useState<Grant | null>(null);
   const [ticked, setTicked] = useState<string[]>([]);
+  const [asked, setAsked] = useState(0);
+  const [ctaDismissed, setCtaDismissed] = useState(false);
+  const [modal, setModal] = useState<'signup' | 'plans' | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
 
   /*
@@ -117,6 +129,20 @@ export function VoyagerWorkspace({ personName }: Props) {
      * and a scenario that produced something unrenderable is refused rather
      * than half-drawn.
      */
+    /*
+     * The count is checked, and the first request passes whatever it says.
+     * Somebody arriving with a spent allowance still gets to see what this does
+     * before being asked for anything.
+     */
+    const allowance = allowanceFor(personName ? 'free' : 'guest', asked);
+    if (!canAsk(allowance, asked === 0)) {
+      setNotice('That is the last of the free messages. An account adds 3 000 tokens.');
+      setModal('signup');
+      return;
+    }
+
+    setAsked((count) => count + 1);
+
     const parsed = parsePlan(responseFor(trimmed));
 
     setRequest(trimmed);
@@ -128,7 +154,7 @@ export function VoyagerWorkspace({ personName }: Props) {
     setPlan(parsed?.plan ?? null);
     setRefusals(parsed?.refusals ?? []);
     setRun(START);
-  }, []);
+  }, [asked, personName]);
 
   /*
    * The clock lives here and the rules live in `lifecycle.ts`.
@@ -538,6 +564,113 @@ export function VoyagerWorkspace({ personName }: Props) {
         }
         onOpenLibrary={() => setLibraryOpen(true)}
         onSave={saveWorkspace}
+        meter={
+          <button
+            className={`${styles.meter} ${
+              meterState(allowanceFor(personName ? 'free' : 'guest', asked)) === 'low'
+                ? styles.meterLow
+                : ''
+            }`}
+            onClick={() => setModal('plans')}
+            title="What each plan is for"
+          >
+            {meterLabel(allowanceFor(personName ? 'free' : 'guest', asked))}
+          </button>
+        }
+        cta={
+          /*
+           * Only for guests, and only until it is dismissed. The canvas reserves
+           * matching space below, so this never covers the last card — nothing
+           * floats over content without an allowance for it.
+           */
+          !personName && !ctaDismissed ? (
+            <div className={styles.cta}>
+              <span className={styles.ctaTile} aria-hidden="true">
+                <Icon name="sparkle" size={15} />
+              </span>
+              <span className={styles.ctaText}>
+                <strong>{SIGNUP_TOKENS.toLocaleString('en-US')} free tokens</strong>
+                <span className={styles.ctaSub}>≈ 40 questions · no card required</span>
+              </span>
+              <button className={styles.ctaButton} onClick={() => setModal('signup')}>
+                Sign up free
+              </button>
+              <button
+                className={styles.noticeClose}
+                onClick={() => setCtaDismissed(true)}
+                title="Dismiss"
+                aria-label="Dismiss"
+              >
+                <Icon name="close" size={13} />
+              </button>
+            </div>
+          ) : null
+        }
+        modal={
+          modal && (
+            <div
+              className={styles.confirmScrim}
+              role="dialog"
+              aria-modal="true"
+              aria-label={modal === 'signup' ? 'Free account' : 'Plans'}
+            >
+              <div className={styles.libraryCard}>
+                <header className={styles.libraryHead}>
+                  <h2 className={styles.confirmTitle}>
+                    {modal === 'signup'
+                      ? `${SIGNUP_TOKENS.toLocaleString('en-US')} tokens with a free account`
+                      : 'What each plan is for'}
+                  </h2>
+                  <span className={styles.spacer} />
+                  <button
+                    className={styles.noticeClose}
+                    onClick={() => setModal(null)}
+                    title="Close"
+                    aria-label="Close"
+                  >
+                    <Icon name="close" size={14} />
+                  </button>
+                </header>
+
+                {modal === 'signup' ? (
+                  <>
+                    <ul className={styles.perkList}>
+                      {SIGNUP_PERKS.map((perk) => (
+                        <li key={perk}>{perk}</li>
+                      ))}
+                    </ul>
+                    <div className={styles.confirmActions}>
+                      <Link className={styles.primaryLink} href="/sign-up">
+                        Create a free account
+                      </Link>
+                      <Link className={styles.topAction} href="/sign-in">
+                        I already have an account
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <div className={styles.planGrid}>
+                    {PLANS.map((offer) => (
+                      <section key={offer.id} className={styles.planCardOffer}>
+                        <h3 className={styles.planName}>
+                          {offer.name}
+                          <span className={styles.planPrice}>{offer.price}</span>
+                        </h3>
+                        {/* What it is for, before what it contains. */}
+                        <p className={styles.planSummary}>{offer.summary}</p>
+                        <ul className={styles.perkList}>
+                          {offer.points.map((point) => (
+                            <li key={point}>{point}</li>
+                          ))}
+                        </ul>
+                      </section>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        }
         notice={notice}
         onDismissNotice={() => setNotice(null)}
       />

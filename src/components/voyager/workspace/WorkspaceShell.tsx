@@ -43,6 +43,9 @@ type Props = {
   notice?: string | null;
   onDismissNotice?: () => void;
   library?: ReactNode;
+  modal?: ReactNode;
+  meter?: ReactNode;
+  cta?: ReactNode;
   onOpenLibrary?: () => void;
   onSave?: () => void;
 };
@@ -58,6 +61,9 @@ export function WorkspaceShell({
   notice,
   onDismissNotice,
   library,
+  modal,
+  meter,
+  cta,
   onOpenLibrary,
   onSave,
 }: Props) {
@@ -190,6 +196,9 @@ export function WorkspaceShell({
                 </button>
               </div>
               <div className={styles.zoneBody}>{conversation}</div>
+              {/* The meter sits under the conversation, where the composer is,
+                  rather than in the header — it is about what is left to ask. */}
+              {meter && <div className={styles.meterRow}>{meter}</div>}
             </>
           ) : (
             /* The rail keeps the zone reachable at 46px rather than removing it,
@@ -206,7 +215,9 @@ export function WorkspaceShell({
         </aside>
 
         <main
-          className={`${styles.canvas} ${zones.mobileTab === 'canvas' ? styles.mobileActive : ''}`}
+          className={`${styles.canvas} ${zones.mobileTab === 'canvas' ? styles.mobileActive : ''} ${
+            cta ? styles.canvasWithCta : ''
+          }`}
           aria-label="Canvas"
         >
           <div className={styles.canvasColumn}>{canvas}</div>
@@ -253,6 +264,8 @@ export function WorkspaceShell({
 
       {confirmation}
       {library}
+      {modal}
+      {cta}
 
       {/*
         A notice, not a toast that vanishes: it says what was applied and how to
