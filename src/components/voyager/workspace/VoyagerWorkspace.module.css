@@ -340,12 +340,12 @@
   text-transform: uppercase;
 }
 
-/* ---- Once a request exists ---- */
+/* ---- The three-zone shell ---- */
 
 .shell {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 64px);
+  height: calc(100vh - 64px);
   background: var(--tn-surface);
 }
 
@@ -363,6 +363,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: none;
 }
 
 .wordmark {
@@ -372,13 +373,24 @@
   color: var(--tn-text);
 }
 
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .workspaceTitle {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--tn-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .namedBadge {
+  flex: none;
   padding: 2px 7px;
   border-radius: 5px;
   background: var(--tn-purple-tint);
@@ -394,6 +406,7 @@
 }
 
 .topAction {
+  flex: none;
   padding: 7px 13px;
   border: 1px solid var(--tn-border-input);
   border-radius: 10px;
@@ -408,43 +421,145 @@
   border-color: var(--tn-purple);
 }
 
-.stagePlaceholder {
-  flex: 1;
+/* ---- Zones ---- */
+
+.zones {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 40px 20px;
-  background: var(--tn-bg);
-  text-align: center;
+  flex: 1;
+  min-height: 0;
 }
 
-.requestEcho {
-  margin: 0;
-  max-width: 52ch;
-  font-size: 17px;
-  font-weight: 700;
+/*
+ * Zone A. Fixed width so it never dominates; the canvas takes the rest.
+ * Collapsing leaves a rail rather than nothing, so reopening is one click.
+ */
+.conversation {
+  flex: 0 0 348px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--tn-border-card);
+  transition: flex-basis 180ms ease;
+}
+
+.conversationRail {
+  flex-basis: 46px;
+  align-items: center;
+  padding-top: 10px;
+}
+
+.railButton {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--tn-text-muted);
+  cursor: pointer;
+}
+
+.railButton:hover {
+  border-color: var(--tn-purple);
+  color: var(--tn-purple);
+}
+
+.zoneHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px 8px;
+}
+
+.zoneLabel {
+  flex: 1;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}
+
+.zoneIcon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--tn-text-muted);
+  cursor: pointer;
+}
+
+.zoneIcon:hover {
+  background: var(--tn-chip-bg);
   color: var(--tn-text);
 }
 
-.placeholderNote {
-  margin: 0;
-  max-width: 58ch;
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--tn-text-nav);
+.zoneBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 14px 14px;
 }
 
-.primaryAction {
-  padding: 10px 18px;
+/* Zone B. The primary surface, so it takes whatever the other two leave. */
+.canvas {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--tn-bg);
+  padding: 16px;
+}
+
+.canvasColumn {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Zone C. A column on a wide screen; an overlay below 1180. */
+.inspector {
+  display: none;
+  flex: 0 0 312px;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--tn-border-card);
+  background: var(--tn-surface);
+}
+
+.inspectorOpen {
+  display: flex;
+}
+
+.inspectorOverlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  width: min(330px, 86vw);
+  box-shadow: -18px 0 44px rgba(19, 23, 34, 0.12);
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
   border: 0;
-  border-radius: 10px;
-  background: var(--tn-purple);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
+  padding: 0;
+  background: rgba(19, 23, 34, 0.16);
   cursor: pointer;
+}
+
+/* ---- The phone tab bar ---- */
+
+.tabBar {
+  display: none;
 }
 
 /* ---- Motion ---- */
@@ -469,4 +584,92 @@
   .categoryCards {
     grid-template-columns: 1fr;
   }
+
+  /*
+   * One zone at a time.
+   *
+   * Three columns on a 390px screen gives all three too little to be usable.
+   * Every zone is hidden and the active tab shows exactly one — which also
+   * means the inspector stops being an overlay here, because there is nothing
+   * behind it to overlay.
+   */
+  .conversation,
+  .canvas,
+  .inspector {
+    display: none;
+    flex: 1;
+    width: 100%;
+    border: 0;
+  }
+
+  .mobileActive {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .canvas.mobileActive {
+    display: block;
+  }
+
+  .inspectorOverlay {
+    position: static;
+    width: 100%;
+    box-shadow: none;
+  }
+
+  .scrim {
+    display: none;
+  }
+
+  .tabBar {
+    display: flex;
+    flex: 0 0 56px;
+    height: 56px;
+    border-top: 1px solid var(--tn-border-card);
+    background: var(--tn-surface);
+    /* Clear of the home indicator on a phone, zero everywhere else. */
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .tab {
+    flex: 1;
+    /* Above the 44px minimum with room for the label at the default size. */
+    min-height: 48px;
+    border: 0;
+    border-top: 2px solid transparent;
+    background: transparent;
+    color: var(--tn-text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .tabOn {
+    color: var(--tn-purple);
+    border-top-color: var(--tn-purple);
+  }
+
+  /* The rail is a wide-screen idea; on a phone the tab bar does that job. */
+  .conversationRail {
+    display: none;
+  }
+}
+
+.zoneStub {
+  padding: 6px 0;
+}
+
+.zoneStubRequest {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--tn-text);
+}
+
+.zoneStubNote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--tn-text-muted);
 }

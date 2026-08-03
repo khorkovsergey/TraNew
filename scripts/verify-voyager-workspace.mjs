@@ -127,6 +127,72 @@ try {
   await page.waitForTimeout(500);
   check('the composer sends', (await page.locator('body').innerText()).includes('gold'));
 
+  group('The three zones, at the geometry the handoff gives');
+
+  // The previous group left a workspace open; the starters only exist on the
+  // landing.
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.waitForTimeout(400);
+  await starters.first().click();
+  await page.waitForTimeout(500);
+
+  const widthOf = async (label) => {
+    const box = await page
+      .locator(`aside[aria-label="${label}"], main[aria-label="${label}"]`)
+      .first()
+      .boundingBox();
+    return box ? Math.round(box.width) : 0;
+  };
+
+  check('conversation is 348 wide', (await widthOf('Conversation')) === 348, `${await widthOf('Conversation')}`);
+  check('the canvas takes the rest', (await widthOf('Canvas')) > 700);
+  check(
+    'the inspector starts closed',
+    !(await page.locator('aside[aria-label="Context and sources"]').isVisible()),
+    'provenance was in front of the thing it is provenance for'
+  );
+
+  await page.getByRole('button', { name: 'Context' }).click();
+  await page.waitForTimeout(400);
+  check('and opens to 312', (await widthOf('Context and sources')) === 312, `${await widthOf('Context and sources')}`);
+
+  await page.getByRole('button', { name: 'Collapse the conversation' }).click();
+  await page.waitForTimeout(400);
+  check('collapsing leaves a 46px rail, not nothing', (await widthOf('Conversation')) === 46);
+
+  const rail = page.getByRole('button', { name: 'Open the conversation' });
+  check('and the rail can reopen it', (await rail.count()) > 0);
+
+  group('The arrangement survives a reload');
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(500);
+  await page.locator('[class*="starters"] > button').first().click();
+  await page.waitForTimeout(600);
+
+  check('the rail is still a rail', (await widthOf('Conversation')) === 46, `${await widthOf('Conversation')}`);
+
+  await page.getByRole('button', { name: 'Open the conversation' }).click();
+  await page.waitForTimeout(400);
+
+  group('Below 1180 the inspector becomes an overlay');
+
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await page.waitForTimeout(500);
+
+  const scrim = page.getByRole('button', { name: 'Close the context panel' }).first();
+  check('it is open from the saved arrangement', await page.locator('aside[aria-label="Context and sources"]').isVisible());
+  check('with a scrim behind it', (await scrim.count()) > 0);
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  check(
+    'Escape closes it',
+    !(await page.locator('aside[aria-label="Context and sources"]').isVisible()),
+    'a panel over the content trapped the person'
+  );
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.close();
 
   group('The phone gets the same screen, not a squeezed one');
@@ -156,6 +222,35 @@ try {
     if (box && box.height > 0 && box.height < 44) tooSmall.push(`${box.height}px`);
   }
   check('starter rows clear 44px', tooSmall.length === 0, tooSmall.join(', '));
+
+  group('And one zone at a time once a request exists');
+
+  await small.locator('[class*="starters"] > button').first().click();
+  await small.waitForTimeout(600);
+
+  const tabBar = small.getByRole('navigation', { name: 'Workspace zones' });
+  check('the four tabs are there', (await tabBar.getByRole('button').count()) === 4);
+
+  const visibleZones = async () => {
+    let count = 0;
+    for (const label of ['Conversation', 'Canvas', 'Context and sources']) {
+      const zone = small.locator(`aside[aria-label="${label}"], main[aria-label="${label}"]`).first();
+      if ((await zone.count()) && (await zone.isVisible())) count += 1;
+    }
+    return count;
+  };
+
+  check('exactly one zone is on screen', (await visibleZones()) === 1, `${await visibleZones()} visible`);
+
+  await tabBar.getByRole('button', { name: 'Chat', exact: true }).click();
+  await small.waitForTimeout(400);
+  check('switching keeps it to one', (await visibleZones()) === 1, `${await visibleZones()} visible`);
+  check('and it is the one asked for', await small.locator('aside[aria-label="Conversation"]').isVisible());
+
+  const tabOverflow = await small.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  check('still no sideways scroll in workspace mode', tabOverflow <= 1, `${tabOverflow}px`);
 
   await phone.close();
 } catch (error) {

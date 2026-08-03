@@ -87,6 +87,8 @@ try {
       'src/lib/superchart/pine/parser.ts',
       'src/lib/superchart/pine/evaluate.ts',
       'src/lib/market/newsShape.ts',
+      'src/lib/voyager/workspace/state.ts',
+      'src/lib/voyager/workspace/landing.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -200,6 +202,8 @@ try {
   const pine = await load('evaluate', 'pine');
   const pineParser = await load('parser', 'pine');
   const news = await load('newsShape', 'market');
+  const zones = await load('state', 'workspace');
+  const landing = await load('landing', 'workspace');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -3179,6 +3183,109 @@ try {
      */
     const story = news.toStory({ ...article, summary: 'Rates <b>held</b>\u0000 steady' });
     assert.ok(!story.summary.includes('\u0000'));
+  });
+
+  /* ========================== Voyager workspace shell ======================== */
+
+  group('The arrangement is a preference, and preferences survive');
+
+  check('a saved arrangement round-trips', () => {
+    const saved = zones.serializeZones({
+      conversationOpen: false,
+      inspectorOpen: true,
+      mobileTab: 'sources',
+    });
+    const back = zones.parseZones(JSON.parse(JSON.stringify(saved)));
+    assert.equal(back.conversationOpen, false);
+    assert.equal(back.inspectorOpen, true);
+    assert.equal(back.mobileTab, 'sources');
+  });
+
+  check('a version from the future is refused rather than guessed at', () => {
+    // Reading a shape written by newer code gives a half-restored workspace,
+    // which is harder to notice than a default one.
+    const saved = zones.serializeZones(zones.DEFAULT_ZONES);
+    assert.equal(zones.parseZones({ ...saved, schemaVersion: 99 }), null);
+  });
+
+  check('one bad field costs that field, not the whole arrangement', () => {
+    const saved = zones.serializeZones(zones.DEFAULT_ZONES);
+    const back = zones.parseZones({
+      ...saved,
+      zones: { conversationOpen: 'yes', inspectorOpen: true, mobileTab: 'canvas' },
+    });
+    assert.equal(back.conversationOpen, zones.DEFAULT_ZONES.conversationOpen);
+    assert.equal(back.inspectorOpen, true);
+  });
+
+  check('an unknown tab falls back rather than rendering nothing', () => {
+    const saved = zones.serializeZones(zones.DEFAULT_ZONES);
+    const back = zones.parseZones({ ...saved, zones: { mobileTab: 'wormhole' } });
+    assert.equal(back.mobileTab, zones.DEFAULT_ZONES.mobileTab);
+  });
+
+  check('rubbish is null, not a partial arrangement', () => {
+    assert.equal(zones.parseZones(null), null);
+    assert.equal(zones.parseZones('open'), null);
+    assert.equal(zones.parseZones({}), null);
+  });
+
+  check('the inspector starts closed', () => {
+    /*
+     * It answers "where did this come from", which people ask after reading an
+     * answer. Open by default puts provenance in front of the thing it is
+     * provenance for.
+     */
+    assert.equal(zones.DEFAULT_ZONES.inspectorOpen, false);
+    assert.equal(zones.DEFAULT_ZONES.conversationOpen, true);
+  });
+
+  check('every tab has a label', () => {
+    for (const tab of zones.MOBILE_TABS) {
+      assert.ok(zones.MOBILE_TAB_LABEL[tab], `${tab} has no label`);
+    }
+  });
+
+  group('The landing offers exactly what the handoff specifies');
+
+  check('five starters, no more', () => {
+    // A sixth turns a menu of things to try into a list to read.
+    assert.equal(landing.STARTERS.length, 5);
+  });
+
+  check('and five editorial categories', () => {
+    assert.equal(landing.PROMPT_CATEGORIES.length, 5);
+  });
+
+  check('every category says who it is for', () => {
+    for (const category of landing.PROMPT_CATEGORIES) {
+      assert.ok(category.subtitle.length > 0, `${category.id} has no subtitle`);
+      assert.ok(category.cards.length > 0, `${category.id} has no cards`);
+    }
+  });
+
+  check('gated prompts are marked, so nobody meets the wall after asking', () => {
+    const gated = landing.PROMPT_CATEGORIES.flatMap((c) => c.cards).filter((card) => card.pro);
+    assert.ok(gated.length >= 4, `${gated.length} marked PRO`);
+  });
+
+  check('every briefing card states why it is shown', () => {
+    /*
+     * The condition the handoff puts on showing one at all: a personalised card
+     * that cannot say why it was chosen is indistinguishable from an advert.
+     */
+    const briefing = landing.briefingFor('Alex', 9);
+    assert.equal(briefing.cards.length, 4);
+    for (const card of briefing.cards) {
+      assert.ok(card.because && card.because.length > 0, `${card.id} has no reason`);
+      assert.ok(card.kind && card.kind.length > 0, `${card.id} has no category`);
+    }
+  });
+
+  check('the greeting follows the hour rather than assuming morning', () => {
+    assert.match(landing.briefingFor('Alex', 9).greeting, /morning/);
+    assert.match(landing.briefingFor('Alex', 14).greeting, /afternoon/);
+    assert.match(landing.briefingFor('Alex', 20).greeting, /evening/);
   });
 
   /* ============================ Superchart layouts ============================ */

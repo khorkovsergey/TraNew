@@ -10,6 +10,7 @@ import {
   STARTERS,
   type Briefing,
 } from '@/lib/voyager/workspace/landing';
+import { WorkspaceShell } from './WorkspaceShell';
 import styles from './VoyagerWorkspace.module.css';
 
 /**
@@ -72,34 +73,44 @@ export function VoyagerWorkspace({ personName }: Props) {
   }, []);
 
   if (stage === 'requested') {
+    /*
+     * The zones exist; what goes inside them does not yet. Each says which
+     * phase brings it rather than showing a convincing empty frame — an empty
+     * panel that looks finished is harder to judge than one that says what it
+     * is waiting for.
+     */
     return (
-      <div className={styles.shell}>
-        <header className={styles.topBar}>
-          <span className={styles.brand}>
-            <VoyagerOrb size={20} />
-            <span className={styles.wordmark}>AI Voyager</span>
-          </span>
-          <span className={styles.workspaceTitle}>New workspace</span>
-          <span className={styles.namedBadge}>Named by Voyager</span>
-          <span className={styles.spacer} />
-          <button className={styles.topAction} onClick={reset}>
-            New
-          </button>
-        </header>
-
-        <div className={styles.stagePlaceholder}>
-          <p className={styles.requestEcho}>{request}</p>
-          <p className={styles.placeholderNote}>
-            The three-zone workspace — conversation, canvas and inspector — is the next phase of
-            this build. What is finished is the screen you came from and the transition you just
-            made; the rest is deliberately absent rather than mocked up, because a frame with
-            nothing behind it is harder to judge than an empty one.
-          </p>
-          <button className={styles.primaryAction} onClick={reset}>
-            Back to the start
-          </button>
-        </div>
-      </div>
+      <WorkspaceShell
+        workspaceName="New workspace"
+        autoNamed
+        onNew={reset}
+        conversation={
+          <div className={styles.zoneStub}>
+            <p className={styles.zoneStubRequest}>{request}</p>
+            <p className={styles.zoneStubNote}>
+              The turn — mode chip, plan card with its steps ticking off, and the summary —
+              arrives with the execution lifecycle in phase 3.
+            </p>
+          </div>
+        }
+        canvas={
+          <div className={styles.zoneStub}>
+            <p className={styles.zoneStubNote}>
+              Modules appear here one at a time as the work completes. The card family and the
+              lifecycle that reveals them are phase 3; the ten scenarios that fill them are
+              phase 4.
+            </p>
+          </div>
+        }
+        inspector={
+          <div className={styles.zoneStub}>
+            <p className={styles.zoneStubNote}>
+              Context in use, Wealth Hub status, sources with timestamps and editable
+              assumptions. Sources arrive with the modules that cite them, in phase 3.
+            </p>
+          </div>
+        }
+      />
     );
   }
 
