@@ -270,9 +270,23 @@ export const PORTFOLIO = {
       sourceIds: [],
       data: {
         scopes: [
-          { id: 'holdings', label: 'Which assets you hold and their weights', required: true },
-          { id: 'values', label: 'What each is worth', required: false },
-          { id: 'history', label: 'When you bought them', required: false },
+          {
+            id: 'holdings',
+            label: 'Which assets you hold, and their weights',
+            required: true,
+          },
+          {
+            id: 'values',
+            label: 'What each holding is worth',
+            required: false,
+            note: 'Refusing this keeps the analysis to proportions. Concentration still works; anything in currency does not.',
+          },
+          {
+            id: 'history',
+            label: 'When you bought them',
+            required: false,
+            note: 'Refusing this loses gains and holding periods.',
+          },
         ],
         note: 'The analysis works without values — it can talk about concentration without knowing the amounts.',
       },

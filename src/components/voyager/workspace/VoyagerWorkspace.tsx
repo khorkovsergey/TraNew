@@ -37,6 +37,14 @@ import {
 } from '@/lib/voyager/workspace/record';
 import { saveLibraryAction } from '@/app/actions/voyagerWorkspace';
 import { WorkspaceLibrary } from './WorkspaceLibrary';
+import {
+  capabilities,
+  grantFrom,
+  revoke as revokeGrant,
+  SCOPES,
+  statusLabel as wealthStatusLabel,
+  type Grant,
+} from '@/lib/voyager/workspace/scopes';
 import { ModuleCard } from './ModuleCard';
 import { WorkspaceShell } from './WorkspaceShell';
 import styles from './VoyagerWorkspace.module.css';
@@ -79,6 +87,12 @@ export function VoyagerWorkspace({ personName }: Props) {
   const [saved, setSaved] = useState<SavedWorkspace[]>([]);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [name, setName] = useState<string | null>(null);
+  /*
+   * The grant for this workspace. Null means nothing has been shared, which is
+   * the state every workspace starts in and returns to on New.
+   */
+  const [grant, setGrant] = useState<Grant | null>(null);
+  const [ticked, setTicked] = useState<string[]>([]);
   const composer = useRef<HTMLTextAreaElement>(null);
 
   /*
@@ -205,6 +219,11 @@ export function VoyagerWorkspace({ personName }: Props) {
     setPending(null);
     setNotice(null);
     setName(null);
+    // A grant is for one workspace. Starting a new one starts with nothing
+    // shared, rather than carrying a decision into a question it was not made
+    // about.
+    setGrant(null);
+    setTicked([]);
   }, []);
 
   /*
@@ -231,10 +250,24 @@ export function VoyagerWorkspace({ personName }: Props) {
 
   const accept = useCallback(() => {
     if (!pending) return;
+
+    /*
+     * Granting is not a generic action: it produces a scoped, workspace-bound
+     * grant rather than an entry that merely says permission was given.
+     */
+    if (pending.action.id === 'grant') {
+      const at = new Date().toISOString();
+      setGrant(grantFrom(`ws_${request.length}`, ticked, at));
+      setHistory((current) => applyAction(current, pending, at));
+      setNotice('Shared for this workspace only. Revoke it in the context panel at any time.');
+      setPending(null);
+      return;
+    }
+
     setHistory((current) => applyAction(current, pending, new Date().toISOString()));
     setNotice(`Applied. ${pending.action.undo}`);
     setPending(null);
-  }, [pending]);
+  }, [pending, request, ticked]);
 
   const undo = useCallback((entryId: string) => {
     setHistory((current) => undoAction(current, entryId));
@@ -336,6 +369,7 @@ export function VoyagerWorkspace({ personName }: Props) {
                   module={module}
                   sources={plan.sources}
                   onAction={onAction}
+                  scopeState={module.kind === 'permission-request' ? { ticked, setTicked } : undefined}
                 />
               ))}
 
@@ -383,6 +417,49 @@ export function VoyagerWorkspace({ personName }: Props) {
                 <p className={styles.zoneStubNote}>
                   Editing these re-runs the result. The editing itself is phase 4.
                 </p>
+              </div>
+
+              <div className={styles.inspectorSection}>
+                <h4 className={styles.inspectorLabel}>Wealth Hub</h4>
+                <p className={styles.wealthStatus}>
+                  {wealthStatusLabel(
+                    grant ? (grant.revokedAt ? 'revoked' : 'granted') : 'not-connected'
+                  )}
+                </p>
+
+                {grant && !grant.revokedAt ? (
+                  <>
+                    <ul className={styles.scopeSummary}>
+                      {SCOPES.filter((scope) => grant.scopes.includes(scope.id)).map((scope) => (
+                        <li key={scope.id}>{scope.label}</li>
+                      ))}
+                    </ul>
+
+                    <p className={styles.zoneStubNote}>
+                      {capabilities(grant.scopes).cannot.length === 0
+                        ? 'Everything the analysis can use is shared.'
+                        : `Not shared: ${capabilities(grant.scopes).cannot.join('; ')}.`}
+                    </p>
+
+                    {/* One click, and it takes effect immediately. */}
+                    <button
+                      className={styles.revokeButton}
+                      onClick={() => {
+                        setGrant((current) =>
+                          current ? revokeGrant(current, new Date().toISOString()) : current
+                        );
+                        setNotice('Revoked. Nothing further is read, and nothing read was kept.');
+                      }}
+                    >
+                      Revoke access
+                    </button>
+                  </>
+                ) : (
+                  <p className={styles.zoneStubNote}>
+                    Nothing from your wealth record has been read. A question that needs it will
+                    ask first, and name exactly what it wants.
+                  </p>
+                )}
               </div>
 
               <div className={styles.inspectorSection}>

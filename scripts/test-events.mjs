@@ -95,6 +95,7 @@ try {
       'src/lib/voyager/workspace/scenarios.ts',
       'src/lib/voyager/workspace/actions.ts',
       'src/lib/voyager/workspace/record.ts',
+      'src/lib/voyager/workspace/scopes.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -215,6 +216,7 @@ try {
   const scenarios = await load('scenarios', 'workspace');
   const actions = await load('actions', 'workspace');
   const library = await load('record', 'workspace');
+  const scopes = await load('scopes', 'workspace');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -3982,6 +3984,96 @@ try {
     assert.match(text, /Asked:/);
     assert.match(text, /not personalised advice/);
     assert.ok(!/user|email|account id/i.test(text), text);
+  });
+
+  group('Nothing is read before consent');
+
+  check('with no grant, nothing may be read', () => {
+    /*
+     * The default, and the one that matters most. There is no argument
+     * combination that permits a read without a grant existing first.
+     */
+    for (const scope of scopes.SCOPES) {
+      assert.equal(scopes.canRead(null, 'ws1', scope.id), false, `${scope.id} was readable`);
+    }
+  });
+
+  const grant = scopes.grantFrom('ws1', ['values'], '2026-08-03T10:00:00Z');
+
+  check('a grant permits only what was ticked', () => {
+    assert.equal(scopes.canRead(grant, 'ws1', 'values'), true);
+    assert.equal(scopes.canRead(grant, 'ws1', 'history'), false);
+    assert.equal(scopes.canRead(grant, 'ws1', 'goals'), false);
+  });
+
+  check('required scopes are included whether or not they arrived', () => {
+    // The dialog shows them ticked and disabled, so their absence in the payload
+    // means the client did not send a disabled input, not that they were refused.
+    assert.equal(scopes.canRead(grant, 'ws1', 'holdings'), true);
+  });
+
+  check('an unknown scope is dropped rather than trusted', () => {
+    // The list comes from a client and is not a list of things to believe.
+    const odd = scopes.grantFrom('ws1', ['values', 'everything', 'tax_returns'], '2026-08-03T10:00:00Z');
+    assert.deepEqual(odd.scopes.sort(), ['holdings', 'values']);
+  });
+
+  check('a grant does not carry into another workspace', () => {
+    /*
+     * "Yes, for this" is not "yes, from now on". A person who allowed one
+     * analysis should not find a later one read the same thing.
+     */
+    assert.equal(scopes.canRead(grant, 'ws2', 'values'), false);
+  });
+
+  check('revoking stops reads immediately', () => {
+    const revoked = scopes.revoke(grant, '2026-08-03T10:05:00Z');
+    for (const scope of scopes.SCOPES) {
+      assert.equal(scopes.canRead(revoked, 'ws1', scope.id), false, `${scope.id} survived a revoke`);
+    }
+  });
+
+  check('and the revoked grant keeps its record', () => {
+    // What was shared, and when, is a thing somebody may need to check later.
+    const revoked = scopes.revoke(grant, '2026-08-03T10:05:00Z');
+    assert.equal(revoked.grantedAt, '2026-08-03T10:00:00Z');
+    assert.equal(revoked.revokedAt, '2026-08-03T10:05:00Z');
+  });
+
+  group('Refusing a scope narrows the answer rather than blocking it');
+
+  check('only one scope is required', () => {
+    /*
+     * A permission dialog whose boxes are all required is not a choice. The
+     * concentration analysis genuinely works on weights alone.
+     */
+    const required = scopes.SCOPES.filter((scope) => scope.required);
+    assert.equal(required.length, 1);
+    assert.equal(required[0].id, 'holdings');
+  });
+
+  check('every optional scope says what refusing it costs', () => {
+    // Somebody deciding needs to know what they lose, not what they give.
+    for (const scope of scopes.SCOPES) {
+      assert.ok(scope.neededFor.length > 0, `${scope.id} does not say what it is for`);
+    }
+  });
+
+  check('holdings alone still answers the concentration question', () => {
+    const out = scopes.capabilities(['holdings']);
+    assert.ok(out.can.some((line) => /Concentration/.test(line)));
+    assert.ok(out.cannot.some((line) => /money/.test(line)));
+  });
+
+  check('and the full grant loses nothing', () => {
+    const out = scopes.capabilities(['holdings', 'values', 'history', 'goals']);
+    assert.equal(out.cannot.length, 0);
+  });
+
+  check('the status line is different for each state', () => {
+    const labels = ['not-connected', 'connected', 'granted', 'revoked'].map(scopes.statusLabel);
+    assert.equal(new Set(labels).size, 4, labels.join(' | '));
+    assert.match(scopes.statusLabel('revoked'), /nothing is being read/i);
   });
 
   /* ============================ Superchart layouts ============================ */

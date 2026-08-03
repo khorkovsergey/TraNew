@@ -152,7 +152,7 @@ try {
     'provenance was in front of the thing it is provenance for'
   );
 
-  await page.getByRole('button', { name: 'Context' }).click();
+  await page.locator('header').getByRole('button', { name: 'Context', exact: true }).click();
   await page.waitForTimeout(400);
   check('and opens to 312', (await widthOf('Context and sources')) === 312, `${await widthOf('Context and sources')}`);
 
@@ -302,7 +302,7 @@ try {
   await page.getByRole('button', { name: 'Cancel' }).click();
   await page.waitForTimeout(300);
 
-  await page.getByRole('button', { name: 'Context' }).click();
+  await page.locator('header').getByRole('button', { name: 'Context', exact: true }).click();
   await page.waitForTimeout(400);
   const historyBefore = await page.locator('aside[aria-label="Context and sources"]').innerText();
   check(
@@ -462,6 +462,103 @@ try {
   const beginnerText = await page.locator('main[aria-label="Canvas"]').innerText();
   check('a beginner is asked questions, not given a portfolio', /How long can the money/.test(beginnerText));
   check('and told this is educational', /Educational/.test(beginnerText));
+
+  group('Wealth Hub: nothing before consent, revocable in one click');
+
+  /*
+   * On its own page. The permission flow is the most security-relevant thing
+   * here and it should be checked from a clean start rather than after twenty
+   * other groups have left state behind — a failure in this group must mean the
+   * permission model is wrong, not that the suite drifted.
+   */
+  /*
+   * A fresh context, not just a fresh page: the zone arrangement and the
+   * library live in localStorage, which pages in one context share. Twenty
+   * groups of earlier clicking is exactly the state this check should not be
+   * standing on.
+   */
+  const wealthContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const wealthPage = await wealthContext.newPage();
+  await wealthPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await wealthPage.waitForTimeout(600);
+  await wealthPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('What are the main risks in my portfolio?');
+  await wealthPage.getByRole('button', { name: 'Send' }).click();
+  await wealthPage.waitForTimeout(3000);
+
+  const wealthPanel = wealthPage.locator('aside[aria-label="Context and sources"]');
+
+  /*
+   * Opened only if it is shut. The arrangement persists across pages, so a
+   * blind click closes it whenever an earlier group left it open — and the
+   * checks below then read an empty panel and fail for the wrong reason.
+   */
+  const openContext = async () => {
+    const body = wealthPanel.locator('[class*="zoneBody"]');
+    if ((await body.count()) === 0 || !(await body.isVisible())) {
+      await wealthPage.locator('header').getByRole('button', { name: 'Context', exact: true }).click();
+      await wealthPage.waitForTimeout(400);
+    }
+  };
+
+  await openContext();
+
+  check('it starts not connected', /not connected/i.test(await wealthPanel.innerText()));
+  check(
+    'and says nothing has been read',
+    /nothing from your wealth record has been read/i.test(await wealthPanel.innerText())
+  );
+  check(
+    'with nothing to revoke, because nothing was granted',
+    (await wealthPage.getByRole('button', { name: 'Revoke access' }).count()) === 0
+  );
+
+  const required = wealthPage.getByRole('checkbox', { name: /Which assets you hold/ });
+  const optional = wealthPage.getByRole('checkbox', { name: /What each holding is worth/ });
+
+  check('the scope that makes the question answerable is locked on', await required.isDisabled());
+  check('and an optional scope starts off', !(await optional.isChecked()));
+  check(
+    'each optional scope says what refusing it costs',
+    /concentration still works/i.test(await wealthPage.locator('main[aria-label="Canvas"]').innerText())
+  );
+
+  await optional.check();
+  await wealthPage.getByRole('button', { name: /Choose scopes and continue/ }).click();
+  await wealthPage.waitForTimeout(400);
+  await wealthPage.getByRole('button', { name: 'Apply', exact: true }).click();
+  await wealthPage.waitForTimeout(700);
+
+  const granted = await wealthPanel.innerText();
+  check('granting shows what was shared', /shared for this workspace/i.test(granted), granted.slice(0, 120));
+  check('including the optional scope that was ticked', /what each holding is worth/i.test(granted));
+  check('and names what was withheld', /not shared/i.test(granted));
+
+  const revokeButton = wealthPage.getByRole('button', { name: 'Revoke access' });
+  check('a revoke is offered', (await revokeButton.count()) === 1);
+
+  await revokeButton.click({ force: true });
+  await wealthPage.waitForTimeout(500);
+
+  const revokedText = await wealthPanel.innerText();
+  check('revoking takes one click', /revoked/i.test(revokedText), revokedText.slice(0, 120));
+  check('and says nothing further is read', /nothing is being read/i.test(revokedText));
+
+  group('A grant does not carry into the next question');
+
+  await wealthPage.getByRole('button', { name: 'New', exact: true }).click();
+  await wealthPage.waitForTimeout(400);
+  await wealthPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('What are the main risks in my portfolio?');
+  await wealthPage.getByRole('button', { name: 'Send' }).click();
+  await wealthPage.waitForTimeout(3000);
+  await openContext();
+
+  check(
+    'the new workspace starts with nothing shared',
+    /not connected/i.test(await wealthPanel.innerText()),
+    'a grant survived into a question it was not made about'
+  );
+
+  await wealthContext.close();
 
   group('An unwritten scenario is refused, not answered wrongly');
 

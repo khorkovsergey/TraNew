@@ -33,6 +33,8 @@ type Props = {
   module: VoyagerModule;
   sources: Source[];
   onAction: (module: VoyagerModule, actionId: string) => void;
+  /** Only the permission card gets this: the boxes are a decision, not display. */
+  scopeState?: { ticked: string[]; setTicked: (next: string[]) => void };
 };
 
 function Row({ label, value, sign }: { label: string; value: string; sign?: number }) {
@@ -54,7 +56,7 @@ function Row({ label, value, sign }: { label: string; value: string; sign?: numb
   );
 }
 
-function Body({ module }: { module: VoyagerModule }) {
+function Body({ module, scopeState }: { module: VoyagerModule; scopeState?: Props['scopeState'] }) {
   const data = (module.data ?? {}) as Record<string, unknown>;
 
   switch (module.kind) {
@@ -244,14 +246,36 @@ function Body({ module }: { module: VoyagerModule }) {
                   {/* Checked and disabled where the analysis genuinely cannot
                       run without it; optional otherwise, and the note says what
                       is still possible when it is withheld. */}
+                  {/*
+                    Controlled, because what is ticked here is what gets read.
+                    An uncontrolled box would let the dialog and the grant
+                    disagree, and the grant is the thing that matters.
+                  */}
                   <input
                     type="checkbox"
-                    defaultChecked={scope.required === true}
+                    checked={
+                      scope.required === true ||
+                      (scopeState?.ticked ?? []).includes(String(scope.id ?? ''))
+                    }
                     disabled={scope.required === true}
+                    onChange={(event) => {
+                      if (!scopeState) return;
+                      const id = String(scope.id ?? '');
+                      scopeState.setTicked(
+                        event.target.checked
+                          ? [...scopeState.ticked, id]
+                          : scopeState.ticked.filter((item) => item !== id)
+                      );
+                    }}
                     aria-label={String(scope.label ?? '')}
                   />
                   <span>{String(scope.label ?? '')}</span>
                   {scope.required === true && <span className={styles.scopeTag}>Needed</span>}
+                  {/* What refusing it costs, said while deciding rather than
+                      discovered in the answer. */}
+                  {scope.required !== true && scope.note ? (
+                    <span className={styles.scopeNote}>{String(scope.note)}</span>
+                  ) : null}
                 </li>
               );
             })}
@@ -323,7 +347,7 @@ function Body({ module }: { module: VoyagerModule }) {
   }
 }
 
-export function ModuleCard({ module, sources, onAction }: Props) {
+export function ModuleCard({ module, sources, onAction, scopeState }: Props) {
   const cited = sourcesFor(module, sources);
 
   return (
@@ -336,7 +360,7 @@ export function ModuleCard({ module, sources, onAction }: Props) {
         {module.tag && <span className={styles.moduleTag}>{module.tag}</span>}
       </header>
 
-      <Body module={module} />
+      <Body module={module} scopeState={scopeState} />
 
       {module.actions.length > 0 && (
         <div className={styles.moduleActions}>
