@@ -653,6 +653,57 @@
   .conversationRail {
     display: none;
   }
+
+  /*
+   * The top bar wraps rather than pushing the page.
+   *
+   * Workspaces, Save, Context and New beside the wordmark come to more than a
+   * 390px row, and a fixed-height bar with `flex-shrink: 0` children pushed the
+   * document 87px wide. Wrapping costs a row of height; the alternative was a
+   * page that scrolls sideways on every screen.
+   */
+  .topBar {
+    height: auto;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    row-gap: 6px;
+    padding: 8px 12px;
+  }
+
+  .titleGroup {
+    order: 10;
+    width: 100%;
+  }
+
+  .topAction {
+    /* Above the 44px minimum, and small enough that four fit on a row. */
+    min-height: 44px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+
+  .wordmark {
+    font-size: 14px;
+  }
+
+  /* A modal on a phone is the screen, not a card floating on it. */
+  .libraryCard,
+  .confirmCard {
+    max-height: 88vh;
+    padding: 16px;
+  }
+
+  .libraryActions {
+    width: 100%;
+  }
+
+  .notice {
+    left: 12px;
+    right: 12px;
+    bottom: 70px;
+    transform: none;
+    max-width: none;
+  }
 }
 
 .zoneStub {
@@ -1434,4 +1485,119 @@
 
 .historyUndo:hover {
   border-color: var(--tn-purple);
+}
+
+/* ---- Workspace library ---- */
+
+.libraryCard {
+  width: min(760px, 100%);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 22px;
+  border-radius: 20px;
+  background: var(--tn-surface);
+  box-shadow: 0 26px 70px rgba(19, 23, 34, 0.2);
+}
+
+.libraryHead {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.librarySearch {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 10px;
+  background: var(--tn-bg);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--tn-text);
+}
+
+.librarySearch:focus-visible {
+  outline: 2px solid var(--tn-purple);
+  outline-offset: 1px;
+}
+
+.filterChipOn {
+  border-color: var(--tn-purple);
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple);
+  font-weight: 700;
+}
+
+.libraryRows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 12px;
+}
+
+.libraryRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--tn-border-card);
+}
+
+.libraryMain {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.libraryName {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  border: 0;
+  padding: 0;
+  background: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.libraryName:hover {
+  color: var(--tn-purple);
+}
+
+.pinnedBadge {
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: var(--tn-amber-tint);
+  color: var(--tn-amber-text);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+/* The question, not a thumbnail: opening replays the request, and this is what
+   somebody searches from memory. */
+.libraryAsked {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--tn-text-nav);
+}
+
+.libraryMeta {
+  font-size: 10.5px;
+  color: var(--tn-text-muted);
+}
+
+.libraryActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 }

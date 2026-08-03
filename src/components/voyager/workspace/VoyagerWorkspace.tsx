@@ -27,6 +27,16 @@ import {
   type Confirmation,
   type HistoryEntry,
 } from '@/lib/voyager/workspace/actions';
+import {
+  parseLibrary,
+  serializeLibrary,
+  suggestName,
+  upsert,
+  WORKSPACE_STORAGE_KEY,
+  type SavedWorkspace,
+} from '@/lib/voyager/workspace/record';
+import { saveLibraryAction } from '@/app/actions/voyagerWorkspace';
+import { WorkspaceLibrary } from './WorkspaceLibrary';
 import { ModuleCard } from './ModuleCard';
 import { WorkspaceShell } from './WorkspaceShell';
 import styles from './VoyagerWorkspace.module.css';
@@ -66,6 +76,9 @@ export function VoyagerWorkspace({ personName }: Props) {
   /** The change waiting to be accepted. Nothing happens while this is set. */
   const [pending, setPending] = useState<Confirmation | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [saved, setSaved] = useState<SavedWorkspace[]>([]);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [name, setName] = useState<string | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
 
   /*
@@ -95,6 +108,9 @@ export function VoyagerWorkspace({ personName }: Props) {
     setRequest(trimmed);
     setStage('requested');
     setDraft('');
+    // Named on arrival, from the request, and marked as a suggestion until
+    // somebody renames it.
+    setName(suggestName(trimmed));
     setPlan(parsed?.plan ?? null);
     setRefusals(parsed?.refusals ?? []);
     setRun(START);
@@ -106,6 +122,68 @@ export function VoyagerWorkspace({ personName }: Props) {
    * Splitting them is what lets the sequence be tested without waiting: the
    * component decides when to step, the module decides what stepping means.
    */
+  /*
+   * The library, restored once. Through the parser, like everything else read
+   * back out of a browser.
+   */
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(WORKSPACE_STORAGE_KEY);
+      if (!raw) return;
+      const restored = parseLibrary(JSON.parse(raw));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (restored) setSaved(restored);
+    } catch {
+      /* Unreadable storage means an empty library, which is recoverable. */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const persist = useCallback((next: SavedWorkspace[]) => {
+    setSaved(next);
+
+    /*
+     * The browser copy is written first and unconditionally: it is what makes
+     * the library survive a reload for somebody who is not signed in, and it
+     * must not depend on a request succeeding.
+     */
+    try {
+      localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(serializeLibrary(next)));
+    } catch {
+      /* Private mode. The account copy below may still work. */
+    }
+
+    void saveLibraryAction({ library: serializeLibrary(next) }).catch(() => null);
+  }, []);
+
+  const saveWorkspace = useCallback(() => {
+    if (!plan || !request) return;
+
+    const at = new Date().toISOString();
+    persist(
+      upsert(saved, {
+        id: `ws_${request.length}_${at.slice(0, 19)}`,
+        name: name ?? suggestName(request),
+        autoNamed: true,
+        kind:
+          plan.mode === 'screen'
+            ? 'screener'
+            : plan.mode === 'build'
+              ? 'chart'
+              : plan.mode === 'monitor'
+                ? 'wealth'
+                : 'research',
+        request,
+        summary: `${plan.modules.length} modules · ${plan.sources.length} sources`,
+        pinned: false,
+        createdAt: at,
+        updatedAt: at,
+      })
+    );
+
+    setNotice('Saved to your workspaces.');
+  }, [plan, request, name, saved, persist]);
+
   useEffect(() => {
     if (!plan || !isRunning(run)) return;
 
@@ -126,6 +204,7 @@ export function VoyagerWorkspace({ personName }: Props) {
     setHistory([]);
     setPending(null);
     setNotice(null);
+    setName(null);
   }, []);
 
   /*
@@ -171,7 +250,7 @@ export function VoyagerWorkspace({ personName }: Props) {
      */
     return (
       <WorkspaceShell
-        workspaceName={plan ? `${request.slice(0, 40)}${request.length > 40 ? '…' : ''}` : 'New workspace'}
+        workspaceName={name ?? 'New workspace'}
         autoNamed
         onNew={reset}
         conversation={
@@ -367,6 +446,21 @@ export function VoyagerWorkspace({ personName }: Props) {
             </div>
           )
         }
+        library={
+          libraryOpen && (
+            <WorkspaceLibrary
+              workspaces={saved}
+              onChange={persist}
+              onOpen={(workspace) => {
+                setLibraryOpen(false);
+                send(workspace.request);
+              }}
+              onClose={() => setLibraryOpen(false)}
+            />
+          )
+        }
+        onOpenLibrary={() => setLibraryOpen(true)}
+        onSave={saveWorkspace}
         notice={notice}
         onDismissNotice={() => setNotice(null)}
       />

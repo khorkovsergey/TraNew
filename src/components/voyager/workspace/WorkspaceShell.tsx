@@ -42,6 +42,9 @@ type Props = {
   confirmation?: ReactNode;
   notice?: string | null;
   onDismissNotice?: () => void;
+  library?: ReactNode;
+  onOpenLibrary?: () => void;
+  onSave?: () => void;
 };
 
 export function WorkspaceShell({
@@ -54,6 +57,9 @@ export function WorkspaceShell({
   confirmation,
   notice,
   onDismissNotice,
+  library,
+  onOpenLibrary,
+  onSave,
 }: Props) {
   const [zones, setZones] = useState<ZoneState>(DEFAULT_ZONES);
   const [narrow, setNarrow] = useState(false);
@@ -143,6 +149,12 @@ export function WorkspaceShell({
           title="Context, sources and assumptions"
         >
           Context
+        </button>
+        <button className={styles.topAction} onClick={onOpenLibrary}>
+          Workspaces
+        </button>
+        <button className={styles.topAction} onClick={onSave}>
+          Save
         </button>
         <button className={styles.topAction} onClick={onNew}>
           New
@@ -240,6 +252,7 @@ export function WorkspaceShell({
       </div>
 
       {confirmation}
+      {library}
 
       {/*
         A notice, not a toast that vanishes: it says what was applied and how to

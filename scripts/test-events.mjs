@@ -94,6 +94,7 @@ try {
       'src/lib/voyager/workspace/scenarioData.ts',
       'src/lib/voyager/workspace/scenarios.ts',
       'src/lib/voyager/workspace/actions.ts',
+      'src/lib/voyager/workspace/record.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -213,6 +214,7 @@ try {
   const life = await load('lifecycle', 'workspace');
   const scenarios = await load('scenarios', 'workspace');
   const actions = await load('actions', 'workspace');
+  const library = await load('record', 'workspace');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -3837,6 +3839,149 @@ try {
       }
     }
     assert.deepEqual(unknown, [], unknown.join(', '));
+  });
+
+  group('The workspace library');
+
+  const made = (id, over) => ({
+    id,
+    name: `Workspace ${id}`,
+    autoNamed: true,
+    kind: 'research',
+    request: 'what is happening in the US market',
+    summary: '4 modules, 2 sources',
+    pinned: false,
+    createdAt: '2026-08-01T10:00:00Z',
+    updatedAt: '2026-08-01T10:00:00Z',
+    ...over,
+  });
+
+  check('a saved workspace round-trips', () => {
+    const stored = library.serializeLibrary([made('w1')]);
+    const back = library.parseLibrary(JSON.parse(JSON.stringify(stored)));
+    assert.equal(back.length, 1);
+    assert.equal(back[0].request, 'what is happening in the US market');
+  });
+
+  check('a version from the future is refused rather than guessed at', () => {
+    const stored = library.serializeLibrary([made('w1')]);
+    assert.equal(library.parseLibrary({ ...stored, schemaVersion: 99 }), null);
+  });
+
+  check('a row with no request is dropped', () => {
+    /*
+     * The request is what makes reopening a replay rather than restoring a
+     * picture. A row that opens to nothing is worse than a row that is missing.
+     */
+    const stored = library.serializeLibrary([made('w1')]);
+    const back = library.parseLibrary({
+      ...stored,
+      workspaces: [{ ...stored.workspaces[0], request: '' }],
+    });
+    assert.equal(back.length, 0);
+  });
+
+  check('two rows with one id do not both survive', () => {
+    const stored = library.serializeLibrary([made('w1'), made('w1', { name: 'Other' })]);
+    const back = library.parseLibrary(stored);
+    assert.equal(back.length, 1);
+  });
+
+  check('pinned work sorts above recent work', () => {
+    const stored = library.serializeLibrary([
+      made('w1', { updatedAt: '2026-08-03T10:00:00Z' }),
+      made('w2', { pinned: true, updatedAt: '2026-07-01T10:00:00Z' }),
+    ]);
+    assert.equal(stored.workspaces[0].id, 'w2');
+  });
+
+  check('the cap drops the oldest unpinned work, never something pinned', () => {
+    const many = [];
+    for (let i = 0; i < library.MAX_WORKSPACES + 10; i += 1) {
+      many.push(made(`w${i}`, { updatedAt: `2026-07-${String((i % 28) + 1).padStart(2, '0')}T10:00:00Z` }));
+    }
+    many.push(made('keep', { pinned: true, updatedAt: '2026-01-01T00:00:00Z' }));
+
+    const stored = library.serializeLibrary(many);
+    assert.equal(stored.workspaces.length, library.MAX_WORKSPACES);
+    assert.ok(stored.workspaces.some((item) => item.id === 'keep'), 'a pinned workspace was dropped');
+  });
+
+  group('Naming, and who did it');
+
+  check('a suggestion is built from the request', () => {
+    assert.equal(library.suggestName('What is happening in the US market today'), 'Happening US market today');
+  });
+
+  check('and an empty request still gets a name', () => {
+    assert.equal(library.suggestName('   '), 'New workspace');
+  });
+
+  check('renaming takes the suggested badge off', () => {
+    /*
+     * A name somebody chose and a name Voyager suggested are different kinds of
+     * thing, and a list of thirty should not read as thirty decisions they made.
+     */
+    const list = library.rename([made('w1')], 'w1', 'Gold macro analysis');
+    assert.equal(list[0].name, 'Gold macro analysis');
+    assert.equal(list[0].autoNamed, false);
+  });
+
+  check('renaming to nothing is ignored', () => {
+    const list = library.rename([made('w1')], 'w1', '   ');
+    assert.equal(list[0].name, 'Workspace w1');
+    assert.equal(list[0].autoNamed, true);
+  });
+
+  group('Library operations');
+
+  check('pinning toggles', () => {
+    const once = library.togglePin([made('w1')], 'w1');
+    assert.equal(once[0].pinned, true);
+    assert.equal(library.togglePin(once, 'w1')[0].pinned, false);
+  });
+
+  check('a duplicate is never pinned', () => {
+    // Pinning is about what somebody is working on; copying pins would fill the
+    // top of the list with duplicates.
+    const list = library.duplicate([made('w1', { pinned: true })], 'w1', '2026-08-03T10:00:00Z');
+    assert.equal(list.length, 2);
+    assert.equal(list[0].pinned, false);
+    assert.match(list[0].name, /\(copy\)/);
+  });
+
+  check('duplicating something that is not there changes nothing', () => {
+    const list = [made('w1')];
+    assert.deepEqual(library.duplicate(list, 'w9', '2026-08-03T10:00:00Z'), list);
+  });
+
+  check('upsert replaces rather than stacking', () => {
+    const list = library.upsert([made('w1')], made('w1', { name: 'Renamed' }));
+    assert.equal(list.length, 1);
+    assert.equal(list[0].name, 'Renamed');
+  });
+
+  check('search looks at the request, not only the name', () => {
+    /*
+     * Somebody looking for the gold workspace remembers what they asked, not
+     * what it ended up called.
+     */
+    const list = [made('w1', { name: 'Untitled', request: 'why has gold risen' })];
+    assert.equal(library.filterWorkspaces(list, 'gold', 'all').length, 1);
+  });
+
+  check('filtering by kind and by pinned both work', () => {
+    const list = [made('w1', { kind: 'chart' }), made('w2', { kind: 'screener', pinned: true })];
+    assert.equal(library.filterWorkspaces(list, '', 'chart').length, 1);
+    assert.equal(library.filterWorkspaces(list, '', 'pinned').length, 1);
+    assert.equal(library.filterWorkspaces(list, '', 'all').length, 2);
+  });
+
+  check('an export carries the question and the disclaimer, not the account', () => {
+    const text = library.exportWorkspace(made('w1'));
+    assert.match(text, /Asked:/);
+    assert.match(text, /not personalised advice/);
+    assert.ok(!/user|email|account id/i.test(text), text);
   });
 
   /* ============================ Superchart layouts ============================ */

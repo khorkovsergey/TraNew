@@ -455,6 +455,29 @@ export const chartScript = pgTable(
   ]
 );
 
+/**
+ * Saved Voyager workspaces.
+ *
+ * The whole library is one serialized value per user rather than a row per
+ * workspace. It is only ever read whole, never queried across users, and the
+ * cap keeps it bounded — a table would buy nothing and cost a query on every
+ * open.
+ */
+export const voyagerWorkspace = pgTable(
+  'voyager_workspace',
+  {
+    userId: text('user_id')
+      .primaryKey()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    /** Serialized `StoredLibrary`, validated on the way in and on the way out. */
+    library: text('library').notNull(),
+    schemaVersion: integer('schema_version').notNull(),
+
+    updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+  }
+);
+
 export const savedObject = pgTable(
   'saved_object',
   {

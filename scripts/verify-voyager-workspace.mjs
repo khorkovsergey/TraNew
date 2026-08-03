@@ -342,6 +342,101 @@ try {
     'a link asked for confirmation, which teaches people to click through them'
   );
 
+  group('The workspace library');
+
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Why has gold risen over the last three months?');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await page.waitForTimeout(3400);
+
+  const named = await page.locator('[class*="workspaceTitle"]').innerText();
+  check('Voyager names the workspace from the request', /gold/i.test(named), named);
+  check('and says the name is a suggestion', (await page.locator('[class*="namedBadge"]').count()) > 0);
+
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.waitForTimeout(500);
+
+  await page.getByRole('button', { name: 'Workspaces' }).click();
+  await page.waitForTimeout(400);
+
+  const dialogLib = page.getByRole('dialog', { name: 'Your workspaces' });
+  check('the library opens', await dialogLib.isVisible());
+  check('with the saved workspace in it', /gold/i.test(await dialogLib.innerText()));
+  check(
+    'showing what was asked, not only what it was called',
+    /Why has gold risen/i.test(await dialogLib.innerText())
+  );
+
+  await dialogLib.getByRole('textbox', { name: 'Search your workspaces' }).fill('gold');
+  await page.waitForTimeout(300);
+  check(
+    'search finds it by the question',
+    (await dialogLib.locator('[class*="libraryMain"]').count()) === 1,
+    `${await dialogLib.locator('[class*="libraryMain"]').count()} rows`
+  );
+
+  await dialogLib.getByRole('textbox', { name: 'Search your workspaces' }).fill('zzzz');
+  await page.waitForTimeout(300);
+  check('and says so when nothing matches', /Nothing matches/.test(await dialogLib.innerText()));
+
+  await dialogLib.getByRole('textbox', { name: 'Search your workspaces' }).fill('');
+  await page.waitForTimeout(300);
+
+  await dialogLib.getByRole('button', { name: 'Pin', exact: true }).first().click();
+  await page.waitForTimeout(300);
+  check('pinning marks it', /Pinned/.test(await dialogLib.innerText()));
+
+  await dialogLib.getByRole('button', { name: 'Duplicate' }).first().click();
+  await page.waitForTimeout(300);
+  check(
+    'duplicating adds a copy',
+    (await dialogLib.locator('[class*="libraryMain"]').count()) === 2,
+    `${await dialogLib.locator('[class*="libraryMain"]').count()} rows`
+  );
+  check('and the copy is not pinned', (await dialogLib.locator('[class*="pinnedBadge"]').count()) === 1);
+
+  await dialogLib.getByRole('button', { name: 'Rename' }).first().click();
+  await page.waitForTimeout(200);
+  await dialogLib.getByRole('textbox', { name: 'New name' }).fill('Gold macro analysis');
+  await dialogLib.getByRole('textbox', { name: 'New name' }).press('Enter');
+  await page.waitForTimeout(400);
+
+  const afterRename = await dialogLib.innerText();
+  check('renaming works', /Gold macro analysis/.test(afterRename));
+
+  group('Reopening replays the request');
+
+  await dialogLib.getByRole('button', { name: 'Open' }).first().click();
+  await page.waitForTimeout(3400);
+
+  check(
+    'the canvas is rebuilt from the question',
+    /gold/i.test(await page.locator('main[aria-label="Canvas"]').innerText())
+  );
+  check('with modules, not a screenshot', (await page.locator('[class*="moduleCard"]').count()) > 0);
+
+  group('It survives a reload');
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(600);
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('anything');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await page.waitForTimeout(3200);
+  await page.getByRole('button', { name: 'Workspaces' }).click();
+  await page.waitForTimeout(400);
+
+  check(
+    'the library is still there',
+    /Gold macro analysis/.test(await page.getByRole('dialog', { name: 'Your workspaces' }).innerText())
+  );
+
+  await page
+    .getByRole('dialog', { name: 'Your workspaces' })
+    .getByRole('button', { name: 'Close' })
+    .click();
+  await page.waitForTimeout(300);
+
   group('The shape of the answer is part of the answer');
 
   await page.getByRole('button', { name: 'New', exact: true }).click();
