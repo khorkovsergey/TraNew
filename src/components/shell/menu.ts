@@ -235,11 +235,24 @@ export const MENUS: Record<Exclude<NavKey, 'home' | 'voyager'>, MenuGroup[]> = {
           // the hub page pointed here.
           href: '/tools',
         },
+        /*
+         * "Learning and events" used to sit here, and it was the same shape as
+         * "Go beyond your plan" above: a hub whose entire content is two links,
+         * one of which — Events near you — was the very next row of this menu.
+         *
+         * Removing it outright would have hidden Academy, which had no menu
+         * entry of its own and was only reachable through that hub. So the hub
+         * is replaced by the destination it was standing in front of, and the
+         * two event rows below stop being duplicates of something above them.
+         *
+         * `/learning-events` is untouched and still linked from the Marketplace
+         * hub, where a page that groups two sections belongs.
+         */
         {
-          labelKey: 'marketplace.learningEvents',
-          subKey: 'marketplace.learningEventsSub',
+          labelKey: 'marketplace.academy',
+          subKey: 'marketplace.academySub',
           kind: 'route',
-          href: '/learning-events',
+          href: '/academy',
         },
         {
           labelKey: 'marketplace.events',

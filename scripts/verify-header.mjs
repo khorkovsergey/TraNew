@@ -155,8 +155,30 @@ try {
       .filter((href) => href !== '/en')
   );
 
+  /*
+   * One deliberate exception, listed rather than allowed by a loose rule.
+   *
+   * `/learning-events` groups two sections — Academy and Events — and the menu
+   * points at both of them directly instead. It used to point at the grouping
+   * page, which put "Learning and events" immediately above "Events near you"
+   * and "Create an event": a row that led to a page containing the two rows
+   * under it. The hub keeps the grouping page, where grouping is the job.
+   *
+   * Anything else missing from the menu is still a failure.
+   */
+  const groupingPages = ['/en/learning-events'];
+
   for (const href of hubHrefs) {
+    if (groupingPages.includes(href)) continue;
     check(`the hub's ${href} is also in the menu`, menuHrefs.includes(href), menuHrefs.join(', '));
+  }
+
+  for (const href of ['/en/academy', '/en/events']) {
+    check(
+      `${href} is in the menu, so the grouping page hides nothing`,
+      menuHrefs.includes(href),
+      menuHrefs.join(', ')
+    );
   }
 
   check(
