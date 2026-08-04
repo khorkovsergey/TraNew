@@ -121,6 +121,8 @@
       "expertServicesSub": "Book a consultation",
       "toolsData": "Tools and data",
       "toolsDataSub": "Indicators, screeners, data feeds",
+      "subscriptions": "Subscriptions",
+      "subscriptionsSub": "Plans, Voyager AI tiers and limits",
       "academy": "Academy",
       "academySub": "Courses and learning paths",
       "learningEvents": "Learning and events",
@@ -297,6 +299,9 @@
       "learningTitle": "Learning and Events",
       "learningText": "Structured programmes, live sessions and the TradingNew Academy.",
       "learningCta": "View programmes",
+      "subscriptionsTitle": "Subscriptions",
+      "subscriptionsText": "Five plans. Every one includes Voyager AI; the higher ones go deeper and remember more.",
+      "subscriptionsCta": "Compare plans",
       "merchTitle": "Merchandise",
       "merchText": "Physical goods and limited editions from TradingNew.",
       "merchCta": "View store"

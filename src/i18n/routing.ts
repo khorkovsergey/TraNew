@@ -43,6 +43,7 @@ export const routing = defineRouting({
     '/research': '/research',
     '/supercharts': '/supercharts',
     '/voyager': '/voyager',
+    '/marketplace/subscriptions': '/marketplace/subscriptions',
     '/portfolio': '/portfolio',
 
     // Economy & community

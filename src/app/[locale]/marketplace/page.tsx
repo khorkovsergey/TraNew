@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  * verification script compares the two.
  */
 const CATEGORIES: Array<{
-  key: 'expert' | 'tools' | 'learning' | 'merch';
+  key: 'expert' | 'tools' | 'learning' | 'merch' | 'subscriptions';
   href: StaticPathname | { pathname: '/tool/[slug]'; params: { slug: string } };
   icon: IconName;
   color: string;
@@ -59,6 +59,13 @@ const CATEGORIES: Array<{
     icon: 'grad',
     color: 'var(--tn-green)',
     tile: 'var(--tn-green-tint)',
+  },
+  {
+    key: 'subscriptions',
+    href: '/marketplace/subscriptions',
+    icon: 'shield',
+    color: 'var(--tn-purple)',
+    tile: 'var(--tn-purple-tint)',
   },
   {
     key: 'merch',

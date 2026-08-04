@@ -31,6 +31,12 @@
   --tn-purple-hover: #6a3de8;
   --tn-purple-tint: #efe9fd;
   --tn-purple-tint-soft: #f6f2fe;
+  /* A lighter rule than --tn-border-card, for rows inside a bordered table
+     where the card border is already doing the outlining. */
+  --tn-border-hairline: #f0f2f7;
+  /* One step above the page, for group headers that must read as structure
+     rather than as content. */
+  --tn-raised: #f8f9fc;
   /* The Voyager entry point. Hex values from the workspace handoff, which is
      specific about them on purpose. */
   --tn-purple-border: #e6dcfb;

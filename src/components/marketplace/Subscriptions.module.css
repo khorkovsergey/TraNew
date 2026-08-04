@@ -1,0 +1,789 @@
+/*
+ * The subscriptions page.
+ *
+ * Geometry follows the handoff. The one structural decision worth naming: the
+ * five-column comparison grid does not shrink to a phone — below the breakpoint
+ * three of the five columns are hidden and a chip row picks which two stay.
+ * Squeezing five columns into 390px produces a table nobody can read, which is
+ * worse than showing two properly.
+ */
+
+.page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 26px 36px 56px;
+}
+
+/* ---- Header ---- */
+
+.header {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--tn-purple);
+}
+
+.h1 {
+  margin: 12px 0 0;
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 800;
+  letter-spacing: -1.6px;
+  line-height: 1.12;
+  color: var(--tn-text);
+}
+
+.lead {
+  margin: 14px auto 0;
+  max-width: 660px;
+  font-size: clamp(14.5px, 1.6vw, 17.5px);
+  line-height: 1.5;
+  color: var(--tn-text-secondary);
+}
+
+.subLead {
+  margin: 10px auto 0;
+  max-width: 620px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+/* ---- Billing toggle ---- */
+
+.billingRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 22px;
+  background: var(--tn-chip-bg);
+}
+
+.segment {
+  border: 0;
+  border-radius: 20px;
+  padding: 9px 22px;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--tn-text-secondary);
+  cursor: pointer;
+}
+
+.segmentOn {
+  background: var(--tn-surface);
+  color: var(--tn-text);
+  box-shadow: 0 1px 4px rgba(19, 23, 34, 0.1);
+}
+
+.savingChip {
+  padding: 7px 14px;
+  border-radius: 16px;
+  background: var(--tn-green-tint);
+  color: var(--tn-green);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+/* ---- Progression strip ---- */
+
+.progression {
+  margin: 26px 0 0;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}
+
+.arrow {
+  color: var(--tn-border-control);
+}
+
+.progressionLast {
+  color: var(--tn-purple);
+}
+
+/* ---- Cards ---- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  margin-top: 24px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  padding: 24px 22px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  background: var(--tn-surface);
+}
+
+.cardFeatured {
+  border: 2px solid var(--tn-blue);
+  padding: 23px 21px;
+  box-shadow: var(--tn-shadow-card-hover);
+}
+
+.cardPrivate {
+  border: 2px solid var(--tn-purple);
+  padding: 23px 21px;
+  background: linear-gradient(180deg, var(--tn-purple-tint-soft) 0%, var(--tn-surface) 240px);
+  box-shadow: 0 14px 40px rgba(124, 77, 255, 0.16);
+}
+
+/* Fixed height, so plan names line up across cards with and without a badge. */
+.badgeSlot {
+  min-height: 24px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 11px;
+  border-radius: 13px;
+  background: var(--tn-chip-bg);
+  color: var(--tn-text-nav);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.badgeFeatured {
+  background: var(--tn-blue-tint);
+  color: var(--tn-blue);
+}
+
+.badgePrivate {
+  background: var(--tn-purple);
+  color: #fff;
+}
+
+.planName {
+  margin: 6px 0 0;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: var(--tn-text);
+}
+
+.planNamePrivate {
+  color: var(--tn-purple-deep);
+}
+
+.tagline {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--tn-text-secondary);
+}
+
+.price {
+  margin: 16px 0 0;
+  font-size: 31px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--tn-text);
+}
+
+.perMonth {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--tn-text-muted);
+}
+
+.billingNote {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--tn-text-muted);
+}
+
+/* Reserved height, so switching to monthly does not make the cards jump. */
+.saving {
+  margin: 4px 0 0;
+  min-height: 19px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-green);
+}
+
+.cta,
+.rowCta {
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px 16px;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ctaOutline {
+  background: var(--tn-surface);
+  border-color: var(--tn-blue);
+  color: var(--tn-blue);
+}
+
+.ctaFeatured {
+  background: var(--tn-blue);
+  color: #fff;
+}
+
+.ctaDark {
+  background: var(--tn-text);
+  color: #fff;
+}
+
+.ctaPrivate {
+  background: var(--tn-purple);
+  color: #fff;
+}
+
+.secondaryLink {
+  display: block;
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-purple);
+  text-decoration: none;
+}
+
+.secondaryLink:hover {
+  text-decoration: underline;
+}
+
+.divider {
+  margin: 18px 0 14px;
+  border-top: 1px solid var(--tn-border-hairline);
+}
+
+/* The private tier's AI list sits in its own card: it is what the plan is for. */
+.voyagerBlockPrivate {
+  padding: 16px;
+  border: 1px solid var(--tn-purple-border);
+  border-radius: 14px;
+  background: var(--tn-surface);
+}
+
+.voyagerTier {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--tn-purple-deep);
+}
+
+.orb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #b79bff, #7c4dff 62%, #4a3a7a);
+}
+
+.voyagerDescription {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tn-text-secondary);
+}
+
+.blockLabel {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}
+
+.featureList {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--tn-text-nav);
+}
+
+.checkAi {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--tn-purple);
+}
+
+.checkPlatform {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--tn-blue);
+}
+
+.inherits {
+  font-weight: 700;
+}
+
+.seeAll {
+  margin-top: auto;
+  padding-top: 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-blue);
+  text-decoration: none;
+}
+
+.seeAll:hover {
+  text-decoration: underline;
+}
+
+/* ---- Fair-use tooltip ---- */
+
+.info {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple);
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.tooltip {
+  display: block;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--tn-text);
+  color: #fff;
+  font-size: 11.5px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+/* ---- Why private ---- */
+
+.whyPrivate {
+  margin-top: 56px;
+  padding: 32px;
+  border: 1px solid var(--tn-purple-border);
+  border-radius: 18px;
+  background: var(--tn-surface);
+}
+
+.whyHeading {
+  margin: 0;
+  font-size: clamp(21px, 2.4vw, 26px);
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  color: var(--tn-purple-deep);
+}
+
+.whyBody {
+  margin: 10px 0 0;
+  max-width: 840px;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--tn-text-nav);
+}
+
+.whyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.whyTile {
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--tn-purple-tint-soft);
+}
+
+.whyTileNote {
+  background: var(--tn-chip-bg);
+}
+
+.whyTileTitle {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--tn-purple-deep);
+}
+
+.whyTileBody {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tn-text-secondary);
+}
+
+/* ---- Comparison ---- */
+
+.compare {
+  margin-top: 56px;
+  scroll-margin-top: 90px;
+}
+
+.compareHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.compareHeading {
+  margin: 0;
+  font-size: clamp(22px, 2.6vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.9px;
+  color: var(--tn-text);
+}
+
+.compareSub {
+  margin: 6px 0 0;
+  font-size: 15.5px;
+  color: var(--tn-text-secondary);
+}
+
+.diffToggle {
+  padding: 10px 18px;
+  border: 1px solid var(--tn-border-control);
+  border-radius: 22px;
+  background: var(--tn-surface);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text);
+  cursor: pointer;
+}
+
+.diffToggleOn {
+  border-color: var(--tn-blue);
+  background: var(--tn-blue-tint);
+  color: var(--tn-blue);
+}
+
+/* The chip row is the phone's answer to five columns; hidden on a wide screen. */
+.planPicker {
+  display: none;
+  gap: 6px;
+  margin-top: 14px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.planChip {
+  flex: none;
+  padding: 7px 13px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 18px;
+  background: var(--tn-surface);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--tn-text);
+  cursor: pointer;
+}
+
+.planChipOn {
+  background: var(--tn-blue);
+  border-color: var(--tn-blue);
+  color: #fff;
+}
+
+.planChipPrivate {
+  background: var(--tn-purple);
+  border-color: var(--tn-purple);
+}
+
+.table {
+  margin-top: 20px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--tn-surface);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 2fr repeat(5, 1fr);
+  align-items: center;
+  border-top: 1px solid var(--tn-border-hairline);
+}
+
+.tableHead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  border-top: 0;
+  border-bottom: 1px solid var(--tn-border-control);
+  background: var(--tn-chip-bg);
+}
+
+.featureCell {
+  padding: 16px 22px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--tn-text-secondary);
+}
+
+.headCell {
+  height: 100%;
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.headFeatured {
+  color: var(--tn-blue);
+}
+
+.headPrivate {
+  color: var(--tn-purple-deep);
+  background: var(--tn-purple-tint-soft);
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 22px;
+  border: 0;
+  border-top: 1px solid var(--tn-border-control);
+  background: var(--tn-raised);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--tn-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.groupHeadPrivate {
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple-deep);
+}
+
+.caret {
+  transition: transform 180ms ease;
+}
+
+.caretClosed {
+  transform: rotate(-90deg);
+}
+
+.featureName {
+  padding: 13px 22px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tn-text);
+}
+
+.featureDescription {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--tn-text-muted);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 13px 12px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+.cellPrivate {
+  background: var(--tn-purple-tint-soft);
+  font-weight: 800;
+  color: var(--tn-purple-deep);
+}
+
+.tick {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--tn-green);
+}
+
+.cellPrivate .tick {
+  color: var(--tn-purple);
+}
+
+/* A dash, never a padlock. */
+.dash {
+  color: var(--tn-text-faint);
+}
+
+.ctaRow {
+  border-top: 0;
+  margin-top: 20px;
+  gap: 8px;
+}
+
+.ctaRow .featureName {
+  padding-left: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--tn-text-secondary);
+}
+
+.rowCta {
+  margin-top: 0;
+  padding: 10px 12px;
+  font-size: 12.5px;
+}
+
+.legal {
+  margin: 22px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--tn-text-muted);
+}
+
+/* ---- Toast ---- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 12px 22px;
+  border-radius: 24px;
+  background: var(--tn-text);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  box-shadow: var(--tn-shadow-dropdown);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.mobileHidden,
+.mobileShown {
+  display: contents;
+}
+
+/* ---- Motion ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    transition: none;
+  }
+}
+
+/* ---- Tablet ---- */
+
+@media (max-width: 1180px) {
+  .page {
+    padding: 22px 20px 48px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ---- Phone ---- */
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .whyPrivate {
+    padding: 22px 18px;
+  }
+
+  .planPicker {
+    display: flex;
+  }
+
+  /*
+   * Two columns, always. The five-column grid does not shrink — three of the
+   * five plan cells are removed from the layout and the chip row above picks
+   * which two remain.
+   */
+  .row {
+    grid-template-columns: 1.4fr 1fr 1fr;
+  }
+
+  .mobileHidden {
+    display: none;
+  }
+
+  .mobileShown {
+    display: block;
+  }
+
+  .featureCell,
+  .featureName {
+    padding-left: 14px;
+    padding-right: 10px;
+  }
+
+  .ctaRow .featureName {
+    padding-left: 0;
+  }
+}

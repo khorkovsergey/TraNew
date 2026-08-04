@@ -261,6 +261,12 @@ export const MENUS: Record<Exclude<NavKey, 'home' | 'voyager'>, MenuGroup[]> = {
           href: '/events',
         },
         {
+          labelKey: 'marketplace.subscriptions',
+          subKey: 'marketplace.subscriptionsSub',
+          kind: 'route',
+          href: '/marketplace/subscriptions',
+        },
+        {
           labelKey: 'marketplace.createEvent',
           subKey: 'marketplace.createEventSub',
           kind: 'route',
