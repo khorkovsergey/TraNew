@@ -40,8 +40,23 @@ try {
   await page.goto(`${BASE}/en`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(500);
 
-  const pill = page.getByRole('link', { name: 'AI Voyager' });
+  const pill = page.locator('header nav').getByRole('link', { name: 'AI Voyager' });
   check('AI Voyager is a first-level entry', (await pill.count()) > 0);
+
+  const items = await page.locator('header nav a, header nav button').allInnerTexts();
+  check('and the last one, beside the others', items[items.length - 1] === 'AI Voyager', items.join(' · '));
+  check('styled like them, not as a pill', (await page.locator('[class*="voyagerPill"]').count()) === 0);
+
+  /*
+   * The navigation is centred in the window, not in the gap the logo and the
+   * buttons leave. It looked centred with `space-between` and was off by the
+   * difference between the two sides, which is the sort of thing only a
+   * measurement catches.
+   */
+  const navBox = await page.locator('header nav').boundingBox();
+  const viewport = page.viewportSize();
+  const drift = Math.abs(navBox.x + navBox.width / 2 - viewport.width / 2);
+  check('the navigation is centred in the window', drift <= 2, `${Math.round(drift)}px off centre`);
 
   const others = await page.locator('header nav a, header nav button').count();
   check('and the rest of the navigation is intact', others >= 5, `${others} nav items`);

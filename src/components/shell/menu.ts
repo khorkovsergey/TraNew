@@ -25,7 +25,14 @@ export type MenuGroup = {
   items: MenuEntry[];
 };
 
-export type NavKey = 'home' | 'market' | 'symbols' | 'economy' | 'community' | 'marketplace';
+export type NavKey =
+  | 'home'
+  | 'market'
+  | 'symbols'
+  | 'economy'
+  | 'community'
+  | 'marketplace'
+  | 'voyager';
 
 /**
  * A destination that is routed but not yet built.
@@ -53,7 +60,7 @@ const symbol = (
   params: { ticker },
 });
 
-export const MENUS: Record<Exclude<NavKey, 'home'>, MenuGroup[]> = {
+export const MENUS: Record<Exclude<NavKey, 'home' | 'voyager'>, MenuGroup[]> = {
   market: [
     {
       titleKey: 'market.overviewTitle',
@@ -255,6 +262,7 @@ export const MENUS: Record<Exclude<NavKey, 'home'>, MenuGroup[]> = {
 /** Route prefixes that light up each nav item. */
 export const NAV_ACTIVE_PREFIXES: Record<NavKey, string[]> = {
   home: ['/'],
+  voyager: ['/voyager'],
   market: ['/market', '/markets', '/news', '/ideas', '/explore', '/supercharts'],
   symbols: ['/symbols', '/research', '/portfolio'],
   economy: ['/economy'],

@@ -7,10 +7,24 @@ import { requestSearchFocus } from '@/lib/searchFocus';
 import { AuthedActions } from './AuthedActions';
 import { useLoginModal } from './LoginModalProvider';
 import { MENUS, NAV_ACTIVE_PREFIXES, type MenuEntry, type NavKey } from './menu';
-import { VoyagerOrb } from '@/components/voyager/VoyagerOrb';
 import styles from './Header.module.css';
 
-const NAV_KEYS: NavKey[] = ['home', 'market', 'symbols', 'economy', 'community', 'marketplace'];
+/*
+ * Voyager is last and is a destination rather than a dropdown, like Home. It
+ * used to be a violet pill sitting outside this row; as an ordinary item it
+ * stops asking for attention the other sections do not get, which is also what
+ * the brand rule about one accent per meaning wants — violet is Voyager's
+ * colour inside Voyager, not a way to make a link louder.
+ */
+const NAV_KEYS: NavKey[] = [
+  'home',
+  'market',
+  'symbols',
+  'economy',
+  'community',
+  'marketplace',
+  'voyager',
+];
 
 export function Header() {
   const t = useTranslations('header');
@@ -181,31 +195,19 @@ export function Header() {
             <span className={styles.wordmark}>TradingNew</span>
           </Link>
 
-          <Link
-            className={styles.voyagerPill}
-            href="/voyager"
-            onClick={closeAll}
-            title="AI Voyager"
-            /*
-             * The accessible name is on the link and stays there when the label
-             * is hidden below 1080px — a control that loses its name at a
-             * breakpoint is a control a screen reader stops being able to
-             * describe exactly when it becomes icon-only.
-             */
-            aria-label="AI Voyager"
-          >
-            <VoyagerOrb size={19} />
-            <span className={styles.voyagerLabel}>AI Voyager</span>
-          </Link>
-
           <nav className={styles.nav} aria-label={t('nav.home')}>
             {NAV_KEYS.map((key) => {
               const className = `${styles.navItem} ${isActive(key) ? styles.navItemActive : ''}`;
 
-              if (key === 'home') {
+              if (key === 'home' || key === 'voyager') {
                 return (
-                  <Link key={key} className={className} href="/" onClick={closeAll}>
-                    {t('nav.home')}
+                  <Link
+                    key={key}
+                    className={className}
+                    href={key === 'home' ? '/' : '/voyager'}
+                    onClick={closeAll}
+                  >
+                    {t(`nav.${key}`)}
                   </Link>
                 );
               }
@@ -251,7 +253,7 @@ export function Header() {
             className={`${styles.panel} ${styles.menuPanel}`}
             style={panelLeft === null ? undefined : { left: panelLeft }}
           >
-            {MENUS[openMenu as Exclude<NavKey, 'home'>].map((group) => (
+            {MENUS[openMenu as Exclude<NavKey, 'home' | 'voyager'>].map((group) => (
               <div className={styles.group} key={group.titleKey}>
                 <div className={styles.groupTitle}>{tMenu(group.titleKey)}</div>
                 <div className={styles.groupItems}>{group.items.map(renderEntry)}</div>
