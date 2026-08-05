@@ -26,6 +26,9 @@
   --tn-blue: #2962ff;
   --tn-blue-hover: #1848d6;
   --tn-blue-tint: #e8edfd;
+  /* The border a selected or focused control takes: blue, but quiet enough not
+     to read as an error. */
+  --tn-border-focus: #c9d4f5;
 
   --tn-purple: #7c4dff;
   --tn-purple-hover: #6a3de8;
@@ -45,6 +48,9 @@
   --tn-green: #1aa966;
   --tn-green-hover: #159056;
   --tn-green-tint: #e3f6ec;
+  /* Text weight for a green surface — the tint is too pale to carry --tn-green
+     at body size and still clear AA. */
+  --tn-green-deep: #127a4b;
 
   --tn-orange: #f4741f;
   --tn-orange-star: #f4a71f;
@@ -56,6 +62,8 @@
   /* The counterpart to --tn-green-tint, at the same lightness, so an added and
      a removed line in a diff read as a pair rather than as two intensities. */
   --tn-red-tint: #fce8e4;
+  /* The outline a destructive control takes: red, without the fill. */
+  --tn-red-border: #f5cdbd;
   /* Heatmap borders, so a tinted tile still has an edge on a white card. */
   --tn-heat-up-border: #c8ecd8;
   --tn-heat-down-border: #f5cdbd;

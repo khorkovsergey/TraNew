@@ -918,3 +918,53 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Connections ---- */
+
+.primaryChip {
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--tn-blue);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+
+.dangerChip {
+  margin-top: 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--tn-red-border);
+  border-radius: 18px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-red);
+  cursor: pointer;
+}
+
+/* A green edge until the next interaction, so a source that has just arrived is
+   findable in a list somebody has not read yet. */
+.cardJustConnected {
+  border-color: var(--tn-green);
+}
+
+.connectionToast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 70;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 12px 22px;
+  border-radius: 24px;
+  background: var(--tn-text);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  box-shadow: var(--tn-shadow-dropdown);
+}

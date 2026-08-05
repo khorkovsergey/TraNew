@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { addAssetAction } from '@/app/actions/wealth';
+import { formatSigned } from '@/content/wealthConnections';
+import { ConnectAccountModal } from './ConnectAccountModal';
 import { useLoginModal } from '@/components/shell/LoginModalProvider';
 import { Icon } from '@/components/ui/Icon';
 import {
@@ -102,6 +104,23 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
    * browser storage on a shared machine.
    */
   const [tab, setTab] = useState<WealthTab>('overview');
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  /*
+   * Sources connected in this session. Demo state: nothing is persisted, and a
+   * disconnected source stays in the list with its assets kept rather than
+   * disappearing along with them.
+   */
+  const [connected, setConnected] = useState<
+    Array<{ id: string; name: string; assets: number; disconnected?: boolean }>
+  >([]);
+  const connectButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4200);
+    return () => clearTimeout(timer);
+  }, [toast]);
   const [view, setView] = useState<StructureView>('type');
   const [scenarioType, setScenarioType] = useState<string | null>(null);
   const [scenarioAsset, setScenarioAsset] = useState('apt');
@@ -568,6 +587,27 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
 
         {tab === 'data' && (
           <>
+            <div className={styles.barHead}>
+              <div>
+                <h2 className={styles.sectionTitle}>Connected sources</h2>
+                <div className={styles.assetSub}>
+                  {DATA_SOURCES.length + connected.length} sources ·{' '}
+                  {connected.reduce((total, item) => total + item.assets, 0) + 7} assets kept up to
+                  date automatically
+                </div>
+              </div>
+              <div className={styles.chips}>
+                <button className={styles.chip}>Sync all</button>
+                <button
+                  className={styles.primaryChip}
+                  ref={connectButton}
+                  onClick={() => setConnectOpen(true)}
+                >
+                  Connect an account
+                </button>
+              </div>
+            </div>
+
             <div className={styles.stack}>
               {DATA_SOURCES.map((source) => (
                 <section className={styles.card} key={source.name}>
@@ -580,9 +620,91 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
                   <div className={styles.assetSub}>{source.sub}</div>
                 </section>
               ))}
+
+              {connected.map((item) => (
+                <section
+                  className={`${styles.card} ${item.disconnected ? '' : styles.cardJustConnected}`}
+                  key={item.id}
+                >
+                  <div className={styles.barHead}>
+                    <h2 className={styles.cardTitle}>{item.name}</h2>
+                    <span
+                      className={`${styles.statusChip} ${
+                        item.disconnected ? TONE.neutral : TONE.positive
+                      }`}
+                    >
+                      {item.disconnected ? 'Disconnected' : 'Connected'}
+                    </span>
+                  </div>
+                  <div className={styles.assetSub}>
+                    {item.assets} asset{item.assets === 1 ? '' : 's'} ·{' '}
+                    {item.disconnected
+                      ? 'kept in manual mode with their last known value'
+                      : 'kept up to date automatically'}
+                  </div>
+
+                  {!item.disconnected && (
+                    /*
+                     * Disconnecting keeps the assets. A source is not the asset
+                     * it created, and deleting somebody's holdings because they
+                     * unplugged a bank would be losing their record, not tidying
+                     * it.
+                     */
+                    <div className={styles.chips}>
+                      <button
+                        className={styles.dangerChip}
+                        onClick={() => {
+                          setConnected((current) =>
+                            current.map((entry) =>
+                              entry.id === item.id ? { ...entry, disconnected: true } : entry
+                            )
+                          );
+                          setToast(
+                            `${item.name} disconnected — ${item.assets} asset${
+                              item.assets === 1 ? '' : 's'
+                            } kept in manual mode.`
+                          );
+                        }}
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  )}
+                </section>
+              ))}
             </div>
             {/* A source is not the asset it created. */}
             <div className={styles.note}>{SOURCE_NOTE}</div>
+
+            {toast && (
+              <div className={styles.connectionToast} role="status">
+                {toast}
+              </div>
+            )}
+
+            {connectOpen && (
+              <ConnectAccountModal
+                connectedIds={connected.map((item) => item.id)}
+                onClose={() => {
+                  setConnectOpen(false);
+                  // Focus goes back where it came from, not to the top of the page.
+                  connectButton.current?.focus();
+                }}
+                onConnected={(provider, accountIds, total) => {
+                  setConnected((current) => [
+                    ...current.filter((item) => item.id !== provider.id),
+                    { id: provider.id, name: provider.name, assets: accountIds.length },
+                  ]);
+                  setConnectOpen(false);
+                  setToast(
+                    `${provider.name} connected — ${accountIds.length} asset${
+                      accountIds.length === 1 ? '' : 's'
+                    } added to your Wealth Record (${formatSigned(total)}).`
+                  );
+                  connectButton.current?.focus();
+                }}
+              />
+            )}
 
             <h2 className={styles.sectionTitle}>Privacy</h2>
             <div className={styles.chips}>
