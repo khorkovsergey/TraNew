@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { background: none; border: 0; padding: 0; cursor: pointer; }
+  body { margin: 0; background: #eef0f4; color: #131722; font-family: 'Plus Jakarta Sans', 'Manrope', system-ui, sans-serif; font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: #2962ff; text-decoration: none; }
+  a:hover { color: #1848d6; }
+  h1, h2, h3, h4, p { margin: 0; }
+  .tn-num { font-variant-numeric: tabular-nums; }
+  @keyframes tn-spin { to { transform: rotate(360deg); } }
+</style>
+</helmet>
+
+<section style="display:flex; flex-direction:column; gap:28px; padding:40px">
+  <div style="display:flex; align-items:baseline; gap:16px; flex-wrap:wrap">
+    <h1 style="font-size:26px; font-weight:800; letter-spacing:-0.8px">Wealth Hub → Data &amp; Connections</h1>
+    <span style="font-size:13.5px; color:#5a6376">Существующая вкладка <code style="font-family:ui-monospace,monospace; font-size:12.5px; background:#f2f4f9; padding:2px 6px; border-radius:6px">data</code> + рабочий сценарий подключения аккаунта. Пройдите: <strong>Connect an account</strong> → Revolut → Authorise → Import</span>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:28px; align-items:flex-start">
+
+    <div id="1a" style="display:flex; flex-direction:column; gap:12px">
+      <div style="display:flex; align-items:center; gap:12px">
+        <span style="background:#131722; color:#fff; font-size:12px; font-weight:800; letter-spacing:0.6px; padding:5px 11px; border-radius:8px">1a</span>
+        <span style="font-size:15px; font-weight:800">Data &amp; Connections — интерактивно</span>
+        <span style="font-size:13px; color:#5a6376">подключение реально проходит все шаги и добавляет источник в список</span>
+      </div>
+
+      <div style="position:relative; width:1232px; background:#fbfcfe; border:1px solid #e6eaf2; border-radius:20px; overflow:hidden">
+
+        <header style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 36px; background:#fff; border-bottom:1px solid #eceff4">
+          <div style="display:flex; align-items:center; gap:10px; flex-shrink:0">
+            <div style="width:30px; height:30px; border-radius:9px; background:linear-gradient(135deg,#2962ff,#8b5cf6); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800; letter-spacing:-0.5px">TN</div>
+            <span style="font-size:19px; font-weight:800; letter-spacing:-0.3px">TradingNew</span>
+          </div>
+          <div style="display:inline-flex; align-items:center; gap:7px; flex:none; margin-left:10px; padding:6px 13px 6px 8px; border:1px solid #e6dcfb; border-radius:20px; background:#f6f2fe; color:#4a3a7a; font-size:12.5px; font-weight:700; white-space:nowrap">
+            <span style="width:19px; height:19px; border-radius:50%; background:radial-gradient(circle at 34% 30%, #b79bff, #7c4dff 62%, #4a3a7a)"></span>AI Voyager
+          </div>
+          <nav style="display:flex; align-items:center; gap:8px; flex:1; justify-content:center; min-width:0; font-size:13.5px; font-weight:500; color:#3a4254">
+            <span style="padding:9px 14px; white-space:nowrap">Home</span>
+            <span style="padding:9px 14px; white-space:nowrap">Market</span>
+            <span style="padding:9px 14px; white-space:nowrap">Symbols</span>
+            <span style="padding:9px 14px; white-space:nowrap">Economy</span>
+            <span style="padding:9px 14px; white-space:nowrap">Community</span>
+            <span style="padding:9px 14px; white-space:nowrap">Marketplace</span>
+          </nav>
+          <div style="display:flex; align-items:center; gap:8px; flex-shrink:0">
+            <span style="width:32px; height:32px; border-radius:50%; background:#e8edfd; color:#2962ff; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800">SH</span>
+            <span style="background:#131722; color:#fff; border-radius:22px; padding:11px 16px; font-size:13.5px; font-weight:700; white-space:nowrap">Open TradingNew</span>
+          </div>
+        </header>
+
+        <div style="max-width:1160px; margin:0 auto; padding:26px 36px 56px">
+
+          <nav style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:18px; font-size:12.5px; color:#8a93a6" aria-label="Breadcrumb">
+            <span style="color:#2962ff; font-weight:600">Home</span><span>/</span><span style="color:#2962ff; font-weight:600">Account</span><span>/</span><span aria-current="page">Wealth Hub</span>
+          </nav>
+
+          <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap">
+            <div>
+              <h1 style="font-size:34px; font-weight:800; letter-spacing:-1.1px">Wealth Hub</h1>
+              <p style="font-size:15px; color:#5a6376; margin-top:6px">Net Wealth €1.21M · Liquid €172K · <span style="{{ needsUpdateStyle }}">{{ needsUpdateText }}</span></p>
+            </div>
+            <div style="display:flex; gap:10px">
+              <span style="background:#fff; border:1px solid #e6eaf2; border-radius:22px; padding:10px 18px; font-size:13.5px; font-weight:700">Add</span>
+              <span style="background:#131722; color:#fff; border-radius:22px; padding:10px 18px; font-size:13.5px; font-weight:700">Ask Voyager</span>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:26px; border-bottom:1px solid #eceff4">
+            <span style="padding:11px 15px; font-size:13.5px; font-weight:700; color:#5a6376">Overview</span>
+            <span style="padding:11px 15px; font-size:13.5px; font-weight:700; color:#5a6376">Assets</span>
+            <span style="padding:11px 15px; font-size:13.5px; font-weight:700; color:#5a6376">Liabilities</span>
+            <span style="padding:11px 15px; font-size:13.5px; font-weight:700; color:#5a6376">Goals</span>
+            <span style="padding:11px 15px; font-size:13.5px; font-weight:700; color:#5a6376">Scenarios</span>
+            <span style="padding:11px 15px; font-size:13.5px; font-weight:700; color:#5a6376">Insights</span>
+            <span style="padding:11px 15px; font-size:13.5px; font-weight:700; color:#2962ff; border-bottom:2.5px solid #2962ff">Data &amp; Connections</span>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:20px; margin-top:26px; flex-wrap:wrap">
+            <div>
+              <h2 style="font-size:17px; font-weight:800; letter-spacing:-0.3px">Connected sources</h2>
+              <p style="font-size:13.5px; color:#5a6376; margin-top:4px">{{ summaryLine }}</p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center">
+              <button style="{{ syncAllStyle }}" onClick="{{ syncAll }}">{{ syncAllLabel }}</button>
+              <button style="background:#2962ff; border:1px solid #2962ff; color:#fff; border-radius:22px; padding:10px 18px; font-size:13.5px; font-weight:700" onClick="{{ openPicker }}">Connect an account</button>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:18px; margin-top:18px">
+            <sc-for list="{{ sources }}" as="source" hint-placeholder-count="4">
+              <section style="{{ source.cardStyle }}">
+                <div style="display:flex; align-items:center; gap:14px">
+                  <span style="{{ source.markStyle }}">{{ source.mark }}</span>
+                  <div style="flex:1; min-width:0">
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+                      <h3 style="font-size:16px; font-weight:800">{{ source.name }}</h3>
+                      <span style="{{ source.chipStyle }}">{{ source.status }}</span>
+                      <span style="{{ source.newChipStyle }}">Just connected</span>
+                    </div>
+                    <div style="font-size:13.5px; color:#5a6376; margin-top:3px">{{ source.sub }}</div>
+                  </div>
+                  <button style="{{ source.actionStyle }}" onClick="{{ source.action }}">{{ source.actionLabel }}</button>
+                  <button style="{{ source.expandStyle }}" onClick="{{ source.toggle }}" aria-expanded="{{ source.open }}">Details</button>
+                </div>
+
+                <sc-if value="{{ source.open }}" hint-placeholder-val="{{ false }}">
+                  <div style="border-top:1px solid #f0f2f7; margin-top:18px; padding-top:16px">
+                    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px">
+                      <div>
+                        <div style="font-size:10.5px; font-weight:700; letter-spacing:0.6px; color:#9aa3b5">PERMISSIONS</div>
+                        <div style="font-size:13.5px; color:#3a4254; margin-top:6px; line-height:1.55">{{ source.permissions }}</div>
+                      </div>
+                      <div>
+                        <div style="font-size:10.5px; font-weight:700; letter-spacing:0.6px; color:#9aa3b5">LAST SYNC</div>
+                        <div style="font-size:13.5px; color:#3a4254; margin-top:6px">{{ source.lastSync }}</div>
+                      </div>
+                      <div>
+                        <div style="font-size:10.5px; font-weight:700; letter-spacing:0.6px; color:#9aa3b5">CONSENT EXPIRES</div>
+                        <div style="font-size:13.5px; color:#3a4254; margin-top:6px">{{ source.expires }}</div>
+                      </div>
+                    </div>
+
+                    <div style="font-size:10.5px; font-weight:700; letter-spacing:0.6px; color:#9aa3b5; margin-top:18px">ASSETS CREATED BY THIS SOURCE</div>
+                    <div style="display:flex; flex-direction:column; gap:8px; margin-top:9px">
+                      <sc-for list="{{ source.assets }}" as="asset" hint-placeholder-count="2">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; background:#f2f4f9; border-radius:14px; padding:12px 16px">
+                          <div style="display:flex; align-items:center; gap:10px; min-width:0">
+                            <span style="font-size:13.5px; font-weight:700">{{ asset.name }}</span>
+                            <span style="background:#e3f6ec; color:#1aa966; border-radius:13px; padding:3px 9px; font-size:11px; font-weight:800">Connected</span>
+                          </div>
+                          <span class="tn-num" style="font-size:13.5px; font-weight:800">{{ asset.value }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+
+                    <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap">
+                      <button style="background:#fff; border:1px solid #e6eaf2; border-radius:22px; padding:9px 16px; font-size:13px; font-weight:700">Edit permissions</button>
+                      <button style="background:#fff; border:1px solid #e6eaf2; border-radius:22px; padding:9px 16px; font-size:13px; font-weight:700">Sync now</button>
+                      <button style="background:#fff; border:1px solid #f5cdbd; color:#e0492f; border-radius:22px; padding:9px 16px; font-size:13px; font-weight:700" onClick="{{ source.disconnect }}">Disconnect</button>
+                    </div>
+                  </div>
+                </sc-if>
+              </section>
+            </sc-for>
+          </div>
+
+          <div style="font-size:12.5px; color:#9aa3b5; line-height:1.6; margin-top:14px">Disconnecting a source never silently deletes your assets — they switch to manual mode and keep their last known value, source and date.</div>
+
+          <h2 style="font-size:17px; font-weight:800; letter-spacing:-0.3px; margin-top:30px">Privacy</h2>
+          <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap">
+            <span style="background:#fff; border:1px solid #e6eaf2; border-radius:22px; padding:10px 18px; font-size:13.5px; font-weight:700">Export my data</span>
+            <span style="background:#fff; border:1px solid #e6eaf2; border-radius:22px; padding:10px 18px; font-size:13.5px; font-weight:700">Manage Voyager permissions</span>
+            <span style="background:#fff; border:1px solid #e6eaf2; border-radius:22px; padding:10px 18px; font-size:13.5px; font-weight:700">Create expert snapshot</span>
+          </div>
+          <div style="margin-top:16px">
+            <span style="background:#fff; border:1px solid #f5cdbd; color:#e0492f; border-radius:22px; padding:10px 18px; font-size:13.5px; font-weight:700">Delete Wealth Profile</span>
+          </div>
+        </div>
+
+        <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+          <div role="dialog" aria-modal="true" style="position:absolute; inset:0; background:rgba(19,23,34,0.4); display:flex; align-items:center; justify-content:center; padding:40px">
+            <div style="width:600px; max-height:100%; overflow:auto; background:#fff; border-radius:20px; box-shadow:0 24px 70px rgba(19,23,34,0.25)">
+
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:22px 26px; border-bottom:1px solid #eceff4">
+                <div>
+                  <h2 style="font-size:18px; font-weight:800; letter-spacing:-0.4px">{{ modalTitle }}</h2>
+                  <div style="font-size:12.5px; color:#8a93a6; margin-top:2px">{{ modalStep }}</div>
+                </div>
+                <button style="width:32px; height:32px; border-radius:50%; background:#f2f4f9; font-size:15px; font-weight:700; color:#5a6376" onClick="{{ closeModal }}" aria-label="Close">✕</button>
+              </div>
+
+              <sc-if value="{{ stepPicker }}" hint-placeholder-val="{{ true }}">
+                <div style="padding:22px 26px 26px">
+                  <div style="display:flex; align-items:center; gap:8px; background:#f2f4f9; border-radius:24px; padding:10px 16px; font-size:13.5px; color:#9aa3b5">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9aa3b5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style="flex-shrink:0"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16M21 21l-4.35-4.35"></path></svg>
+                    Search for your bank, broker or exchange
+                  </div>
+
+                  <div style="display:flex; gap:6px; margin-top:16px; flex-wrap:wrap">
+                    <sc-for list="{{ filters }}" as="filter" hint-placeholder-count="4">
+                      <button style="{{ filter.style }}" onClick="{{ filter.on }}">{{ filter.label }}</button>
+                    </sc-for>
+                  </div>
+
+                  <div style="display:flex; flex-direction:column; gap:8px; margin-top:16px">
+                    <sc-for list="{{ providers }}" as="provider" hint-placeholder-count="5">
+                      <button style="{{ provider.rowStyle }}" onClick="{{ provider.select }}">
+                        <span style="{{ provider.markStyle }}">{{ provider.mark }}</span>
+                        <span style="flex:1; min-width:0; text-align:left">
+                          <span style="display:block; font-size:14.5px; font-weight:700">{{ provider.name }}</span>
+                          <span style="display:block; font-size:12.5px; color:#8a93a6">{{ provider.sub }}</span>
+                        </span>
+                        <span style="{{ provider.tagStyle }}">{{ provider.tag }}</span>
+                      </button>
+                    </sc-for>
+                  </div>
+
+                  <div style="font-size:12.5px; color:#9aa3b5; line-height:1.6; margin-top:16px">Connections are read-only and handled by a regulated open-banking provider. TradingNew never sees your login details and cannot move money.</div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ stepConsent }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:22px 26px 26px">
+                  <div style="display:flex; align-items:center; gap:14px; background:#f2f4f9; border-radius:16px; padding:16px 18px">
+                    <span style="{{ activeMarkStyle }}">{{ activeMark }}</span>
+                    <div>
+                      <div style="font-size:15px; font-weight:800">{{ activeName }}</div>
+                      <div style="font-size:12.5px; color:#8a93a6">{{ activeSub }}</div>
+                    </div>
+                  </div>
+
+                  <div style="font-size:10.5px; font-weight:700; letter-spacing:0.6px; color:#9aa3b5; margin-top:22px">TRADINGNEW WILL BE ABLE TO</div>
+                  <div style="display:flex; flex-direction:column; gap:10px; margin-top:11px">
+                    <sc-for list="{{ activeScopes }}" as="scope" hint-placeholder-count="3">
+                      <div style="display:flex; gap:10px; font-size:13.5px; color:#3a4254; line-height:1.5"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1aa966" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style="flex-shrink:0; margin-top:4px"><path d="M20 6 9 17l-5-5"></path></svg>{{ scope }}</div>
+                    </sc-for>
+                  </div>
+
+                  <div style="font-size:10.5px; font-weight:700; letter-spacing:0.6px; color:#9aa3b5; margin-top:20px">IT WILL NEVER BE ABLE TO</div>
+                  <div style="display:flex; flex-direction:column; gap:10px; margin-top:11px">
+                    <div style="display:flex; gap:10px; font-size:13.5px; color:#3a4254; line-height:1.5"><span style="color:#e0492f; font-weight:800; flex-shrink:0; width:15px; text-align:center">✕</span>Move, transfer or withdraw money</div>
+                    <div style="display:flex; gap:10px; font-size:13.5px; color:#3a4254; line-height:1.5"><span style="color:#e0492f; font-weight:800; flex-shrink:0; width:15px; text-align:center">✕</span>Place, modify or cancel orders</div>
+                    <div style="display:flex; gap:10px; font-size:13.5px; color:#3a4254; line-height:1.5"><span style="color:#e0492f; font-weight:800; flex-shrink:0; width:15px; text-align:center">✕</span>See your login credentials</div>
+                  </div>
+
+                  <div style="background:#f6f2fe; border:1px solid #e6dcfb; border-radius:14px; padding:14px 16px; margin-top:20px">
+                    <label style="display:flex; gap:11px; font-size:13px; color:#3a4254; line-height:1.5; cursor:pointer">
+                      <input type="checkbox" checked="{{ voyagerConsent }}" onChange="{{ toggleVoyagerConsent }}" style="margin-top:4px; width:15px; height:15px; flex-shrink:0; accent-color:#7c4dff"></input>
+                      <span>Let Voyager use these balances as private context. You can withdraw this separately, without disconnecting the account.</span>
+                    </label>
+                  </div>
+
+                  <div style="font-size:12.5px; color:#9aa3b5; line-height:1.6; margin-top:16px">Consent lasts 90 days, as required by PSD2, and can be revoked at any time from this page.</div>
+
+                  <div style="display:flex; gap:10px; margin-top:22px">
+                    <button style="flex:1; background:#fff; border:1px solid #e6eaf2; border-radius:22px; padding:12px 18px; font-size:13.5px; font-weight:700" onClick="{{ backToPicker }}">Back</button>
+                    <button style="flex:2; background:#2962ff; border:1px solid #2962ff; color:#fff; border-radius:22px; padding:12px 18px; font-size:13.5px; font-weight:700" onClick="{{ authorise }}">Authorise with {{ activeName }}</button>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ stepSyncing }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:38px 26px 42px; display:flex; flex-direction:column; align-items:center; text-align:center">
+                  <span style="width:44px; height:44px; border-radius:50%; border:3px solid #e8edfd; border-top-color:#2962ff; animation:tn-spin 0.9s linear infinite"></span>
+                  <div style="font-size:16px; font-weight:800; margin-top:18px">Importing from {{ activeName }}</div>
+                  <div style="font-size:13.5px; color:#5a6376; margin-top:6px; max-width:360px">Reading balances and positions. This usually takes a few seconds.</div>
+                  <div style="width:100%; max-width:360px; display:flex; flex-direction:column; gap:9px; margin-top:22px; text-align:left">
+                    <sc-for list="{{ syncSteps }}" as="step" hint-placeholder-count="4">
+                      <div style="display:flex; align-items:center; gap:10px; font-size:13px; color:#3a4254"><span style="{{ step.dotStyle }}">{{ step.dot }}</span>{{ step.label }}</div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ stepReview }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:22px 26px 26px">
+                  <div style="display:flex; align-items:center; gap:12px; background:#e3f6ec; border-radius:14px; padding:14px 16px">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1aa966" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style="flex-shrink:0"><path d="M20 6 9 17l-5-5"></path></svg>
+                    <span style="font-size:13.5px; font-weight:700; color:#0f7a49">{{ activeName }} connected · {{ foundCount }} accounts found</span>
+                  </div>
+
+                  <div style="font-size:13.5px; color:#5a6376; line-height:1.55; margin-top:16px">Choose what enters your Wealth Record. Nothing is added until you confirm.</div>
+
+                  <div style="display:flex; flex-direction:column; gap:8px; margin-top:14px">
+                    <sc-for list="{{ foundAccounts }}" as="account" hint-placeholder-count="3">
+                      <label style="{{ account.rowStyle }}">
+                        <input type="checkbox" checked="{{ account.checked }}" onChange="{{ account.toggle }}" style="margin-top:4px; width:15px; height:15px; flex-shrink:0; accent-color:#2962ff"></input>
+                        <span style="flex:1; min-width:0">
+                          <span style="display:block; font-size:14px; font-weight:700">{{ account.name }}</span>
+                          <span style="display:block; font-size:12.5px; color:#8a93a6">{{ account.sub }}</span>
+                        </span>
+                        <span class="tn-num" style="font-size:14px; font-weight:800; white-space:nowrap">{{ account.value }}</span>
+                      </label>
+                    </sc-for>
+                  </div>
+
+                  <div style="background:#fdf3e3; border-radius:14px; padding:14px 16px; margin-top:16px; font-size:13px; color:#7a5407; line-height:1.55">{{ duplicateNote }}</div>
+
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; border-top:1px solid #f0f2f7; margin-top:18px; padding-top:16px">
+                    <div>
+                      <div style="font-size:12.5px; color:#8a93a6">Adds to Net Wealth</div>
+                      <div class="tn-num" style="font-size:22px; font-weight:800; letter-spacing:-0.6px">{{ importTotal }}</div>
+                    </div>
+                    <button style="{{ importStyle }}" onClick="{{ finishImport }}">{{ importLabel }}</button>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
+          <div role="status" style="position:absolute; left:50%; bottom:26px; transform:translateX(-50%); background:#131722; color:#fff; border-radius:24px; padding:12px 22px; font-size:13.5px; font-weight:600; box-shadow:0 18px 50px rgba(19,23,34,0.24); white-space:nowrap">{{ toastText }}</div>
+        </sc-if>
+      </div>
+    </div>
+
+    <div id="1b" style="display:flex; flex-direction:column; gap:12px; width:520px">
+      <div style="display:flex; align-items:center; gap:12px">
+        <span style="background:#131722; color:#fff; font-size:12px; font-weight:800; letter-spacing:0.6px; padding:5px 11px; border-radius:8px">1b</span>
+        <span style="font-size:15px; font-weight:800">Решения по дизайну</span>
+      </div>
+
+      <div style="background:#fff; border:1px solid #eceff4; border-radius:18px; padding:26px; display:flex; flex-direction:column; gap:18px">
+        <div>
+          <div style="font-size:14.5px; font-weight:800">Не новый модуль, а достройка вкладки</div>
+          <p style="font-size:13.5px; color:#5a6376; line-height:1.6; margin-top:5px"><code style="font-family:ui-monospace,monospace; font-size:12px; background:#f2f4f9; padding:2px 5px; border-radius:5px">DATA_SOURCES</code> уже содержит «Bank accounts · Not connected» — заглушку. Здесь она становится входом в поток, а карточки получают раскрытие: права, срок согласия, созданные активы.</p>
+        </div>
+        <div>
+          <div style="font-size:14.5px; font-weight:800">Read-only заявлено дважды</div>
+          <p style="font-size:13.5px; color:#5a6376; line-height:1.6; margin-top:5px">Блок «никогда не сможет» — перевод, вывод средств, ордера, логин — стоит на экране согласия рядом с разрешениями. Для брокерского доступа это главный барьер, и его нельзя прятать в мелкий шрифт.</p>
+        </div>
+        <div>
+          <div style="font-size:14.5px; font-weight:800">Согласие Voyager — отдельный чекбокс</div>
+          <p style="font-size:13.5px; color:#5a6376; line-height:1.6; margin-top:5px">Подключить счёт и отдать баланс в приватный контекст AI — два разных решения. Отзыв второго не рвёт первое. Это же правило у вас в <code style="font-family:ui-monospace,monospace; font-size:12px; background:#f2f4f9; padding:2px 5px; border-radius:5px">/account/voyager</code>.</p>
+        </div>
+        <div>
+          <div style="font-size:14.5px; font-weight:800">Импорт с подтверждением, а не автоматом</div>
+          <p style="font-size:13.5px; color:#5a6376; line-height:1.6; margin-top:5px">Провайдер отдаёт все счета, пользователь выбирает, что попадёт в Wealth Record, и заранее видит, на сколько вырастет Net Wealth. Дубликаты с ручными активами отмечаются до импорта, а не после.</p>
+        </div>
+        <div>
+          <div style="font-size:14.5px; font-weight:800">Статусы — существующие</div>
+          <p style="font-size:13.5px; color:#5a6376; line-height:1.6; margin-top:5px">Импортированный актив получает <code style="font-family:ui-monospace,monospace; font-size:12px; background:#f2f4f9; padding:2px 5px; border-radius:5px">connected</code> из <code style="font-family:ui-monospace,monospace; font-size:12px; background:#f2f4f9; padding:2px 5px; border-radius:5px">DataStatus</code>, отключение переводит его в <code style="font-family:ui-monospace,monospace; font-size:12px; background:#f2f4f9; padding:2px 5px; border-radius:5px">manual</code> с последним известным значением — ровно как обещает <code style="font-family:ui-monospace,monospace; font-size:12px; background:#f2f4f9; padding:2px 5px; border-radius:5px">SOURCE_NOTE</code>. Попробуйте Disconnect у Revolut после импорта.</p>
+        </div>
+        <div style="background:#f2f4f9; border-radius:14px; padding:16px 18px">
+          <div style="font-size:13px; font-weight:800">Что не спроектировано намеренно</div>
+          <p style="font-size:13px; color:#5a6376; line-height:1.55; margin-top:5px">Реальная интеграция (Plaid / TrueLayer / SnapTrade), обработка ошибок банка, реавторизация по истечении 90 дней, мультивалютная сверка. Это следующий слой — сначала стоит проверить, доходят ли пользователи до экрана согласия.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:&quot;100%&quot;}}">
+const PROVIDERS = [
+  { id: 'revolut', name: 'Revolut', sub: 'Current accounts, savings, crypto · EU', tag: 'Bank', kind: 'bank', mark: 'R', color: '#131722',
+    scopes: ['Read your account balances and currency', 'Read transaction history for the last 24 months', 'Read savings vaults and crypto balances', 'Refresh these balances automatically once a day'],
+    accounts: [
+      { id: 'r-eur', name: 'Current account · EUR', sub: 'Available instantly', value: '€8,420', amount: 8420, checked: true },
+      { id: 'r-usd', name: 'Current account · USD', sub: 'Converted at 1.09', value: '€3,180', amount: 3180, checked: true },
+      { id: 'r-sav', name: 'Savings vault · 2.4%', sub: 'Flexible withdrawal', value: '€14,000', amount: 14000, checked: true },
+      { id: 'r-btc', name: 'Crypto · 0.12 BTC', sub: 'Price from Revolut', value: '€11,640', amount: 11640, checked: false },
+    ],
+    duplicate: 'Your manual asset “Cash — Bank of Cyprus (EUR)” looks similar to the EUR current account. Both were kept — merge them later from Assets if they are the same money.' },
+  { id: 'fxpro', name: 'FxPro', sub: 'CFD and FX trading accounts', tag: 'Broker', kind: 'broker', mark: 'FX', color: '#1c3f94',
+    scopes: ['Read open positions and account equity', 'Read realised and unrealised P&L', 'Read margin level and free margin', 'Refresh positions every 15 minutes'],
+    accounts: [
+      { id: 'f-live', name: 'Live account · EUR', sub: 'Equity, 3 open positions', value: '€21,400', amount: 21400, checked: true },
+      { id: 'f-demo', name: 'Demo account', sub: 'Excluded from net wealth by default', value: '€50,000', amount: 0, checked: false },
+    ],
+    duplicate: 'Leveraged positions are reported at equity, not notional value. Your Wealth Record will show €21,400, not the size of the underlying exposure.' },
+  { id: 'ibkr', name: 'Interactive Brokers', sub: 'Stocks, ETFs, options · global', tag: 'Broker', kind: 'broker', mark: 'IB', color: '#c8462b',
+    scopes: ['Read holdings and cost basis', 'Read cash balances per currency', 'Read dividend and interest income', 'Refresh positions at market close'],
+    accounts: [
+      { id: 'i-main', name: 'Individual account · USD', sub: '14 positions', value: '€96,300', amount: 96300, checked: true },
+      { id: 'i-cash', name: 'Cash balance · USD', sub: 'Uninvested', value: '€4,120', amount: 4120, checked: true },
+    ],
+    duplicate: 'Vanguard S&P 500 ETF is already connected through NorthBridge Securities. Importing it again would double-count €85,000 — it has been unticked for you.' },
+  { id: 'boc', name: 'Bank of Cyprus', sub: 'Accounts, deposits, mortgage', tag: 'Bank', kind: 'bank', mark: 'BC', color: '#1a6b4a',
+    scopes: ['Read account balances', 'Read term deposit rate and maturity date', 'Read outstanding mortgage balance', 'Refresh balances once a day'],
+    accounts: [
+      { id: 'b-cur', name: 'Current account · EUR', sub: 'Available instantly', value: '€52,000', amount: 52000, checked: true },
+      { id: 'b-dep', name: 'Term deposit · 3.1%', sub: 'Matures Sep 15, 2026', value: '€150,000', amount: 150000, checked: true },
+      { id: 'b-mor', name: 'Mortgage', sub: 'Imported as a liability', value: '−€430,000', amount: -430000, checked: true },
+    ],
+    duplicate: 'Two of your manual assets match this bank. Connecting replaces manual entry with live balances and keeps your edit history.' },
+  { id: 'binance', name: 'Binance', sub: 'Spot and earn balances', tag: 'Exchange', kind: 'exchange', mark: 'B', color: '#b7860b',
+    scopes: ['Read spot wallet balances', 'Read earn and staking positions', 'Read trade history for tax reporting', 'Refresh balances every hour'],
+    accounts: [
+      { id: 'bi-spot', name: 'Spot wallet', sub: '4 assets', value: '€6,830', amount: 6830, checked: true },
+      { id: 'bi-earn', name: 'Earn · flexible', sub: 'Average 4.1% APR', value: '€2,200', amount: 2200, checked: true },
+    ],
+    duplicate: 'Crypto valuations move continuously. Your Wealth Record stores the value at the last sync, with its timestamp.' },
+  { id: 'ing', name: 'ING', sub: 'Accounts and savings · EU', tag: 'Bank', kind: 'bank', mark: 'IN', color: '#d4620a',
+    scopes: ['Read account balances', 'Read savings balances', 'Refresh balances once a day'],
+    accounts: [{ id: 'n-cur', name: 'Current account · EUR', sub: 'Available instantly', value: '€2,940', amount: 2940, checked: true }],
+    duplicate: 'No overlap with your existing assets was detected.' },
+];
+
+const FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'bank', label: 'Banks' },
+  { id: 'broker', label: 'Brokers' },
+  { id: 'exchange', label: 'Crypto' },
+];
+
+const SYNC_STEPS = ['Authorising with the provider', 'Reading account list', 'Reading balances and positions', 'Checking for duplicates'];
+
+const BASE_SOURCES = [
+  { id: 'tn', name: 'TradingNew Portfolios', sub: 'Reads positions & prices · synced 09:45 UTC · 2 assets created', status: 'Connected', tone: 'good', mark: 'TN', color: '#2962ff',
+    permissions: 'Read positions and prices', lastSync: 'Today, 09:45 UTC', expires: 'No expiry — internal source',
+    assets: [{ name: 'Tesla (TSLA) — 120 shares', value: '≈ €35,200' }, { name: 'Cash — trading balance', value: '€2,400' }] },
+  { id: 'nb', name: 'NorthBridge Securities', sub: 'Reads holdings · synced 09:45 UTC · 1 asset created', status: 'Connected', tone: 'good', mark: 'NB', color: '#1c3f94',
+    permissions: 'Read holdings and cost basis', lastSync: 'Today, 09:45 UTC', expires: 'Nov 2, 2026 · 89 days left',
+    assets: [{ name: 'Vanguard S&P 500 ETF', value: '€85,000' }] },
+  { id: 'manual', name: 'Manual sources', sub: '3 assets entered manually or via Voyager', status: 'Active', tone: 'info', mark: 'M', color: '#8a93a6',
+    permissions: 'Entered by you', lastSync: 'Apartment valuation — 9 months ago', expires: 'Not applicable',
+    assets: [{ name: 'Limassol apartment', value: '€600,000' }, { name: 'TechServe Ltd (34%)', value: '€475,000' }, { name: 'Term deposit', value: '€150,000' }] },
+];
+
+const TONE_CHIP = {
+  good: { background: '#e3f6ec', color: '#1aa966' },
+  info: { background: '#e8edfd', color: '#2962ff' },
+  muted: { background: '#f2f4f9', color: '#8a93a6' },
+  warn: { background: '#fdf3e3', color: '#b07708' },
+};
+
+const euro = (n) => '€' + Math.round(n).toLocaleString('en-US');
+
+class Component extends DCLogic {
+  state = {
+    step: null,
+    filter: 'all',
+    activeId: null,
+    selection: {},
+    voyagerConsent: true,
+    syncProgress: 0,
+    connected: [],
+    justConnected: null,
+    open: {},
+    toast: '',
+    syncing: false,
+  };
+
+  componentWillUnmount() {
+    clearTimeout(this.timer);
+    clearInterval(this.ticker);
+    clearTimeout(this.toastTimer);
+  }
+
+  flash(text) {
+    this.setState({ toast: text });
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => this.setState({ toast: '' }), 3200);
+  }
+
+  active() {
+    return PROVIDERS.find((p) => p.id === this.state.activeId) || null;
+  }
+
+  selectedAccounts() {
+    const provider = this.active();
+    if (!provider) return [];
+    return provider.accounts.filter((a) => this.state.selection[a.id]);
+  }
+
+  chip(tone) {
+    return { ...TONE_CHIP[tone], borderRadius: '13px', padding: '4px 11px', fontSize: '11.5px', fontWeight: 800, whiteSpace: 'nowrap' };
+  }
+
+  mark(text, color, size) {
+    const s = size || 40;
+    return {
+      width: s + 'px', height: s + 'px', borderRadius: '12px', background: color, color: '#fff',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      fontSize: (s > 40 ? 15 : 13.5) + 'px', fontWeight: 800, letterSpacing: '-0.3px',
+    };
+  }
+
+  buildSources() {
+    const rows = [];
+
+    BASE_SOURCES.slice(0, 2).forEach((s) => rows.push(s));
+
+    this.state.connected.forEach((c) => {
+      const provider = PROVIDERS.find((p) => p.id === c.id);
+      rows.push({
+        id: c.id,
+        name: provider.name,
+        sub: c.disconnected
+          ? c.assets.length + ' assets switched to manual · last value from ' + c.syncedAt
+          : 'Reads balances · synced ' + c.syncedAt + ' · ' + c.assets.length + ' assets created',
+        status: c.disconnected ? 'Disconnected' : 'Connected',
+        tone: c.disconnected ? 'muted' : 'good',
+        mark: provider.mark,
+        color: c.disconnected ? '#9aa3b5' : provider.color,
+        permissions: c.disconnected ? 'Revoked — no further access' : provider.scopes[0] + ' · read-only',
+        lastSync: c.disconnected ? 'Stopped · ' + c.syncedAt : 'Today, ' + c.syncedAt,
+        expires: c.disconnected ? '—' : 'Nov 3, 2026 · 90 days left',
+        assets: c.assets,
+        isNew: this.state.justConnected === c.id,
+        disconnected: c.disconnected,
+      });
+    });
+
+    rows.push({
+      id: 'bank-stub',
+      name: 'More banks and brokers',
+      sub: 'Revolut, FxPro, Interactive Brokers, Bank of Cyprus, Binance and more',
+      status: 'Not connected',
+      tone: 'muted',
+      mark: '+',
+      color: '#c9cfdb',
+      stub: true,
+    });
+
+    rows.push(BASE_SOURCES[2]);
+    return rows;
+  }
+
+  renderVals() {
+    const s = this.state;
+    const provider = this.active();
+    const selected = this.selectedAccounts();
+    const importTotalValue = selected.reduce((sum, a) => sum + a.amount, 0);
+    const liveCount = s.connected.filter((c) => !c.disconnected).length;
+    const importedAssets = s.connected.filter((c) => !c.disconnected).reduce((n, c) => n + c.assets.length, 0);
+
+    const sources = this.buildSources().map((row) => ({
+      ...row,
+      open: !!s.open[row.id],
+      cardStyle: {
+        background: '#fff',
+        border: '1px solid ' + (row.isNew ? '#1aa966' : '#eceff4'),
+        borderRadius: '18px',
+        padding: '24px 26px',
+        opacity: row.stub ? 0.85 : 1,
+      },
+      markStyle: this.mark(row.mark, row.color),
+      chipStyle: this.chip(row.tone),
+      newChipStyle: row.isNew
+        ? { background: '#e3f6ec', color: '#1aa966', borderRadius: '13px', padding: '4px 11px', fontSize: '11.5px', fontWeight: 800 }
+        : { display: 'none' },
+      actionLabel: row.stub ? 'Browse' : row.disconnected ? 'Reconnect' : 'Sync now',
+      actionStyle: {
+        background: row.stub ? '#2962ff' : '#fff',
+        border: '1px solid ' + (row.stub ? '#2962ff' : '#e6eaf2'),
+        color: row.stub ? '#fff' : '#131722',
+        borderRadius: '22px', padding: '9px 16px', fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap',
+      },
+      action: row.stub
+        ? () => this.setState({ step: 'picker' })
+        : row.disconnected
+          ? () => { this.setState({ activeId: row.id, step: 'consent' }); }
+          : () => this.flash(row.name + ' synced just now.'),
+      expandStyle: row.stub
+        ? { display: 'none' }
+        : { background: 'transparent', color: '#2962ff', fontSize: '13px', fontWeight: 700, padding: '9px 4px', whiteSpace: 'nowrap' },
+      toggle: () => this.setState((st) => ({ open: { ...st.open, [row.id]: !st.open[row.id] } })),
+      disconnect: () => {
+        this.setState((st) => ({
+          connected: st.connected.map((c) => (c.id === row.id ? { ...c, disconnected: true } : c)),
+          justConnected: null,
+        }));
+        this.flash(row.name + ' disconnected — ' + row.assets.length + ' assets kept in manual mode.');
+      },
+      permissions: row.permissions,
+      lastSync: row.lastSync,
+      expires: row.expires,
+      assets: row.assets || [],
+    }));
+
+    return {
+      summaryLine: liveCount
+        ? liveCount + 2 + ' sources connected · ' + (importedAssets + 3) + ' assets kept up to date automatically'
+        : '2 sources connected · 3 assets entered manually',
+      needsUpdateText: '1 valuation needs updating',
+      needsUpdateStyle: { color: '#b07708', fontWeight: 700 },
+
+      syncAllLabel: s.syncing ? 'Syncing…' : 'Sync all',
+      syncAllStyle: {
+        background: '#fff', border: '1px solid #e6eaf2', borderRadius: '22px',
+        padding: '10px 18px', fontSize: '13.5px', fontWeight: 700,
+        color: s.syncing ? '#8a93a6' : '#131722',
+      },
+      syncAll: () => {
+        if (s.syncing) return;
+        this.setState({ syncing: true });
+        setTimeout(() => {
+          this.setState({ syncing: false });
+          this.flash('All sources synced · ' + new Date().toUTCString().slice(17, 22) + ' UTC');
+        }, 1400);
+      },
+
+      sources,
+
+      modalOpen: !!s.step,
+      stepPicker: s.step === 'picker',
+      stepConsent: s.step === 'consent',
+      stepSyncing: s.step === 'syncing',
+      stepReview: s.step === 'review',
+      modalTitle: s.step === 'picker' ? 'Connect an account' : provider ? provider.name : 'Connect an account',
+      modalStep:
+        s.step === 'picker' ? 'Step 1 of 3 · choose a provider'
+        : s.step === 'consent' ? 'Step 2 of 3 · review permissions'
+        : s.step === 'syncing' ? 'Step 3 of 3 · importing'
+        : 'Step 3 of 3 · choose what to import',
+      openPicker: () => this.setState({ step: 'picker', activeId: null }),
+      closeModal: () => { clearTimeout(this.timer); clearInterval(this.ticker); this.setState({ step: null }); },
+      backToPicker: () => this.setState({ step: 'picker' }),
+
+      filters: FILTERS.map((f) => ({
+        label: f.label,
+        style: {
+          borderRadius: '20px', padding: '8px 15px', fontSize: '12.5px', fontWeight: 700,
+          border: '1px solid ' + (s.filter === f.id ? '#131722' : '#e6eaf2'),
+          background: s.filter === f.id ? '#131722' : '#fff',
+          color: s.filter === f.id ? '#fff' : '#131722',
+        },
+        on: () => this.setState({ filter: f.id }),
+      })),
+
+      providers: PROVIDERS.filter((p) => s.filter === 'all' || p.kind === s.filter).map((p) => {
+        const already = s.connected.some((c) => c.id === p.id && !c.disconnected);
+        return {
+          name: p.name,
+          sub: already ? 'Already connected' : p.sub,
+          mark: p.mark,
+          markStyle: this.mark(p.mark, already ? '#c9cfdb' : p.color, 38),
+          tag: already ? 'Connected' : p.tag,
+          tagStyle: this.chip(already ? 'good' : 'muted'),
+          rowStyle: {
+            display: 'flex', alignItems: 'center', gap: '14px', width: '100%',
+            background: '#fff', border: '1px solid #e6eaf2', borderRadius: '14px',
+            padding: '12px 16px', textAlign: 'left', opacity: already ? 0.6 : 1,
+          },
+          select: already
+            ? () => this.flash(p.name + ' is already connected.')
+            : () => {
+                const selection = {};
+                p.accounts.forEach((a) => { selection[a.id] = a.checked; });
+                this.setState({ activeId: p.id, selection, step: 'consent', syncProgress: 0 });
+              },
+        };
+      }),
+
+      activeName: provider ? provider.name : '',
+      activeSub: provider ? provider.sub : '',
+      activeMark: provider ? provider.mark : '',
+      activeMarkStyle: provider ? this.mark(provider.mark, provider.color, 46) : {},
+      activeScopes: provider ? provider.scopes : [],
+
+      voyagerConsent: s.voyagerConsent,
+      toggleVoyagerConsent: () => this.setState((st) => ({ voyagerConsent: !st.voyagerConsent })),
+
+      authorise: () => {
+        this.setState({ step: 'syncing', syncProgress: 0 });
+        clearInterval(this.ticker);
+        this.ticker = setInterval(() => {
+          this.setState((st) => {
+            const next = st.syncProgress + 1;
+            if (next >= SYNC_STEPS.length) {
+              clearInterval(this.ticker);
+              this.timer = setTimeout(() => this.setState({ step: 'review' }), 420);
+            }
+            return { syncProgress: next };
+          });
+        }, 620);
+      },
+
+      syncSteps: SYNC_STEPS.map((label, i) => {
+        const done = i < s.syncProgress;
+        return {
+          label,
+          dot: done ? '✓' : '',
+          dotStyle: {
+            width: '17px', height: '17px', borderRadius: '50%', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '10px', fontWeight: 800,
+            background: done ? '#1aa966' : '#e6eaf2',
+            color: '#fff',
+          },
+        };
+      }),
+
+      foundCount: provider ? provider.accounts.length : 0,
+      foundAccounts: provider
+        ? provider.accounts.map((a) => ({
+            name: a.name,
+            sub: a.sub,
+            value: a.value,
+            checked: !!s.selection[a.id],
+            rowStyle: {
+              display: 'flex', alignItems: 'flex-start', gap: '11px',
+              background: s.selection[a.id] ? '#fff' : '#fbfcfe',
+              border: '1px solid ' + (s.selection[a.id] ? '#c9d4f5' : '#eceff4'),
+              borderRadius: '14px', padding: '13px 16px', cursor: 'pointer',
+            },
+            toggle: () => this.setState((st) => ({ selection: { ...st.selection, [a.id]: !st.selection[a.id] } })),
+          }))
+        : [],
+      duplicateNote: provider ? provider.duplicate : '',
+      importTotal: (importTotalValue < 0 ? '−' : '+') + euro(Math.abs(importTotalValue)),
+      importLabel: selected.length ? 'Import ' + selected.length + ' accounts' : 'Select at least one',
+      importStyle: {
+        background: selected.length ? '#2962ff' : '#f2f4f9',
+        border: '1px solid ' + (selected.length ? '#2962ff' : '#e6eaf2'),
+        color: selected.length ? '#fff' : '#9aa3b5',
+        borderRadius: '22px', padding: '12px 22px', fontSize: '13.5px', fontWeight: 700, whiteSpace: 'nowrap',
+      },
+      finishImport: () => {
+        if (!selected.length || !provider) return;
+        const syncedAt = new Date().toUTCString().slice(17, 22) + ' UTC';
+        this.setState((st) => ({
+          step: null,
+          justConnected: provider.id,
+          open: { ...st.open, [provider.id]: true },
+          connected: st.connected
+            .filter((c) => c.id !== provider.id)
+            .concat([{ id: provider.id, syncedAt, assets: selected.map((a) => ({ name: a.name, value: a.value })) }]),
+        }));
+        this.flash('✓ ' + provider.name + ' connected — ' + selected.length + ' assets added to your Wealth Record.');
+      },
+
+      toastOpen: !!s.toast,
+      toastText: s.toast,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -97,6 +97,7 @@ try {
       'src/lib/voyager/workspace/record.ts',
       'src/lib/voyager/workspace/scopes.ts',
       'src/lib/voyager/workspace/credits.ts',
+      'src/content/wealthConnections.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -219,6 +220,7 @@ try {
   const library = await load('record', 'workspace');
   const scopes = await load('scopes', 'workspace');
   const credits = await load('credits', 'workspace');
+  const wc = await load('wealthConnections', 'content');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -4158,6 +4160,168 @@ try {
     assert.equal(credits.SIGNUP_PERKS.length, 4);
     assert.ok(credits.SIGNUP_PERKS.some((perk) => /3,000/.test(perk)));
     assert.ok(credits.SIGNUP_PERKS.some((perk) => /permission/.test(perk)));
+  });
+
+  /* ======================== Wealth Hub account connections =================== */
+
+  group('What a connection can never do');
+
+  check('the negative list is a constant, not per-provider data', () => {
+    /*
+     * The point of the consent screen. If each provider carried its own version,
+     * adding one could quietly ship a shorter list — and the short version is
+     * the one somebody would agree to without noticing.
+     */
+    assert.equal(wc.NEVER_ABLE_TO.length, 3);
+    assert.match(wc.NEVER_ABLE_TO.join(' '), /Move, transfer or withdraw money/);
+    assert.match(wc.NEVER_ABLE_TO.join(' '), /Place, modify or cancel orders/);
+    assert.match(wc.NEVER_ABLE_TO.join(' '), /login credentials/);
+  });
+
+  check('every scope is a reading scope', () => {
+    /*
+     * The invariant, stated as what a scope must be rather than as words it must
+     * avoid. A blocklist flagged "Read trade history", which is reading;
+     * requiring the verb is both stricter and correct — a scope that grants an
+     * action cannot begin with Read, See or Refresh.
+     */
+    // `startsWith`, not a regular expression: a word boundary written through
+    // two layers of escaping is how a literal control character got shipped
+    // into this file once before.
+    const READING = ['Read', 'See', 'Refresh', 'View'];
+    for (const provider of wc.CONNECTION_PROVIDERS) {
+      for (const scope of provider.scopes) {
+        const reads = READING.some((verb) => scope.startsWith(verb + ' '));
+        assert.ok(reads, `${provider.id}: "${scope}"`);
+      }
+    }
+  });
+
+  check('every provider says what it will read', () => {
+    for (const provider of wc.CONNECTION_PROVIDERS) {
+      assert.ok(provider.scopes.length >= 3, `${provider.id} has ${provider.scopes.length} scopes`);
+    }
+  });
+
+  check('the read-only note says who holds the credentials', () => {
+    assert.match(wc.READ_ONLY_NOTE, /never sees your login details/);
+    assert.match(wc.READ_ONLY_NOTE, /cannot move money/);
+  });
+
+  check('Voyager consent is described as separable', () => {
+    /*
+     * Connecting an account and feeding it to the assistant are two decisions.
+     * Withdrawing the second must not break the first, and the checkbox says so
+     * rather than leaving it to a policy nobody opens.
+     */
+    assert.match(wc.VOYAGER_CONSENT_NOTE, /withdraw this separately/);
+    assert.match(wc.VOYAGER_CONSENT_NOTE, /without disconnecting/);
+  });
+
+  check('consent has a stated expiry', () => {
+    assert.match(wc.CONSENT_NOTE, /90 days/);
+    assert.match(wc.CONSENT_NOTE, /revoked at any time/);
+  });
+
+  group('Nothing is imported that would be wrong');
+
+  const byId = (id) => wc.providerById(id);
+
+  check('the known duplicate starts unticked', () => {
+    /*
+     * IBKR's VOO already arrives through NorthBridge. Ticking it by default
+     * would double-count €85,000 in somebody's net worth, and they would find
+     * out much later.
+     */
+    const ibkr = byId('ibkr');
+    const duplicate = ibkr.accounts.find((account) => /Vanguard|VOO|S&P/i.test(account.name));
+    assert.ok(duplicate, 'the duplicate fixture is missing');
+    assert.equal(duplicate.checked, false);
+  });
+
+  check('and the import explains why', () => {
+    assert.match(byId('ibkr').duplicate, /double-count/);
+  });
+
+  check('leverage is imported at equity, and says so', () => {
+    // Notional exposure is not net worth. Importing the position size would
+    // inflate somebody's wealth by the size of a loan.
+    assert.match(byId('fxpro').duplicate, /equity, not notional/);
+  });
+
+  check('a liability imports negative, so the total can be too', () => {
+    /*
+     * A mortgage arriving as an asset is the worst possible sign error on this
+     * screen: it would add several hundred thousand to net worth.
+     */
+    const bank = byId('boc');
+    const liability = bank.accounts.find((account) => account.amount < 0);
+    assert.ok(liability, 'no negative account in the bank fixture');
+
+    const all = Object.fromEntries(bank.accounts.map((a) => [a.id, true]));
+    assert.ok(wc.importTotal(bank, all) < 0, 'the mortgage did not drag the total negative');
+  });
+
+  check('the total is signed, and a negative one reads as negative', () => {
+    assert.match(wc.formatSigned(-430000), /^−€430,000$/);
+    assert.match(wc.formatSigned(8420), /^\+€8,420$/);
+  });
+
+  group('The default selection comes from the fixtures, not from "all on"');
+
+  check('defaults follow each row rather than ticking everything', () => {
+    for (const provider of wc.CONNECTION_PROVIDERS) {
+      const selection = wc.defaultSelection(provider);
+      for (const account of provider.accounts) {
+        assert.equal(selection[account.id], account.checked, `${provider.id}/${account.id}`);
+      }
+    }
+  });
+
+  check('at least one provider ships with something unticked', () => {
+    // If every row defaulted to on, the review step would be a formality.
+    const anyUnticked = wc.CONNECTION_PROVIDERS.some((provider) =>
+      provider.accounts.some((account) => !account.checked)
+    );
+    assert.ok(anyUnticked);
+  });
+
+  check('the total counts only what is ticked', () => {
+    const revolut = byId('revolut');
+    const none = Object.fromEntries(revolut.accounts.map((a) => [a.id, false]));
+    assert.equal(wc.importTotal(revolut, none), 0);
+    assert.equal(wc.selectedCount(revolut, none), 0);
+
+    const one = { ...none, [revolut.accounts[0].id]: true };
+    assert.equal(wc.importTotal(revolut, one), revolut.accounts[0].amount);
+    assert.equal(wc.selectedCount(revolut, one), 1);
+  });
+
+  group('The fixtures are coherent');
+
+  check('all six providers are present', () => {
+    assert.equal(wc.CONNECTION_PROVIDERS.length, 6);
+  });
+
+  check('every provider has a category the picker can filter by', () => {
+    for (const provider of wc.CONNECTION_PROVIDERS) {
+      assert.ok(['bank', 'broker', 'exchange'].includes(provider.kind), provider.id);
+    }
+  });
+
+  check('every account id is unique across the whole fixture set', () => {
+    // Two rows sharing an id would tick together and import once.
+    const ids = wc.CONNECTION_PROVIDERS.flatMap((p) => p.accounts.map((a) => a.id));
+    assert.equal(new Set(ids).size, ids.length);
+  });
+
+  check('the sync checklist has the four named steps', () => {
+    assert.equal(wc.CONNECTION_SYNC_STEPS.length, 4);
+    assert.match(wc.CONNECTION_SYNC_STEPS.join(' '), /Checking for duplicates/);
+  });
+
+  check('an unknown provider resolves to nothing rather than the first one', () => {
+    assert.equal(wc.providerById('not-a-bank'), null);
   });
 
   /* ============================ Superchart layouts ============================ */
