@@ -28,12 +28,66 @@ export const WEALTH_TABS = [
 
 export type WealthTab = (typeof WEALTH_TABS)[number]['id'] | 'add';
 
-export const SNAPSHOT = [
-  { k: 'NET WEALTH', v: '€1.21M', tone: 'plain' as const },
-  { k: 'LIQUID WITHIN 30 DAYS', v: '€172K', tone: 'plain' as const },
-  { k: 'MONTHLY PASSIVE INCOME', v: '€3,050', tone: 'good' as const },
-  { k: 'TOTAL DEBT', v: '€185K', tone: 'bad' as const },
-];
+/**
+ * The snapshot, as numbers rather than as pre-formatted strings.
+ *
+ * It used to be four literals — "€1.21M", "€172K". That reads fine and cannot
+ * be added to, which meant importing an account changed the Data tab and left
+ * Net Wealth exactly where it was: the toast claimed assets had been added and
+ * the Overview said otherwise one tab away.
+ *
+ * Amounts here, formatting at the edge, so the figures can move when the record
+ * does.
+ */
+export const SNAPSHOT_BASE = {
+  netWealth: 1_210_000,
+  liquid: 172_000,
+  passiveIncome: 3_050,
+  debt: 185_000,
+};
+
+/** Compact euros: €1.21M, €172K, €3,050 — the reading the cards were built for. */
+export function formatWealth(amount: number): string {
+  const absolute = Math.abs(amount);
+  const sign = amount < 0 ? '−' : '';
+
+  if (absolute >= 1_000_000) return `${sign}€${(absolute / 1_000_000).toFixed(2)}M`;
+  if (absolute >= 100_000) return `${sign}€${Math.round(absolute / 1000)}K`;
+  return `${sign}€${Math.round(absolute).toLocaleString('en-US')}`;
+}
+
+/**
+ * The four cards, given whatever has been imported this session.
+ *
+ * A liability moves debt up and net wealth down; an asset moves net wealth and,
+ * where it is cash, liquidity. Passive income is untouched: a balance does not
+ * tell you what it yields, and inventing a figure would be the kind of
+ * confident wrong number this screen exists to avoid.
+ */
+export function snapshotWith(imported: { assets: number; liabilities: number; liquid: number }) {
+  const netWealth = SNAPSHOT_BASE.netWealth + imported.assets - imported.liabilities;
+
+  return [
+    { k: 'NET WEALTH', v: formatWealth(netWealth), tone: 'plain' as const },
+    {
+      k: 'LIQUID WITHIN 30 DAYS',
+      v: formatWealth(SNAPSHOT_BASE.liquid + imported.liquid),
+      tone: 'plain' as const,
+    },
+    {
+      k: 'MONTHLY PASSIVE INCOME',
+      v: formatWealth(SNAPSHOT_BASE.passiveIncome),
+      tone: 'good' as const,
+    },
+    {
+      k: 'TOTAL DEBT',
+      v: formatWealth(SNAPSHOT_BASE.debt + imported.liabilities),
+      tone: 'bad' as const,
+    },
+  ];
+}
+
+export const SNAPSHOT = snapshotWith({ assets: 0, liabilities: 0, liquid: 0 });
 
 export const SNAPSHOT_CONFIDENCE =
   'Market prices updated today 09:45 UTC · Property valuation 9 months old · Overall confidence: Medium';

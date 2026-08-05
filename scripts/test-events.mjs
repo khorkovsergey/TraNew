@@ -98,6 +98,7 @@ try {
       'src/lib/voyager/workspace/scopes.ts',
       'src/lib/voyager/workspace/credits.ts',
       'src/content/wealthConnections.ts',
+      'src/content/wealth.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
       'src/lib/wave.ts',
@@ -221,6 +222,7 @@ try {
   const scopes = await load('scopes', 'workspace');
   const credits = await load('credits', 'workspace');
   const wc = await load('wealthConnections', 'content');
+  const wealth = await load('wealth', 'content');
   const wave = await load('wave');
 
   /* ------------------------------------------------------ Filter round-trip */
@@ -4322,6 +4324,55 @@ try {
 
   check('an unknown provider resolves to nothing rather than the first one', () => {
     assert.equal(wc.providerById('not-a-bank'), null);
+  });
+
+  group('An import moves the Overview, not just the Data tab');
+
+  check('with nothing imported the snapshot is the authored one', () => {
+    const base = wealth.snapshotWith({ assets: 0, liabilities: 0, liquid: 0 });
+    assert.equal(base[0].v, '€1.21M');
+    assert.equal(base[3].v, '€185K');
+  });
+
+  check('an imported asset raises net wealth', () => {
+    /*
+     * The bug this closes: the toast said assets had been added and the
+     * Overview one tab away said €1.21M, unchanged. A figure that contradicts
+     * the message that produced it is worse than no figure.
+     */
+    const after = wealth.snapshotWith({ assets: 100_000, liabilities: 0, liquid: 0 });
+    assert.equal(after[0].v, '€1.31M');
+  });
+
+  check('a liability lowers it and raises debt', () => {
+    // A mortgage is not an asset, and importing one must move both numbers.
+    const after = wealth.snapshotWith({ assets: 0, liabilities: 430_000, liquid: 0 });
+    // €780K rather than €0.78M: below a million the thousands reading is the
+    // clearer one, which is what the formatter chooses.
+    assert.equal(after[0].v, '€780K');
+    assert.equal(after[3].v, '€615K');
+  });
+
+  check('only cash-like accounts move liquidity', () => {
+    const after = wealth.snapshotWith({ assets: 100_000, liabilities: 0, liquid: 25_600 });
+    assert.equal(after[1].v, '€198K');
+  });
+
+  check('passive income is left alone', () => {
+    /*
+     * A balance does not say what it yields. Moving this number would be
+     * inventing a return, which is the kind of confident wrong figure the
+     * whole screen is built to avoid.
+     */
+    const after = wealth.snapshotWith({ assets: 500_000, liabilities: 0, liquid: 500_000 });
+    assert.equal(after[2].v, wealth.snapshotWith({ assets: 0, liabilities: 0, liquid: 0 })[2].v);
+  });
+
+  check('the formatter keeps the reading the cards were built for', () => {
+    assert.equal(wealth.formatWealth(1_210_000), '€1.21M');
+    assert.equal(wealth.formatWealth(172_000), '€172K');
+    assert.equal(wealth.formatWealth(3_050), '€3,050');
+    assert.equal(wealth.formatWealth(-430_000), '−€430K');
   });
 
   /* ============================ Superchart layouts ============================ */

@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { addAssetAction } from '@/app/actions/wealth';
 import { formatSigned } from '@/content/wealthConnections';
+import { snapshotWith } from '@/content/wealth';
 import { ConnectAccountModal } from './ConnectAccountModal';
 import { useLoginModal } from '@/components/shell/LoginModalProvider';
 import { Icon } from '@/components/ui/Icon';
@@ -112,8 +113,64 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
    * disappearing along with them.
    */
   const [connected, setConnected] = useState<
-    Array<{ id: string; name: string; assets: number; disconnected?: boolean }>
+    Array<{
+      id: string;
+      name: string;
+      /*
+       * The rows themselves, not a count. A count is enough for the Data tab
+       * and useless everywhere else — and "everywhere else" is where the import
+       * has to show up if the toast is telling the truth.
+       */
+      accounts: Array<{ id: string; name: string; sub: string; value: string; amount: number }>;
+      disconnected?: boolean;
+    }>
   >([]);
+
+  /*
+   * What the imports come to, split the way the snapshot needs it.
+   *
+   * A disconnected source keeps contributing: its assets stayed in the record
+   * in manual mode, so removing them from the totals here would delete
+   * somebody's holdings from their net worth for unplugging a bank.
+   */
+  const imported = useMemo(() => {
+    const rows = connected.flatMap((source) => source.accounts);
+
+    return {
+      assets: rows.filter((row) => row.amount > 0).reduce((total, row) => total + row.amount, 0),
+      liabilities: rows
+        .filter((row) => row.amount < 0)
+        .reduce((total, row) => total + Math.abs(row.amount), 0),
+      // Only what a bank would actually hand over within the month.
+      liquid: rows
+        .filter((row) => row.amount > 0 && /current|savings|cash/i.test(row.name))
+        .reduce((total, row) => total + row.amount, 0),
+    };
+  }, [connected]);
+
+  const snapshot = useMemo(() => snapshotWith(imported), [imported]);
+
+  /** Imported rows, shaped like the authored ones so the Assets tab needs no special case. */
+  const importedAssets = useMemo(
+    () =>
+      connected.flatMap((source) =>
+        source.accounts.map((account) => ({
+          id: `${source.id}_${account.id}`,
+          category: account.amount < 0 ? 'Liabilities' : 'Connected accounts',
+          name: account.name,
+          value: account.value,
+          // The existing vocabulary, not a new one: disconnecting moves an asset
+          // to manual, it does not invent a third state.
+          status: (source.disconnected ? 'manual' : 'connected') as WealthAssetView['status'],
+          sub: `${source.name} · ${account.sub}`,
+          hasDetail: false,
+          // The fixtures are converted to euros before they arrive; the row
+          // says so in its sub-line rather than carrying a second currency.
+          currency: 'EUR',
+        }))
+      ),
+    [connected]
+  );
   const connectButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -181,7 +238,7 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
   // The demo constant is gone from this path: an empty record shows an empty
   // record. Filling it with someone else's sample assets would be the same lie the
   // mocks told, just with a database behind it.
-  const grouped = assets.reduce<Record<string, WealthAssetView[]>>((acc, asset) => {
+  const grouped = [...assets, ...importedAssets].reduce<Record<string, WealthAssetView[]>>((acc, asset) => {
     (acc[asset.category] ??= []).push(asset);
     return acc;
   }, {});
@@ -244,7 +301,7 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
         {tab === 'overview' && (
           <>
             <div className={styles.snapshot}>
-              {SNAPSHOT.map((item) => (
+              {snapshot.map((item: { k: string; v: string; tone: keyof typeof TONE }) => (
                 <div className={styles.card} key={item.k}>
                   <div className={styles.snapKey}>{item.k}</div>
                   <div className={`${styles.snapValue} ${TONE[item.tone]} tn-num`}>{item.v}</div>
@@ -592,7 +649,7 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
                 <h2 className={styles.sectionTitle}>Connected sources</h2>
                 <div className={styles.assetSub}>
                   {DATA_SOURCES.length + connected.length} sources ·{' '}
-                  {connected.reduce((total, item) => total + item.assets, 0) + 7} assets kept up to
+                  {connected.reduce((total, item) => total + item.accounts.length, 0) + 7} assets kept up to
                   date automatically
                 </div>
               </div>
@@ -637,7 +694,7 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
                     </span>
                   </div>
                   <div className={styles.assetSub}>
-                    {item.assets} asset{item.assets === 1 ? '' : 's'} ·{' '}
+                    {item.accounts.length} asset{item.accounts.length === 1 ? '' : 's'} ·{' '}
                     {item.disconnected
                       ? 'kept in manual mode with their last known value'
                       : 'kept up to date automatically'}
@@ -660,8 +717,8 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
                             )
                           );
                           setToast(
-                            `${item.name} disconnected — ${item.assets} asset${
-                              item.assets === 1 ? '' : 's'
+                            `${item.name} disconnected — ${item.accounts.length} asset${
+                              item.accounts.length === 1 ? '' : 's'
                             } kept in manual mode.`
                           );
                         }}
@@ -693,7 +750,13 @@ export function WealthScreen({ assets = [] }: { assets?: WealthAssetView[] }) {
                 onConnected={(provider, accountIds, total) => {
                   setConnected((current) => [
                     ...current.filter((item) => item.id !== provider.id),
-                    { id: provider.id, name: provider.name, assets: accountIds.length },
+                    {
+                      id: provider.id,
+                      name: provider.name,
+                      accounts: provider.accounts.filter((account) =>
+                        accountIds.includes(account.id)
+                      ),
+                    },
                   ]);
                   setConnectOpen(false);
                   setToast(
