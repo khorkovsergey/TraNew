@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 import { SignInForm } from '@/components/auth/AuthForms';
+import { AuthShell } from '@/components/auth/AuthShell';
+import { SpaceBackdrop } from '@/components/shell/SpaceBackdrop';
 import type { Locale } from '@/i18n/routing';
 import { configuredSocialProviders } from '@/lib/authProviders';
 import { pageMetadata } from '@/lib/metadata';
@@ -34,8 +36,13 @@ export default async function Page({ params, searchParams }: Props) {
   const providers = configuredSocialProviders();
 
   return (
-    <div className={styles.wrap}>
-      <SignInForm providers={providers} next={typeof search.next === "string" ? search.next : undefined} />
-    </div>
+    <>
+      <SpaceBackdrop tone={3} />
+      <AuthShell mode="in">
+        <div className={styles.wrap}>
+          <SignInForm providers={providers} next={typeof search.next === "string" ? search.next : undefined} />
+        </div>
+      </AuthShell>
+    </>
   );
 }

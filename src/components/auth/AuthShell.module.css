@@ -1,0 +1,155 @@
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px var(--tn-page-pad) 64px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tn-text-secondary);
+}
+
+.back:hover {
+  color: var(--tn-text);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
+  gap: clamp(24px, 5vw, 64px);
+  align-items: start;
+  margin-top: 26px;
+}
+
+.formColumn {
+  min-width: 0;
+}
+
+/* ---- Mode switch ---- */
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  margin-bottom: 18px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 13px;
+  background: var(--tn-surface);
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--tn-text-secondary);
+  transition: color var(--tn-transition-fast), border-color var(--tn-transition-fast);
+}
+
+.tab:hover {
+  color: var(--tn-text);
+}
+
+.tabOn {
+  background: var(--tn-mint-tint);
+  border-color: var(--tn-mint-border);
+  color: #fff;
+}
+
+.reassure {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+  font-size: 12.5px;
+  color: var(--tn-text-muted);
+}
+
+/* ---- What an account keeps ---- */
+
+.aside {
+  position: relative;
+  padding-top: 8px;
+}
+
+.robot {
+  width: 120px;
+  height: auto;
+  margin: -18px 0 0 -14px;
+  pointer-events: none;
+}
+
+.asideTitle {
+  margin: 6px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+}
+
+.keeps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.keep {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--tn-text-body);
+}
+
+.keep > :first-child {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.keepLead {
+  color: var(--tn-text);
+  font-weight: 800;
+}
+
+.asideNote {
+  margin-top: 20px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--tn-text-faint);
+  max-width: 320px;
+}
+
+.accent_mint {
+  color: var(--tn-mint);
+}
+.accent_green {
+  color: var(--tn-green);
+}
+.accent_blue {
+  color: var(--tn-blue);
+}
+.accent_purple {
+  color: var(--tn-purple);
+}
+
+@media (max-width: 880px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+
+  .aside {
+    order: -1;
+  }
+
+  .robot {
+    display: none;
+  }
+}

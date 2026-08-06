@@ -4,7 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useTranslations } from 'next-intl';
 import { Icon } from '@/components/ui/Icon';
 import { Link, usePathname } from '@/i18n/navigation';
-import { requestSearchFocus } from '@/lib/searchFocus';
 import { AuthedActions } from './AuthedActions';
 import { useLoginModal } from './LoginModalProvider';
 import { MENUS, type MenuEntry } from './menu';
@@ -145,15 +144,7 @@ export function Header() {
     }
 
     return (
-      <Link
-        key={index}
-        className={styles.menuItem}
-        href="/"
-        onClick={() => {
-          closeAll();
-          requestSearchFocus();
-        }}
-      >
+      <Link key={index} className={styles.menuItem} href="/research" onClick={closeAll}>
         {body}
       </Link>
     );
@@ -224,16 +215,21 @@ export function Header() {
           </nav>
 
           <div className={styles.actions}>
-            <button
+            {/*
+              * A link, not a button that focuses a field somewhere on the page.
+              * The old home carried a hero search box and this button jumped to
+              * it; the redesigned home has no such box, so the same code would
+              * have shouted into an empty room. The research workspace is where
+              * a symbol search actually lives.
+              */}
+            <Link
               className={styles.iconButton}
+              href="/research"
               aria-label={t('search')}
-              onClick={() => {
-                closeAll();
-                requestSearchFocus();
-              }}
+              onClick={closeAll}
             >
               <Icon name="search" size={17} strokeWidth={2.2} />
-            </button>
+            </Link>
 
             {/* Signed in, the two anonymous CTAs give way to saved, notifications
                 and the avatar. */}

@@ -1,15 +1,14 @@
 .wrap {
-  max-width: 460px;
-  margin: 40px auto 80px;
-  padding: 0 24px;
+  width: 100%;
+  min-width: 0;
 }
 
 .card {
   background: var(--tn-surface);
   border: 1px solid var(--tn-border-card);
-  border-radius: 22px;
-  padding: 34px 32px;
-  box-shadow: 0 10px 40px rgba(19, 23, 34, 0.06);
+  border-radius: 18px;
+  padding: 28px 30px;
+  box-shadow: var(--tn-shadow-card-hover);
 }
 
 .title {
@@ -40,7 +39,7 @@
   padding: 12px 14px;
   font-size: 16px;
   margin-top: 7px;
-  background: var(--tn-surface);
+  background: var(--tn-input-bg);
 }
 
 .field:focus {
@@ -57,18 +56,18 @@
 
 .primary {
   width: 100%;
-  background: var(--tn-blue);
-  color: #fff;
+  background: var(--tn-gradient-cta);
+  color: var(--tn-gradient-cta-text);
   border-radius: 12px;
   padding: 13px 0;
   font-size: 14.5px;
-  font-weight: 700;
+  font-weight: 800;
   margin-top: 22px;
-  transition: background var(--tn-transition-fast);
+  transition: filter var(--tn-transition-fast);
 }
 
 .primary:hover:not(:disabled) {
-  background: var(--tn-blue-hover);
+  filter: brightness(1.08);
 }
 
 .primary:disabled {
@@ -84,17 +83,17 @@
 
 .social {
   flex: 1;
-  background: var(--tn-surface);
+  background: var(--tn-input-bg);
   border: 1px solid var(--tn-border-input);
   border-radius: 12px;
   padding: 11px 0;
   font-size: 13px;
   font-weight: 600;
-  transition: background var(--tn-transition-fast);
+  transition: border-color var(--tn-transition-fast);
 }
 
 .social:hover {
-  background: var(--tn-chip-bg);
+  border-color: var(--tn-border-hover);
 }
 
 .links {
