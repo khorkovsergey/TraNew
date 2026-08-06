@@ -45,8 +45,64 @@ if (process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET) {
   };
 }
 
+/**
+ * Which origins may make a state-changing auth request.
+ *
+ * better-auth checks the browser's `Origin` header on every POST to
+ * `/api/auth/*` and answers 403 when it is not on this list. That check is the
+ * CSRF defence and it is doing its job — the bug it caused was that the list
+ * defaults to `[baseURL]` alone, and this app answers on more than one host.
+ * Railway always keeps its `*.up.railway.app` domain alive beside a custom one,
+ * so anybody who arrived through it could sign in — the demo path is a
+ * server-side call and never sees the check — and then could not sign out.
+ *
+ * Deliberately not a wildcard. Trusting every origin would remove the reason the
+ * check exists, on a product where the state being changed is somebody's
+ * session. Extra hosts are named, in an environment variable, one per entry.
+ */
+function trustedOrigins(): string[] {
+  const origins = new Set<string>();
+
+  const add = (value: string | undefined) => {
+    if (!value) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    try {
+      // Normalised through URL so `tradingnew.space`, a trailing slash and a
+      // full URL all end up as the same origin string.
+      origins.add(new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`).origin);
+    } catch {
+      // An unparseable entry is dropped rather than trusted as a literal.
+    }
+  };
+
+  add(SITE_URL);
+  add(process.env.BETTER_AUTH_URL);
+  // Railway's generated domain, which exists whether or not it is advertised.
+  add(process.env.RAILWAY_PUBLIC_DOMAIN);
+  process.env.AUTH_TRUSTED_ORIGINS?.split(',').forEach(add);
+
+  /*
+   * The www. sibling of the configured site. Same registrable domain, and a
+   * person who typed it should be able to sign out of the session they signed
+   * into — this cannot be forged by anybody who does not already control the
+   * domain.
+   */
+  try {
+    const site = new URL(SITE_URL);
+    if (!site.hostname.startsWith('www.')) {
+      origins.add(`${site.protocol}//www.${site.hostname}`);
+    }
+  } catch {
+    // SITE_URL is malformed; the list is whatever else resolved.
+  }
+
+  return [...origins];
+}
+
 export const auth = betterAuth({
   baseURL: SITE_URL,
+  trustedOrigins: trustedOrigins(),
   secret: process.env.BETTER_AUTH_SECRET,
 
   database: drizzleAdapter(db, {

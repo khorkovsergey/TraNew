@@ -35,14 +35,40 @@ export function useLoginModal() {
  */
 export function LoginModalProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
+  /** Set when a sign-out request came back refused. Cleared on the next attempt. */
+  const [signOutFailed, setSignOutFailed] = useState(false);
   const t = useTranslations('login');
   const { data: session } = authClient.useSession();
 
   const openLogin = useCallback(() => setIsOpen(true), []);
   const closeLogin = useCallback(() => setIsOpen(false), []);
 
+  /*
+   * Signing out, and admitting when it did not happen.
+   *
+   * This used to navigate home unconditionally. `authClient.signOut()` resolves
+   * with `{ error }` rather than throwing, so a rejected request — a 403 from
+   * the origin check, a network failure — produced the whole appearance of
+   * having signed out: the menu closed, the page went to the home screen, and
+   * the session was still live. On a shared machine that is not a cosmetic bug.
+   *
+   * Now the redirect only happens on success, and a failure says so and leaves
+   * the person signed in, where they can see that they are.
+   */
   const signOut = useCallback(async () => {
-    await authClient.signOut();
+    setSignOutFailed(false);
+    try {
+      const result = await authClient.signOut();
+      if (result?.error) {
+        setSignOutFailed(true);
+        return;
+      }
+    } catch {
+      setSignOutFailed(true);
+      return;
+    }
+    // A full load, not a router push: every server component holding the old
+    // session has to be rebuilt, and the session cookie is gone by now.
     window.location.href = '/en';
   }, []);
 
@@ -63,6 +89,23 @@ export function LoginModalProvider({ children }: { children: React.ReactNode }) 
   return (
     <LoginModalContext.Provider value={value}>
       {children}
+      {/*
+        * Said where the person is, not on a screen they were sent to. The
+        * notice stays until they try again or leave the page: a session that
+        * was not ended is worth interrupting for.
+        */}
+      {signOutFailed && (
+        <div className={styles.signOutError} role="alert">
+          <span>
+            <b>You are still signed in.</b> The sign-out request was refused, so your session is
+            unchanged. Try again — if it keeps failing, close every tab of this site.
+          </span>
+          <button onClick={() => setSignOutFailed(false)} aria-label="Dismiss">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {isOpen && (
         <>
           <div className={styles.overlay} onClick={closeLogin} />

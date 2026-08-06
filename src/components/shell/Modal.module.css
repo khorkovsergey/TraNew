@@ -101,3 +101,44 @@
 .links a:hover {
   text-decoration: underline;
 }
+
+/*
+ * Sign-out was refused and the session is still live.
+ *
+ * Bottom-left rather than a toast in the corner nobody watches, and it does not
+ * time out: "you are still signed in" is not a message to miss on a shared
+ * machine.
+ */
+.signOutError {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 90;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  max-width: 420px;
+  padding: 14px 16px;
+  border: 1px solid var(--tn-red-border);
+  border-radius: var(--tn-radius-card);
+  background: var(--tn-surface);
+  box-shadow: var(--tn-shadow-dropdown);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--tn-text-body);
+}
+
+.signOutError b {
+  color: var(--tn-red);
+}
+
+.signOutError button {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-text-secondary);
+}
+
+.signOutError button:hover {
+  color: var(--tn-text);
+}
