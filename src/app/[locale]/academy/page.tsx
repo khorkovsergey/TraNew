@@ -1,9 +1,24 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Link } from '@/i18n/navigation';
+import { LearnLanding } from '@/components/academy/LearnLanding';
+import { SpaceBackdrop } from '@/components/shell/SpaceBackdrop';
+import { BEGINNER_PATH } from '@/content/learn';
 import type { Locale } from '@/i18n/routing';
+import { learnSummary, type LearnSummary } from '@/lib/academy/summary';
+import { getProgress } from '@/lib/data/academy';
 import { pageMetadata } from '@/lib/metadata';
-import styles from '@/components/academy/Academy.module.css';
+import { getSession } from '@/lib/session';
+
+/**
+ * Learn — the Academy landing.
+ *
+ * Dynamic, because the hero card differs for somebody who has started and
+ * somebody who has not, and a prerendered page would serve one of them the
+ * other's version. The progress comes from the same table the Academy has always
+ * written to; nothing underneath moved.
+ */
+
+export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ locale: Locale }> };
 
@@ -23,51 +38,26 @@ export default async function AcademyLandingPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const t = await getTranslations('academy');
-  const tScreens = await getTranslations('screens');
-  const tCommon = await getTranslations('common');
+  const session = await getSession();
+  let summary: LearnSummary = { state: 'new', total: BEGINNER_PATH.length };
+
+  if (session?.user?.id) {
+    try {
+      const progress = await getProgress(session.user.id);
+      summary = learnSummary(progress.lessonsDone, BEGINNER_PATH);
+    } catch {
+      /*
+       * A database that cannot be reached costs the ring, not the page. The
+       * fallback is the honest one — no progress shown, rather than a number
+       * invented to fill the space.
+       */
+    }
+  }
 
   return (
-    <div className={styles.wrap}>
-      <Link className={styles.backHome} href="/">
-        {tCommon('backHome')}
-      </Link>
-
-      <div className={styles.crumbs}>
-        <span className={styles.crumbActive}>{t('breadcrumb.intro')}</span>
-        <span className={styles.crumbSep}>→</span>
-        <span className={styles.crumbIdle}>{t('breadcrumb.plan')}</span>
-        <span className={styles.crumbSep}>→</span>
-        <span className={styles.crumbIdle}>{t('breadcrumb.lesson')}</span>
-      </div>
-
-      <h1 className={styles.h1}>{tScreens('academy.title')}</h1>
-      <p className={styles.lead}>{t('landing.sub')}</p>
-      <p className={styles.note}>{t('landing.note')}</p>
-
-      <div className={styles.chips}>
-        <span className={styles.chipPurple}>{t('landing.chipTime')}</span>
-        <span className={styles.chipGreen}>{t('landing.chipFree')}</span>
-      </div>
-
-      <div className={styles.ctaRow}>
-        <Link className={styles.primary} href="/academy/setup">
-          {t('landing.start')}
-        </Link>
-        <Link
-          className={styles.secondary}
-          href={{ pathname: '/tool/[slug]', params: { slug: 'courses' } }}
-        >
-          {t('landing.browse')}
-        </Link>
-        {/* Skipping the level question is a shortcut through setup, not a separate path. */}
-        <Link
-          className={styles.textLink}
-          href={{ pathname: '/academy/setup', query: { skip: '1' } }}
-        >
-          {t('landing.skip')}
-        </Link>
-      </div>
-    </div>
+    <>
+      <SpaceBackdrop tone={2} />
+      <LearnLanding summary={summary} />
+    </>
   );
 }

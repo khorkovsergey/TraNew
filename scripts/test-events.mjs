@@ -99,6 +99,7 @@ try {
       'src/lib/voyager/workspace/credits.ts',
       'src/content/wealthConnections.ts',
       'src/lib/start/path.ts',
+      'src/lib/academy/summary.ts',
       'src/content/wealth.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
@@ -224,6 +225,7 @@ try {
   const credits = await load('credits', 'workspace');
   const wc = await load('wealthConnections', 'content');
   const start = await load('path', 'start');
+  const learn = await load('summary', 'academy');
   const wealth = await load('wealth', 'content');
   const wave = await load('wave');
 
@@ -4547,6 +4549,90 @@ try {
     });
     assert.equal(start.firstUnanswered(done), 3);
     assert.ok(start.isComplete(done));
+  });
+
+  /* ================================ Learn =================================== */
+
+  group('What the Learn hero says about progress');
+
+  const PATH = [
+    { slug: 'a', title: 'A' },
+    { slug: 'b', title: 'B' },
+    { slug: 'c', title: 'C' },
+    { slug: 'd', title: 'D' },
+  ];
+
+  check('nobody who has read nothing is shown a ring at zero', () => {
+    /*
+     * A dashboard for a journey that has not begun reads as a record of
+     * failure, and "0% · next lesson: A" is a personal metric for a person who
+     * has no metrics yet. The state is different, not the number.
+     */
+    const summary = learn.learnSummary([], PATH);
+    assert.equal(summary.state, 'new');
+    assert.equal(summary.percent, undefined);
+    assert.equal(summary.next, undefined);
+  });
+
+  check('one lesson in is a quarter of four', () => {
+    const summary = learn.learnSummary(['a'], PATH);
+    assert.equal(summary.state, 'started');
+    assert.equal(summary.done, 1);
+    assert.equal(summary.percent, 25);
+    assert.equal(summary.next.slug, 'b');
+  });
+
+  check('the next lesson is the first outstanding one, not the one after the last done', () => {
+    // Somebody who read C before B is owed B, not D.
+    const summary = learn.learnSummary(['a', 'c'], PATH);
+    assert.equal(summary.next.slug, 'b');
+  });
+
+  check('a slug that is not on the path cannot inflate the count', () => {
+    /*
+     * Progress rows outlive the path they were written against. Counting a slug
+     * from an older path would show somebody further along than they have read.
+     */
+    const summary = learn.learnSummary(['a', 'from-an-old-path'], PATH);
+    assert.equal(summary.done, 1);
+    assert.equal(summary.percent, 25);
+  });
+
+  check('the same lesson twice counts once', () => {
+    assert.equal(learn.learnSummary(['a', 'a', 'a'], PATH).done, 1);
+  });
+
+  check('it never reads 100% while something is outstanding', () => {
+    // Rounding 3 of 300 would; the cap is what stops it.
+    const many = Array.from({ length: 300 }, (_, i) => ({ slug: 's' + i, title: 's' + i }));
+    const done = many.slice(0, 299).map((lesson) => lesson.slug);
+    const summary = learn.learnSummary(done, many);
+    assert.equal(summary.state, 'started');
+    assert.ok(summary.percent < 100, 'read ' + summary.percent + '%');
+  });
+
+  check('and it does read 100% when everything is done', () => {
+    const summary = learn.learnSummary(['a', 'b', 'c', 'd'], PATH);
+    assert.equal(summary.state, 'finished');
+    assert.equal(summary.percent, 100);
+    assert.equal(summary.next, null);
+  });
+
+  check('the ring is drawn from the same number the text says', () => {
+    const radius = 48;
+    const circumference = 2 * Math.PI * radius;
+    const [filled, rest] = learn.ringDash(25, radius).split(' ').map(Number);
+    assert.ok(Math.abs(filled - circumference / 4) < 0.2, 'filled ' + filled);
+    assert.ok(Math.abs(filled + rest - circumference) < 0.2, 'the dash does not close the circle');
+  });
+
+  check('a nonsense percentage is clamped rather than drawn past the circle', () => {
+    const radius = 48;
+    const circumference = 2 * Math.PI * radius;
+    const [over] = learn.ringDash(240, radius).split(' ').map(Number);
+    const [under] = learn.ringDash(-40, radius).split(' ').map(Number);
+    assert.ok(Math.abs(over - circumference) < 0.2);
+    assert.equal(under, 0);
   });
 
   /* ============================ Superchart layouts ============================ */
