@@ -459,7 +459,7 @@
 /* ---- Wealth preview card ---- */
 
 .wealthCard {
-  background: linear-gradient(135deg, var(--tn-blue-tint), var(--tn-purple-tint-soft));
+  background: var(--tn-chip-bg);
   border: 1px solid var(--tn-blue-border);
   border-radius: var(--tn-radius-card);
   padding: 22px 24px;

@@ -116,19 +116,38 @@
   --tn-study-2: #34d399;
   --tn-study-3: #f87171;
 
-  /* ---- Gradients ----
-   * Four, each with exactly one job. A fifth would mean the gradient no longer
-   * says anything by being there.
+  /* ---- Fills ----
+   *
+   * Flat, all of them. The redesign shipped with five gradients and the
+   * refinement pass removed every one: a gradient reads as decoration, and on a
+   * screen where the only thing that should be loud is the next step, five
+   * decorated surfaces mean none of them is.
+   *
+   * The names no longer say "gradient", because a token called
+   * `--tn-gradient-cta` holding a flat colour is the kind of quiet lie that
+   * survives for years.
    */
-  /* Text-clip on a headline. One line per screen. */
-  --tn-gradient-headline: linear-gradient(90deg, #34d399, #22d3ee);
-  /* The primary CTA. Dark ink on it, because white on mint is unreadable. */
-  --tn-gradient-cta: linear-gradient(135deg, #10c98f, #0ea5e9);
-  --tn-gradient-cta-text: #04211a;
-  /* The secondary "sign up / continue" CTA, white text. */
-  --tn-gradient-cta-blue: linear-gradient(135deg, #38bdf8, #2563eb);
-  --tn-gradient-progress: linear-gradient(90deg, #10c98f, #22d3ee);
-  --tn-gradient-logo: linear-gradient(135deg, #10c98f, #2563eb);
+  /* The one level-1 action on a screen. Dark ink, because white on mint is
+     unreadable. */
+  --tn-cta: #2ee6a8;
+  --tn-cta-text: #04211a;
+  /* Level 2 — "Get started", send, submit. White text. */
+  --tn-cta-blue: #2563eb;
+  /* Accent text in a headline, clipped to the glyphs. */
+  --tn-accent-fill: #2ee6a8;
+  /* Progress bars and rings. */
+  --tn-progress: #2ee6a8;
+  /* Avatars and the monogram tile: a flat brand colour, not a gradient. */
+  --tn-avatar: #0e7a5f;
+
+  /* ---- Icons ----
+   *
+   * One neutral stroke for every decorative and functional icon. Colour on an
+   * icon is reserved for the few places it carries meaning — a rising or
+   * falling number, a trust label, a risk badge, and the single mint icon that
+   * marks the next step in a flow.
+   */
+  --tn-icon: #93a4b8;
 
   /* ---- Radii ---- */
   --tn-radius-card: 14px;

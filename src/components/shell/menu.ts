@@ -1,12 +1,24 @@
 import type { AppPathname } from '@/i18n/routing';
 
 /**
- * Structure of the five header dropdowns. Labels are message keys under `menu.*`,
- * resolved at render time so both locales stay in lockstep with the route map.
+ * The header dropdowns.
+ *
+ * Five sections carry one: Start Investing, Explore, Learn, Voyager and
+ * Marketplace. The redesign shipped with only Marketplace, on the argument that
+ * a beginner should be able to read the top of the page rather than navigate
+ * it; the sections underneath then had to be reached through the page they
+ * belonged to. These bring the shortcuts back without taking the destinations
+ * away — every menu opens with the section itself, so the label is still a way
+ * in and not only a way to a list.
+ *
+ * Copy is literal rather than message keys. The portal is English-only by an
+ * explicit decision, and every other file the redesign added carries its
+ * English copy directly; a `menu.*` namespace for one file would be the odd one
+ * out and a second place to look for a label.
  */
 export type MenuEntry = {
-  labelKey: string;
-  subKey?: string;
+  label: string;
+  sub?: string;
   /** Routed, but the screen behind it is still being built. */
   soon?: boolean;
 } & (
@@ -17,32 +29,15 @@ export type MenuEntry = {
       query?: Record<string, string>;
     }
   | { kind: 'auth' }
-  | { kind: 'focusSearch' }
 );
 
 export type MenuGroup = {
-  titleKey: string;
+  title: string;
   items: MenuEntry[];
 };
 
-export type NavKey =
-  | 'home'
-  | 'market'
-  | 'symbols'
-  | 'economy'
-  | 'community'
-  | 'marketplace'
-  | 'voyager';
+export type MenuKey = 'start' | 'explore' | 'learn' | 'voyager' | 'marketplace';
 
-/**
- * A destination that is routed but not yet built.
- *
- * Half the navigation currently lands on the generic tool page, which says the
- * screen is still being built — but it only says so *after* the click. Marking
- * them here means the menu tells the truth before someone spends a navigation
- * finding out, and it gives one list to work through as each screen lands:
- * delete the flag, and the badge goes with it.
- */
 const tool = (
   slug: string
 ): { kind: 'route'; href: AppPathname; params: Record<string, string>; soon: true } => ({
@@ -60,231 +55,237 @@ const symbol = (
   params: { ticker },
 });
 
-export const MENUS: Record<Exclude<NavKey, 'home' | 'voyager'>, MenuGroup[]> = {
-  market: [
+const klass = (
+  key: string
+): { kind: 'route'; href: AppPathname; params: Record<string, string> } => ({
+  kind: 'route',
+  href: '/explore/[class]',
+  params: { class: key },
+});
+
+export const MENUS: Record<MenuKey, MenuGroup[]> = {
+  start: [
     {
-      titleKey: 'market.overviewTitle',
+      title: 'Find your footing',
       items: [
         {
-          labelKey: 'market.globalMarkets',
-          subKey: 'market.globalMarketsSub',
+          label: 'Start Investing',
+          sub: 'Four questions and a starting path',
+          kind: 'route',
+          href: '/start',
+        },
+        {
+          label: 'Build my plan',
+          sub: 'The longer interview, and what it produces',
+          kind: 'route',
+          href: '/strategy',
+        },
+        {
+          label: 'My learning path',
+          sub: 'What to read, in the order it builds',
+          kind: 'route',
+          href: '/academy/path',
+        },
+      ],
+    },
+    {
+      title: 'If you already invest',
+      items: [
+        {
+          label: 'Practice portfolio',
+          sub: 'Try a decision with virtual money',
+          kind: 'route',
+          href: '/portfolio',
+        },
+        {
+          label: 'Compare the options',
+          sub: 'Every category, side by side',
+          kind: 'route',
+          href: '/explore/options',
+        },
+      ],
+    },
+  ],
+
+  explore: [
+    {
+      title: 'Investment types',
+      items: [
+        { label: 'Stocks', ...klass('stocks') },
+        { label: 'ETFs', ...klass('etfs') },
+        { label: 'Bonds', ...klass('bonds') },
+        { label: 'Cash & deposits', ...klass('cash') },
+        { label: 'Crypto', ...klass('crypto') },
+        { label: 'Property', ...klass('property') },
+        { label: 'See all options', kind: 'route', href: '/explore/options' },
+      ],
+    },
+    /*
+     * Market, Symbols and Economy are named groups here on purpose. They were
+     * three top-level sections before the redesign folded them into Explore,
+     * and somebody who knew where they used to be should find them by that name
+     * rather than by guessing which tab absorbed them.
+     */
+    {
+      title: 'Market',
+      items: [
+        {
+          label: 'Today in markets',
+          sub: 'What moved, and whether it matters',
           kind: 'route',
           href: '/markets/global',
         },
-        {
-          labelKey: 'market.marketNews',
-          subKey: 'market.marketNewsSub',
-          kind: 'route',
-          href: '/news',
-        },
-        {
-          labelKey: 'market.tradingIdeas',
-          subKey: 'market.tradingIdeasSub',
-          kind: 'route',
-          href: '/ideas',
-        },
+        { label: 'Market news', sub: 'Headlines with the reason under them', kind: 'route', href: '/news' },
+        { label: 'Market Views', sub: 'Opinion, labelled as opinion', kind: 'route', href: '/ideas' },
       ],
     },
     {
-      titleKey: 'market.assetsTitle',
+      title: 'Symbols',
       items: [
-        { labelKey: 'market.indices', ...tool('indices') },
-        { labelKey: 'market.stocks', ...tool('stocks') },
-        { labelKey: 'market.crypto', ...tool('crypto') },
-        { labelKey: 'market.forex', ...tool('forex') },
-        { labelKey: 'market.bonds', ...tool('bonds') },
-        { labelKey: 'market.etfs', ...tool('etfs') },
-        { labelKey: 'market.commodities', ...tool('commodities') },
+        { label: 'Research an asset', sub: 'Ask about one in particular', kind: 'route', href: '/research' },
+        { label: 'Tesla', ...symbol('TSLA') },
+        { label: 'S&P 500', ...symbol('SPX') },
+        { label: 'NVIDIA', ...symbol('NVDA') },
+        { label: 'Bitcoin', ...symbol('BTC') },
+        { label: 'Gold', ...symbol('GOLD') },
       ],
     },
     {
-      titleKey: 'market.toolsTitle',
+      title: 'Economy',
       items: [
-        { labelKey: 'market.supercharts', kind: 'route', href: '/supercharts' },
-        { labelKey: 'market.screeners', ...tool('screeners') },
-        { labelKey: 'market.calendars', ...tool('calendars') },
-        { labelKey: 'market.brokers', kind: 'route', href: '/brokers' },
+        {
+          label: 'Economy & your money',
+          sub: 'Rates, inflation, and what they do to a plan',
+          kind: 'route',
+          href: '/economy',
+        },
+        { label: 'Countries', kind: 'route', href: '/economy', query: { tab: 'countries' } },
+        { label: 'Indicators', kind: 'route', href: '/economy', query: { tab: 'indicators' } },
+        { label: 'Calendar', kind: 'route', href: '/economy', query: { tab: 'calendar' } },
+      ],
+    },
+    {
+      title: 'Advanced',
+      items: [
+        { label: 'Advanced charts', sub: 'The professional workspace', kind: 'route', href: '/supercharts' },
+        { label: 'Find investments', ...tool('screeners') },
+        { label: 'Brokers', kind: 'route', href: '/brokers' },
+        { label: 'How we explain markets', kind: 'route', href: '/how-we-explain' },
       ],
     },
   ],
 
-  symbols: [
+  learn: [
     {
-      titleKey: 'symbols.popularTitle',
+      title: 'Learn',
       items: [
-        { labelKey: 'symbols.tesla', ...symbol('TSLA') },
-        { labelKey: 'symbols.sp500', ...symbol('SPX') },
-        { labelKey: 'symbols.bitcoin', ...symbol('BTC') },
-        { labelKey: 'symbols.gold', ...symbol('GOLD') },
-        { labelKey: 'symbols.nvidia', ...symbol('NVDA') },
+        { label: 'Learn', sub: 'Short lessons, in plain language', kind: 'route', href: '/academy' },
+        { label: 'Beginner path', sub: 'Five lessons that build on each other', kind: 'route', href: '/academy/path' },
+        { label: 'Where should I start?', sub: 'Two minutes of questions', kind: 'route', href: '/academy/setup' },
+        { label: 'My progress', kind: 'route', href: '/academy/dashboard' },
       ],
     },
     {
-      titleKey: 'symbols.researchTitle',
+      title: 'Practise',
       items: [
         {
-          labelKey: 'symbols.researchAsset',
-          subKey: 'symbols.researchAssetSub',
-          kind: 'focusSearch',
-        },
-        { labelKey: 'symbols.compare', subKey: 'symbols.compareSub', ...tool('compare') },
-        { labelKey: 'symbols.watchlists', subKey: 'symbols.watchlistsSub', kind: 'auth' },
-      ],
-    },
-  ],
-
-  economy: [
-    {
-      titleKey: 'economy.sectionTitle',
-      items: [
-        {
-          labelKey: 'economy.overview',
-          subKey: 'economy.overviewSub',
+          label: 'Practice portfolio',
+          sub: 'Virtual money, real prices',
           kind: 'route',
-          href: '/economy',
+          href: '/portfolio',
         },
         {
-          labelKey: 'economy.countries',
-          subKey: 'economy.countriesSub',
+          label: 'First lesson',
+          sub: 'Why people invest',
           kind: 'route',
-          href: '/economy',
-          query: { tab: 'countries' },
-        },
-        {
-          labelKey: 'economy.indicators',
-          subKey: 'economy.indicatorsSub',
-          kind: 'route',
-          href: '/economy',
-          query: { tab: 'indicators' },
-        },
-        {
-          labelKey: 'economy.calendar',
-          subKey: 'economy.calendarSub',
-          kind: 'route',
-          href: '/economy',
-          query: { tab: 'calendar' },
-        },
-        {
-          labelKey: 'economy.news',
-          subKey: 'economy.newsSub',
-          kind: 'route',
-          href: '/economy',
-          query: { tab: 'news' },
+          href: '/academy/lesson/[slug]',
+          params: { slug: 'why-people-invest' },
         },
       ],
     },
     {
-      // Tools, not sections — kept visually separate so the section list stays readable.
-      titleKey: 'economy.toolsTitle',
+      title: 'Events',
       items: [
-        { labelKey: 'economy.macroMaps', ...tool('macro-maps') },
-        { labelKey: 'economy.countryCompare', ...tool('country-compare') },
-        { labelKey: 'economy.yieldCurves', ...tool('yield-curves') },
-        { labelKey: 'economy.indicatorCompare', ...tool('indicator-compare') },
-        { labelKey: 'economy.scenarioExplorer', ...tool('scenario-explorer') },
+        { label: 'Events', sub: 'Meetups, webinars and conferences', kind: 'route', href: '/events' },
+        { label: 'Create an event', kind: 'route', href: '/events/create' },
+        { label: 'Learning & events hub', kind: 'route', href: '/learning-events' },
       ],
     },
   ],
 
-  community: [
+  voyager: [
     {
-      titleKey: 'community.contestsTitle',
-      items: [{ labelKey: 'community.theLeap', subKey: 'community.theLeapSub', ...tool('the-leap') }],
-    },
-    {
-      titleKey: 'community.createdTitle',
+      title: 'Voyager',
       items: [
-        { labelKey: 'community.ideas', kind: 'route', href: '/ideas' },
-        { labelKey: 'community.indicators', ...tool('indicators') },
-        { labelKey: 'community.topAuthors', ...tool('top-authors') },
+        {
+          label: 'Open the workspace',
+          sub: 'Ask, build or monitor — with its sources shown',
+          kind: 'route',
+          href: '/voyager',
+        },
+        {
+          label: 'Explain a concept',
+          sub: 'What an ETF is, what inflation does',
+          kind: 'route',
+          href: '/voyager',
+          query: { q: 'What is an ETF?' },
+        },
+        {
+          label: 'What happened today',
+          sub: 'The market, summarised',
+          kind: 'route',
+          href: '/voyager',
+          query: { q: 'What is happening in markets today?' },
+        },
       ],
     },
     {
-      titleKey: 'community.growthTitle',
+      title: 'Your Voyager',
       items: [
-        { labelKey: 'community.referral', ...tool('referral') },
-        { labelKey: 'community.rewards', ...tool('rewards') },
-        { labelKey: 'community.powerOfCommunity', kind: 'route', href: '/community' },
+        { label: 'Saved workspaces', sub: 'Requires an account', kind: 'auth' },
+        { label: 'Voyager settings', kind: 'route', href: '/account/voyager' },
+        { label: 'Plans and limits', kind: 'route', href: '/marketplace/subscriptions' },
       ],
     },
   ],
 
   marketplace: [
     {
-      titleKey: 'marketplace.featuredTitle',
+      title: 'Featured',
       items: [
-        /*
-         * "Go beyond your plan" used to lead this list. It opened the Marketplace
-         * hub, whose entire content is the four links directly below it — a click
-         * that costs a navigation and returns the menu you were already looking
-         * at. The hub is still reachable from the home carousel, from Community
-         * and from the breadcrumb on the expert pages, where it lands as a
-         * destination rather than as a detour.
-         */
         {
-          labelKey: 'marketplace.expertServices',
-          subKey: 'marketplace.expertServicesSub',
+          label: 'Expert services',
+          sub: 'Book a consultation',
           kind: 'route',
           href: '/marketplace/experts',
         },
         {
-          labelKey: 'marketplace.toolsData',
-          subKey: 'marketplace.toolsDataSub',
+          label: 'Tools and data',
+          sub: 'Indicators, screeners, data feeds',
           kind: 'route',
-          // The real screen, not the placeholder the menu used to point at while
-          // the hub page pointed here.
           href: '/tools',
         },
-        /*
-         * "Learning and events" used to sit here, and it was the same shape as
-         * "Go beyond your plan" above: a hub whose entire content is two links,
-         * one of which — Events near you — was the very next row of this menu.
-         *
-         * Removing it outright would have hidden Academy, which had no menu
-         * entry of its own and was only reachable through that hub. So the hub
-         * is replaced by the destination it was standing in front of, and the
-         * two event rows below stop being duplicates of something above them.
-         *
-         * `/learning-events` is untouched and still linked from the Marketplace
-         * hub, where a page that groups two sections belongs.
-         */
+        { label: 'Academy', sub: 'Courses and learning paths', kind: 'route', href: '/academy' },
         {
-          labelKey: 'marketplace.academy',
-          subKey: 'marketplace.academySub',
-          kind: 'route',
-          href: '/academy',
-        },
-        {
-          labelKey: 'marketplace.events',
-          subKey: 'marketplace.eventsSub',
+          label: 'Events near you',
+          sub: 'Meetups, webinars and conferences',
           kind: 'route',
           href: '/events',
         },
         {
-          labelKey: 'marketplace.subscriptions',
-          subKey: 'marketplace.subscriptionsSub',
+          label: 'Subscriptions',
+          sub: 'Plans, Voyager tiers and limits',
           kind: 'route',
           href: '/marketplace/subscriptions',
         },
         {
-          labelKey: 'marketplace.createEvent',
-          subKey: 'marketplace.createEventSub',
+          label: 'Create an event',
+          sub: 'Publish yours to the community',
           kind: 'route',
           href: '/events/create',
         },
-        { labelKey: 'marketplace.merchandise', ...tool('merchandise') },
+        { label: 'Merchandise', ...tool('merchandise') },
       ],
     },
   ],
-};
-
-/** Route prefixes that light up each nav item. */
-export const NAV_ACTIVE_PREFIXES: Record<NavKey, string[]> = {
-  home: ['/'],
-  voyager: ['/voyager'],
-  market: ['/market', '/markets', '/news', '/ideas', '/explore', '/supercharts'],
-  symbols: ['/symbols', '/research', '/portfolio'],
-  economy: ['/economy'],
-  community: ['/community', '/brokers'],
-  marketplace: ['/marketplace', '/academy', '/strategy'],
 };

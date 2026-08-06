@@ -23,7 +23,7 @@
 }
 
 .name {
-  font-size: 14.5px;
+  font-size: 15.5px;
   font-weight: 800;
   color: var(--tn-text);
 }
@@ -91,41 +91,41 @@ a.name:hover {
 }
 
 .accent_green {
-  color: var(--tn-green);
+  color: var(--tn-icon);
 }
 .accent_blue {
-  color: var(--tn-blue);
+  color: var(--tn-icon);
 }
 .accent_purple {
-  color: var(--tn-purple);
+  color: var(--tn-icon);
 }
 .accent_amber {
-  color: var(--tn-orange-star);
+  color: var(--tn-icon);
 }
 .accent_orange {
-  color: var(--tn-orange);
+  color: var(--tn-icon);
 }
 .accent_rose {
-  color: var(--tn-red);
+  color: var(--tn-icon);
 }
 
 .dotOn_green {
-  background: var(--tn-green);
+  background: var(--tn-text-faint);
 }
 .dotOn_blue {
-  background: var(--tn-blue);
+  background: var(--tn-text-faint);
 }
 .dotOn_purple {
-  background: var(--tn-purple);
+  background: var(--tn-text-faint);
 }
 .dotOn_amber {
-  background: var(--tn-orange-star);
+  background: var(--tn-text-faint);
 }
 .dotOn_orange {
-  background: var(--tn-orange);
+  background: var(--tn-text-faint);
 }
 .dotOn_rose {
-  background: var(--tn-red);
+  background: var(--tn-text-faint);
 }
 
 @media (max-width: 760px) {

@@ -51,12 +51,34 @@ try {
 
   check('and nothing else is', labels.length === 6, `found ${labels.length}: ${labels.join(', ')}`);
 
+  // The three sections Explore absorbed are named groups inside its menu, so
+  // somebody who knew where Market or Economy used to live finds them by name.
+  await page.locator('header nav button', { hasText: 'Explore' }).first().click();
+  await page.waitForTimeout(300);
+  const exploreGroups = await page.locator('div[class*="groupTitle"]').allInnerTexts();
+  for (const group of ['MARKET', 'SYMBOLS', 'ECONOMY']) {
+    check(`Explore names ${group} as a group`, exploreGroups.includes(group), exploreGroups.join(' | '));
+  }
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+
   check(
     'the current section is marked in the markup, not only in colour',
     (await page.locator('header nav [aria-current="page"]').count()) === 1
   );
 
-  group('Marketplace is the one dropdown left');
+  group('Every section carries a dropdown');
+
+  /*
+   * Five of them now. The redesign shipped with only Marketplace; the sections
+   * underneath then had to be reached through the page they belonged to, and
+   * the shortcuts came back. Each menu opens with its own section, so a label
+   * that opens a panel is still a way in.
+   */
+  for (const section of ['Start Investing', 'Explore', 'Learn', 'Voyager', 'Marketplace']) {
+    const item = page.locator('header nav button', { hasText: section }).first();
+    check(`${section} opens a menu`, (await item.getAttribute('aria-haspopup')) === 'true');
+  }
 
   const trigger = page.locator('header nav button', { hasText: 'Marketplace' });
 

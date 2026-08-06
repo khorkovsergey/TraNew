@@ -70,18 +70,12 @@ export function LearnLanding({ summary }: { summary: LearnSummary }) {
                     cy="55"
                     r={RING_RADIUS}
                     fill="none"
-                    stroke="url(#learnRing)"
+                    stroke="var(--tn-progress)"
                     strokeWidth="9"
                     strokeLinecap="round"
                     strokeDasharray={ringDash(summary.percent, RING_RADIUS)}
                     transform="rotate(-90 55 55)"
                   />
-                  <defs>
-                    <linearGradient id="learnRing" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#10c98f" />
-                      <stop offset="100%" stopColor="#22d3ee" />
-                    </linearGradient>
-                  </defs>
                 </svg>
                 <div className={`${styles.ringValue} tn-num`}>
                   {summary.percent}

@@ -1,4 +1,5 @@
 import type { StaticPathname } from '@/i18n/routing';
+import type { MenuKey } from './menu';
 
 /**
  * The redesigned primary navigation.
@@ -24,6 +25,13 @@ export type NavItem = {
    * to know about the other.
    */
   prefixes: string[];
+  /**
+   * The dropdown this item opens, if it has one.
+   *
+   * An item with a menu is still a destination: the menu's first entry is the
+   * section itself, so the label is a way in and not only a way to a list.
+   */
+  menu?: MenuKey;
 };
 
 const START: NavItem = {
@@ -31,6 +39,7 @@ const START: NavItem = {
   labelKey: 'start',
   href: '/start',
   prefixes: ['/start', '/strategy'],
+  menu: 'start',
 };
 
 const EXPLORE: NavItem = {
@@ -52,6 +61,7 @@ const EXPLORE: NavItem = {
     '/community',
     '/brokers',
   ],
+  menu: 'explore',
 };
 
 const LEARN: NavItem = {
@@ -59,6 +69,7 @@ const LEARN: NavItem = {
   labelKey: 'learn',
   href: '/academy',
   prefixes: ['/academy', '/events', '/learning-events', '/organizers', '/portfolio'],
+  menu: 'learn',
 };
 
 const VOYAGER: NavItem = {
@@ -66,6 +77,7 @@ const VOYAGER: NavItem = {
   labelKey: 'voyager',
   href: '/voyager',
   prefixes: ['/voyager'],
+  menu: 'voyager',
 };
 
 export const GUEST_NAV: NavItem[] = [

@@ -68,7 +68,7 @@
   align-items: center;
   gap: 9px;
   margin-top: 16px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--tn-text-muted);
 }
 
@@ -121,23 +121,23 @@
 
 .asideNote {
   margin-top: 20px;
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--tn-text-faint);
   max-width: 320px;
 }
 
 .accent_mint {
-  color: var(--tn-mint);
+  color: var(--tn-icon);
 }
 .accent_green {
-  color: var(--tn-green);
+  color: var(--tn-icon);
 }
 .accent_blue {
-  color: var(--tn-blue);
+  color: var(--tn-icon);
 }
 .accent_purple {
-  color: var(--tn-purple);
+  color: var(--tn-icon);
 }
 
 @media (max-width: 880px) {

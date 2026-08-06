@@ -41,7 +41,7 @@
 
 .h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.4px;
 }
@@ -94,7 +94,7 @@
 
 .cardText {
   flex: 1;
-  font-size: 12.5px;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--tn-text-soft);
   margin-top: 6px;
@@ -123,7 +123,7 @@
   border-radius: 9px;
   border: 1px solid var(--tn-border-control);
   color: #c3d2e0;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 700;
   transition: border-color var(--tn-transition-fast);
 }
@@ -146,47 +146,53 @@
 }
 
 .accent_green {
-  color: var(--tn-green);
+  color: var(--tn-icon);
 }
 .accent_blue {
-  color: var(--tn-blue);
+  color: var(--tn-icon);
 }
 .accent_purple {
-  color: var(--tn-purple);
+  color: var(--tn-icon);
 }
 .accent_amber {
-  color: var(--tn-orange-star);
+  color: var(--tn-icon);
 }
 .accent_orange {
-  color: var(--tn-orange);
+  color: var(--tn-icon);
 }
 .accent_rose {
-  color: var(--tn-red);
+  color: var(--tn-icon);
 }
 
 .tag_green {
-  background: var(--tn-green-tint);
-  color: var(--tn-green-deep);
+  background: #101c2a;
+  border: 1px solid #22303f;
+  color: #aebdcd;
 }
 .tag_blue {
-  background: var(--tn-blue-tint);
-  color: var(--tn-blue-hover);
+  background: #101c2a;
+  border: 1px solid #22303f;
+  color: #aebdcd;
 }
 .tag_purple {
-  background: var(--tn-purple-tint);
-  color: var(--tn-purple-deep);
+  background: #101c2a;
+  border: 1px solid #22303f;
+  color: #aebdcd;
 }
 .tag_amber {
-  background: var(--tn-amber-tint);
-  color: var(--tn-amber-text);
+  background: #101c2a;
+  border: 1px solid #22303f;
+  color: #aebdcd;
 }
 .tag_orange {
-  background: var(--tn-orange-tint);
-  color: var(--tn-orange);
+  background: #101c2a;
+  border: 1px solid #22303f;
+  color: #aebdcd;
 }
 .tag_rose {
-  background: var(--tn-red-tint);
-  color: var(--tn-red);
+  background: #101c2a;
+  border: 1px solid #22303f;
+  color: #aebdcd;
 }
 
 @media (max-width: 1000px) {

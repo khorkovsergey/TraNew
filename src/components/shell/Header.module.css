@@ -148,7 +148,7 @@
 .startButton {
   padding: 10px 22px;
   border: 1px solid transparent;
-  background: var(--tn-gradient-cta-blue);
+  background: var(--tn-cta-blue);
   color: #fff;
 }
 
@@ -180,8 +180,7 @@
   top: 64px;
   left: 12px;
   z-index: 50;
-  width: 340px;
-  padding: 22px 24px;
+  padding: 22px 26px;
   background: var(--tn-surface);
   border: 1px solid #1c2836;
   border-radius: 16px;
@@ -190,7 +189,31 @@
   overflow-y: auto;
 }
 
-.group + .group {
+/* One group: a single column, at a width a sentence reads well in. */
+.panelNarrow {
+  width: 340px;
+}
+
+/*
+ * Several groups: columns side by side rather than one long scroll. Explore
+ * carries five — investment types, and the three sections that used to be
+ * top-level headings of their own, named so somebody who knew where Market or
+ * Economy lived finds them by that name rather than by guessing which tab
+ * absorbed them.
+ */
+.panelWide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px 40px;
+  width: max-content;
+  max-width: min(940px, calc(100vw - 40px));
+}
+
+.panelWide .group {
+  min-width: 190px;
+}
+
+.panelNarrow .group + .group {
   margin-top: 18px;
 }
 

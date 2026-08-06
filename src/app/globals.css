@@ -164,7 +164,7 @@ svg {
   z-index: 100;
   padding: 10px 18px;
   background: var(--tn-mint);
-  color: var(--tn-gradient-cta-text);
+  color: var(--tn-cta-text);
   border-radius: 0 0 var(--tn-radius-option) 0;
   font-size: 13.5px;
   font-weight: 700;

@@ -7,7 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Link, usePathname } from '@/i18n/navigation';
 import { AuthedActions } from './AuthedActions';
 import { useLoginModal } from './LoginModalProvider';
-import { MENUS, type MenuEntry } from './menu';
+import { MENUS, type MenuEntry, type MenuKey } from './menu';
 import { AUTHED_NAV, GUEST_NAV, activeNavKey } from './nav';
 import styles from './Header.module.css';
 
@@ -20,15 +20,15 @@ import styles from './Header.module.css';
  */
 export function Header() {
   const t = useTranslations('header');
-  const tMenu = useTranslations('menu');
   const pathname = usePathname();
   const { openLogin, authed } = useLoginModal();
 
-  const [mpOpen, setMpOpen] = useState(false);
+  /** Which section's dropdown is open, if any. One at a time. */
+  const [openMenu, setOpenMenu] = useState<MenuKey | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const trigger = useRef<HTMLButtonElement>(null);
+  const triggers = useRef<Partial<Record<MenuKey, HTMLButtonElement | null>>>({});
   const panelRef = useRef<HTMLDivElement>(null);
   const [panelLeft, setPanelLeft] = useState<number | null>(null);
 
@@ -42,8 +42,8 @@ export function Header() {
    * otherwise hang off the screen at narrow widths.
    */
   const placePanel = useCallback(() => {
-    if (!mpOpen) return;
-    const anchor = trigger.current?.getBoundingClientRect();
+    if (!openMenu) return;
+    const anchor = triggers.current[openMenu]?.getBoundingClientRect();
     const panel = panelRef.current;
     if (!anchor || !panel) return;
 
@@ -53,16 +53,16 @@ export function Header() {
     const rightmost = Math.max(margin, window.innerWidth - width - margin);
 
     setPanelLeft(Math.round(Math.min(Math.max(centred, margin), rightmost)));
-  }, [mpOpen]);
+  }, [openMenu]);
 
   // Before paint, so the panel is never seen at the position it starts from.
   useLayoutEffect(placePanel, [placePanel]);
 
   useEffect(() => {
-    if (!mpOpen) return;
+    if (!openMenu) return;
     window.addEventListener('resize', placePanel);
     return () => window.removeEventListener('resize', placePanel);
-  }, [mpOpen, placePanel]);
+  }, [openMenu, placePanel]);
 
   const cancelClose = () => {
     if (closeTimer.current) {
@@ -76,7 +76,7 @@ export function Header() {
       clearTimeout(closeTimer.current);
       closeTimer.current = null;
     }
-    setMpOpen(false);
+    setOpenMenu(null);
   }, []);
 
   /*
@@ -88,13 +88,13 @@ export function Header() {
   const scheduleClose = (event: React.PointerEvent) => {
     if (event.pointerType === 'touch') return;
     cancelClose();
-    closeTimer.current = setTimeout(() => setMpOpen(false), 220);
+    closeTimer.current = setTimeout(() => setOpenMenu(null), 220);
   };
 
   useEffect(() => cancelClose, []);
 
   useEffect(() => {
-    if (!mpOpen && !searchOpen) return;
+    if (!openMenu && !searchOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       closeAll();
@@ -102,19 +102,17 @@ export function Header() {
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [mpOpen, searchOpen, closeAll]);
+  }, [openMenu, searchOpen, closeAll]);
 
   const renderEntry = (entry: MenuEntry, index: number) => {
-    const label = tMenu(entry.labelKey);
-    const sub = entry.subKey ? tMenu(entry.subKey) : null;
     const body = (
       <>
         <div className={styles.menuItemLabel}>
-          {label}
+          {entry.label}
           {/* Said before the click rather than after it. */}
           {entry.soon && <span className={styles.soon}>Soon</span>}
         </div>
-        {sub && <div className={styles.menuItemSub}>{sub}</div>}
+        {entry.sub && <div className={styles.menuItemSub}>{entry.sub}</div>}
       </>
     );
 
@@ -192,26 +190,63 @@ export function Header() {
           </Link>
 
           <nav className={styles.nav} aria-label={t('nav.home')}>
-            {items.map((item) => (
-              <Link
-                key={item.key}
-                className={`${styles.navItem} ${active === item.key ? styles.navItemActive : ''}`}
-                href={item.href}
-                aria-current={active === item.key ? 'page' : undefined}
-                onClick={closeAll}
-              >
-                {t(`nav.${item.labelKey}`)}
-              </Link>
-            ))}
+            {items.map((item) => {
+              const on = active === item.key || (item.menu && openMenu === item.menu);
+              const className = `${styles.navItem} ${on ? styles.navItemActive : ''}`;
+
+              /*
+               * A section with a dropdown is a button, not a link. The section
+               * itself is the first entry inside its menu, so nothing became
+               * unreachable — but a label that both navigates and opens a panel
+               * is a control nobody can predict, and on a touch screen it fires
+               * both at once.
+               */
+              if (item.menu) {
+                const menuKey = item.menu;
+                return (
+                  <button
+                    key={item.key}
+                    ref={(element) => {
+                      triggers.current[menuKey] = element;
+                    }}
+                    className={`${className} ${styles.navTrigger}`}
+                    aria-expanded={openMenu === menuKey}
+                    aria-haspopup="true"
+                    onClick={() =>
+                      setOpenMenu((current) => (current === menuKey ? null : menuKey))
+                    }
+                  >
+                    {t(`nav.${item.labelKey}`)}
+                    <Icon name="chevronDown" size={12} strokeWidth={2.4} />
+                  </button>
+                );
+              }
+
+              return (
+                <Link
+                  key={item.key}
+                  className={className}
+                  href={item.href}
+                  aria-current={active === item.key ? 'page' : undefined}
+                  onClick={closeAll}
+                >
+                  {t(`nav.${item.labelKey}`)}
+                </Link>
+              );
+            })}
 
             <button
-              ref={trigger}
+              ref={(element) => {
+                triggers.current.marketplace = element;
+              }}
               className={`${styles.navItem} ${styles.navTrigger} ${
-                active === 'marketplace' || mpOpen ? styles.navItemActive : ''
+                active === 'marketplace' || openMenu === 'marketplace' ? styles.navItemActive : ''
               }`}
-              aria-expanded={mpOpen}
+              aria-expanded={openMenu === 'marketplace'}
               aria-haspopup="true"
-              onClick={() => setMpOpen((open) => !open)}
+              onClick={() =>
+                setOpenMenu((current) => (current === 'marketplace' ? null : 'marketplace'))
+              }
             >
               {t('nav.marketplace')}
               <Icon name="chevronDown" size={12} strokeWidth={2.4} />
@@ -255,15 +290,17 @@ export function Header() {
           </div>
         </header>
 
-        {mpOpen && (
+        {openMenu && (
           <div
             ref={panelRef}
-            className={styles.panel}
+            className={`${styles.panel} ${
+              MENUS[openMenu].length > 1 ? styles.panelWide : styles.panelNarrow
+            }`}
             style={panelLeft === null ? undefined : { left: panelLeft }}
           >
-            {MENUS.marketplace.map((group) => (
-              <div className={styles.group} key={group.titleKey}>
-                <div className={styles.groupTitle}>{tMenu(group.titleKey)}</div>
+            {MENUS[openMenu].map((group) => (
+              <div className={styles.group} key={group.title}>
+                <div className={styles.groupTitle}>{group.title}</div>
                 <div className={styles.groupItems}>{group.items.map(renderEntry)}</div>
               </div>
             ))}
@@ -271,7 +308,7 @@ export function Header() {
         )}
       </div>
 
-      {mpOpen && <div className={styles.scrim} onClick={closeAll} />}
+      {openMenu && <div className={styles.scrim} onClick={closeAll} />}
 
       {searchOpen && (
         <>

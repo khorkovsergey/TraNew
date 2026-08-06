@@ -43,7 +43,7 @@
 }
 
 .accentText {
-  background: var(--tn-gradient-headline);
+  background: var(--tn-accent-fill);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -86,7 +86,7 @@
 .progressFill {
   height: 100%;
   border-radius: 4px;
-  background: var(--tn-gradient-progress);
+  background: var(--tn-progress);
   transition: width var(--tn-transition-slow);
 }
 
@@ -179,12 +179,12 @@
 }
 
 .railTitle {
-  font-size: 14.5px;
+  font-size: 15.5px;
   font-weight: 800;
 }
 
 .railSub {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--tn-text-muted);
   margin-top: 3px;
 }
@@ -261,7 +261,7 @@
 .tickOn {
   background: var(--tn-mint);
   border-color: transparent;
-  color: var(--tn-gradient-cta-text);
+  color: var(--tn-cta-text);
 }
 
 .optionTitle {
@@ -273,7 +273,7 @@
 
 .optionText {
   display: block;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--tn-text-soft);
   margin-top: 5px;
   line-height: 1.5;
@@ -292,7 +292,7 @@
   align-items: center;
   gap: 9px;
   margin-top: 18px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--tn-text-muted);
 }
 
@@ -318,7 +318,7 @@
   border: 1px solid var(--tn-border-control);
   background: #081120;
   color: #c3d2e0;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .back:hover:not(:disabled) {
@@ -327,9 +327,9 @@
 
 .continue {
   padding: 12px 26px;
-  background: var(--tn-gradient-cta);
-  color: var(--tn-gradient-cta-text);
-  font-size: 14.5px;
+  background: var(--tn-cta);
+  color: var(--tn-cta-text);
+  font-size: 15.5px;
   font-weight: 800;
 }
 
@@ -378,7 +378,7 @@
 }
 
 .unlockTitle {
-  font-size: 14.5px;
+  font-size: 15.5px;
   font-weight: 800;
 }
 
@@ -425,7 +425,7 @@
 
 .rail2 {
   position: relative;
-  background: linear-gradient(165deg, #081119 0%, #060b12 100%);
+  background: #070f18;
   border: 1px solid #16303a;
   border-radius: 18px;
   padding: 24px 24px 22px;
@@ -458,7 +458,7 @@
 .railLead {
   position: relative;
   margin: 6px 0 0;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--tn-text-soft);
   max-width: 240px;
 }
@@ -487,13 +487,13 @@
 
 .pathTitle {
   display: block;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
 }
 
 .pathBody {
   display: block;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--tn-text-soft);
   margin-top: 2px;
   line-height: 1.45;
@@ -508,7 +508,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
 }
 
@@ -526,7 +526,9 @@
 .savePlan {
   margin-top: 16px;
   padding: 14px;
-  background: linear-gradient(90deg, #10c98f, #2563eb);
+  /* Level 2. "Continue" is the one level-1 action on this screen, and two mint
+     buttons on one page means neither of them is the next step. */
+  background: var(--tn-cta-blue);
   color: #fff;
   font-size: 15px;
   font-weight: 800;
@@ -548,7 +550,7 @@
   border: 1px solid var(--tn-border-control);
   background: transparent;
   color: #c3d2e0;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .withoutAccount:hover {
@@ -560,7 +562,7 @@
   align-items: center;
   gap: 9px;
   margin-top: 14px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--tn-text-muted);
 }
 
@@ -589,50 +591,56 @@
 /* ---- Accents ---- */
 
 .accent_mint {
-  color: var(--tn-mint);
+  color: var(--tn-icon);
 }
 .accent_green {
-  color: var(--tn-green);
+  color: var(--tn-icon);
 }
 .accent_blue {
-  color: var(--tn-blue);
+  color: var(--tn-icon);
 }
 .accent_purple {
-  color: var(--tn-purple);
+  color: var(--tn-icon);
 }
 .accent_amber {
-  color: var(--tn-orange-star);
+  color: var(--tn-icon);
 }
 .accent_lime {
-  color: var(--tn-lime);
+  color: var(--tn-icon);
 }
 .accent_cyan {
-  color: var(--tn-cyan);
+  color: var(--tn-icon);
 }
 
 .num_green {
-  border-color: var(--tn-heat-up-border);
-  color: var(--tn-green);
+  background: #101c2a;
+  border-color: #22303f;
+  color: #aebdcd;
 }
 .num_lime {
-  border-color: rgba(163, 230, 53, 0.35);
-  color: var(--tn-lime);
+  background: #101c2a;
+  border-color: #22303f;
+  color: #aebdcd;
 }
 .num_blue {
-  border-color: var(--tn-blue-border);
-  color: var(--tn-blue);
+  background: #101c2a;
+  border-color: #22303f;
+  color: #aebdcd;
 }
 .num_purple {
-  border-color: var(--tn-purple-border);
-  color: var(--tn-purple);
+  background: #101c2a;
+  border-color: #22303f;
+  color: #aebdcd;
 }
 .num_cyan {
-  border-color: rgba(103, 232, 249, 0.35);
-  color: var(--tn-cyan);
+  background: #101c2a;
+  border-color: #22303f;
+  color: #aebdcd;
 }
 .num_amber {
-  border-color: var(--tn-amber-border);
-  color: var(--tn-amber-text);
+  background: #101c2a;
+  border-color: #22303f;
+  color: #aebdcd;
 }
 
 /* ---- Narrower ---- */

@@ -150,7 +150,7 @@
 .cardPrivate {
   border: 2px solid var(--tn-purple);
   padding: 23px 21px;
-  background: linear-gradient(180deg, var(--tn-purple-tint-soft) 0%, var(--tn-surface) 240px);
+  background: var(--tn-purple-tint-soft);
   box-shadow: 0 14px 40px rgba(124, 77, 255, 0.16);
 }
 
