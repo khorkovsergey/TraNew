@@ -141,16 +141,45 @@ try {
 
   group('The search control goes somewhere');
 
-  const search = page.locator('header a[aria-label="Search"], header button[aria-label="Search"]');
+  const search = page.locator('header button[aria-label="Search"]');
   check('it exists', (await search.count()) === 1);
+
+  await search.click();
+  await page.waitForTimeout(400);
+
+  /*
+   * An overlay with a field, not a jump to a search screen. Sending somebody to
+   * another page to type is asking them to leave the thing they wanted to look
+   * something up about.
+   */
+  const field = page.locator('[role="dialog"] input[type="text"], [role="search"] input');
+  check('it opens a field in place', (await field.count()) > 0);
   check(
-    'and is a link rather than a button that focuses a field nothing renders',
-    (await search.first().evaluate((node) => node.tagName)) === 'A'
+    'and puts the cursor in it',
+    await field.first().evaluate((node) => node === document.activeElement).catch(() => false)
   );
 
-  await search.first().click();
-  await page.waitForURL(/\/research/, { timeout: 5000 }).catch(() => {});
-  check('it opens the research workspace', page.url().includes('/research'), page.url());
+  await field.first().fill('What is an ETF?');
+  await field.first().press('Enter');
+  await page.waitForURL(/\/research\?q=/, { timeout: 5000 }).catch(() => {});
+  check(
+    'and the question travels in the URL',
+    // Read through URLSearchParams, not decodeURIComponent: a query string
+    // encodes a space as "+", which decodeURIComponent leaves alone.
+    new URL(page.url()).searchParams.get('q') === 'What is an ETF?',
+    page.url()
+  );
+
+  await page.goto(`${base}/en/research`, { waitUntil: 'networkidle' });
+  const emptyBody = await page.locator('main').innerText();
+
+  // The canned "Direct answer" with sources and a timestamp used to render under
+  // a heading that admitted nobody had asked anything.
+  check('the empty research page carries no answer', !/direct answer/i.test(emptyBody), emptyBody.slice(0, 80));
+  check(
+    'and offers a field instead',
+    (await page.locator('main [role="search"] input').count()) === 1
+  );
 
   group('Phones');
 

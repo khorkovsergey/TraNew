@@ -77,6 +77,12 @@ export default async function HomePage({ params }: Props) {
                 key={card.id}
                 className={styles.intentCard}
                 href={{ pathname: card.href, params: card.params } as never}
+                /*
+                 * A grid of options is not a path anybody is about to take —
+                 * they will follow at most one of these. Prefetching all of them
+                 * spends the network on the five that will not be opened.
+                 */
+                prefetch={false}
               >
                 <Icon
                   name={card.icon}
@@ -167,7 +173,13 @@ export default async function HomePage({ params }: Props) {
             {PATH_STEPS.map((step, index) => (
               <li key={step.step} className={styles.pathItem}>
                 {index > 0 && <span className={styles.pathLink} aria-hidden="true" />}
-                <Link className={styles.pathCard} href={step.href}>
+                <Link className={styles.pathCard} href={step.href}
+                  /*
+                   * A grid of options is not a path anybody is about to take —
+                   * they will follow at most one of these. Prefetching all of them
+                   * spends the network on the five that will not be opened.
+                   */
+                  prefetch={false}>
                   <span className={`${styles.pathStep} ${styles[`step_${step.accent}`]}`}>
                     {step.step}
                   </span>

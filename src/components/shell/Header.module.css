@@ -305,3 +305,31 @@
     white-space: nowrap;
   }
 }
+
+/* ---- Search overlay ---- */
+
+/*
+ * Above the header, unlike the Marketplace scrim: this one is a dialog, and a
+ * click anywhere outside it should close it — including on the nav.
+ */
+.searchScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--tn-overlay);
+  backdrop-filter: blur(2px);
+}
+
+.searchPanel {
+  position: fixed;
+  top: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 61;
+  width: min(680px, calc(100vw - 32px));
+  padding: 22px 24px 24px;
+  background: var(--tn-surface);
+  border: 1px solid var(--tn-border-control);
+  border-radius: 18px;
+  box-shadow: var(--tn-shadow-modal);
+}

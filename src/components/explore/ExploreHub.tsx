@@ -57,7 +57,8 @@ export function ExploreHub() {
               {entry.label}
             </span>
           ) : (
-            <Link key={entry.label} className={styles.subnavLink} href={entry.href}>
+            <Link key={entry.label} className={styles.subnavLink} href={entry.href}
+            prefetch={false}>
               {entry.label}
             </Link>
           )
@@ -115,6 +116,7 @@ export function ExploreHub() {
           <Link
             className={styles.learnMore}
             href={{ pathname: category.href, params: category.params } as never}
+            prefetch={false}
           >
             Learn more about {category.name}
             {category.soon && <span className={styles.soon}>Soon</span>}
@@ -130,7 +132,19 @@ export function ExploreHub() {
                 How three common choices sit against one another.
               </div>
             </div>
-            <Link className={styles.ghostChip} href="/research">
+            {/*
+              * The comparison this button is standing next to, carried in the
+              * URL. It used to open an empty research page, which threw away the
+              * only thing the person had told us.
+              */}
+            <Link
+              className={styles.ghostChip}
+              href={{
+                pathname: '/research',
+                query: { q: `Compare ${COMPARE_CARDS.map((entry) => entry.name).join(', ')}` },
+              }}
+              prefetch={false}
+            >
               Compare in detail
             </Link>
           </div>
@@ -178,7 +192,7 @@ export function ExploreHub() {
 
           <div className={styles.ratingNote}>
             <Icon name="info" size={13} strokeWidth={2} />
-            {RATING_NOTE} <Link href="/how-we-explain">How we explain this</Link>
+            {RATING_NOTE} <Link href="/how-we-explain" prefetch={false}>How we explain this</Link>
           </div>
         </section>
 
@@ -231,7 +245,11 @@ export function ExploreHub() {
               <h2 className={styles.cardTitle}>Popular starting points</h2>
               <div className={styles.cardSub}>Where most people begin, and why.</div>
             </div>
-            <Link className={styles.moreLink} href="/research">
+            <Link
+              className={styles.moreLink}
+              href={{ pathname: '/research', query: { q: 'Where should a beginner start investing?' } }}
+              prefetch={false}
+            >
               See all options
               <Icon name="arrowRight" size={13} strokeWidth={2.2} />
             </Link>
@@ -264,6 +282,7 @@ export function ExploreHub() {
                 <Link
                   className={styles.starterCta}
                   href={{ pathname: starter.href, params: starter.params } as never}
+                  prefetch={false}
                 >
                   {starter.cta}
                   {starter.soon && <span className={styles.soon}>Soon</span>}
@@ -285,7 +304,7 @@ export function ExploreHub() {
               <h2 className={styles.cardTitle}>Today in markets</h2>
               <div className={styles.cardSub}>A quick look at what moved.</div>
             </div>
-            <Link className={styles.moreLink} href="/markets/global">
+            <Link className={styles.moreLink} href="/markets/global" prefetch={false}>
               View markets
               <Icon name="arrowRight" size={13} strokeWidth={2.2} />
             </Link>

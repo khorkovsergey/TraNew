@@ -68,7 +68,6 @@ const COLUMNS: Array<{ title: string; links: FooterLink[] }> = [
   {
     title: 'Community',
     links: [
-      { label: 'Market Views', href: '/ideas' },
       { label: 'The power of community', href: '/community' },
       tool('top-authors', 'Top authors'),
       tool('indicators', 'Community indicators'),
@@ -83,7 +82,6 @@ const COLUMNS: Array<{ title: string; links: FooterLink[] }> = [
       { label: 'Trust centre', href: '/trust' },
       { label: 'How we explain markets', href: '/how-we-explain' },
       { label: 'Personal guidance', href: '/guidance' },
-      { label: 'Professional tools', href: '/tools' },
     ],
   },
 ];
@@ -132,6 +130,16 @@ export function Footer() {
                     <Link
                       className={styles.link}
                       href={{ pathname: link.href, params: link.params } as never}
+                      /*
+                       * A footer is a directory, not a path anybody is about to
+                       * take. Left to prefetch, these twenty-five links fired an
+                       * RSC request each on every page in the portal — 112 of
+                       * them on the home page alone, several URLs four to six
+                       * times over — and the host started answering 503 to its
+                       * own pages. The one thing a footer must not do is make
+                       * the page above it slower.
+                       */
+                      prefetch={false}
                     >
                       {link.label}
                       {link.soon && <span className={styles.soon}>Soon</span>}

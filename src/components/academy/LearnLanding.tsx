@@ -128,6 +128,7 @@ export function LearnLanding({ summary }: { summary: LearnSummary }) {
               key={category.name}
               className={styles.catCard}
               href={{ pathname: category.href, params: category.params } as never}
+              prefetch={false}
             >
               <Icon
                 name={category.icon}
@@ -148,7 +149,7 @@ export function LearnLanding({ summary }: { summary: LearnSummary }) {
             Beginner path
             <span className={styles.h2Sub}>Five lessons, in the order they build on each other.</span>
           </h2>
-          <Link className={styles.moreLink} href="/academy/path">
+          <Link className={styles.moreLink} href="/academy/path" prefetch={false}>
             See the whole plan
             <Icon name="arrowRight" size={13} strokeWidth={2.2} />
           </Link>
@@ -164,6 +165,7 @@ export function LearnLanding({ summary }: { summary: LearnSummary }) {
                     ? ({ pathname: '/academy/lesson/[slug]', params: { slug: lesson.slug } } as never)
                     : '/academy/path'
                 }
+                prefetch={false}
               >
                 <div className={styles.lessonTop}>
                   <span className={`${styles.lessonNumber} ${styles[`num_${lesson.accent}`]}`}>
@@ -185,7 +187,7 @@ export function LearnLanding({ summary }: { summary: LearnSummary }) {
         <section className={styles.card}>
           <div className={styles.sectionHead}>
             <h2 className={styles.h2}>Learn from today</h2>
-            <Link className={styles.moreLink} href="/news">
+            <Link className={styles.moreLink} href="/news" prefetch={false}>
               All news
               <Icon name="arrowRight" size={13} strokeWidth={2.2} />
             </Link>
@@ -193,7 +195,8 @@ export function LearnLanding({ summary }: { summary: LearnSummary }) {
 
           <div className={styles.articleList}>
             {LEARN_ARTICLES.map((article) => (
-              <Link key={article.title} className={styles.article} href={article.href}>
+              <Link key={article.title} className={styles.article} href={article.href}
+              prefetch={false}>
                 <span className={`${styles.articleIcon} ${styles[`mark_${article.accent}`]}`}>
                   <Icon name={article.icon} size={18} strokeWidth={1.9} />
                 </span>
@@ -219,6 +222,7 @@ export function LearnLanding({ summary }: { summary: LearnSummary }) {
                 key={tile.name}
                 className={styles.practiceTile}
                 href={{ pathname: tile.href, params: tile.params } as never}
+                prefetch={false}
               >
                 <Icon
                   name={tile.icon}

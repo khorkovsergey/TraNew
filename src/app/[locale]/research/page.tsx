@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { SearchForm } from '@/components/shared/SearchForm';
 import { TrustLabel } from '@/components/ui/TrustLabel';
 import { SYMBOLS } from '@/content/symbols';
 import { pick } from '@/content/types';
@@ -47,6 +48,34 @@ export default async function ResearchWorkspacePage({ params, searchParams }: Pr
   const t = await getTranslations('workspace');
   const tCommon = await getTranslations('common');
 
+  /*
+   * No question, no answer.
+   *
+   * This page used to render its canned "Direct answer" — with sources and a
+   * timestamp — under a heading that admitted nobody had asked anything. On a
+   * product whose whole claim is that it separates facts from opinions, an
+   * answer to a question that was never put is the worst thing that can be on
+   * the screen. Without `q` the page is a search box.
+   */
+  if (!q?.trim()) {
+    return (
+      <div className={styles.wrap}>
+        <Link className={styles.backHome} href="/">
+          {tCommon('backHome')}
+        </Link>
+
+        <div className={styles.eyebrow}>{t('eyebrow')}</div>
+        <h1 className={styles.question}>What would you like to understand?</h1>
+        <p className={styles.emptyLead}>
+          Search for a company, or ask a question in your own words. The answer will show the data
+          it used and where each figure came from.
+        </p>
+
+        <SearchForm autoFocus />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.wrap}>
       <Link className={styles.backHome} href="/">
@@ -54,7 +83,7 @@ export default async function ResearchWorkspacePage({ params, searchParams }: Pr
       </Link>
 
       <div className={styles.eyebrow}>{t('eyebrow')}</div>
-      <h1 className={styles.question}>{q ? `“${q}”` : t('emptyQuestion')}</h1>
+      <h1 className={styles.question}>{`“${q}”`}</h1>
 
       <section className={styles.card}>
         <div className={styles.cardHead}>

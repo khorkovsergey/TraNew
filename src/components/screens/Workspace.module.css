@@ -176,3 +176,12 @@
     font-size: 26px;
   }
 }
+
+/* The empty state: a search box, not an answer to a question nobody asked. */
+.emptyLead {
+  margin: 12px 0 26px;
+  max-width: 560px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--tn-text-secondary);
+}

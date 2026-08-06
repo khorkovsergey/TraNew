@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { SearchForm } from '@/components/shared/SearchForm';
 import { Icon } from '@/components/ui/Icon';
 import { Link, usePathname } from '@/i18n/navigation';
 import { AuthedActions } from './AuthedActions';
@@ -24,6 +25,7 @@ export function Header() {
   const { openLogin, authed } = useLoginModal();
 
   const [mpOpen, setMpOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const trigger = useRef<HTMLButtonElement>(null);
@@ -92,13 +94,15 @@ export function Header() {
   useEffect(() => cancelClose, []);
 
   useEffect(() => {
-    if (!mpOpen) return;
+    if (!mpOpen && !searchOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeAll();
+      if (event.key !== 'Escape') return;
+      closeAll();
+      setSearchOpen(false);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [mpOpen, closeAll]);
+  }, [mpOpen, searchOpen, closeAll]);
 
   const renderEntry = (entry: MenuEntry, index: number) => {
     const label = tMenu(entry.labelKey);
@@ -216,20 +220,22 @@ export function Header() {
 
           <div className={styles.actions}>
             {/*
-              * A link, not a button that focuses a field somewhere on the page.
-              * The old home carried a hero search box and this button jumped to
-              * it; the redesigned home has no such box, so the same code would
-              * have shouted into an empty room. The research workspace is where
-              * a symbol search actually lives.
+              * An overlay with a real field, rather than a jump to another page.
+              * Sending somebody to a search screen to type is asking them to
+              * leave the thing they were reading in order to look something up
+              * about it.
               */}
-            <Link
+            <button
               className={styles.iconButton}
-              href="/research"
               aria-label={t('search')}
-              onClick={closeAll}
+              aria-expanded={searchOpen}
+              onClick={() => {
+                closeAll();
+                setSearchOpen(true);
+              }}
             >
               <Icon name="search" size={17} strokeWidth={2.2} />
-            </Link>
+            </button>
 
             {/* Signed in, the two anonymous CTAs give way to saved, notifications
                 and the avatar. */}
@@ -266,6 +272,20 @@ export function Header() {
       </div>
 
       {mpOpen && <div className={styles.scrim} onClick={closeAll} />}
+
+      {searchOpen && (
+        <>
+          <div className={styles.searchScrim} onClick={() => setSearchOpen(false)} />
+          <div
+            className={styles.searchPanel}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('search')}
+          >
+            <SearchForm autoFocus onNavigate={() => setSearchOpen(false)} />
+          </div>
+        </>
+      )}
     </>
   );
 }
