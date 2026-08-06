@@ -44,10 +44,11 @@ export default async function HomePage({ params }: Props) {
       <div className={styles.page}>
         <section className={styles.hero}>
           <div>
+            {/* Three words, one line — no break: at 62px "Explore. Analyze."
+                already fills the column, and a forced break would leave the
+                accent word stranded on its own row on a wide screen. */}
             <h1 className={styles.h1}>
-              Understand the market.
-              <br />
-              <span className={styles.h1Accent}>Know what to explore next.</span>
+              Explore. Analyze. <span className={styles.h1Accent}>Invest.</span>
             </h1>
             <p className={styles.heroSub}>
               TradingNew helps new investors cut through the noise, understand your options, and
