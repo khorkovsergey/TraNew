@@ -99,6 +99,7 @@ try {
       'src/lib/voyager/workspace/credits.ts',
       'src/content/wealthConnections.ts',
       'src/lib/start/path.ts',
+      'src/lib/start/plan.ts',
       'src/lib/academy/summary.ts',
       'src/lib/explore/answers.ts',
       'src/content/wealth.ts',
@@ -226,6 +227,7 @@ try {
   const credits = await load('credits', 'workspace');
   const wc = await load('wealthConnections', 'content');
   const start = await load('path', 'start');
+  const plan = await load('plan', 'start');
   const learn = await load('summary', 'academy');
   const answers = await load('answers', 'explore');
   const wealth = await load('wealth', 'content');
@@ -4784,6 +4786,224 @@ try {
 
     const answer = plan.modules.find((module) => module.title === 'The short answer');
     assert.equal(answer.data.body, answers.findAnswer(question).answer);
+  });
+
+  /* ========================= The plan a diagnostic makes ==================== */
+
+  group('Different answers produce visibly different plans');
+
+  const answersFor = (patch) => ({
+    knowledge: null,
+    priorities: [],
+    horizon: null,
+    learning: null,
+    ...patch,
+  });
+  const planFor = (patch) => plan.buildPlan(answersFor(patch));
+  const idsFor = (patch) => planFor(patch).map((step) => step.id);
+
+  check('a cautious beginner and a confident investor get different routes', () => {
+    /*
+     * The whole point of the journey. The old sidebar showed the same five rows
+     * whatever anybody answered, under a heading that called it theirs.
+     */
+    const cautious = idsFor({ knowledge: 'new', priorities: ['safety'], horizon: 'short' });
+    const confident = idsFor({ knowledge: 'investing', priorities: ['growth'], horizon: 'long' });
+
+    assert.notDeepEqual(cautious, confident);
+    assert.notEqual(cautious.length, confident.length);
+    assert.notEqual(cautious[0], confident[0]);
+  });
+
+  check('money needed within a year gets a reserve before anything else', () => {
+    assert.equal(idsFor({ horizon: 'short', priorities: ['growth'] })[0], 'reserve');
+    assert.equal(idsFor({ priorities: ['safety'] })[0], 'reserve');
+    assert.equal(idsFor({ priorities: ['cash'] })[0], 'reserve');
+  });
+
+  check('and a long horizon with a growth goal does not', () => {
+    assert.ok(!idsFor({ priorities: ['growth'], horizon: 'long' }).includes('reserve'));
+  });
+
+  check('somebody new gets the whole path, somebody experienced a refresher', () => {
+    assert.ok(idsFor({ knowledge: 'new' }).includes('basics-full'));
+    assert.ok(idsFor({ knowledge: 'investing' }).includes('basics-refresh'));
+    assert.ok(!idsFor({ knowledge: 'investing' }).includes('basics-full'));
+  });
+
+  check('and the refresher is honestly shorter', () => {
+    const full = planFor({ knowledge: 'new' }).find((step) => step.id === 'basics-full');
+    const refresh = planFor({ knowledge: 'investing' }).find((step) => step.id === 'basics-refresh');
+    assert.ok(full.minutes > refresh.minutes, `${full.minutes} vs ${refresh.minutes}`);
+  });
+
+  check('the comparison follows the goal', () => {
+    assert.ok(idsFor({ priorities: ['income'] }).includes('compare-income'));
+    assert.ok(idsFor({ priorities: ['growth'], horizon: 'long' }).includes('compare-growth'));
+    assert.ok(idsFor({ priorities: ['cash'] }).includes('compare-cash'));
+  });
+
+  check('exactly one comparison, whatever was chosen', () => {
+    // A plan that compares everything compares nothing.
+    for (const patch of [
+      {},
+      { priorities: ['growth', 'income'] },
+      { priorities: ['safety', 'cash'] },
+      { priorities: ['unsure'] },
+    ]) {
+      const comparisons = idsFor(patch).filter((id) => id.startsWith('compare'));
+      assert.equal(comparisons.length, 1, JSON.stringify(patch) + ' -> ' + comparisons.join(','));
+    }
+  });
+
+  check('practice and save are always the last two', () => {
+    for (const patch of [
+      {},
+      { knowledge: 'new', priorities: ['safety'], horizon: 'short' },
+      { knowledge: 'investing', priorities: ['growth'], horizon: 'long' },
+    ]) {
+      const ids = idsFor(patch);
+      assert.equal(ids[ids.length - 2], 'practice', JSON.stringify(patch));
+      assert.equal(ids[ids.length - 1], 'save', JSON.stringify(patch));
+    }
+  });
+
+  group('Every step says which answer produced it');
+
+  check('no step is ever without a reason', () => {
+    /*
+     * A personalised route that cannot say what personalised it is
+     * indistinguishable from a generic one with a better title. The check is
+     * mechanical rather than editorial: the builder cannot emit a step without
+     * a why.
+     */
+    for (const patch of [
+      {},
+      { knowledge: 'new', priorities: ['safety'], horizon: 'short' },
+      { knowledge: 'basics', priorities: ['income'], horizon: 'medium' },
+      { knowledge: 'investing', priorities: ['growth'], horizon: 'long' },
+      { priorities: ['unsure'], horizon: 'unsure' },
+    ]) {
+      for (const step of planFor(patch)) {
+        assert.ok(step.why && step.why.length > 25, `${step.id}: "${step.why}"`);
+      }
+    }
+  });
+
+  check('and the reason quotes the answer that was actually given', () => {
+    const safety = planFor({ priorities: ['safety'] })[0];
+    assert.match(safety.why, /you chose safety/i);
+
+    const short = planFor({ horizon: 'short', priorities: ['growth'] })[0];
+    assert.match(short.why, /under a year/i);
+
+    const income = planFor({ priorities: ['income'] }).find((step) => step.id === 'compare-income');
+    assert.match(income.why, /regular income/i);
+  });
+
+  check('nothing in a plan is a product, an amount or a ticker', () => {
+    /*
+     * Four questions cannot tell anybody what to buy. The test is for an
+     * instruction, not for the words: "forces you to sell something at the
+     * wrong moment" describes the harm a reserve prevents, and banning the verb
+     * outright would ban the explanation along with the advice.
+     */
+    const forbidden = /(buy|sell) (a|an|the|some)|(broker|ticker)|[0-9]+\s?%|[€$]/i;
+    for (const patch of [
+      {},
+      { priorities: ['growth'], horizon: 'long' },
+      { priorities: ['income'] },
+      { priorities: ['safety', 'cash'], horizon: 'short' },
+    ]) {
+      for (const step of planFor(patch)) {
+        assert.ok(!forbidden.test(`${step.title} ${step.text} ${step.why}`), `${step.id}`);
+      }
+    }
+  });
+
+  group('Risk comfort is inferred, and says so');
+
+  check('safety and a short horizon read as low', () => {
+    assert.equal(plan.riskComfortOf(answersFor({ priorities: ['safety'] })), 'low');
+    assert.equal(plan.riskComfortOf(answersFor({ horizon: 'short' })), 'low');
+  });
+
+  check('growth over a long horizon reads as high', () => {
+    assert.equal(
+      plan.riskComfortOf(answersFor({ priorities: ['growth'], horizon: 'long' })),
+      'high'
+    );
+  });
+
+  check('anything else is moderate', () => {
+    assert.equal(plan.riskComfortOf(answersFor({ priorities: ['unsure'] })), 'moderate');
+  });
+
+  check('the profile admits it was inferred rather than asked', () => {
+    /*
+     * Presenting a derived value as something the person told us, when they did
+     * not, is a small fabrication on a screen whose whole claim is that it
+     * followed their answers.
+     */
+    const row = plan
+      .profileOf(answersFor({ priorities: ['growth'], horizon: 'long' }))
+      .find((entry) => entry.label === 'Risk comfort');
+    assert.match(row.note, /inferred/i);
+  });
+
+  check('the simulator opens at the allocation the risk implies', () => {
+    const step = planFor({ priorities: ['growth'], horizon: 'long' }).find(
+      (entry) => entry.id === 'practice'
+    );
+    assert.equal(step.action.allocation, 'high');
+    assert.match(step.text, /growth-tilted/);
+  });
+
+  group('Progress survives an answer being changed');
+
+  check('a done step that is no longer in the plan stops counting', () => {
+    /*
+     * Editing an answer can remove a step. Carrying its id over would inflate
+     * the count against a plan that never contained it.
+     */
+    const cautious = planFor({ priorities: ['safety'], horizon: 'short' });
+    const confident = planFor({ priorities: ['growth'], horizon: 'long' });
+
+    const kept = plan.parseProgress(['reserve', 'practice'], confident);
+    assert.deepEqual(kept, ['practice']);
+    assert.deepEqual(plan.parseProgress(['reserve'], cautious), ['reserve']);
+  });
+
+  check('junk in the stored progress is discarded', () => {
+    const steps = planFor({});
+    assert.deepEqual(plan.parseProgress('not an array', steps), []);
+    assert.deepEqual(plan.parseProgress([1, null, 'nonsense'], steps), []);
+    assert.deepEqual(plan.parseProgress(['save', 'save'], steps), ['save']);
+  });
+
+  check('the next step is the first one outstanding', () => {
+    const steps = planFor({ knowledge: 'new', priorities: ['growth'], horizon: 'long' });
+    assert.equal(plan.nextStep(steps, []).id, steps[0].id);
+    assert.equal(plan.nextStep(steps, [steps[0].id]).id, steps[1].id);
+    assert.equal(plan.nextStep(steps, steps.map((step) => step.id)), null);
+  });
+
+  check('progress never reads 100% while a step is outstanding', () => {
+    const steps = planFor({});
+    const almost = steps.slice(0, steps.length - 1).map((step) => step.id);
+    assert.ok(plan.planProgress(steps, almost).percent < 100);
+    assert.equal(plan.planProgress(steps, steps.map((step) => step.id)).percent, 100);
+  });
+
+  group('How the answers shaped it, in one line each');
+
+  check('every answer given gets a line', () => {
+    const lines = plan.shapedBy(
+      answersFor({ knowledge: 'new', priorities: ['growth'], horizon: 'long', learning: 'reading' })
+    );
+    assert.ok(lines.length >= 4, lines.join(' | '));
+    assert.ok(lines.some((line) => /growth/i.test(line)));
+    assert.ok(lines.some((line) => /inferred, not asked/i.test(line)));
   });
 
   /* ============================ Superchart layouts ============================ */

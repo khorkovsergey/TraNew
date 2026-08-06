@@ -97,58 +97,61 @@ try {
     }
   });
 
-  group('The suggested path answers the questions');
+  group('The rail promises nothing until the answers are in');
 
-  await check('a short horizon puts a cash reserve first', async () => {
-    // Back to safety, then a horizon under a year: the reserve rule should fire
-    // and it should be visible on screen, not only in the unit test.
-    await option('Safety').click();
-    await continueButton().click();
-    await page.getByText('When might you need this money?').waitFor();
-    await option('Within a year').click();
-
-    const first = await page.locator('ol').last().locator('li').first().innerText();
-    if (!/cash reserve/i.test(first)) throw new Error(`first step was: ${first.split('\n')[0]}`);
+  await check('it says the path is still being built', async () => {
+    /*
+     * This panel used to render a finished five-step route from the moment the
+     * page loaded — the same five rows whatever anybody answered, under a
+     * heading that called it theirs. The route is its own page now and
+     * `verify-plan.mjs` drives it; what has to be true *here* is that nothing
+     * pretends to be personalised before it is.
+     */
+    const rail = await page.locator('aside').innerText();
+    if (!/being built/i.test(rail)) throw new Error(rail.split('\n')[0]);
   });
 
-  await check('the path never runs past five rows', async () => {
-    const rows = await page.locator('ol').last().locator('li').count();
-    if (rows > 5) throw new Error(`${rows} rows`);
-  });
-
-  await check('saving the plan is the last row', async () => {
-    const last = await page.locator('ol').last().locator('li').last().innerText();
-    if (!/save your plan/i.test(last)) throw new Error(`last step was: ${last.split('\n')[0]}`);
-  });
-
-  group('Saving is asked for at the end, and never as a gate');
-
-  await check('Save my plan is closed until every question is answered', async () => {
-    const save = page.getByRole('button', { name: /Save my plan/ }).first();
-    if (!(await save.isDisabled())) throw new Error('Save was open with a question outstanding');
-  });
-
-  await check('the last question opens it', async () => {
-    await continueButton().click();
-    await page.getByText('How do you want to learn?').waitFor();
-    await option('Short reads').click();
-
-    const save = page.getByRole('button', { name: /Save my plan/ }).first();
-    if (await save.isDisabled()) throw new Error('Save stayed closed with everything answered');
-  });
-
-  await check('Save my plan asks a guest to sign in rather than losing the answers', async () => {
-    await page.getByRole('button', { name: /Save my plan/ }).first().click();
-    await page.waitForTimeout(500);
-    const body = await page.locator('body').innerText();
-    if (!/sign in|log in|create an account|continue with/i.test(body)) {
-      throw new Error('nothing asked for an account');
+  await check('and names no step of a route that does not exist yet', async () => {
+    const rail = await page.locator('aside').innerText();
+    if (/cash reserve|beginner path|practice portfolio/i.test(rail)) {
+      throw new Error('a step was named before the answers were in');
     }
   });
 
-  await check('and the answers are still there behind it', async () => {
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
+  group('Through the remaining questions');
+
+  await check('the horizon question accepts an answer', async () => {
+    await continueButton().click();
+    await page.getByText('When might you need this money?').waitFor();
+    await option('Within a year').click();
+  });
+
+  await check('and the last one opens', async () => {
+    await continueButton().click();
+    await page.getByText('How do you want to learn?').waitFor();
+  });
+
+  group('The last step produces the result rather than asking for an account');
+
+  await check('the final button is closed until every question is answered', async () => {
+    const finish = page.getByRole('button', { name: 'See my plan' });
+    if (!(await finish.isDisabled())) throw new Error('it was open with a question outstanding');
+  });
+
+  await check('answering the last question opens it', async () => {
+    await option('Short reads').click();
+    const finish = page.getByRole('button', { name: 'See my plan' });
+    if (await finish.isDisabled()) throw new Error('it stayed closed');
+  });
+
+  await check('and it leads to the plan, not to a sign-up prompt', async () => {
+    await page.getByRole('button', { name: 'See my plan' }).click();
+    await page.waitForURL(/\/start\/plan/, { timeout: 8000 });
+  });
+
+  await check('the answers are still there behind it', async () => {
+    await page.goBack();
+    await page.waitForTimeout(500);
     const checked = await page.locator('[role="radio"][aria-checked="true"]').count();
     if (checked !== 1) throw new Error('the last answer was lost');
   });
@@ -165,10 +168,6 @@ try {
     if (checked !== 1) throw new Error(`${checked} answers restored on step 4`);
   });
 
-  await check('and the suggested path was rebuilt from them', async () => {
-    const first = await page.locator('ol').last().locator('li').first().innerText();
-    if (!/cash reserve/i.test(first)) throw new Error(`first step was: ${first.split('\n')[0]}`);
-  });
 
   group('A corrupt draft is discarded, not half-restored');
 

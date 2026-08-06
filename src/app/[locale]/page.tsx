@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { AskVoyager } from '@/components/home/AskVoyager';
+import { IntentCards } from '@/components/home/IntentCards';
 import { SpaceBackdrop } from '@/components/shell/SpaceBackdrop';
 import { Icon } from '@/components/ui/Icon';
-import { INTENT_CARDS, PATH_STEPS, TODAY_CARDS, TODAY_INDEX, TRUST_ITEMS } from '@/content/homeV2';
+import { PATH_STEPS, TODAY_CARDS, TODAY_INDEX, TRUST_ITEMS } from '@/content/homeV2';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
@@ -44,9 +45,9 @@ export default async function HomePage({ params }: Props) {
         <section className={styles.hero}>
           <div>
             <h1 className={styles.h1}>
-              Make sense of
+              Understand the market.
               <br />
-              money and <span className={styles.h1Accent}>investing</span>
+              <span className={styles.h1Accent}>Know what to explore next.</span>
             </h1>
             <p className={styles.heroSub}>
               TradingNew helps new investors cut through the noise, understand your options, and
@@ -71,40 +72,14 @@ export default async function HomePage({ params }: Props) {
         <section className={styles.section}>
           <h2 className={styles.h2}>What brings you here today?</h2>
 
-          <div className={styles.intentGrid}>
-            {INTENT_CARDS.map((card) => (
-              <Link
-                key={card.id}
-                className={styles.intentCard}
-                href={{ pathname: card.href, params: card.params } as never}
-                /*
-                 * A grid of options is not a path anybody is about to take —
-                 * they will follow at most one of these. Prefetching all of them
-                 * spends the network on the five that will not be opened.
-                 */
-                prefetch={false}
-              >
-                <Icon
-                  name={card.icon}
-                  size={26}
-                  strokeWidth={1.8}
-                  className={styles[`accent_${card.accent}`]}
-                />
-                <div className={styles.intentTitle}>{card.title}</div>
-                <div className={styles.intentBody}>{card.body}</div>
-                <span className={styles.intentGo} aria-hidden="true">
-                  <Icon name="chevronRight" size={13} strokeWidth={2.4} />
-                </span>
-              </Link>
-            ))}
-          </div>
+          <IntentCards />
         </section>
 
         <section className={styles.section}>
           <div className={styles.sectionHead}>
             <h2 className={styles.h2}>
               Today in 3 minutes
-              <span className={styles.h2Sub}>Short, clear, and beginner-friendly.</span>
+              <span className={styles.h2Sub}>Short, clear, and focused on what matters.</span>
             </h2>
             <Link className={styles.sectionLink} href="/markets/global">
               View market snapshot

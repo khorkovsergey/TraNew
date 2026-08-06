@@ -702,3 +702,46 @@
     padding: 2px 0;
   }
 }
+
+/* ---- The rail teaser ----
+ *
+ * This panel used to render a finished five-step path from the moment the page
+ * loaded — the same five steps whatever anybody answered, under a heading that
+ * called it theirs. It shows the shape of the answer now: four bars that fill
+ * as the questions are answered, and nothing that pretends to be a route.
+ */
+
+.teaserList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.teaserRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--tn-text-faint);
+}
+
+.teaserBar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--tn-border-hairline);
+}
+
+.teaserRowOn {
+  color: var(--tn-text-body);
+}
+
+.teaserRowOn .teaserBar {
+  background: var(--tn-progress);
+}
+
+.teaserLabel {
+  min-width: 0;
+}

@@ -125,6 +125,15 @@ export const routing = defineRouting({
 
     // Value-first entry point for anonymous visitors (never a pricing page).
     '/start': '/start',
+    /*
+     * The plan a diagnostic produced. Its own route rather than a state inside
+     * the wizard: the result is a thing to come back to, share a link to and
+     * land on after signing up, and none of that works if it only exists as the
+     * last screen of a form.
+     */
+    '/start/plan': '/start/plan',
+    /* The guest's temporary workspace. Signed-in visitors are sent to theirs. */
+    '/workspace': '/workspace',
 
     // Info pages
     '/why': '/why-tradingnew',

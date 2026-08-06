@@ -53,7 +53,27 @@ export type AnalyticsEvent =
   | { name: 'superchart_undo'; source: 'keyboard' | 'button' | 'toast' }
   | { name: 'superchart_script_generated'; studies: number }
   | { name: 'superchart_script_exported' }
-  | { name: 'superchart_preview_run'; outcome: 'ok' | 'failed' | 'unavailable'; plots: number };
+  | { name: 'superchart_preview_run'; outcome: 'ok' | 'failed' | 'unavailable'; plots: number }
+  /*
+   * The starting-plan funnel. Counts and shapes only: which goal somebody chose
+   * is a fact about their money, and the product's questions of this data —
+   * where people stop, whether a personalised route gets further than a generic
+   * one — are all answerable from step counts.
+   */
+  | { name: 'intent_selected'; intent: string }
+  | { name: 'diagnostic_completed'; steps: number }
+  | { name: 'plan_generated'; steps: number; risk: string }
+  | { name: 'plan_step_started'; stepId: string; index: number }
+  | { name: 'plan_step_completed'; stepId: string; ofSteps: number }
+  | { name: 'save_prompt_viewed'; surface: string }
+  /*
+   * `registration_completed_from_plan` belongs here and is not declared yet.
+   * Migrating a guest draft into an account on sign-up is not built — see the
+   * journey notes — and an event that promises to measure a step nobody has
+   * written reads later as "nobody registers from the plan" rather than "the
+   * step does not exist". It arrives with the migration.
+   */
+  | { name: 'plan_resumed'; surface: string; completed: number; ofSteps: number };
 
 export interface AnalyticsSink {
   track(event: AnalyticsEvent): void;

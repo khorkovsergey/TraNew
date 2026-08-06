@@ -14,12 +14,14 @@ import {
   type WizardOption,
 } from '@/content/startWizard';
 import { useRouter } from '@/i18n/navigation';
+import { track } from '@/lib/events/analytics';
 import {
   draftServerSnapshot,
   draftSnapshot,
-  setDraft,
+  setAnswers,
   subscribeDraft,
 } from '@/lib/start/draftStore';
+import { riskComfortOf } from '@/lib/start/plan';
 import {
   MAX_PRIORITIES,
   firstUnanswered,
@@ -51,7 +53,8 @@ export function StartWizard() {
   const router = useRouter();
   const { openLogin, authed } = useLoginModal();
 
-  const answers = useSyncExternalStore(subscribeDraft, draftSnapshot, draftServerSnapshot);
+  const state = useSyncExternalStore(subscribeDraft, draftSnapshot, draftServerSnapshot);
+  const answers = state.answers;
 
   /*
    * Which step is on screen.
@@ -65,25 +68,28 @@ export function StartWizard() {
   const step = pinned ?? firstUnanswered(answers);
   const [saved, setSaved] = useState(false);
 
-  const path = useMemo(() => suggestPath(answers), [answers]);
   const complete = isComplete(answers);
 
   const update = useCallback(
     (patch: Partial<StartAnswers>, atStep: number) => {
       setPinned(atStep);
-      setDraft({ ...answers, ...patch });
+      setAnswers({ ...answers, ...patch });
     },
     [answers]
   );
 
-  const save = () => {
-    if (!authed) {
-      // The one place an account is asked for, and only to keep something.
-      openLogin();
-      return;
-    }
-    setSaved(true);
-    router.push('/strategy');
+  /*
+   * The last Continue does not save anything — it produces the result.
+   *
+   * The plan used to be a sidebar beside the questions, which meant the
+   * personalised thing appeared before the answers that personalise it and had
+   * to be generic until they arrived. It is its own screen now, and this is the
+   * only way to it.
+   */
+  const finish = () => {
+    track({ name: 'diagnostic_completed', steps: STEP_META.length });
+    track({ name: 'plan_generated', steps: 0, risk: riskComfortOf(answers) });
+    router.push('/start/plan');
   };
 
   const progress = Math.round(((step + 1) / STEP_META.length) * 100);
@@ -227,8 +233,8 @@ export function StartWizard() {
                     <Icon name="arrowRight" size={16} strokeWidth={2.4} />
                   </button>
                 ) : (
-                  <button className={styles.continue} disabled={!complete} onClick={save}>
-                    Save my plan
+                  <button className={styles.continue} disabled={!complete} onClick={finish}>
+                    See my plan
                     <Icon name="arrowRight" size={16} strokeWidth={2.4} />
                   </button>
                 )}
@@ -275,45 +281,43 @@ export function StartWizard() {
 
           <div className={styles.railHead}>
             <Icon name="sparkle" size={19} strokeWidth={2} className={styles.accent_cyan} />
-            <span className={styles.railHeading}>Your suggested starting path</span>
+            <span className={styles.railHeading}>Your path is being built</span>
           </div>
+
+          {/*
+            * A teaser, not a route.
+            *
+            * This panel used to render a finished five-step path from the first
+            * moment the screen loaded — the same five steps whatever anybody
+            * answered, under a heading that called it theirs. Showing the shape
+            * of the answer while the questions are still being answered is the
+            * honest version: something is coming, and it is not written yet.
+            */}
           <p className={styles.railLead}>
-            {complete
-              ? 'Based on your answers. It orders what to learn — it does not tell you what to buy.'
-              : 'This updates as you answer. It orders what to learn — it does not tell you what to buy.'}
+            Each answer changes it. Nothing is decided until all four are in, so there is nothing
+            here to read yet.
           </p>
 
-          <ol className={styles.pathList}>
-            {path.map((entry, index) => (
-              <li key={entry.id} className={styles.pathRow}>
-                <span className={styles.pathText}>
-                  <span className={styles.pathTitle}>{entry.title}</span>
-                  <span className={styles.pathBody}>{entry.text}</span>
-                </span>
-                <span className={`${styles.pathNumber} ${styles[`num_${entry.accent}`]}`}>
-                  {index + 1}
-                </span>
-              </li>
-            ))}
+          <ol className={styles.teaserList}>
+            {STEP_META.map((meta, index) => {
+              const answeredHere = index < step || (index === step && answered(answers, index));
+              return (
+                <li
+                  key={meta.number}
+                  className={`${styles.teaserRow} ${answeredHere ? styles.teaserRowOn : ''}`}
+                >
+                  <span className={styles.teaserBar} aria-hidden="true" />
+                  <span className={styles.teaserLabel}>
+                    {answeredHere ? meta.title : 'Waiting on your answer'}
+                  </span>
+                </li>
+              );
+            })}
           </ol>
-
-          <button className={styles.savePlan} disabled={!complete} onClick={save}>
-            {saved ? 'Saved' : 'Save my plan'}
-            <Icon name="bookmark" size={16} strokeWidth={2.2} />
-          </button>
-
-          <button
-            className={styles.withoutAccount}
-            onClick={() => router.push(answers.learning === 'practice' ? '/portfolio' : '/academy')}
-          >
-            Continue without an account
-          </button>
 
           <div className={styles.railNote}>
             <Icon name="lock" size={14} strokeWidth={2} />
-            {complete
-              ? 'Your answers are in this browser only. Saving keeps them to your account.'
-              : 'Answer all four questions to save this path.'}
+            Your answers stay in this browser. Saving is the last step, not the first.
           </div>
         </aside>
       </div>

@@ -1,0 +1,249 @@
+/* The guest's temporary workspace. */
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px var(--tn-page-pad) 56px;
+}
+
+/*
+ * The banner does not dismiss and does not time out. "Stored in this browser
+ * only" is the one fact about this screen somebody otherwise discovers by
+ * losing something.
+ */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border: 1px solid var(--tn-amber-border);
+  border-radius: 12px;
+  background: var(--tn-amber-tint);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tn-text-body);
+}
+
+.banner > :first-child {
+  flex-shrink: 0;
+  color: var(--tn-amber-text);
+}
+
+.banner span {
+  flex: 1;
+  min-width: 240px;
+}
+
+.banner b {
+  color: var(--tn-text);
+}
+
+.bannerCta {
+  flex-shrink: 0;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--tn-border-control);
+  background: var(--tn-surface);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-fast);
+}
+
+.bannerCta:hover {
+  border-color: var(--tn-border-hover);
+}
+
+.h1 {
+  margin: 28px 0 0;
+  font-size: clamp(28px, 3.2vw, 40px);
+  font-weight: 800;
+  letter-spacing: -1.3px;
+}
+
+.resume {
+  margin-top: 20px;
+  padding: 22px 24px;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: 16px;
+}
+
+.resumeHead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.resumeIcon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tn-mint-tint);
+  border: 1px solid var(--tn-mint-border);
+  color: var(--tn-mint);
+}
+
+.resumeTitle {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.resumeSub {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--tn-text-soft);
+}
+
+.resumeCount {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-text-secondary);
+  white-space: nowrap;
+}
+
+.progressTrack {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--tn-border-hairline);
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--tn-progress);
+  transition: width var(--tn-transition-slow);
+}
+
+/* The one level-1 action on this screen. */
+.resumeCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 13px 24px;
+  border-radius: 12px;
+  background: var(--tn-cta);
+  color: var(--tn-cta-text);
+  font-size: 14.5px;
+  font-weight: 800;
+  transition: filter var(--tn-transition-fast);
+}
+
+.resumeCta:hover {
+  filter: brightness(1.08);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.cardIcon {
+  color: var(--tn-icon);
+}
+
+.cardTitle {
+  margin-top: 12px;
+  font-size: 15.5px;
+  font-weight: 800;
+}
+
+.cardBody {
+  flex: 1;
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tn-text-soft);
+}
+
+.cardCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-blue);
+}
+
+.cardCta:hover {
+  color: var(--tn-blue-hover);
+}
+
+.saveBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+  padding: 22px 24px;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: 16px;
+}
+
+.saveTitle {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.saveText {
+  margin: 6px 0 0;
+  max-width: 620px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--tn-text-soft);
+}
+
+.saveCta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 24px;
+  border-radius: 12px;
+  background: var(--tn-cta-blue);
+  color: #fff;
+  font-size: 14.5px;
+  font-weight: 800;
+  transition: filter var(--tn-transition-fast);
+}
+
+.saveCta:hover {
+  filter: brightness(1.1);
+}
+
+@media (max-width: 1000px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
