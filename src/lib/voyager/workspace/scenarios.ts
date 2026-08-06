@@ -31,7 +31,7 @@ import {
 const NOW = '2026-08-03T09:15:00Z';
 
 /** Routed on keywords, as the prototype does. Narrow and honest about it. */
-export function scenarioFor(question: string): string {
+export function scenarioFor(question: string): string | null {
   const q = question.toLowerCase();
 
   /*
@@ -97,7 +97,19 @@ export function scenarioFor(question: string): string {
     return 'explain';
   }
 
-  return 'market';
+  /*
+   * The market summary is no longer the fallback.
+   *
+   * It used to be, and that is how "What can you help me with?" was answered
+   * with where the S&P closed: a question none of the eleven scripted analyses
+   * recognised got the one that happened to sit at the end of the list. A
+   * dashboard is an answer to a question about the market, not a shrug.
+   *
+   * `null` means "no built analysis covers this" — the caller asks the model.
+   */
+  if (has('market', 'markets', 'today', 'session', 'indices', 'sectors')) return 'market';
+
+  return null;
 }
 
 
@@ -512,6 +524,7 @@ export const SCENARIO_IDS = [...Object.keys(SCENARIOS), 'explain'];
 /** The raw response for a question, or null where the scenario is not written yet. */
 export function responseFor(question: string): unknown | null {
   const id = scenarioFor(question);
+  if (!id) return null;
   // The explanation depends on which concept was named, so it is built rather
   // than looked up. Everything else is one fixed response per scenario.
   if (id === 'explain') return explainFor(question);

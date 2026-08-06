@@ -3654,6 +3654,24 @@ try {
     assert.equal(scenarios.scenarioFor('Explain diversification'), 'explain');
   });
 
+  check('a question no built analysis covers goes to the model, not to a dashboard', () => {
+    /*
+     * The reported bug, as an assertion. The market summary used to sit at the
+     * end of the router as the fallback, so "What can you help me with?" was
+     * answered with where the S&P closed. `null` means "ask the model" — a
+     * dashboard is an answer to a question about the market, not a shrug.
+     */
+    for (const question of [
+      'What can you help me with?',
+      'Who built this?',
+      'Should I worry about my mortgage?',
+      'hello',
+    ]) {
+      assert.equal(scenarios.scenarioFor(question), null, question);
+      assert.equal(scenarios.responseFor(question), null, question);
+    }
+  });
+
   check('and asking about today still gets today', () => {
     // The educational branch runs first, so it has to be narrow enough not to
     // swallow the questions the other scenarios exist for.

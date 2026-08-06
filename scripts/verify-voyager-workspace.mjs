@@ -790,12 +790,23 @@ try {
   await page.waitForTimeout(3000);
 
   /*
-   * Everything routes somewhere, and the fallback is the market summary. What
-   * this checks is that the fallback is honest about what it answered rather
-   * than pretending the question was understood.
+   * The market summary is no longer the fallback, and this is where that is
+   * held. It used to be: a question none of the scripted analyses recognised
+   * got the one at the end of the list, so "Book me a flight to Lisbon" was
+   * answered with where the S&P closed. A dashboard answers a question about
+   * the market; it is not a shrug.
    */
   const canvasAfter = await page.locator('main[aria-label="Canvas"]').innerText();
-  check('the fallback answers the market question it can answer', /US market/.test(canvasAfter));
+  check(
+    'an off-topic question does not get the market dashboard',
+    !/Where the US market closed/.test(canvasAfter),
+    canvasAfter.slice(0, 80)
+  );
+  check(
+    'it goes to the model, and the question is repeated back',
+    /You asked/.test(canvasAfter) && /Lisbon/.test(canvasAfter),
+    canvasAfter.slice(0, 80)
+  );
   check('and still cites its sources', (await page.locator('[class*="sourceList"] li').count()) > 0);
 
   await page.close();

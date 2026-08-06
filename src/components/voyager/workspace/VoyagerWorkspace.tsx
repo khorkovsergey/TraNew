@@ -11,7 +11,10 @@ import {
   type Briefing,
 } from '@/lib/voyager/workspace/landing';
 import { takeDraft } from '@/components/voyager/AskEntry';
+import { GENERIC_CONTEXT } from '@/lib/voyager/context';
 import { contextLabel, parseContext } from '@/lib/voyager/session';
+import type { VoyagerAnswer } from '@/lib/voyager/types';
+import { conversationalPlan, failurePlan } from '@/lib/voyager/workspace/conversational';
 import { parsePlan, type VoyagerModule, type VoyagerPlan } from '@/lib/voyager/workspace/contract';
 import {
   advance,
@@ -162,6 +165,10 @@ export function VoyagerWorkspace({
   // The seeded question counts as asked; it produced an answer.
   const [asked, setAsked] = useState(opening ? 1 : 0);
   const [ctaDismissed, setCtaDismissed] = useState(false);
+  /** Waiting on the model. The canvas says so rather than showing an empty plan. */
+  const [asking, setAsking] = useState(false);
+  /** The request already sent to the model, so it is never sent twice. */
+  const askingRef = useRef<string | null>(null);
   const [modal, setModal] = useState<'signup' | 'plans' | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
 
@@ -176,6 +183,31 @@ export function VoyagerWorkspace({
   const [briefing] = useState<Briefing | null>(() =>
     personName ? briefingFor(personName, new Date().getHours()) : null
   );
+
+  /**
+   * One call to the API the widget already uses. History is not sent yet — the
+   * canvas keeps a plan rather than a transcript, and inventing turns to fill
+   * the field would tell the model a conversation happened that did not.
+   */
+  const askModel = useCallback(async (question: string) => {
+    const response = await fetch('/api/voyager', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        question,
+        context: GENERIC_CONTEXT,
+        disabledSources: [],
+        history: [],
+      }),
+    });
+
+    if (!response.ok) throw new Error(`voyager ${response.status}`);
+
+    const payload = (await response.json()) as { answer?: VoyagerAnswer };
+    if (!payload.answer?.text) throw new Error('empty answer');
+
+    return conversationalPlan(question, payload.answer, new Date().toISOString());
+  }, []);
 
   const send = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -233,6 +265,38 @@ export function VoyagerWorkspace({
    * Splitting them is what lets the sequence be tested without waiting: the
    * component decides when to step, the module decides what stepping means.
    */
+  /*
+   * A request with no built analysis behind it goes to the model.
+   *
+   * An effect rather than a branch inside `send`, because a question can also
+   * arrive already asked — from the home page, a chip, or a link with `?q=` —
+   * and that path builds its opening state in an initialiser and never passes
+   * through `send` at all. Both routes end here.
+   */
+  useEffect(() => {
+    if (stage !== 'requested' || plan || !request) return;
+    /*
+     * The guard is a ref, not state.
+     *
+     * With `asking` in the dependency array, setting it re-ran the effect, and
+     * the cleanup from the previous run cancelled the request that had just
+     * been sent — the fetch completed and its answer was thrown away, so the
+     * canvas sat empty forever. A ref changes without re-running anything.
+     */
+    if (askingRef.current === request) return;
+    askingRef.current = request;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAsking(true);
+
+    askModel(request)
+      .then((next) => setPlan(parsePlan(next)?.plan ?? null))
+      .catch(() =>
+        setPlan(parsePlan(failurePlan(request, new Date().toISOString()))?.plan ?? null)
+      )
+      .finally(() => setAsking(false));
+  }, [stage, plan, request, askModel]);
+
   /*
    * The library, restored once. Through the parser, like everything else read
    * back out of a browser.
@@ -425,6 +489,17 @@ export function VoyagerWorkspace({
                 <Icon name="arrowRight" size={15} />
               </button>
             </form>
+
+            {/*
+              * Waiting on the model, said rather than left blank. An empty
+              * canvas during a real request is indistinguishable from one that
+              * failed.
+              */}
+            {asking && !plan && (
+              <p className={styles.contextLine} role="status">
+                Asking Voyager…
+              </p>
+            )}
 
             {plan ? (
               <>
