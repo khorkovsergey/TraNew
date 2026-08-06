@@ -52,9 +52,16 @@ export const INTENT_CARDS: IntentCard[] = [
     id: 'markets',
     icon: 'bars',
     accent: 'blue',
-    title: 'I want to understand markets',
-    body: "Make sense of what's happening today.",
-    href: '/markets/global',
+    /*
+     * The one card here that names a place rather than an intent. It goes to
+     * Explore, which is where markets, symbols and economy now live, and the
+     * subtitle lists them by their old names — somebody looking for "Symbols"
+     * should recognise it from the home page rather than have to open a menu to
+     * find out which section absorbed it.
+     */
+    title: 'Research',
+    body: 'Markets, symbols, economy.',
+    href: '/explore',
   },
   {
     id: 'practice',
