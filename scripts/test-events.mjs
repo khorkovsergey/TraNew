@@ -98,6 +98,7 @@ try {
       'src/lib/voyager/workspace/scopes.ts',
       'src/lib/voyager/workspace/credits.ts',
       'src/content/wealthConnections.ts',
+      'src/lib/start/path.ts',
       'src/content/wealth.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
@@ -222,6 +223,7 @@ try {
   const scopes = await load('scopes', 'workspace');
   const credits = await load('credits', 'workspace');
   const wc = await load('wealthConnections', 'content');
+  const start = await load('path', 'start');
   const wealth = await load('wealth', 'content');
   const wave = await load('wave');
 
@@ -4373,6 +4375,178 @@ try {
     assert.equal(wealth.formatWealth(172_000), '€172K');
     assert.equal(wealth.formatWealth(3_050), '€3,050');
     assert.equal(wealth.formatWealth(-430_000), '−€430K');
+  });
+
+  /* ============================ Start Investing ============================= */
+
+  group('What the wizard suggests, and what it refuses to');
+
+  const answersOf = (patch) => ({
+    knowledge: null,
+    priorities: [],
+    horizon: null,
+    learning: null,
+    ...patch,
+  });
+  const idsOf = (patch) => start.suggestPath(answersOf(patch)).map((step) => step.id);
+
+  check('money that may be needed within a year gets a cash reserve first', () => {
+    /*
+     * The single most common way a beginner is hurt: investing money they need
+     * next year. No other suggestion is worth making before that one, so it is
+     * the first rule and it is checked first.
+     */
+    assert.equal(idsOf({ horizon: 'short', priorities: ['growth'] })[0], 'reserve');
+    assert.equal(idsOf({ priorities: ['safety'] })[0], 'reserve');
+    assert.equal(idsOf({ priorities: ['cash'] })[0], 'reserve');
+  });
+
+  check('someone already investing is not sent back to the basics', () => {
+    assert.ok(!idsOf({ knowledge: 'investing', priorities: ['growth'] }).includes('basics'));
+    assert.ok(idsOf({ knowledge: 'basics', priorities: ['growth'] }).includes('basics'));
+  });
+
+  check('safety is answered with its own cost, not only with reassurance', () => {
+    // A reserve is right and it loses to inflation. Saying the first without the
+    // second is the comfortable half of the truth.
+    assert.ok(idsOf({ priorities: ['safety'] }).includes('inflation'));
+  });
+
+  check('the comparison follows the priorities', () => {
+    assert.ok(idsOf({ priorities: ['income'] }).includes('compare-income'));
+    assert.ok(idsOf({ priorities: ['growth'] }).includes('compare-growth'));
+    assert.ok(idsOf({ priorities: ['safety'] }).includes('compare-safe'));
+  });
+
+  check('an empty answer set still produces something to compare', () => {
+    assert.ok(idsOf({}).some((id) => id.startsWith('compare')));
+  });
+
+  check('saving the plan is always the last row', () => {
+    for (const patch of [
+      {},
+      { priorities: ['safety', 'income'], horizon: 'short', knowledge: 'new', learning: 'practice' },
+      { knowledge: 'investing', priorities: ['growth'], horizon: 'long' },
+    ]) {
+      const ids = idsOf(patch);
+      assert.equal(ids[ids.length - 1], 'plan', JSON.stringify(patch));
+    }
+  });
+
+  check('the path never runs past five rows', () => {
+    // Long enough to be a plan, short enough to start today. The worst case is
+    // every rule firing at once.
+    const ids = idsOf({
+      knowledge: 'new',
+      priorities: ['safety', 'income'],
+      horizon: 'short',
+      learning: 'practice',
+    });
+    assert.ok(ids.length <= start.PATH_LIMIT, 'got ' + ids.length);
+    assert.equal(ids[ids.length - 1], 'plan');
+  });
+
+  check('no row is ever repeated', () => {
+    const ids = idsOf({ priorities: ['safety', 'cash'], horizon: 'short' });
+    assert.equal(new Set(ids).size, ids.length);
+  });
+
+  check('nothing suggested is a product, an amount or a ticker', () => {
+    /*
+     * The line this screen must not cross. Four questions cannot tell anybody
+     * what to do with their money, and a step that named an instrument would be
+     * advice wearing the clothes of a lesson.
+     */
+    const forbidden = /\b(buy|sell|broker|ticker)\b|[0-9]+\s?%|[0-9]/i;
+    for (const patch of [
+      {},
+      { priorities: ['growth'], horizon: 'long' },
+      { priorities: ['income'] },
+      { priorities: ['safety', 'cash'], horizon: 'short' },
+    ]) {
+      for (const step of start.suggestPath(answersOf(patch))) {
+        assert.ok(!forbidden.test(step.title + ' ' + step.text), step.id + ': ' + step.text);
+      }
+    }
+  });
+
+  group('Choosing two priorities');
+
+  check('a third choice replaces the oldest rather than being ignored', () => {
+    // A limit that silently swallows a click reads as a broken button.
+    assert.deepEqual(start.togglePriority(['safety', 'growth'], 'income'), ['growth', 'income']);
+  });
+
+  check('choosing the same one again clears it', () => {
+    assert.deepEqual(start.togglePriority(['safety', 'growth'], 'safety'), ['growth']);
+  });
+
+  check('two is the cap, whatever order they arrive in', () => {
+    let picked = [];
+    for (const key of ['safety', 'growth', 'income', 'cash', 'unsure']) {
+      picked = start.togglePriority(picked, key);
+      assert.ok(picked.length <= start.MAX_PRIORITIES);
+    }
+    assert.deepEqual(picked, ['cash', 'unsure']);
+  });
+
+  group('A draft is parsed, not trusted');
+
+  check('a well-formed draft round-trips', () => {
+    const draft = {
+      knowledge: 'basics',
+      priorities: ['growth', 'income'],
+      horizon: 'long',
+      learning: 'reading',
+    };
+    assert.deepEqual(start.parseDraft(draft), draft);
+  });
+
+  check('an unknown value discards the whole draft, not just that field', () => {
+    /*
+     * A half-restored draft would put somebody on step four holding answers they
+     * never gave — worse than starting over, because it looks like their own.
+     */
+    assert.equal(start.parseDraft({ knowledge: 'expert' }), null);
+    assert.equal(start.parseDraft({ priorities: ['gambling'] }), null);
+    assert.equal(start.parseDraft({ horizon: 'forever' }), null);
+  });
+
+  check('more than two priorities is refused', () => {
+    assert.equal(start.parseDraft({ priorities: ['safety', 'growth', 'income'] }), null);
+  });
+
+  check('junk is refused rather than coerced', () => {
+    for (const raw of [null, 'a string', 42, { priorities: 'growth' }]) {
+      assert.equal(start.parseDraft(raw), null, JSON.stringify(raw));
+    }
+  });
+
+  check('an empty draft is a valid empty draft', () => {
+    assert.deepEqual(start.parseDraft({}), start.EMPTY_ANSWERS);
+  });
+
+  check('a returning visitor opens on their first unanswered question', () => {
+    assert.equal(start.firstUnanswered(start.EMPTY_ANSWERS), 0);
+    assert.equal(start.firstUnanswered(answersOf({ knowledge: 'new' })), 1);
+    assert.equal(start.firstUnanswered(answersOf({ knowledge: 'new', priorities: ['growth'] })), 2);
+    assert.equal(
+      start.firstUnanswered(
+        answersOf({ knowledge: 'new', priorities: ['growth'], horizon: 'long' })
+      ),
+      3
+    );
+  });
+
+  check('a finished draft stays on the last step rather than falling off the end', () => {
+    const done = answersOf({
+      knowledge: 'new',
+      priorities: ['growth'],
+      horizon: 'long',
+      learning: 'reading',
+    });
+    assert.equal(start.firstUnanswered(done), 3);
+    assert.ok(start.isComplete(done));
   });
 
   /* ============================ Superchart layouts ============================ */

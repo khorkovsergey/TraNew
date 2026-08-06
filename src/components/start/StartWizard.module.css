@@ -1,0 +1,696 @@
+/*
+ * Start Investing.
+ *
+ * The layout is the handoff's: wizard on the left, the suggested path pinned on
+ * the right where it stays visible while the questions are answered. That
+ * placement is the argument for the screen — the result exists before the
+ * account does, and it visibly changes as the questions are answered.
+ */
+
+.page {
+  max-width: var(--tn-page-max);
+  margin: 0 auto;
+  padding: 36px var(--tn-page-pad) 24px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 26px;
+  align-items: start;
+}
+
+.main {
+  min-width: 0;
+}
+
+/* ---- Head ---- */
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.h1 {
+  margin: 0;
+  font-size: clamp(30px, 3.2vw, 42px);
+  font-weight: 800;
+  letter-spacing: -1.4px;
+  line-height: 1.12;
+}
+
+.accentText {
+  background: var(--tn-gradient-headline);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.lead {
+  margin: 12px 0 0;
+  font-size: 15px;
+  color: var(--tn-text-secondary);
+  max-width: 440px;
+}
+
+.progressBlock {
+  min-width: 220px;
+  flex-shrink: 0;
+  padding-bottom: 6px;
+}
+
+.progressLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.progressPercent {
+  color: var(--tn-text-secondary);
+}
+
+.progressTrack {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--tn-border-hairline);
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--tn-gradient-progress);
+  transition: width var(--tn-transition-slow);
+}
+
+/* ---- The wizard card ---- */
+
+.card {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  margin-top: 24px;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.rail {
+  border-right: 1px solid var(--tn-border-hairline);
+  padding: 26px 22px;
+}
+
+.railItem {
+  display: flex;
+  gap: 14px;
+}
+
+.railGutter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.railDot {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  border: 1.5px solid;
+}
+
+.railDot:disabled {
+  cursor: default;
+}
+
+.dot_done {
+  background: var(--tn-mint-tint);
+  border-color: var(--tn-mint);
+  color: var(--tn-mint);
+}
+
+.dot_current {
+  background: #0b1a26;
+  border-color: var(--tn-mint);
+  color: var(--tn-mint);
+  box-shadow: 0 0 12px rgba(46, 230, 168, 0.35);
+}
+
+.dot_todo {
+  background: var(--tn-surface-inner);
+  border-color: #24303e;
+  color: var(--tn-text-muted);
+}
+
+.railLine {
+  flex: 1;
+  width: 0;
+  border-left: 2px dashed #1d3a4a;
+  margin: 6px 0;
+  min-height: 26px;
+}
+
+.railText,
+.railTextCurrent {
+  padding-bottom: 18px;
+  flex: 1;
+  min-width: 0;
+}
+
+.railTextCurrent {
+  background: #0b141f;
+  border: 1px solid #1a2836;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+}
+
+.railTitle {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+
+.railSub {
+  font-size: 12px;
+  color: var(--tn-text-muted);
+  margin-top: 3px;
+}
+
+/* ---- Questions ---- */
+
+.questionPane {
+  padding: 28px 30px;
+}
+
+.questionHeading {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+.questionHint {
+  font-size: 13.5px;
+  color: var(--tn-text-soft);
+  margin-top: 4px;
+}
+
+.optionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.option {
+  display: block;
+  text-align: left;
+  border-radius: var(--tn-radius-card);
+  padding: 18px 18px 20px;
+  background: var(--tn-surface-inner);
+  border: 1.5px solid var(--tn-border-inner);
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-fast), background var(--tn-transition-fast);
+}
+
+.option:hover {
+  border-color: var(--tn-border-hover);
+}
+
+/*
+ * Selection is a border, a tint, a glow *and* a tick. Three of the four are
+ * colour; the tick is the one that still works when colour does not.
+ */
+.optionOn {
+  background: rgba(16, 201, 143, 0.07);
+  border-color: var(--tn-mint);
+  box-shadow: var(--tn-mint-glow);
+}
+
+.optionTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tick {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #2b3948;
+}
+
+.tickOn {
+  background: var(--tn-mint);
+  border-color: transparent;
+  color: var(--tn-gradient-cta-text);
+}
+
+.optionTitle {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  margin-top: 16px;
+}
+
+.optionText {
+  display: block;
+  font-size: 12.5px;
+  color: var(--tn-text-soft);
+  margin-top: 5px;
+  line-height: 1.5;
+}
+
+.optionSwap {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-amber-text);
+  margin-top: 8px;
+}
+
+.note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 18px;
+  font-size: 12.5px;
+  color: var(--tn-text-muted);
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 22px;
+}
+
+.back,
+.continue {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border-radius: 11px;
+  font-weight: 700;
+  transition: border-color var(--tn-transition-fast), filter var(--tn-transition-fast);
+}
+
+.back {
+  padding: 11px 20px;
+  border: 1px solid var(--tn-border-control);
+  background: #081120;
+  color: #c3d2e0;
+  font-size: 14px;
+}
+
+.back:hover:not(:disabled) {
+  border-color: var(--tn-border-hover);
+}
+
+.continue {
+  padding: 12px 26px;
+  background: var(--tn-gradient-cta);
+  color: var(--tn-gradient-cta-text);
+  font-size: 14.5px;
+  font-weight: 800;
+}
+
+.continue:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.back:disabled,
+.continue:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- What an account adds ---- */
+
+.unlockStrip {
+  display: flex;
+  align-items: stretch;
+  margin-top: 20px;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: 16px;
+  padding: 18px 24px;
+}
+
+.unlockHead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 24px;
+  border-right: 1px solid var(--tn-border-hairline);
+  max-width: 300px;
+}
+
+.unlockIcon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--tn-mint-tint);
+  border: 1px solid var(--tn-mint-border);
+  color: var(--tn-mint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.unlockTitle {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+
+.unlockSub {
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+.unlockGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex: 1;
+  min-width: 0;
+}
+
+.unlockItem {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 2px 18px;
+  border-right: 1px solid var(--tn-border-hairline);
+}
+
+.unlockItem:last-child {
+  border-right: 0;
+}
+
+.unlockItemTitle {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.unlockItemText {
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+/* ---- The suggested path ---- */
+
+.rail2 {
+  position: relative;
+  background: linear-gradient(165deg, #081119 0%, #060b12 100%);
+  border: 1px solid #16303a;
+  border-radius: 18px;
+  padding: 24px 24px 22px;
+  overflow: hidden;
+}
+
+.robot {
+  position: absolute;
+  top: -14px;
+  right: -26px;
+  width: 150px;
+  height: auto;
+  pointer-events: none;
+}
+
+.railHead {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 250px;
+}
+
+.railHeading {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.railLead {
+  position: relative;
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--tn-text-soft);
+  max-width: 240px;
+}
+
+.pathList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.pathRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(10, 20, 31, 0.85);
+  border: 1px solid #16222f;
+  border-radius: 13px;
+  padding: 13px 16px;
+}
+
+.pathText {
+  flex: 1;
+  min-width: 0;
+}
+
+.pathTitle {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.pathBody {
+  display: block;
+  font-size: 12px;
+  color: var(--tn-text-soft);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.pathNumber {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.savePlan,
+.withoutAccount {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.savePlan {
+  margin-top: 16px;
+  padding: 14px;
+  background: linear-gradient(90deg, #10c98f, #2563eb);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  transition: filter var(--tn-transition-fast);
+}
+
+.savePlan:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.savePlan:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.withoutAccount {
+  margin-top: 10px;
+  padding: 13px;
+  border: 1px solid var(--tn-border-control);
+  background: transparent;
+  color: #c3d2e0;
+  font-size: 14px;
+}
+
+.withoutAccount:hover {
+  border-color: var(--tn-border-hover);
+}
+
+.railNote {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--tn-text-muted);
+}
+
+/* ---- Trust bar ---- */
+
+.trustBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 4vw, 60px);
+  flex-wrap: wrap;
+  margin-top: 26px;
+  padding: 16px 0;
+  border-top: 1px solid var(--tn-hairline-soft);
+}
+
+.trustItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tn-text-secondary);
+}
+
+/* ---- Accents ---- */
+
+.accent_mint {
+  color: var(--tn-mint);
+}
+.accent_green {
+  color: var(--tn-green);
+}
+.accent_blue {
+  color: var(--tn-blue);
+}
+.accent_purple {
+  color: var(--tn-purple);
+}
+.accent_amber {
+  color: var(--tn-orange-star);
+}
+.accent_lime {
+  color: var(--tn-lime);
+}
+.accent_cyan {
+  color: var(--tn-cyan);
+}
+
+.num_green {
+  border-color: var(--tn-heat-up-border);
+  color: var(--tn-green);
+}
+.num_lime {
+  border-color: rgba(163, 230, 53, 0.35);
+  color: var(--tn-lime);
+}
+.num_blue {
+  border-color: var(--tn-blue-border);
+  color: var(--tn-blue);
+}
+.num_purple {
+  border-color: var(--tn-purple-border);
+  color: var(--tn-purple);
+}
+.num_cyan {
+  border-color: rgba(103, 232, 249, 0.35);
+  color: var(--tn-cyan);
+}
+.num_amber {
+  border-color: var(--tn-amber-border);
+  color: var(--tn-amber-text);
+}
+
+/* ---- Narrower ---- */
+
+@media (max-width: 1240px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .rail2 {
+    max-width: 520px;
+  }
+}
+
+@media (max-width: 960px) {
+  .card {
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    border-right: 0;
+    border-bottom: 1px solid var(--tn-border-hairline);
+  }
+
+  .optionGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .unlockStrip {
+    flex-direction: column;
+  }
+
+  .unlockHead {
+    max-width: none;
+    padding-right: 0;
+    padding-bottom: 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--tn-border-hairline);
+  }
+
+  .unlockGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 0;
+  }
+
+  .unlockItem:nth-child(2n) {
+    border-right: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .optionGrid,
+  .unlockGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .unlockItem {
+    border-right: 0;
+    padding: 2px 0;
+  }
+}

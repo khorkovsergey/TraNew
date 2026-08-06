@@ -1,11 +1,21 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { StartResume } from '@/components/content/StartResume';
-import { Icon } from '@/components/ui/Icon';
-import { Link } from '@/i18n/navigation';
-import type { Locale, StaticPathname } from '@/i18n/routing';
+import { SpaceBackdrop } from '@/components/shell/SpaceBackdrop';
+import { StartWizard } from '@/components/start/StartWizard';
+import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
-import styles from '@/components/content/Content.module.css';
+
+/**
+ * Start Investing.
+ *
+ * "Get started" for an anonymous visitor lands here — on four questions and a
+ * result, not on a pricing table. Registration is asked for at the end, and only
+ * to save something that already exists on screen.
+ *
+ * The five-link menu this page used to be is not lost: each of those
+ * destinations is in Explore, Learn or the footer, which is where they belong
+ * once there is a funnel to arrive through.
+ */
 
 type Props = { params: Promise<{ locale: Locale }> };
 
@@ -21,53 +31,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-/**
- * "Open TradingNew" for an anonymous visitor lands here — on value, not on a
- * pricing table. Registration is asked for later, and only to save something.
- */
-const ROWS: Array<{ key: string; href: StaticPathname }> = [
-  { key: 'research', href: '/explore' },
-  { key: 'brief', href: '/market/brief' },
-  { key: 'learn', href: '/academy' },
-  { key: 'strategy', href: '/strategy' },
-  { key: 'charts', href: '/supercharts' },
-];
-
 export default async function StartPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const t = await getTranslations('start');
-  const tScreens = await getTranslations('screens');
-  const tCommon = await getTranslations('common');
-
   return (
-    <div className={`${styles.wrap} ${styles.wrapNarrow}`}>
-      <Link className={styles.backHome} href="/">
-        {tCommon('backHome')}
-      </Link>
-
-      <h1 className={styles.h1}>{tScreens('start.title')}</h1>
-      <p className={styles.lead}>{tScreens('start.subtitle')}</p>
-
-      {/* Above the five choices, and only when there is something to return to. */}
-      <StartResume
-        title={t('resumeTitle')}
-        hint={t('resumeHint')}
-        strategyLabel={t('resumeStrategy')}
-        academyLabel={t('resumeAcademy')}
-      />
-
-      <div className={styles.rowLinks}>
-        {ROWS.map((row) => (
-          <Link className={styles.rowLink} href={row.href} key={row.key}>
-            <span>{t(`rows.${row.key}`)}</span>
-            <Icon name="arrowRight" size={18} />
-          </Link>
-        ))}
-      </div>
-
-      <p className={styles.note}>{t('note')}</p>
-    </div>
+    <>
+      <SpaceBackdrop tone={2} />
+      <StartWizard />
+    </>
   );
 }
