@@ -100,6 +100,7 @@ try {
       'src/content/wealthConnections.ts',
       'src/lib/start/path.ts',
       'src/lib/academy/summary.ts',
+      'src/lib/explore/answers.ts',
       'src/content/wealth.ts',
       'src/lib/investment/agents/index.ts',
       'src/lib/investment/graph/index.ts',
@@ -226,6 +227,7 @@ try {
   const wc = await load('wealthConnections', 'content');
   const start = await load('path', 'start');
   const learn = await load('summary', 'academy');
+  const answers = await load('answers', 'explore');
   const wealth = await load('wealth', 'content');
   const wave = await load('wave');
 
@@ -4694,6 +4696,94 @@ try {
     const [under] = learn.ringDash(-40, radius).split(' ').map(Number);
     assert.ok(Math.abs(over - circumference) < 0.2);
     assert.equal(under, 0);
+  });
+
+  /* ======================= Explore: the written answers ===================== */
+
+  group('Every question the tabs offer has an answer');
+
+  check('all eighteen are answered', () => {
+    /*
+     * The tabs were offering these questions and the assistant could answer none
+     * of them — each one produced the market summary, which is how somebody
+     * asking whether ETFs suit a beginner was told where the S&P closed. This is
+     * the check that keeps the two lists in step.
+     */
+    assert.equal(answers.ANSWERED_QUESTIONS.length, 18);
+    for (const question of answers.ANSWERED_QUESTIONS) {
+      const found = answers.findAnswer(question);
+      assert.ok(found, question);
+      assert.ok(found.answer.length > 120, `too short to be an answer: ${question}`);
+    }
+  });
+
+  check('matching survives punctuation and case', () => {
+    // The question arrives from a chip, a URL or somebody's keyboard, and those
+    // three do not agree about capitals or question marks.
+    const target = 'What is the difference between an ETF and a stock?';
+    for (const variant of [
+      target,
+      target.toUpperCase(),
+      target.replace('?', ''),
+      `  ${target}  `,
+    ]) {
+      assert.ok(answers.findAnswer(variant), variant);
+    }
+  });
+
+  check('a question nobody wrote up returns nothing rather than something', () => {
+    assert.equal(answers.findAnswer('what is a covered call'), null);
+    assert.match(answers.answerFor('what is a covered call'), /does not have a written answer/i);
+  });
+
+  group('Two answers refuse the question as put, on purpose');
+
+  check('the tax answer names no rate and no country', () => {
+    /*
+     * The honest answer depends on a jurisdiction nobody told us. Inventing a
+     * percentage would be the most quietly damaging thing on the page.
+     */
+    const text = answers.findAnswer('How are ETFs taxed where I live?').answer;
+    assert.ok(!/[0-9]+\s?%/.test(text), 'a rate was quoted');
+    assert.match(text, /does not know|depends on where/i);
+    assert.match(text, /not tax advice/i);
+  });
+
+  check('the "how much crypto" answer names no number', () => {
+    // A figure there is advice from a page that has never met the reader.
+    const text = answers.findAnswer('How much of a portfolio would be sensible?').answer;
+    assert.ok(!/[0-9]+\s?%\s+(of|in)/i.test(text), 'a share was quoted');
+    assert.match(text, /will not name a number/i);
+  });
+
+  check('no answer tells anybody to buy anything', () => {
+    const forbidden = /\byou should (buy|sell|invest)\b|\bguaranteed\b|\bwill (rise|fall)\b/i;
+    for (const entry of answers.EXPLORE_ANSWERS) {
+      assert.ok(!forbidden.test(entry.answer), entry.question);
+    }
+  });
+
+  group('The answers reach Voyager');
+
+  check('every offered question routes to the educational branch', () => {
+    for (const question of answers.ANSWERED_QUESTIONS) {
+      assert.equal(scenarios.scenarioFor(question), 'explain', question);
+    }
+  });
+
+  check('and the plan carries the written answer, not a definition of something near it', () => {
+    /*
+     * "Are ETFs suitable for beginners?" names a concept the table also knows,
+     * so without the exact-match rule it would have been answered with the
+     * definition of an ETF — related, and not what was asked.
+     */
+    const question = 'Are ETFs suitable for beginners?';
+    const plan = contract.parsePlan(scenarios.responseFor(question))?.plan;
+    const asked = plan.modules.find((module) => module.title === 'You asked');
+    assert.equal(asked.data.body, question);
+
+    const answer = plan.modules.find((module) => module.title === 'The short answer');
+    assert.equal(answer.data.body, answers.findAnswer(question).answer);
   });
 
   /* ============================ Superchart layouts ============================ */

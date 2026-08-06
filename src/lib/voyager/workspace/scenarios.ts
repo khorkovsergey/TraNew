@@ -1,3 +1,4 @@
+import { findAnswer } from '../../explore/answers';
 import type { VoyagerPlan } from './contract';
 import {
   BEGINNER,
@@ -68,6 +69,11 @@ export function scenarioFor(question: string): string {
    * such question fell through to the market summary and got told where the S&P
    * closed.
    */
+  // An exact match against a question the product offers wins outright: those
+  // have answers written for them, and no keyword rule should be able to send
+  // one somewhere else.
+  if (findAnswer(question)) return 'explain';
+
   if (asksForAnExplanation(padded) && conceptIn(padded)) return 'explain';
 
   if (has('pine', 'script', 'indicator')) return 'pine';
@@ -225,6 +231,55 @@ function conceptIn(padded: string): boolean {
  */
 function explainFor(question: string): unknown {
   const padded = ` ${question.toLowerCase().replace(/[^a-z]+/g, ' ').trim()} `;
+
+  /*
+   * An exact match against a question the product itself offers comes first.
+   *
+   * Every "Try asking" chip on Explore is in that library with an answer
+   * written for it. Falling through to the concept table would answer "Are ETFs
+   * suitable for beginners?" with the definition of an ETF — related, and not
+   * what was asked.
+   */
+  const written = findAnswer(question);
+  if (written) {
+    return {
+      mode: 'learn',
+      because: 'this is a question the product offers, and it has a written answer',
+      steps: ['Read the request as a question about a concept', 'Find the written answer'],
+      work: [{ id: 'w1', label: 'Finding the written answer', done: false }],
+      sources: [
+        {
+          id: 'src_academy',
+          kind: 'EDUCATIONAL',
+          provider: 'TradingNew Learn',
+          at: NOW,
+          detail: 'Written lesson material, reviewed',
+        },
+      ],
+      assumptions: [],
+      modules: [
+        {
+          id: 'm_asked',
+          kind: 'text-insight',
+          title: 'You asked',
+          provenance: ['educational'],
+          sourceIds: [],
+          data: { body: written.question },
+          actions: [],
+        },
+        {
+          id: 'm_answer',
+          kind: 'text-insight',
+          title: 'The short answer',
+          provenance: ['educational'],
+          sourceIds: ['src_academy'],
+          data: { body: written.answer },
+          actions: [{ id: 'save_workspace', label: 'Save this explanation', mutates: true }],
+        },
+      ],
+    };
+  }
+
   const concept = conceptFor(padded);
 
   if (!concept) {

@@ -37,6 +37,13 @@ export const routing = defineRouting({
     '/news': '/news',
     '/ideas': '/ideas',
     '/explore': '/explore',
+    /*
+     * The asset-class pages, and the catalogue that lists them. They replace
+     * `/tool/{stocks|etfs|…}`, which was the generic placeholder screen — those
+     * six slugs now redirect here (see middleware.ts).
+     */
+    '/explore/options': '/explore/options',
+    '/explore/[class]': '/explore/[class]',
 
     // Symbols & research
     '/symbols/[ticker]': '/symbols/[ticker]',

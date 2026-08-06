@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { CompareMatrix } from '@/components/explore/CompareMatrix';
 import { SearchForm } from '@/components/shared/SearchForm';
+import { assetClass } from '@/content/assetClasses';
+import { parseCompare } from '@/lib/explore/compareLink';
 import { TrustLabel } from '@/components/ui/TrustLabel';
 import { SYMBOLS } from '@/content/symbols';
 import { pick } from '@/content/types';
@@ -13,7 +16,7 @@ import styles from '@/components/screens/Workspace.module.css';
 
 type Props = {
   params: Promise<{ locale: Locale }>;
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; assets?: string }>;
 };
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
@@ -44,7 +47,7 @@ export default async function ResearchWorkspacePage({ params, searchParams }: Pr
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const { q } = await searchParams;
+  const { q, assets } = await searchParams;
   const t = await getTranslations('workspace');
   const tCommon = await getTranslations('common');
 
@@ -72,6 +75,74 @@ export default async function ResearchWorkspacePage({ params, searchParams }: Pr
         </p>
 
         <SearchForm autoFocus />
+      </div>
+    );
+  }
+
+  /*
+   * A comparison, when the URL asks for one.
+   *
+   * "Compare in detail" on Explore used to land here and get the same canned
+   * answer as everything else — the only thing the person had told us was the
+   * three things they wanted side by side, and it was discarded on arrival.
+   * The list is parsed rather than trusted: it comes from a URL, and a slug
+   * nobody recognises is dropped instead of rendering an empty column.
+   */
+  const compared = parseCompare(assets);
+  if (compared) {
+    const entries = compared.map((key) => assetClass(key)!);
+
+    return (
+      <div className={styles.wrap}>
+        <Link className={styles.backHome} href="/explore">
+          ← Explore
+        </Link>
+
+        <div className={styles.eyebrow}>{t('eyebrow')}</div>
+        <h1 className={styles.question}>{entries.map((entry) => entry.name).join(' vs ')}</h1>
+        <p className={styles.emptyLead}>
+          The same six measures for each, side by side. They are coarse guides to a whole category —
+          the words carry the value and the bars only repeat them.
+        </p>
+
+        <CompareMatrix entries={entries} linkToPages />
+
+        <section className={styles.compareProse}>
+          <h2 className={styles.compareHeading}>How to choose between them</h2>
+          <p>
+            Start with when you need the money. Anything you may want within a year or two belongs
+            in the steadiest column here, whatever the growth figures say — a fall does not matter
+            until you have to sell into it, and a short horizon is what turns a fall into a sale.
+          </p>
+          <p>
+            Then read the risk row against your own position rather than against the other columns.
+            The question is not which is riskiest; it is which of these you could watch fall by a
+            third without changing anything else you had planned.
+          </p>
+          <p>
+            Costs compound in the direction you do not notice. A fraction of a per cent each year is
+            invisible in a statement and decisive over decades, and it is charged whether the year
+            was good or bad.
+          </p>
+          <p>
+            Most people end up holding more than one of these rather than choosing between them.
+            That is the usual answer, and it is not a compromise — the reason to hold two is that
+            they do not fall at the same time.
+          </p>
+        </section>
+
+        <div className={styles.compareCtas}>
+          {entries.map((entry) => (
+            <Link
+              key={entry.key}
+              className={styles.compareCta}
+              href={{ pathname: '/explore/[class]', params: { class: entry.key } }}
+              prefetch={false}
+            >
+              Understand {entry.name}
+            </Link>
+          ))}
+        </div>
       </div>
     );
   }

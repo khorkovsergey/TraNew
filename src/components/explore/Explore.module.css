@@ -37,50 +37,18 @@
 
 /* ---- Sub-nav ---- */
 
-.subnav {
-  display: flex;
-  gap: 8px;
-  margin-top: 22px;
-  flex-wrap: wrap;
-  border-bottom: 1px solid var(--tn-border-hairline);
-  padding-bottom: 14px;
-}
 
-.subnavHere,
-.subnavLink {
-  padding: 9px 16px;
-  border-radius: var(--tn-radius-chip);
-  font-size: 12.5px;
-  font-weight: 700;
-  white-space: nowrap;
-  transition: border-color var(--tn-transition-fast), color var(--tn-transition-fast);
-}
 
-.subnavHere {
-  background: var(--tn-mint-tint);
-  border: 1.5px solid var(--tn-mint);
-  color: #fff;
-  font-weight: 800;
-}
 
-.subnavLink {
-  border: 1px solid var(--tn-border-inner);
-  background: var(--tn-surface-veil);
-  color: var(--tn-text-nav);
-}
 
-.subnavLink:hover {
-  border-color: var(--tn-mint);
-  color: #fff;
-}
 
 /* ---- Category tabs ---- */
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 16px;
+  margin-top: 22px;
 }
 
 .tab {
@@ -270,93 +238,18 @@
   border-color: var(--tn-border-hover);
 }
 
-.compareGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 18px;
-}
 
-.compareTile {
-  background: var(--tn-surface-inner);
-  border: 1px solid var(--tn-border-inner);
-  border-radius: 13px;
-  padding: 16px 16px 14px;
-  min-width: 0;
-}
 
-.compareName {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 14.5px;
-  font-weight: 800;
-}
 
-.metric {
-  margin-top: 11px;
-}
 
-.metricLine {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--tn-text-soft);
-}
 
-.metricValue {
-  color: var(--tn-text-nav);
-  font-weight: 700;
-  text-align: right;
-}
 
-.dots {
-  display: flex;
-  gap: 3px;
-  margin-top: 5px;
-}
 
-.dot {
-  flex: 1;
-  height: 5px;
-  border-radius: 3px;
-  background: #1b2836;
-}
 
-.compareTag,
-.badge {
-  display: block;
-  text-align: center;
-  padding: 7px 10px;
-  border-radius: 9px;
-  font-size: 11.5px;
-  font-weight: 700;
-}
 
-.compareTag {
-  margin-top: 14px;
-}
 
-.ratingNote,
-.delayNote {
-  font-size: 11.5px;
-  color: var(--tn-text-muted);
-  line-height: 1.5;
-}
 
-.ratingNote {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-}
 
-.ratingNote a {
-  color: var(--tn-blue);
-}
 
 .delayNote {
   margin-top: 12px;
@@ -758,6 +651,112 @@
   .compareGrid,
   .starterGrid,
   .tileGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Added with the rebuild ---- */
+
+.matrixSlot {
+  margin-top: 18px;
+}
+
+.badge {
+  align-self: flex-start;
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 9px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.starterCtas {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.note,
+.delayNote {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+.note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.delayNote {
+  margin-top: 12px;
+  font-size: 10.5px;
+  color: var(--tn-text-faint);
+}
+
+.section {
+  margin-top: 40px;
+}
+
+.h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+/*
+ * "Explore more" is deliberately not a tab and does not look like one. These
+ * six used to sit in the row above the tabs as pills, so switching a class and
+ * leaving the section were the same gesture.
+ */
+.moreGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.moreCard {
+  display: block;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 18px 16px;
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-hover);
+}
+
+.moreCard:hover {
+  border-color: var(--tn-mint);
+}
+
+.moreName {
+  font-size: 13.5px;
+  font-weight: 800;
+  margin-top: 12px;
+}
+
+.moreText {
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+  margin-top: 5px;
+  line-height: 1.45;
+}
+
+@media (max-width: 1180px) {
+  .moreGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .moreGrid {
     grid-template-columns: 1fr;
   }
 }

@@ -3,34 +3,38 @@
 import { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import {
-  CATEGORIES,
-  COMPARE_CARDS,
-  DOT_SCALE,
-  EXPLORE_SUBNAV,
-  MARKET_TILES,
-  RATING_NOTE,
-  STARTERS,
-  type CategoryKey,
-} from '@/content/explore';
+  ASSET_CLASSES,
+  assetClass,
+  comparisonSet,
+  verbFor,
+  type AssetClassKey,
+} from '@/content/assetClasses';
+import { EXPLORE_MORE, MARKET_TILES, STARTERS } from '@/content/explore';
 import { Link, useRouter } from '@/i18n/navigation';
+import { compareHref } from '@/lib/explore/compareLink';
 import { wave } from '@/lib/wave';
+import { CompareMatrix } from './CompareMatrix';
 import styles from './Explore.module.css';
 
 /**
  * Explore.
  *
- * One tab is selected at a time and everything on the upper half follows it:
- * the explanation, the comparison, and what Voyager offers to be asked. That is
- * the progressive disclosure the brief asks for — the beginner layer is what you
- * land on, and the detailed and advanced layers are a link away rather than a
- * different product.
+ * One class is selected and all three columns follow it. That sounds obvious
+ * and was not true: the comparison in the middle was a fixed table of three
+ * classes, so choosing Bonds produced a page whose middle column was about
+ * somebody else.
+ *
+ * Economy is no longer a tab. It was a seventh entry in a row of asset classes
+ * and is not one — it sits in "Explore more" at the foot of the page with the
+ * other sections that were dressed as tabs and are not.
  */
 export function ExploreHub() {
   const router = useRouter();
-  const [key, setKey] = useState<CategoryKey>('etfs');
+  const [key, setKey] = useState<AssetClassKey>('stocks');
   const [question, setQuestion] = useState('');
 
-  const category = CATEGORIES.find((entry) => entry.key === key) ?? CATEGORIES[1];
+  const category = assetClass(key) ?? ASSET_CLASSES[0];
+  const comparison = comparisonSet(key);
 
   const ask = (text: string) => {
     const trimmed = text.trim();
@@ -50,25 +54,10 @@ export function ExploreHub() {
         </p>
       </header>
 
-      <nav className={styles.subnav} aria-label="Explore sections">
-        {EXPLORE_SUBNAV.map((entry) =>
-          entry.href === null ? (
-            <span key={entry.label} className={styles.subnavHere} aria-current="page">
-              {entry.label}
-            </span>
-          ) : (
-            <Link key={entry.label} className={styles.subnavLink} href={entry.href}
-            prefetch={false}>
-              {entry.label}
-            </Link>
-          )
-        )}
-      </nav>
-
-      {/* Radios, not buttons: exactly one category is shown, and that is a
-          choice among alternatives rather than seven independent switches. */}
+      {/* Radios, not buttons: exactly one class is shown, and that is a choice
+          among alternatives rather than six independent switches. */}
       <div className={styles.tabs} role="radiogroup" aria-label="Investment type">
-        {CATEGORIES.map((entry) => (
+        {ASSET_CLASSES.map((entry) => (
           <button
             key={entry.key}
             role="radio"
@@ -103,23 +92,17 @@ export function ExploreHub() {
 
           <dl className={styles.facts}>
             <Fact icon="fileSearch" accent="blue" term="What it is" detail={category.what} />
-            <Fact
-              icon="checkCircle"
-              accent="green"
-              term="Why people use it"
-              detail={category.why}
-            />
+            <Fact icon="checkCircle" accent="green" term="Why people use it" detail={category.why} />
             <Fact icon="alert" accent="amber" term="Main risks" detail={category.risks} />
             <Fact icon="user" accent="purple" term="Who it may suit" detail={category.suit} />
           </dl>
 
           <Link
             className={styles.learnMore}
-            href={{ pathname: category.href, params: category.params } as never}
+            href={{ pathname: '/explore/[class]', params: { class: category.key } }}
             prefetch={false}
           >
             Learn more about {category.name}
-            {category.soon && <span className={styles.soon}>Soon</span>}
             <Icon name="arrowRight" size={15} strokeWidth={2.2} />
           </Link>
         </section>
@@ -129,70 +112,17 @@ export function ExploreHub() {
             <div>
               <h2 className={styles.cardTitle}>Compare options</h2>
               <div className={styles.cardSub}>
-                How three common choices sit against one another.
+                {category.name} beside the two it is most often weighed against.
               </div>
             </div>
-            {/*
-              * The comparison this button is standing next to, carried in the
-              * URL. It used to open an empty research page, which threw away the
-              * only thing the person had told us.
-              */}
-            <Link
-              className={styles.ghostChip}
-              href={{
-                pathname: '/research',
-                query: { q: `Compare ${COMPARE_CARDS.map((entry) => entry.name).join(', ')}` },
-              }}
-              prefetch={false}
-            >
+            {/* The comparison on screen, carried into the URL. */}
+            <Link className={styles.ghostChip} href={compareHref(key)} prefetch={false}>
               Compare in detail
             </Link>
           </div>
 
-          <div className={styles.compareGrid}>
-            {COMPARE_CARDS.map((entry) => (
-              <div key={entry.name} className={styles.compareTile}>
-                <div className={styles.compareName}>
-                  <Icon
-                    name={entry.icon}
-                    size={18}
-                    strokeWidth={1.9}
-                    className={styles[`accent_${entry.accent}`]}
-                  />
-                  {entry.name}
-                </div>
-
-                {entry.metrics.map((metric) => (
-                  <div key={metric.label} className={styles.metric}>
-                    <div className={styles.metricLine}>
-                      <span>{metric.label}</span>
-                      {/* The word is the value; the dots repeat it. Anyone who
-                          cannot see the fill still reads "Medium". */}
-                      <span className={styles.metricValue}>{metric.value}</span>
-                    </div>
-                    <div className={styles.dots} aria-hidden="true">
-                      {Array.from({ length: DOT_SCALE }, (_, index) => (
-                        <span
-                          key={index}
-                          className={`${styles.dot} ${
-                            index < metric.level ? styles[`dotOn_${entry.accent}`] : ''
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-
-                <div className={`${styles.compareTag} ${styles[`tag_${entry.accent}`]}`}>
-                  {entry.tag}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className={styles.ratingNote}>
-            <Icon name="info" size={13} strokeWidth={2} />
-            {RATING_NOTE} <Link href="/how-we-explain" prefetch={false}>How we explain this</Link>
+          <div className={styles.matrixSlot}>
+            <CompareMatrix entries={comparison} linkToPages />
           </div>
         </section>
 
@@ -203,7 +133,7 @@ export function ExploreHub() {
             {/* eslint-disable-next-line @next/next/no-img-element -- decorative, fixed size. */}
             <img className={styles.robot} src="/redesign/voyager-robot.png" alt="" aria-hidden="true" />
             <p className={styles.voyagerLine}>
-              I can explain how {category.name} work, and what they cost you.
+              I can explain how {category.subject} {verbFor(category)}, and what it costs you.
             </p>
           </div>
 
@@ -245,32 +175,30 @@ export function ExploreHub() {
               <h2 className={styles.cardTitle}>Popular starting points</h2>
               <div className={styles.cardSub}>Where most people begin, and why.</div>
             </div>
-            <Link
-              className={styles.moreLink}
-              href={{ pathname: '/research', query: { q: 'Where should a beginner start investing?' } }}
-              prefetch={false}
-            >
+            <Link className={styles.moreLink} href="/explore/options" prefetch={false}>
               See all options
               <Icon name="arrowRight" size={13} strokeWidth={2.2} />
             </Link>
           </div>
 
           <div className={styles.starterGrid}>
-            {STARTERS.map((starter) => (
+            {STARTERS.slice(0, 4).map((starter) => (
               <div key={starter.name} className={styles.starter}>
                 <div className={styles.starterTop}>
                   <div>
                     <div className={styles.starterName}>{starter.name}</div>
                     <div className={styles.starterText}>{starter.text}</div>
                   </div>
+                  {/* Dashed and dimmed, so it cannot be mistaken for the real
+                      mini-charts in "Today in markets" one column away. */}
                   <svg viewBox="0 0 64 30" className={styles.starterSpark} aria-hidden="true">
                     <polyline
                       points={wave(starter.seed, 14, 64, 30)}
                       fill="none"
-                      stroke={`var(--tn-${accentVar(starter.accent)})`}
-                      strokeWidth="2"
+                      stroke="var(--tn-text-faint)"
+                      strokeWidth="1.6"
+                      strokeDasharray="3 3"
                       strokeLinecap="round"
-                      strokeLinejoin="round"
                     />
                   </svg>
                 </div>
@@ -279,22 +207,29 @@ export function ExploreHub() {
                   {starter.badge}
                 </span>
 
-                <Link
-                  className={styles.starterCta}
-                  href={{ pathname: starter.href, params: starter.params } as never}
-                  prefetch={false}
-                >
-                  {starter.cta}
-                  {starter.soon && <span className={styles.soon}>Soon</span>}
-                </Link>
+                <div className={styles.starterCtas}>
+                  <Link
+                    className={styles.starterCta}
+                    href={{ pathname: '/explore/[class]', params: { class: starter.klass } }}
+                    prefetch={false}
+                  >
+                    Understand
+                  </Link>
+                  <Link
+                    className={styles.starterCta}
+                    href={compareHref(starter.klass)}
+                    prefetch={false}
+                  >
+                    Compare
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
 
-          {/* The shapes are generated, not measured. Said once, near them. */}
-          <div className={styles.ratingNote}>
+          <div className={styles.note}>
             <Icon name="info" size={13} strokeWidth={2} />
-            The shapes are illustrative, not price history.
+            The dashed shapes are illustrative, not price history.
           </div>
         </section>
 
@@ -321,7 +256,7 @@ export function ExploreHub() {
                   <polyline
                     points={wave(tile.seed, 18, 80, 26)}
                     fill="none"
-                    stroke={`var(--tn-${accentVar(tile.accent)})`}
+                    stroke={tile.up ? 'var(--tn-green)' : 'var(--tn-red)'}
                     strokeWidth="1.8"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -336,6 +271,26 @@ export function ExploreHub() {
           </div>
         </section>
       </div>
+
+      <section className={styles.section}>
+        <h2 className={styles.h2}>Explore more</h2>
+        <p className={styles.cardSub}>The parts of the market that are not an asset class.</p>
+
+        <div className={styles.moreGrid}>
+          {EXPLORE_MORE.map((entry) => (
+            <Link key={entry.label} className={styles.moreCard} href={entry.href} prefetch={false}>
+              <Icon
+                name={entry.icon}
+                size={22}
+                strokeWidth={1.8}
+                className={styles[`accent_${entry.accent}`]}
+              />
+              <div className={styles.moreName}>{entry.label}</div>
+              <div className={styles.moreText}>{entry.text}</div>
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
@@ -360,12 +315,4 @@ function Fact({
       </div>
     </div>
   );
-}
-
-/** Accent name to the token that carries it, so an SVG stroke can use one too. */
-function accentVar(accent: string): string {
-  if (accent === 'rose') return 'red';
-  if (accent === 'amber') return 'orange-star';
-  if (accent === 'orange') return 'orange';
-  return accent;
 }

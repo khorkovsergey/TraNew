@@ -1,0 +1,202 @@
+/* The catalogue behind "See all options". */
+
+.page {
+  max-width: var(--tn-page-max);
+  margin: 0 auto;
+  padding: 32px var(--tn-page-pad) 56px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tn-text-secondary);
+}
+
+.back:hover {
+  color: var(--tn-text);
+}
+
+.h1 {
+  margin: 22px 0 0;
+  font-size: clamp(30px, 3.6vw, 46px);
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  line-height: 1.12;
+}
+
+.lead {
+  margin: 14px 0 0;
+  max-width: 620px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--tn-text-secondary);
+}
+
+.section {
+  margin-top: 40px;
+}
+
+.h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+.sectionSub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--tn-text-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 20px;
+  min-width: 0;
+}
+
+.starterTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.spark {
+  width: 64px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.cardName {
+  font-size: 15px;
+  font-weight: 800;
+  margin-top: 12px;
+}
+
+.starterTop .cardName {
+  margin-top: 0;
+}
+
+.cardText {
+  flex: 1;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tn-text-soft);
+  margin-top: 6px;
+}
+
+.badge {
+  align-self: flex-start;
+  margin-top: 10px;
+  padding: 3px 9px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.ctas {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cta {
+  flex: 1;
+  text-align: center;
+  padding: 9px;
+  border-radius: 9px;
+  border: 1px solid var(--tn-border-control);
+  color: #c3d2e0;
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.cta:hover {
+  border-color: var(--tn-mint);
+}
+
+.cardMeta {
+  margin-top: 10px;
+  font-size: 10.5px;
+  color: var(--tn-text-faint);
+}
+
+.disclaimer {
+  margin: 34px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--tn-text-faint);
+}
+
+.accent_green {
+  color: var(--tn-green);
+}
+.accent_blue {
+  color: var(--tn-blue);
+}
+.accent_purple {
+  color: var(--tn-purple);
+}
+.accent_amber {
+  color: var(--tn-orange-star);
+}
+.accent_orange {
+  color: var(--tn-orange);
+}
+.accent_rose {
+  color: var(--tn-red);
+}
+
+.tag_green {
+  background: var(--tn-green-tint);
+  color: var(--tn-green-deep);
+}
+.tag_blue {
+  background: var(--tn-blue-tint);
+  color: var(--tn-blue-hover);
+}
+.tag_purple {
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple-deep);
+}
+.tag_amber {
+  background: var(--tn-amber-tint);
+  color: var(--tn-amber-text);
+}
+.tag_orange {
+  background: var(--tn-orange-tint);
+  color: var(--tn-orange);
+}
+.tag_rose {
+  background: var(--tn-red-tint);
+  color: var(--tn-red);
+}
+
+@media (max-width: 1000px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

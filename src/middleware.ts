@@ -27,8 +27,29 @@ function stripLocale(pathname: string): string {
  * check belongs on the server, and every private page calls `requireUser()` for it.
  * Treating this as the authority would let a revoked or forged cookie through.
  */
+/**
+ * The asset-class slugs that used to open the generic placeholder screen.
+ *
+ * They are real pages now, at their own URLs. A permanent redirect rather than a
+ * quiet rewrite: these were linked from the menu for months, and the old
+ * addresses should stop existing rather than keep working invisibly.
+ *
+ * Only these six. The other `/tool/*` slugs — screeners, heatmaps, calendars —
+ * are still placeholders and are left alone; sending them here would promise a
+ * page that does not exist.
+ */
+const CLASS_SLUGS = new Set(['stocks', 'etfs', 'bonds', 'cash', 'crypto', 'property']);
+
 export default function middleware(request: NextRequest) {
   const path = stripLocale(request.nextUrl.pathname);
+
+  const toolMatch = /^\/tool\/([a-z-]+)\/?$/.exec(path);
+  if (toolMatch && CLASS_SLUGS.has(toolMatch[1])) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/${routing.defaultLocale}/explore/${toolMatch[1]}`;
+    url.search = '';
+    return NextResponse.redirect(url, 301);
+  }
   // The prefix must match `advanced.cookiePrefix` in the auth config, otherwise this
   // looks for a cookie that is never set and every signed-in user is bounced.
   const hasSessionCookie = Boolean(getSessionCookie(request, { cookiePrefix: 'tn' }));
