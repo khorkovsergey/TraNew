@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import type { StoredPlan } from '@/app/actions/startPlan';
+import { Icon } from '@/components/ui/Icon';
+import { buildPlan, nextStep, planProgress } from '@/lib/start/plan';
 import {
   ACADEMY_SUMMARY,
   ACTIVITY_FILTERS,
@@ -41,6 +44,40 @@ import {
 import styles from './Account.module.css';
 
 /* ---------------------------------------------------------------- Overview */
+
+/**
+ * The strip that resumes a plan.
+ *
+ * Rendered from the saved plan rather than from copy: it names the actual next
+ * step and the actual position, because a "continue where you left off" that
+ * cannot say where that is has not been anywhere.
+ */
+export function ResumePlan({ stored }: { stored: StoredPlan | null }) {
+  if (!stored) return null;
+
+  const steps = buildPlan(stored.answers);
+  const progress = planProgress(steps, stored.done);
+  const next = nextStep(steps, stored.done);
+  if (!next) return null;
+
+  return (
+    <Link className={styles.resumeStrip} href="/start/plan">
+      <span className={styles.resumeIcon}>
+        <Icon name="bookmark" size={18} strokeWidth={2} />
+      </span>
+      <span className={styles.resumeText}>
+        <span className={styles.resumeLabel}>Continue where you left off</span>
+        <span className={styles.resumeNext}>
+          {next.title} · step {progress.completed + 1} of {progress.total}
+        </span>
+        <span className={styles.resumeTrack} aria-hidden="true">
+          <span className={styles.resumeFill} style={{ width: `${progress.percent}%` }} />
+        </span>
+      </span>
+      <span className={styles.resumeCta}>Resume</span>
+    </Link>
+  );
+}
 
 export function AccountOverview() {
   const user = getUser();

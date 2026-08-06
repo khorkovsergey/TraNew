@@ -153,3 +153,27 @@
     display: none;
   }
 }
+
+/* Only rendered when arriving from the plan, where it is true. */
+.preserve {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border: 1px solid var(--tn-mint-border);
+  border-radius: 12px;
+  background: var(--tn-mint-tint);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tn-text-body);
+}
+
+.preserve > :first-child {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.preserve b {
+  color: var(--tn-text);
+}

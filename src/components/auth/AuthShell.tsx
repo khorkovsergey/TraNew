@@ -40,10 +40,14 @@ const KEEPS: Array<{ icon: 'layers' | 'trendUp' | 'book'; accent: string; lead: 
 export function AuthShell({
   mode,
   children,
+  next,
 }: {
   mode: 'in' | 'up';
   children: React.ReactNode;
+  /** Where the person came from, so the promise below can name it. */
+  next?: string;
 }) {
+  const fromPlan = next?.includes('/start/plan') ?? false;
   return (
     <div className={styles.page}>
       <Link className={styles.back} href="/">
@@ -71,6 +75,24 @@ export function AuthShell({
               Create account
             </Link>
           </nav>
+
+          {/*
+            * Said before the form, not after it.
+            *
+            * Somebody who pressed "save" on their plan is being asked to
+            * register in the middle of something. The reassurance is only worth
+            * printing where it is true, so it names what is preserved and it
+            * only appears when arriving from the plan.
+            */}
+          {fromPlan && (
+            <div className={styles.preserve}>
+              <Icon name="shieldCheck" size={15} strokeWidth={2} className={styles.accent_mint} />
+              <span>
+                <b>Your plan is waiting.</b> All four answers and your progress are preserved — you
+                will land right back on it.
+              </span>
+            </div>
+          )}
 
           {children}
 

@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 import { SpaceBackdrop } from '@/components/shell/SpaceBackdrop';
+import { loadStartPlan } from '@/app/actions/startPlan';
 import { PlanResult } from '@/components/start/PlanResult';
 import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
+import { getSession } from '@/lib/session';
 
 /**
  * The plan a diagnostic produced.
@@ -12,6 +14,8 @@ import { pageMetadata } from '@/lib/metadata';
  * returned to, linked to, and landed on after signing up. It renders nothing
  * generic: without answers the client sends you back to the questions.
  */
+
+export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ locale: Locale }> };
 
@@ -34,10 +38,18 @@ export default async function Page({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
+  /*
+   * The saved plan, when there is a session. Read on the server so a person
+   * arriving on a second device sees their plan in the first render rather than
+   * the empty state their browser would otherwise report.
+   */
+  const session = await getSession();
+  const stored = session?.user?.id ? await loadStartPlan(session.user.id).catch(() => null) : null;
+
   return (
     <>
       <SpaceBackdrop tone={2} />
-      <PlanResult />
+      <PlanResult stored={stored} />
     </>
   );
 }

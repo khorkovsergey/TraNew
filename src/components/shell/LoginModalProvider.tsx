@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
 import { authClient } from '@/lib/authClient';
 import styles from './Modal.module.css';
 
@@ -38,7 +38,18 @@ export function LoginModalProvider({ children }: { children: React.ReactNode }) 
   /** Set when a sign-out request came back refused. Cleared on the next attempt. */
   const [signOutFailed, setSignOutFailed] = useState(false);
   const t = useTranslations('login');
+  const pathname = usePathname();
   const { data: session } = authClient.useSession();
+
+  /*
+   * Where to come back to.
+   *
+   * The prompt used to send everybody to a generic sign-in and drop them on
+   * whatever the auth flow considered home. Somebody who pressed "save" on
+   * their plan meant to keep *that*, and landing anywhere else reads as having
+   * lost it — which, until the migration existed, they had.
+   */
+  const next = pathname && pathname !== '/' ? pathname : null;
 
   const openLogin = useCallback(() => setIsOpen(true), []);
   const closeLogin = useCallback(() => setIsOpen(false), []);
@@ -116,12 +127,16 @@ export function LoginModalProvider({ children }: { children: React.ReactNode }) 
               account. {t('reassurance')}
             </div>
 
-            <Link className={styles.primary} href="/sign-in" style={{ display: 'block', textAlign: 'center' }}>
+            <Link
+              className={styles.primary}
+              href={{ pathname: '/sign-in', query: next ? { next } : undefined }}
+              style={{ display: 'block', textAlign: 'center' }}
+            >
               {t('title')}
             </Link>
             <Link
               className={styles.social}
-              href="/sign-up"
+              href={{ pathname: '/sign-up', query: next ? { next } : undefined }}
               style={{ display: 'block', textAlign: 'center', width: '100%', marginTop: 10 }}
             >
               {t('create')}

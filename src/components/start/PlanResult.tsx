@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { saveStartPlanAction, type StoredPlan } from '@/app/actions/startPlan';
 import { useLoginModal } from '@/components/shell/LoginModalProvider';
 import { Icon } from '@/components/ui/Icon';
 import { Link, useRouter } from '@/i18n/navigation';
 import { track } from '@/lib/events/analytics';
 import {
+  clearDraft,
   draftServerSnapshot,
   draftSnapshot,
   markStep,
@@ -13,6 +15,7 @@ import {
 } from '@/lib/start/draftStore';
 import { isComplete } from '@/lib/start/path';
 import {
+  buildPlan,
   nextStep,
   planProgress,
   profileOf,
@@ -33,12 +36,32 @@ import styles from './PlanResult.module.css';
  * default route — it sends you to the questions, because a plan nobody answered
  * for is the thing this journey exists to replace.
  */
-export function PlanResult() {
+export function PlanResult({ stored }: { stored: StoredPlan | null }) {
   const router = useRouter();
   const { authed, openLogin } = useLoginModal();
   const state = useSyncExternalStore(subscribeDraft, draftSnapshot, draftServerSnapshot);
 
-  const { answers, steps, done } = state;
+  /*
+   * A draft in this browser is what the person is looking at; the saved plan is
+   * what they kept. The draft wins while it is complete, and the account wins
+   * otherwise.
+   *
+   * That order matters at exactly one moment: somebody who redid the diagnostic
+   * as a guest and then signed into an account that already had a plan. Reading
+   * the account first would show them a plan they had just replaced and drop the
+   * one they were looking at when they pressed save — which is the loss this
+   * screen promises will not happen. Redoing the diagnostic *is* how a plan is
+   * replaced, and they had just done it.
+   */
+  const draftReady = isComplete(state.answers) && state.steps.length > 0;
+  const fromAccount =
+    stored && !draftReady
+      ? { answers: stored.answers, steps: buildPlan(stored.answers), done: stored.done }
+      : null;
+  const { answers, steps, done } = fromAccount ?? state;
+  const [migrated, setMigrated] = useState(false);
+  /* One attempt per visit. A failed save must not spin against the server. */
+  const migrating = useRef(false);
   const ready = isComplete(answers) && steps.length > 0;
   const progress = planProgress(steps, done);
   const next = nextStep(steps, done);
@@ -53,12 +76,47 @@ export function PlanResult() {
    * loads on its first call, so by the time this runs it is the real answer.
    */
   useEffect(() => {
+    /*
+     * A plan on the account counts. The migration clears the browser copy once
+     * it has been saved, so a guard that only looked at storage bounced people
+     * to the questions on the first reload *after* their plan was kept — which
+     * is the one moment the screen has just promised nothing was lost.
+     */
+    if (stored) return;
     if (!isComplete(draftSnapshot().answers)) router.replace('/start');
-  }, [router]);
+  }, [router, stored]);
 
   useEffect(() => {
     if (ready) track({ name: 'save_prompt_viewed', surface: 'plan' });
   }, [ready]);
+
+  /*
+   * Signing in is what moves the plan onto the account.
+   *
+   * The screen promises "nothing is lost either way" beside the sign-up button,
+   * and until this ran that was untrue — a guest built a plan, registered, and
+   * came back to an empty account. The browser copy is cleared only after the
+   * server confirms, so a failed save leaves the guest's copy exactly where it
+   * was rather than losing it to a network error.
+   */
+  useEffect(() => {
+    if (!authed || !ready || !draftReady || migrating.current) return;
+    migrating.current = true;
+
+    saveStartPlanAction({ answers, done })
+      .then((result) => {
+        if (result.status !== 'saved') return;
+        track({ name: 'registration_completed_from_plan', steps: result.steps });
+        clearDraft();
+        setMigrated(true);
+        // The server component still holds the plan as it was before this save.
+        router.refresh();
+      })
+      .catch(() => {
+        // The plan stays in the browser and the banner does not appear. Saying
+        // nothing is better than claiming a save that did not happen.
+      });
+  }, [authed, ready, draftReady, answers, done, router]);
 
   if (!ready) {
     return (
@@ -89,6 +147,14 @@ export function PlanResult() {
 
   return (
     <div className={styles.page}>
+      {migrated && (
+        <div className={styles.migrated} role="status">
+          <Icon name="check" size={15} strokeWidth={2.6} />
+          Saved to your account. It is on your other devices now, and this browser no longer holds
+          the only copy.
+        </div>
+      )}
+
       <div className={styles.head}>
         <div>
           <span className={styles.badge}>
@@ -194,6 +260,14 @@ export function PlanResult() {
                         aria-pressed={isDone}
                         onClick={() => {
                           markStep(step.id, !isDone);
+                          if (authed) {
+                            const next = isDone
+                              ? done.filter((entry) => entry !== step.id)
+                              : [...done, step.id];
+                            // Fire and forget: the tick has already moved, and a
+                            // failed write costs the progress, not the click.
+                            void saveStartPlanAction({ answers, done: next });
+                          }
                           if (!isDone) {
                             track({
                               name: 'plan_step_completed',

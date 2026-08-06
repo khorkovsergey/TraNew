@@ -38,7 +38,7 @@ export default async function Page({ params, searchParams }: Props) {
   return (
     <>
       <SpaceBackdrop tone={3} />
-      <AuthShell mode="in">
+      <AuthShell mode="in" next={typeof search.next === 'string' ? search.next : undefined}>
         <div className={styles.wrap}>
           <SignInForm providers={providers} next={typeof search.next === "string" ? search.next : undefined} />
         </div>

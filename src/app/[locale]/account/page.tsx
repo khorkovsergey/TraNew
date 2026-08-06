@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 import { AccountLayout } from '@/components/account/AccountLayout';
-import { AccountOverview } from '@/components/account/AccountSections';
+import { loadStartPlan } from '@/app/actions/startPlan';
+import { AccountOverview, ResumePlan } from '@/components/account/AccountSections';
 import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
 import { requireUser } from '@/lib/session';
@@ -24,10 +25,13 @@ export default async function Page({ params }: Props) {
   setRequestLocale(locale);
 
   // Middleware only checks that a cookie exists; this is the real gate.
-  await requireUser();
+  const user = await requireUser();
+  const stored = await loadStartPlan(user.id).catch(() => null);
 
   return (
     <AccountLayout>
+      {/* Above everything else: it is the thing they were in the middle of. */}
+      <ResumePlan stored={stored} />
       <AccountOverview />
     </AccountLayout>
   );

@@ -510,3 +510,83 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Resume the plan ----
+ *
+ * Rendered from the saved plan rather than from copy. A "continue where you
+ * left off" that cannot name where that is has not been anywhere.
+ */
+.resumeStrip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 20px 0 8px;
+  padding: 18px 20px;
+  border: 1px solid var(--tn-mint-border);
+  border-radius: 14px;
+  background: var(--tn-mint-tint);
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-fast);
+}
+
+.resumeStrip:hover {
+  border-color: var(--tn-mint);
+}
+
+.resumeIcon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tn-surface);
+  border: 1px solid var(--tn-mint-border);
+  color: var(--tn-mint);
+}
+
+.resumeText {
+  flex: 1;
+  min-width: 0;
+}
+
+.resumeLabel {
+  display: block;
+  font-size: 15.5px;
+  font-weight: 800;
+}
+
+.resumeNext {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  color: var(--tn-text-soft);
+}
+
+.resumeTrack {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--tn-border-hairline);
+  margin-top: 10px;
+  overflow: hidden;
+  max-width: 420px;
+}
+
+.resumeFill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--tn-progress);
+}
+
+.resumeCta {
+  flex-shrink: 0;
+  padding: 11px 22px;
+  border-radius: 11px;
+  background: var(--tn-cta);
+  color: var(--tn-cta-text);
+  font-size: 14px;
+  font-weight: 800;
+}
