@@ -2,72 +2,66 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Icon } from '@/components/ui/Icon';
 import { Link, usePathname } from '@/i18n/navigation';
 import { requestSearchFocus } from '@/lib/searchFocus';
 import { AuthedActions } from './AuthedActions';
 import { useLoginModal } from './LoginModalProvider';
-import { MENUS, NAV_ACTIVE_PREFIXES, type MenuEntry, type NavKey } from './menu';
+import { MENUS, type MenuEntry } from './menu';
+import { AUTHED_NAV, GUEST_NAV, activeNavKey } from './nav';
 import styles from './Header.module.css';
 
-/*
- * Voyager is last and is a destination rather than a dropdown, like Home. It
- * used to be a violet pill sitting outside this row; as an ordinary item it
- * stops asking for attention the other sections do not get, which is also what
- * the brand rule about one accent per meaning wants — violet is Voyager's
- * colour inside Voyager, not a way to make a link louder.
+/**
+ * The shared shell.
+ *
+ * Marketplace is the only dropdown left. The other five headings became
+ * destinations, which is the point of the redesign: a beginner should be able to
+ * read the top of the page rather than navigate it.
  */
-const NAV_KEYS: NavKey[] = [
-  'home',
-  'market',
-  'symbols',
-  'economy',
-  'community',
-  'marketplace',
-  'voyager',
-];
-
 export function Header() {
   const t = useTranslations('header');
   const tMenu = useTranslations('menu');
   const pathname = usePathname();
   const { openLogin, authed } = useLoginModal();
 
-  const [openMenu, setOpenMenu] = useState<NavKey | null>(null);
+  const [mpOpen, setMpOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const triggers = useRef<Partial<Record<NavKey, HTMLButtonElement | null>>>({});
+  const trigger = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [panelLeft, setPanelLeft] = useState<number | null>(null);
+
+  const items = authed ? AUTHED_NAV : GUEST_NAV;
+  const active = activeNavKey(items, pathname);
 
   /*
    * A dropdown belongs under the thing that opened it. The panel is fixed, so
    * that means measuring the trigger and writing a pixel `left` — and clamping
-   * it, because the Marketplace item sits near the right edge and its panel
-   * would otherwise hang off the screen at narrow widths.
+   * it, because Marketplace sits near the right edge and its panel would
+   * otherwise hang off the screen at narrow widths.
    */
   const placePanel = useCallback(() => {
-    if (!openMenu) return;
-    const trigger = triggers.current[openMenu];
+    if (!mpOpen) return;
+    const anchor = trigger.current?.getBoundingClientRect();
     const panel = panelRef.current;
-    if (!trigger || !panel) return;
+    if (!anchor || !panel) return;
 
-    const anchor = trigger.getBoundingClientRect();
     const width = panel.offsetWidth;
     const margin = 12;
     const centred = anchor.left + anchor.width / 2 - width / 2;
     const rightmost = Math.max(margin, window.innerWidth - width - margin);
 
     setPanelLeft(Math.round(Math.min(Math.max(centred, margin), rightmost)));
-  }, [openMenu]);
+  }, [mpOpen]);
 
   // Before paint, so the panel is never seen at the position it starts from.
   useLayoutEffect(placePanel, [placePanel]);
 
   useEffect(() => {
-    if (!openMenu) return;
+    if (!mpOpen) return;
     window.addEventListener('resize', placePanel);
     return () => window.removeEventListener('resize', placePanel);
-  }, [openMenu, placePanel]);
+  }, [mpOpen, placePanel]);
 
   const cancelClose = () => {
     if (closeTimer.current) {
@@ -76,44 +70,36 @@ export function Header() {
     }
   };
 
-  const closeAll = () => {
-    cancelClose();
-    setOpenMenu(null);
-  };
+  const closeAll = useCallback(() => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+    setMpOpen(false);
+  }, []);
 
   /*
-   * Closing when the pointer leaves.
-   *
-   * Without this the panel stays open until something is clicked, which is why it
-   * felt like it had to be dismissed rather than simply left. The delay matters:
-   * the panel sits below the header, so a diagonal path from a nav item to the
-   * panel crosses a gap where the pointer is inside neither. Closing instantly
-   * would snatch the menu away mid-reach.
-   *
-   * Pointer only — a touch never "leaves", so on a phone the scrim and the
-   * trigger stay the way out.
+   * Closing when the pointer leaves, with a delay: the panel sits below the
+   * header, so a diagonal path from the trigger to the panel crosses a gap where
+   * the pointer is inside neither. Closing instantly would snatch the menu away
+   * mid-reach. Pointer only — a touch never "leaves".
    */
   const scheduleClose = (event: React.PointerEvent) => {
     if (event.pointerType === 'touch') return;
     cancelClose();
-    closeTimer.current = setTimeout(() => setOpenMenu(null), 220);
+    closeTimer.current = setTimeout(() => setMpOpen(false), 220);
   };
 
   useEffect(() => cancelClose, []);
 
   useEffect(() => {
-    if (!openMenu) return;
+    if (!mpOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeAll();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [openMenu]);
-
-  const isActive = (key: NavKey) => {
-    if (key === 'home') return pathname === '/';
-    return NAV_ACTIVE_PREFIXES[key].some((prefix) => pathname.startsWith(prefix));
-  };
+  }, [mpOpen, closeAll]);
 
   const renderEntry = (entry: MenuEntry, index: number) => {
     const label = tMenu(entry.labelKey);
@@ -122,9 +108,7 @@ export function Header() {
       <>
         <div className={styles.menuItemLabel}>
           {label}
-          {/* Said before the click rather than after it. The destination still
-              exists and still explains itself — this only stops the menu from
-              implying the screen is finished. */}
+          {/* Said before the click rather than after it. */}
           {entry.soon && <span className={styles.soon}>Soon</span>}
         </div>
         {sub && <div className={styles.menuItemSub}>{sub}</div>}
@@ -136,9 +120,7 @@ export function Header() {
         <Link
           key={index}
           className={styles.menuItem}
-          href={
-            { pathname: entry.href, params: entry.params, query: entry.query } as never
-          }
+          href={{ pathname: entry.href, params: entry.params, query: entry.query } as never}
           onClick={closeAll}
         >
           {body}
@@ -182,55 +164,79 @@ export function Header() {
       {/* Header and panel share one pointer region so leaving either closes the
           menu. The scrim stays outside it: a full-viewport child would mean the
           pointer never leaves, and the close would never fire. */}
-      <div
-        className={styles.headerDock}
-        onPointerLeave={scheduleClose}
-        onPointerEnter={cancelClose}
-      >
+      <div className={styles.headerDock} onPointerLeave={scheduleClose} onPointerEnter={cancelClose}>
         <header className={styles.header}>
           <Link className={styles.logo} href="/" aria-label={t('homeLink')} onClick={closeAll}>
-            <span className={styles.mark} aria-hidden="true">
-              TN
-            </span>
+            {/* The mark is a rising line that turns into an arrow — the mint
+                stroke is the line, the blue one the corner it leaves through. */}
+            <svg
+              className={styles.mark}
+              width="30"
+              height="30"
+              viewBox="0 0 32 32"
+              fill="none"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                d="M4 22 L12 13 L18 18 L28 7"
+                stroke="var(--tn-mint)"
+                strokeWidth="3.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M21 7h7v7"
+                stroke="var(--tn-blue)"
+                strokeWidth="3.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
             <span className={styles.wordmark}>TradingNew</span>
           </Link>
 
           <nav className={styles.nav} aria-label={t('nav.home')}>
-            {NAV_KEYS.map((key) => {
-              const className = `${styles.navItem} ${isActive(key) ? styles.navItemActive : ''}`;
+            {items.map((item) => (
+              <Link
+                key={item.key}
+                className={`${styles.navItem} ${active === item.key ? styles.navItemActive : ''}`}
+                href={item.href}
+                aria-current={active === item.key ? 'page' : undefined}
+                onClick={closeAll}
+              >
+                {t(`nav.${item.labelKey}`)}
+              </Link>
+            ))}
 
-              if (key === 'home' || key === 'voyager') {
-                return (
-                  <Link
-                    key={key}
-                    className={className}
-                    href={key === 'home' ? '/' : '/voyager'}
-                    onClick={closeAll}
-                  >
-                    {t(`nav.${key}`)}
-                  </Link>
-                );
-              }
-
-              return (
-                <button
-                  key={key}
-                  ref={(element) => {
-                    triggers.current[key] = element;
-                  }}
-                  className={className}
-                  aria-expanded={openMenu === key}
-                  aria-haspopup="true"
-                  onClick={() => setOpenMenu((current) => (current === key ? null : key))}
-                >
-                  {t(`nav.${key}`)}
-                </button>
-              );
-            })}
+            <button
+              ref={trigger}
+              className={`${styles.navItem} ${styles.navTrigger} ${
+                active === 'marketplace' || mpOpen ? styles.navItemActive : ''
+              }`}
+              aria-expanded={mpOpen}
+              aria-haspopup="true"
+              onClick={() => setMpOpen((open) => !open)}
+            >
+              {t('nav.marketplace')}
+              <Icon name="chevronDown" size={12} strokeWidth={2.4} />
+            </button>
           </nav>
 
           <div className={styles.actions}>
-            {/* Signed in, the two anonymous CTAs give way to notifications and the avatar. */}
+            <button
+              className={styles.iconButton}
+              aria-label={t('search')}
+              onClick={() => {
+                closeAll();
+                requestSearchFocus();
+              }}
+            >
+              <Icon name="search" size={17} strokeWidth={2.2} />
+            </button>
+
+            {/* Signed in, the two anonymous CTAs give way to saved, notifications
+                and the avatar. */}
             {authed ? (
               <AuthedActions />
             ) : (
@@ -239,7 +245,7 @@ export function Header() {
                   {t('login')}
                 </button>
 
-                <Link className={styles.openButton} href="/start" onClick={closeAll}>
+                <Link className={styles.startButton} href="/start" onClick={closeAll}>
                   {t('openApp')}
                 </Link>
               </>
@@ -247,13 +253,13 @@ export function Header() {
           </div>
         </header>
 
-        {openMenu && (
+        {mpOpen && (
           <div
             ref={panelRef}
-            className={`${styles.panel} ${styles.menuPanel}`}
+            className={styles.panel}
             style={panelLeft === null ? undefined : { left: panelLeft }}
           >
-            {MENUS[openMenu as Exclude<NavKey, 'home' | 'voyager'>].map((group) => (
+            {MENUS.marketplace.map((group) => (
               <div className={styles.group} key={group.titleKey}>
                 <div className={styles.groupTitle}>{tMenu(group.titleKey)}</div>
                 <div className={styles.groupItems}>{group.items.map(renderEntry)}</div>
@@ -263,7 +269,7 @@ export function Header() {
         )}
       </div>
 
-      {openMenu && <div className={styles.scrim} onClick={closeAll} />}
+      {mpOpen && <div className={styles.scrim} onClick={closeAll} />}
     </>
   );
 }

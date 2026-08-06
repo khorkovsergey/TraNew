@@ -81,12 +81,20 @@ type Stage = 'landing' | 'requested';
 type Props = {
   /** From the session on the server; the prototype's persona switch is not product. */
   personName: string | null;
+  /**
+   * A question carried in from elsewhere — the home page's Ask Voyager box.
+   *
+   * It seeds the composer and nothing else. Sending it automatically would mean
+   * a link could put words in somebody's mouth, and the state it would have to
+   * set is the state of an answer having been asked for.
+   */
+  seedQuestion?: string | null;
 };
 
-export function VoyagerWorkspace({ personName }: Props) {
+export function VoyagerWorkspace({ personName, seedQuestion = null }: Props) {
   const [stage, setStage] = useState<Stage>('landing');
   const [request, setRequest] = useState('');
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(seedQuestion ?? '');
   const [showCategories, setShowCategories] = useState(false);
   const [plan, setPlan] = useState<VoyagerPlan | null>(null);
   const [refusals, setRefusals] = useState<string[]>([]);

@@ -55,7 +55,7 @@
 }
 
 .navItem:hover {
-  background: #f0f3f8;
+  background: var(--tn-chip-bg);
 }
 
 .navItemActive {
@@ -184,7 +184,7 @@
 
 .insightCard {
   background: var(--tn-purple-tint-soft);
-  border: 1px solid #e0d5fb;
+  border: 1px solid var(--tn-purple-border);
   border-radius: var(--tn-radius-card);
   padding: 20px 22px;
 }
@@ -355,7 +355,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px 0;
-  border-bottom: 1px solid #f0f2f7;
+  border-bottom: 1px solid var(--tn-border-hairline);
 }
 
 .settingRow:last-child {
@@ -400,7 +400,7 @@
   width: 44px;
   height: 25px;
   border-radius: 13px;
-  background: #d5dae5;
+  background: var(--tn-border-control);
   position: relative;
   flex-shrink: 0;
   transition: background var(--tn-transition-fast);
@@ -459,8 +459,8 @@
 /* ---- Wealth preview card ---- */
 
 .wealthCard {
-  background: linear-gradient(135deg, #eef2ff, #f6f2fe);
-  border: 1px solid #dfe4fb;
+  background: linear-gradient(135deg, var(--tn-blue-tint), var(--tn-purple-tint-soft));
+  border: 1px solid var(--tn-blue-border);
   border-radius: var(--tn-radius-card);
   padding: 22px 24px;
   margin-top: 16px;

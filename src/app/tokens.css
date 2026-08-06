@@ -1,100 +1,155 @@
 /**
- * TradingNew design tokens — transcribed from design_handoff_tradingnew_portal/README.md.
- * Values here are final (high-fidelity handoff); change them only alongside the design.
+ * TradingNew design tokens — v2, the beginner-first dark system.
+ *
+ * Transcribed from design_handoff_tradingnew_redesign/README.md. The v1 light
+ * palette is gone rather than kept alongside: every surface in this codebase is
+ * already written in tokens, so one set of values decides the whole portal's
+ * appearance. Two sets would mean two portals, and the half that nobody
+ * remembered to switch is the half a person would find.
+ *
+ * The token *names* are unchanged wherever v1 had one, which is why screens the
+ * redesign has not reached yet come out dark and coherent instead of broken.
+ * Names whose meaning was tied to lightness — `--tn-green-deep`, `--tn-purple-deep`
+ * — now hold the *lighter* value, because "deep" always meant "the readable one
+ * on a tinted surface" and on a dark surface that is the lighter end.
  */
 
 :root {
   /* ---- Text ---- */
-  --tn-text: #131722;
-  --tn-text-secondary: #5a6376;
-  --tn-text-muted: #8a93a6;
-  --tn-text-faint: #9aa3b5;
-  --tn-text-nav: #3a4254;
+  --tn-text: #eef4f9;
+  --tn-text-secondary: #93a4b8;
+  /* Long-form body copy: one step brighter than secondary, because a paragraph
+     read at 13px needs more than a label does. */
+  --tn-text-body: #a7b8c9;
+  --tn-text-soft: #8fa2b5;
+  --tn-text-muted: #7e93a8;
+  --tn-text-faint: #5c6f85;
+  --tn-text-nav: #aebdcd;
 
   /* ---- Surfaces ---- */
-  --tn-bg: #fbfcfe;
-  --tn-surface: #ffffff;
-  --tn-chip-bg: #f2f4f9;
-  --tn-hero-bg: linear-gradient(180deg, #eef1fb 0%, #fbfcfe 640px);
+  --tn-bg: #04070c;
+  --tn-surface: #070e16;
+  /* Over a space background: the same surface, letting a little of the sky
+     through so a card reads as sitting on the image rather than punched out. */
+  --tn-surface-veil: rgba(7, 14, 22, 0.9);
+  /* A card inside a card. Lighter than the page, darker than nothing. */
+  --tn-surface-inner: #0a121c;
+  --tn-chip-bg: #0d1826;
+  --tn-input-bg: #0a1522;
+  --tn-raised: #0a121c;
+  --tn-header-bg: rgba(4, 7, 12, 0.82);
+  /*
+   * The page wash. On the redesigned screens the real background is a space
+   * image set per section (see .tn-space-* in globals.css); this stays as the
+   * flat fallback so a screen that has not been given one is still on-brand.
+   */
+  --tn-hero-bg: radial-gradient(1200px 620px at 78% -10%, #0a1a24 0%, #04070c 62%);
 
   /* ---- Borders ---- */
-  --tn-border-card: #eceff4;
-  --tn-border-control: #e6eaf2;
-  --tn-border-input: #e2e6ee;
+  --tn-border-card: #15202d;
+  --tn-border-inner: #1a2531;
+  --tn-border-control: #22303f;
+  --tn-border-input: #1d2f42;
+  --tn-border-hairline: #101a26;
+  --tn-hairline-soft: #0c1420;
+  /* The border a neutral control takes on hover — visible, but not an accent. */
+  --tn-border-hover: #33465c;
 
   /* ---- Accents ---- */
-  --tn-blue: #2962ff;
-  --tn-blue-hover: #1848d6;
-  --tn-blue-tint: #e8edfd;
-  /* The border a selected or focused control takes: blue, but quiet enough not
-     to read as an error. */
-  --tn-border-focus: #c9d4f5;
+  /*
+   * Mint is the interaction accent of the redesign: hover borders, the active
+   * nav underline, selected states. It is deliberately not the same green as
+   * market data — a rising price and a focused card must never be told apart by
+   * shade alone.
+   */
+  --tn-mint: #2ee6a8;
+  --tn-mint-tint: rgba(46, 230, 168, 0.09);
+  --tn-mint-border: rgba(46, 230, 168, 0.35);
+  --tn-mint-glow: 0 0 20px rgba(46, 230, 168, 0.14);
 
-  --tn-purple: #7c4dff;
-  --tn-purple-hover: #6a3de8;
-  --tn-purple-tint: #efe9fd;
-  --tn-purple-tint-soft: #f6f2fe;
-  /* A lighter rule than --tn-border-card, for rows inside a bordered table
-     where the card border is already doing the outlining. */
-  --tn-border-hairline: #f0f2f7;
-  /* One step above the page, for group headers that must read as structure
-     rather than as content. */
-  --tn-raised: #f8f9fc;
-  /* The Voyager entry point. Hex values from the workspace handoff, which is
-     specific about them on purpose. */
-  --tn-purple-border: #e6dcfb;
-  --tn-purple-deep: #4a3a7a;
+  /* Blue: links and accents at #38bdf8 (readable on the page); the solid fill
+     under white button text is the darker end, which white can actually sit on. */
+  --tn-blue: #38bdf8;
+  --tn-blue-hover: #7dd3fc;
+  --tn-blue-strong: #2563eb;
+  --tn-blue-tint: rgba(56, 189, 248, 0.12);
+  --tn-blue-border: rgba(56, 189, 248, 0.35);
+  --tn-border-focus: #2563eb;
 
-  --tn-green: #1aa966;
-  --tn-green-hover: #159056;
-  --tn-green-tint: #e3f6ec;
-  /* Text weight for a green surface — the tint is too pale to carry --tn-green
-     at body size and still clear AA. */
-  --tn-green-deep: #127a4b;
+  --tn-teal: #22d3ee;
+  --tn-cyan: #67e8f9;
 
-  --tn-orange: #f4741f;
+  --tn-purple: #a78bfa;
+  --tn-purple-hover: #c4b5fd;
+  --tn-purple-tint: rgba(167, 139, 250, 0.12);
+  --tn-purple-tint-soft: rgba(167, 139, 250, 0.06);
+  --tn-purple-border: rgba(167, 139, 250, 0.35);
+  /* Voyager text on a violet tint. */
+  --tn-purple-deep: #c4b5fd;
+
+  --tn-green: #34d399;
+  --tn-green-hover: #6ee7b7;
+  --tn-green-tint: rgba(52, 211, 153, 0.12);
+  --tn-green-deep: #6ee7b7;
+
+  --tn-lime: #a3e635;
+  --tn-yellow: #facc15;
+
+  --tn-orange: #fb923c;
   --tn-orange-star: #f4a71f;
-  --tn-orange-tint: #fdeee3;
-  --tn-amber-tint: #fdf3e3;
-  --tn-amber-text: #b07708;
+  --tn-orange-tint: rgba(251, 146, 60, 0.12);
+  --tn-amber-tint: rgba(250, 204, 21, 0.1);
+  --tn-amber-border: rgba(250, 204, 21, 0.32);
+  --tn-amber-text: #fcd34d;
 
-  --tn-red: #e0492f;
-  /* The counterpart to --tn-green-tint, at the same lightness, so an added and
-     a removed line in a diff read as a pair rather than as two intensities. */
-  --tn-red-tint: #fce8e4;
-  /* The outline a destructive control takes: red, without the fill. */
-  --tn-red-border: #f5cdbd;
-  /* Heatmap borders, so a tinted tile still has an edge on a white card. */
-  --tn-heat-up-border: #c8ecd8;
-  --tn-heat-down-border: #f5cdbd;
+  --tn-red: #f87171;
+  --tn-red-tint: rgba(248, 113, 113, 0.12);
+  --tn-red-border: rgba(248, 113, 113, 0.35);
+  /* Heatmap borders, so a tinted tile still has an edge on a dark card. */
+  --tn-heat-up-border: rgba(52, 211, 153, 0.35);
+  --tn-heat-down-border: rgba(248, 113, 113, 0.35);
 
   /* Study lines. Indexed rather than named, because a study says "colour 0",
      not "blue" — which line gets which colour is the registry's business. */
-  --tn-study-0: #7c4dff;
-  --tn-study-1: #f4a71f;
-  --tn-study-2: #1aa966;
-  --tn-study-3: #e0492f;
+  --tn-study-0: #a78bfa;
+  --tn-study-1: #fcd34d;
+  --tn-study-2: #34d399;
+  --tn-study-3: #f87171;
 
-  --tn-gradient-headline: linear-gradient(90deg, #8b5cf6, #2962ff);
-  --tn-gradient-logo: linear-gradient(135deg, #2962ff, #8b5cf6);
+  /* ---- Gradients ----
+   * Four, each with exactly one job. A fifth would mean the gradient no longer
+   * says anything by being there.
+   */
+  /* Text-clip on a headline. One line per screen. */
+  --tn-gradient-headline: linear-gradient(90deg, #34d399, #22d3ee);
+  /* The primary CTA. Dark ink on it, because white on mint is unreadable. */
+  --tn-gradient-cta: linear-gradient(135deg, #10c98f, #0ea5e9);
+  --tn-gradient-cta-text: #04211a;
+  /* The secondary "sign up / continue" CTA, white text. */
+  --tn-gradient-cta-blue: linear-gradient(135deg, #38bdf8, #2563eb);
+  --tn-gradient-progress: linear-gradient(90deg, #10c98f, #22d3ee);
+  --tn-gradient-logo: linear-gradient(135deg, #10c98f, #2563eb);
 
   /* ---- Radii ---- */
-  --tn-radius-card: 18px;
-  --tn-radius-showcase: 26px;
-  --tn-radius-pill: 24px;
-  --tn-radius-pill-sm: 20px;
-  --tn-radius-chip: 16px;
-  --tn-radius-chip-sm: 13px;
-  --tn-radius-option: 14px;
+  --tn-radius-card: 14px;
+  --tn-radius-showcase: 20px;
+  --tn-radius-pill: 12px;
+  --tn-radius-pill-sm: 10px;
+  --tn-radius-chip: 10px;
+  --tn-radius-chip-sm: 8px;
+  --tn-radius-option: 12px;
   --tn-radius-logo: 9px;
-  --tn-radius-search: 36px;
+  --tn-radius-search: 12px;
 
-  /* ---- Shadows ---- */
-  --tn-shadow-card-hover: 0 10px 30px rgba(19, 23, 34, 0.09);
-  --tn-shadow-dropdown: 0 18px 50px rgba(19, 23, 34, 0.14);
-  --tn-shadow-modal: 0 24px 70px rgba(19, 23, 34, 0.25);
-  --tn-shadow-search: 0 6px 24px rgba(41, 98, 255, 0.09);
-  --tn-overlay: rgba(19, 23, 34, 0.4);
+  /* ---- Shadows ----
+   * On a near-black page a shadow is not a soft grey — it is an absence, and it
+   * has to be far heavier than its light-theme counterpart to register at all.
+   */
+  --tn-shadow-card-hover: 0 12px 34px rgba(0, 0, 0, 0.5);
+  --tn-shadow-dropdown: 0 24px 60px rgba(0, 0, 0, 0.6);
+  --tn-shadow-modal: 0 30px 80px rgba(0, 0, 0, 0.7);
+  --tn-shadow-search: 0 6px 24px rgba(46, 230, 168, 0.12);
+  --tn-overlay: rgba(2, 4, 8, 0.72);
 
   /* ---- Motion ---- */
   --tn-transition-hover: 0.18s ease;
@@ -102,7 +157,7 @@
   --tn-transition-slow: 0.3s ease;
 
   /* ---- Layout ---- */
-  --tn-page-max: 1160px;
-  --tn-page-pad: clamp(12px, 2.5vw, 36px);
+  --tn-page-max: 1480px;
+  --tn-page-pad: clamp(16px, 3vw, 48px);
   --tn-header-h: 69px;
 }

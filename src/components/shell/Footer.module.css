@@ -1,0 +1,115 @@
+.footer {
+  margin-top: 56px;
+  border-top: 1px solid var(--tn-border-hairline);
+  background: rgba(4, 7, 12, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.inner {
+  max-width: var(--tn-page-max);
+  margin: 0 auto;
+  padding: 40px var(--tn-page-pad) 28px;
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: clamp(24px, 4vw, 64px);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.wordmark {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--tn-text);
+}
+
+.tagline {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--tn-text-muted);
+  max-width: 260px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 20px 24px;
+}
+
+.columnTitle {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--tn-text-faint);
+  margin-bottom: 12px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--tn-text-secondary);
+  transition: color var(--tn-transition-fast);
+}
+
+.link:hover {
+  color: var(--tn-mint);
+}
+
+.soon {
+  border-radius: var(--tn-radius-chip-sm);
+  background: #101c2a;
+  border: 1px solid #1e2c3c;
+  padding: 1px 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}
+
+.legal {
+  max-width: var(--tn-page-max);
+  margin: 0 auto;
+  padding: 18px var(--tn-page-pad) 32px;
+  border-top: 1px solid var(--tn-hairline-soft);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--tn-text-faint);
+}
+
+.legal p {
+  max-width: 760px;
+}
+
+.copyright {
+  white-space: nowrap;
+}
+
+@media (max-width: 1080px) {
+  .inner {
+    grid-template-columns: 1fr;
+  }
+
+  .columns {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}

@@ -3,7 +3,7 @@
   inset: 0;
   /* Above the Voyager panel (75) and everything else on the page. */
   z-index: 200;
-  background: #0b0d13;
+  background: var(--tn-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,7 +15,7 @@
   /* Contain, not cover: the film is a centred composition and cropping it on a
      wide screen cuts the wordmark off. */
   object-fit: contain;
-  background: #0b0d13;
+  background: var(--tn-bg);
 }
 
 .controls {

@@ -77,7 +77,7 @@
 }
 
 .secondary:hover {
-  background: #eef2ff;
+  background: var(--tn-blue-tint);
 }
 
 .ghost {
@@ -91,7 +91,7 @@
 }
 
 .ghost:hover {
-  background: #f4f6fa;
+  background: var(--tn-chip-bg);
 }
 
 .hint {
@@ -207,7 +207,7 @@
 .progressTrack {
   flex: 1;
   height: 6px;
-  background: #eef0f5;
+  background: var(--tn-chip-bg);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -237,7 +237,7 @@
   padding: 12px 16px;
   margin-top: 10px;
   font-size: 13px;
-  color: #4a3a7a;
+  color: var(--tn-purple-deep);
   line-height: 1.6;
 }
 
@@ -533,7 +533,7 @@
   padding: 14px 18px;
   margin-top: 12px;
   font-size: 13px;
-  color: #4a3a7a;
+  color: var(--tn-purple-deep);
   line-height: 1.6;
 }
 
@@ -563,7 +563,7 @@
   gap: 14px;
   font-size: 13.5px;
   padding: 9px 0;
-  border-bottom: 1px solid #f0f2f7;
+  border-bottom: 1px solid var(--tn-border-hairline);
 }
 
 .kv:last-child {
@@ -580,7 +580,7 @@
 }
 
 .review {
-  border-top: 1px solid #f0f2f7;
+  border-top: 1px solid var(--tn-border-hairline);
   padding-top: 14px;
   margin-top: 14px;
 }
@@ -630,7 +630,7 @@
 
 .disclosureItem {
   font-size: 13.5px;
-  color: #7a5407;
+  color: var(--tn-amber-text);
   line-height: 1.5;
 }
 
@@ -640,7 +640,7 @@
   gap: 14px;
   font-size: 13.5px;
   padding: 11px 0;
-  border-bottom: 1px solid #f0f2f7;
+  border-bottom: 1px solid var(--tn-border-hairline);
 }
 
 .packageRow:last-child {
@@ -655,7 +655,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px 0;
-  border-bottom: 1px solid #f0f2f7;
+  border-bottom: 1px solid var(--tn-border-hairline);
 }
 
 .toggleRow:last-child {
@@ -671,7 +671,7 @@
   width: 46px;
   height: 26px;
   border-radius: 13px;
-  background: #dfe4ee;
+  background: var(--tn-border-control);
   position: relative;
   flex-shrink: 0;
   transition: background var(--tn-transition-fast);
@@ -889,7 +889,7 @@
 }
 
 .dark:hover {
-  background: #2a3040;
+  background: var(--tn-chip-bg);
 }
 
 .payButton {
@@ -948,7 +948,7 @@
 }
 
 .star {
-  color: #dfe4ee;
+  color: var(--tn-text-secondary);
   transition: color var(--tn-transition-fast);
 }
 

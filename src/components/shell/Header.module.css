@@ -15,21 +15,19 @@
 
 /*
  * A grid, so the navigation is centred in the window rather than in the space
- * the logo and the buttons happen to leave.
- *
- * With `space-between` and a flexible middle the row looked centred and was
- * not: the logo is about 175px, the sign-in group rather more, and the nav sat
- * left of centre by the difference. Equal side columns put the middle column
- * on the actual centre line whatever the two sides weigh.
+ * the logo and the buttons happen to leave. With `space-between` and a flexible
+ * middle the row looks centred and is not: the logo is about 175px and the
+ * action group rather more, so the nav sits left of centre by the difference.
  */
 .header {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: clamp(6px, 1vw, 16px);
-  padding: 16px var(--tn-page-pad);
-  background: var(--tn-surface);
-  border-bottom: 1px solid var(--tn-border-card);
+  gap: clamp(6px, 1vw, 20px);
+  padding: 14px var(--tn-page-pad);
+  background: var(--tn-header-bg);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--tn-border-hairline);
 }
 
 /* ---- Logo ---- */
@@ -39,21 +37,11 @@
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  color: var(--tn-text);
 }
 
 .mark {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--tn-radius-logo);
-  background: var(--tn-gradient-logo);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  color: #fff;
-  font-size: 12.5px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
 }
 
 .wordmark {
@@ -67,18 +55,26 @@
 .nav {
   display: flex;
   align-items: center;
-  gap: clamp(0px, 0.4vw, 8px);
+  gap: clamp(10px, 2vw, 30px);
   justify-content: safe center;
   min-width: 0;
 }
 
+/*
+ * The active item takes a mint underline, not a colour swap alone. Colour is the
+ * first thing to go for a person who cannot separate these two blues, and "which
+ * section am I in" is not a decorative question.
+ */
 .navItem {
-  color: var(--tn-text-nav);
-  font-size: clamp(11px, 1.25vw, 13.5px);
-  font-weight: 500;
-  padding: 9px clamp(1px, 0.72vw, 14px);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tn-text-secondary);
+  font-size: clamp(12.5px, 1.1vw, 14.5px);
+  font-weight: 600;
+  padding: 8px 2px 10px;
   white-space: nowrap;
-  border-radius: 8px;
+  border-bottom: 2px solid transparent;
   transition: color var(--tn-transition-fast);
 }
 
@@ -87,7 +83,17 @@
 }
 
 .navItemActive {
-  color: var(--tn-blue);
+  color: #fff;
+  font-weight: 700;
+  border-bottom-color: var(--tn-mint);
+}
+
+.navTrigger {
+  background: none;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  cursor: pointer;
 }
 
 /* ---- Right-hand actions ---- */
@@ -96,47 +102,66 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: clamp(2px, 0.6vw, 8px);
+  gap: 10px;
   min-width: 0;
 }
 
-.loginButton {
-  padding: 10px clamp(4px, 0.8vw, 10px);
-  font-size: 13.5px;
-  font-weight: 600;
+.iconButton {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--tn-border-control);
+  border-radius: var(--tn-radius-chip);
+  background: var(--tn-surface);
+  color: var(--tn-text-nav);
+  transition: border-color var(--tn-transition-fast), color var(--tn-transition-fast);
+}
+
+.iconButton:hover {
+  border-color: var(--tn-border-hover);
   color: var(--tn-text);
+}
+
+.loginButton,
+.startButton {
+  padding: 10px 20px;
+  border-radius: var(--tn-radius-chip);
+  font-size: 13.5px;
+  font-weight: 700;
   white-space: nowrap;
-  transition: color var(--tn-transition-fast);
+  transition: border-color var(--tn-transition-fast), filter var(--tn-transition-fast);
+}
+
+.loginButton {
+  border: 1px solid var(--tn-border-control);
+  background: var(--tn-surface);
+  color: var(--tn-text);
 }
 
 .loginButton:hover {
-  color: var(--tn-blue);
+  border-color: var(--tn-border-hover);
 }
 
-.openButton {
-  background: var(--tn-text);
-  border-radius: 22px;
-  padding: 11px clamp(10px, 1.2vw, 16px);
-  font-size: clamp(12.5px, 1.35vw, 13.5px);
-  font-weight: 700;
+.startButton {
+  padding: 10px 22px;
+  border: 1px solid transparent;
+  background: var(--tn-gradient-cta-blue);
   color: #fff;
-  white-space: nowrap;
-  transition: background var(--tn-transition-fast);
 }
 
-.openButton:hover {
-  background: #2a3040;
+.startButton:hover {
+  filter: brightness(1.1);
 }
 
-/* ---- Dropdown shell ---- */
+/* ---- Marketplace dropdown ---- */
 
 /*
- * Below the header (40), not above it.
- *
- * At 45 the scrim covered the nav, so pressing the open item again never reached
- * the button — the click landed on the scrim. The menu still closed, which is why
- * it looked like it worked, but the only way to dismiss it was to click somewhere
- * off to the side. Under the header, the trigger toggles and the scrim catches
+ * Below the header (40), not above it. At 45 the scrim covered the nav, so
+ * pressing the open item again never reached the button — the click landed on
+ * the scrim. Under the header, the trigger toggles and the scrim catches
  * everything else.
  */
 .scrim {
@@ -145,37 +170,28 @@
   z-index: 35;
 }
 
+/*
+ * `left` is written by the header once the panel has been measured, so it sits
+ * under the item that opened it. The 12px here is only what it starts at for the
+ * one layout pass before that happens.
+ */
 .panel {
   position: fixed;
-  top: 66px;
+  top: 64px;
+  left: 12px;
   z-index: 50;
+  width: 340px;
+  padding: 22px 24px;
   background: var(--tn-surface);
-  border: 1px solid var(--tn-border-control);
-  border-radius: var(--tn-radius-card);
+  border: 1px solid #1c2836;
+  border-radius: 16px;
   box-shadow: var(--tn-shadow-dropdown);
   max-height: calc(100vh - 90px);
   overflow-y: auto;
 }
 
-/*
- * `left` is written by the header once the panel has been measured, so it sits
- * under the item that opened it. The 12px here is only what it starts at for the
- * one layout pass before that happens — every panel used to be centred on the
- * viewport instead, which happens to look right under the wide menus and leaves
- * the narrow Marketplace one floating a long way from its own trigger.
- */
-.menuPanel {
-  left: 12px;
-  padding: 26px 30px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 28px 40px;
-  width: max-content;
-  max-width: min(920px, calc(100vw - 40px));
-}
-
-.group {
-  min-width: 180px;
+.group + .group {
+  margin-top: 18px;
 }
 
 .groupTitle {
@@ -184,7 +200,7 @@
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--tn-text-faint);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .groupItems {
@@ -197,13 +213,13 @@
   display: block;
   width: 100%;
   text-align: left;
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: var(--tn-radius-chip);
+  padding: 9px 10px;
   transition: background var(--tn-transition-fast);
 }
 
 .menuItem:hover {
-  background: #f0f3f8;
+  background: var(--tn-chip-bg);
 }
 
 .menuItemLabel {
@@ -219,18 +235,17 @@
 }
 
 /*
- * "Soon" beside a menu label.
- *
- * A word, not only a colour: the point is to be readable, and a grey dot would
- * mean nothing to anyone who has not been told what it means.
+ * "Soon" beside a menu label — a word, not only a colour: the point is to be
+ * readable, and a grey dot would mean nothing to anyone not told what it means.
  */
 .soon {
   display: inline-block;
   margin-left: 8px;
-  border-radius: 8px;
-  background: var(--tn-chip-bg);
-  padding: 2px 7px;
-  font-size: 10px;
+  border-radius: var(--tn-radius-chip-sm);
+  background: #101c2a;
+  border: 1px solid #1e2c3c;
+  padding: 1px 7px;
+  font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -238,71 +253,17 @@
   vertical-align: 1px;
 }
 
-/* ---- AI Voyager ---- */
-
-/*
- * A destination, not a dropdown, so it sits outside the nav row and is styled
- * as its own thing. Differentiated but quiet: no glow, no animation, no "AI"
- * sticker. The orb is the only AI imagery the design allows anywhere.
- */
-.voyagerPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  flex: none;
-  margin-left: 10px;
-  padding: 6px 13px 6px 8px;
-  border: 1px solid var(--tn-purple-border);
-  border-radius: 20px;
-  background: var(--tn-purple-tint-soft);
-  color: var(--tn-purple-deep);
-  font-size: 12.5px;
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: border-color 140ms ease;
-}
-
-.voyagerPill:hover {
-  border-color: var(--tn-purple);
-}
-
-.voyagerPill:focus-visible {
-  outline: 2px solid var(--tn-purple);
-  outline-offset: 2px;
-}
-
-/*
- * Below 1080 the label goes and the orb stays. The name lives on the link
- * itself, so hiding this text costs nothing a screen reader needed.
- */
-@media (max-width: 1080px) {
-  .voyagerLabel {
-    display: none;
-  }
-
-  .voyagerPill {
-    padding: 6px 8px;
-  }
-}
-
 /*
  * Phones.
  *
- * The header had no mobile treatment at all — one media query in the whole file,
- * and it was for the Voyager label. The full desktop row rendered at 390px and
- * pushed the document 15px wide, so every page on the site scrolled sideways a
- * little. The symptom was small; the cause is that this row was never designed
- * for a narrow screen.
- *
- * This is the contained fix, not that design: the navigation scrolls inside
- * itself so every item stays reachable, and the action group is allowed to
- * shrink instead of forcing the page wider. A proper phone header — a drawer,
- * or a reduced set — is its own piece of work and is not invented here.
+ * The desktop row at 390px pushed the document wider than the viewport, so every
+ * page scrolled sideways a little. This is the contained fix, not a phone
+ * design: the navigation scrolls inside itself so every item stays reachable,
+ * and the action group is allowed to shrink instead of forcing the page wider.
  */
-@media (max-width: 760px) {
-  /* Back to a wrapping row: three columns on a 390px screen give the middle
-     one nothing to work with. */
+@media (max-width: 860px) {
+  /* Back to a wrapping row: three columns on a 390px screen give the middle one
+     nothing to work with. */
   .header {
     display: flex;
     flex-wrap: wrap;
@@ -312,6 +273,7 @@
   .nav {
     flex: 1 0 100%;
     order: 10;
+    gap: 18px;
     overflow-x: auto;
     justify-content: flex-start;
     scrollbar-width: none;
@@ -326,9 +288,18 @@
   .actions {
     flex-shrink: 1;
     min-width: 0;
+    gap: 8px;
   }
 
-  .openButton {
+  /* Both stay. "Get started" is not a way back in for someone who already has an
+     account, so dropping Sign in on a phone would lock returning users out of
+     the only screen that can let them back. */
+  .loginButton,
+  .startButton {
+    padding: 10px 12px;
+  }
+
+  .startButton {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

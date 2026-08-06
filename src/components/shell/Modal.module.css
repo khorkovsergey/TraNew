@@ -84,7 +84,7 @@
 }
 
 .social:hover {
-  background: #f4f6fa;
+  background: var(--tn-chip-bg);
 }
 
 .links {

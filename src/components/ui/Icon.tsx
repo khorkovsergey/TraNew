@@ -37,6 +37,50 @@ const PATHS = {
   toolVerticalLine: 'M12 3v18M13.5 5.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0M13.5 18.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0',
   toolRectangle: 'M4 6h16v12H4zM5.5 7.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M18.5 20.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3',
   toolText: 'M5 6V4h14v2M12 4v16M9 20h6',
+
+  /*
+   * The redesign set.
+   *
+   * Every glyph is one `d` string, circles included — arcs rather than <circle>
+   * elements, so the component stays a single path and an icon can never
+   * half-render because someone added a second child by hand.
+   */
+  wallet: 'M20 7H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2ZM16 13h3M2 7l3-3h12',
+  coins:
+    'M20 7c0 1.7-3.6 3-8 3S4 8.7 4 7s3.6-3 8-3 8 1.3 8 3ZM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
+  flask: 'M10 2v6L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 8V2M8 2h8M7.5 14h9',
+  trendUp: 'M3 17 9 11l4 4 8-8M15 7h6v6',
+  trendDown: 'M3 7l6 6 4-4 8 8M13 17h8v-6',
+  venn: 'M12.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0M20.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0',
+  send: 'M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z',
+  fileSearch:
+    'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h9M14 2l5 5M14 2v5h5M8 13h5M8 17h3M19.5 16.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0M19 19l2.5 2.5',
+  shieldCheck: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Zm-3-10 2 2 4-4',
+  book: 'M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z',
+  checkCircle: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18m-3.5-9 2.5 2.5 4.5-5',
+  sliders:
+    'M4 8h11M4 16h4M12 16h8M19.2 8a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0M11.2 16a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0',
+  chevronRight: 'm9 6 6 6-6 6',
+  chevronLeft: 'm15 6-6 6 6 6',
+  arrowLeft: 'M19 12H5M11 5l-7 7 7 7',
+  calendar: 'M5 5h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1ZM4 10h16M8 3v4M16 3v4',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M12 7v5l3 2',
+  lock: 'M6 10h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1ZM8 10V7a4 4 0 0 1 8 0v3',
+  home: 'M3 10.5 12 3l9 7.5M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5M9.5 21v-6h5v6',
+  plus: 'M12 5v14M5 12h14',
+  bookmark: 'M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z',
+  info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M12 11v5M12 7.6v.4',
+  alert: 'M12 3 2.5 20h19L12 3ZM12 9v5M12 17.4v.2',
+  refresh: 'M20 12a8 8 0 1 1-2.6-5.9M20 4v4h-4',
+  layers: 'M12 2.5 2.5 8 12 13.5 21.5 8 12 2.5ZM2.5 16 12 21.5 21.5 16M2.5 12 12 17.5 21.5 12',
+  compass: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M15.5 8.5l-2 5-5 2 2-5 5-2Z',
+  percent: 'M19 5 5 19M8.5 6.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0M19.5 17.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0',
+  scale: 'M12 3v18M7 21h10M4 8h16M4 8l-2.5 6h5L4 8ZM20 8l-2.5 6h5L20 8Z',
+  chat: 'M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z',
+  play: 'M7 4.5 19 12 7 19.5v-15Z',
+  building: 'M4 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17M15 9h4a1 1 0 0 1 1 1v11M8 7h3M8 11h3M8 15h3M2 21h20',
+  rocket:
+    'M5 14c-1.5 1.5-2 5-2 5s3.5-.5 5-2M9 15l-3-3c1-5 5-9 11-9 0 6-4 10-9 11ZM14.5 8.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0',
 } as const;
 
 export type IconName = keyof typeof PATHS;

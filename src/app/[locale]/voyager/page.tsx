@@ -19,7 +19,11 @@ import { getSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
-type Props = { params: Promise<{ locale: Locale }> };
+type Props = {
+  params: Promise<{ locale: Locale }>;
+  /** `?q=` — a question carried in from the home page's Ask Voyager box. */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -33,11 +37,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function VoyagerPage({ params }: Props) {
+export default async function VoyagerPage({ params, searchParams }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
   const session = await getSession();
+  const query = await searchParams;
+
+  /*
+   * The question arrives in the composer, not in the transcript.
+   *
+   * `?q=` is a URL anybody can write, and sending it the moment the page loads
+   * would let a link ask Voyager something on someone's behalf before they had
+   * read it. Pre-filled and focused, the person presses Enter — which costs one
+   * keystroke and keeps the asking theirs.
+   */
+  const raw = query.q;
+  const seed = typeof raw === 'string' ? raw.slice(0, 400).trim() : '';
 
   /*
    * The first name only. The greeting needs one word and the rest is personal
@@ -45,5 +61,5 @@ export default async function VoyagerPage({ params }: Props) {
    */
   const personName = session?.user?.name?.trim().split(/\s+/)[0] ?? null;
 
-  return <VoyagerWorkspace personName={personName} />;
+  return <VoyagerWorkspace personName={personName} seedQuestion={seed || null} />;
 }

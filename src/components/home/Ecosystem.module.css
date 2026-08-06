@@ -246,7 +246,7 @@
 
 .miniCard {
   box-sizing: border-box;
-  background: #fff;
+  background: var(--tn-surface);
   border-radius: 14px;
   padding: 14px 18px;
   box-shadow: 0 8px 26px rgba(19, 23, 34, 0.1);
@@ -375,7 +375,7 @@
 .barTrack {
   height: 6px;
   border-radius: 3px;
-  background: #eef0f5;
+  background: var(--tn-chip-bg);
   margin-top: 4px;
   overflow: hidden;
 }
@@ -390,7 +390,7 @@
 .workspace {
   box-sizing: border-box;
   width: 620px;
-  background: #fff;
+  background: var(--tn-surface);
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -8px 30px rgba(19, 23, 34, 0.08);
   padding: 16px 20px 0;
@@ -432,7 +432,7 @@
 }
 
 .assetRow {
-  background: #fff;
+  background: var(--tn-surface);
   border-radius: 10px;
   padding: 7px 13px;
   font-size: 11px;
@@ -446,7 +446,7 @@
 .categoryCard {
   box-sizing: border-box;
   width: 118px;
-  background: #fff;
+  background: var(--tn-surface);
   border-radius: 14px;
   padding: 16px 18px;
   box-shadow: 0 8px 26px rgba(19, 23, 34, 0.1);
@@ -528,7 +528,7 @@
   width: 8px;
   height: 8px;
   border-radius: 4px;
-  background: #d5dae5;
+  background: var(--tn-border-control);
   transition:
     width var(--slide) var(--ease),
     background var(--slide) var(--ease);

@@ -283,7 +283,7 @@
   gap: 14px;
   font-size: 13.5px;
   padding: 11px 0;
-  border-bottom: 1px solid #f0f2f7;
+  border-bottom: 1px solid var(--tn-border-hairline);
 }
 
 .row:last-child {
@@ -418,7 +418,7 @@
 }
 
 .gridLine {
-  stroke: #eef0f5;
+  stroke: var(--tn-border-control);
   stroke-width: 1;
 }
 
@@ -468,12 +468,12 @@
 .bannerTitle {
   font-size: 16px;
   font-weight: 800;
-  color: #1f3a8f;
+  color: var(--tn-blue);
 }
 
 .bannerText {
   font-size: 13.5px;
-  color: #2b478f;
+  color: var(--tn-blue);
   margin-top: 4px;
 }
 
@@ -502,7 +502,7 @@
 }
 
 .ghost:hover {
-  background: #f4f6fa;
+  background: var(--tn-chip-bg);
 }
 
 .ctaRow {

@@ -108,7 +108,7 @@
 }
 
 .ctaSecondary:hover {
-  background: #eef2ff;
+  background: var(--tn-blue-tint);
 }
 
 /* ---- Search ---- */
@@ -452,7 +452,7 @@
 
 .bannerCta {
   background: var(--tn-surface);
-  border: 1px solid #c9d4f5;
+  border: 1px solid var(--tn-blue-border);
   border-radius: var(--tn-radius-pill);
   padding: 12px 22px;
   font-size: 14px;
@@ -463,7 +463,7 @@
 }
 
 .bannerCta:hover {
-  background: #eef2ff;
+  background: var(--tn-blue-tint);
 }
 
 /* ---- Narrow desktop / tablet ---- */

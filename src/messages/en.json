@@ -32,16 +32,19 @@
     "homeLink": "TradingNew — home",
     "nav": {
       "home": "Home",
-      "market": "Market",
-      "symbols": "Symbols",
-      "economy": "Economy",
-      "community": "Community",
-      "marketplace": "Marketplace",
-      "voyager": "AI Voyager"
+      "mine": "My TradingNew",
+      "start": "Start Investing",
+      "explore": "Explore",
+      "learn": "Learn",
+      "money": "My Money",
+      "voyager": "Voyager",
+      "marketplace": "Marketplace"
     },
-    "login": "Log in",
-    "openApp": "Open TradingNew",
-    "openMenu": "Open {menu} menu"
+    "login": "Sign in",
+    "openApp": "Get started",
+    "openMenu": "Open {menu} menu",
+    "search": "Search",
+    "saved": "Saved"
   },
   "menu": {
     "market": {

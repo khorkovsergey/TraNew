@@ -3,6 +3,7 @@ import { Manrope, Plus_Jakarta_Sans } from 'next/font/google';
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { Footer } from '@/components/shell/Footer';
 import { Header } from '@/components/shell/Header';
 import { LoginModalProvider } from '@/components/shell/LoginModalProvider';
 import { VoyagerProvider } from '@/components/voyager/VoyagerProvider';
@@ -78,6 +79,7 @@ export default async function LocaleLayout(props: {
               <div className="tn-app">
                 <Header />
                 <main id="main">{props.children}</main>
+                <Footer />
               </div>
               <VoyagerWidget chartWorkspaceLive={FEATURE_FLAGS.superchartEnabled} />
             </VoyagerProvider>

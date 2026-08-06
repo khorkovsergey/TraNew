@@ -51,7 +51,7 @@
 .progressTrack {
   flex: 1;
   height: 6px;
-  background: #eef0f5;
+  background: var(--tn-chip-bg);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -141,7 +141,7 @@
 }
 
 .secondary:hover {
-  background: #f4f6fa;
+  background: var(--tn-chip-bg);
 }
 
 .hint {
@@ -280,7 +280,7 @@
 
 .upsell {
   background: var(--tn-purple-tint-soft);
-  border: 1px solid #e0d5fb;
+  border: 1px solid var(--tn-purple-border);
   border-radius: var(--tn-radius-card);
   padding: 24px 26px;
   margin-top: 20px;

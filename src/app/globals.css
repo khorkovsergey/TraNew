@@ -74,10 +74,69 @@ svg {
   max-width: 100%;
 }
 
-/* Page-wide hero wash — sits behind the header and fades out by 640px. */
+/*
+ * Page-wide wash. Redesigned screens put a space image behind this with
+ * <SpaceBackdrop>; the gradient is what a screen gets when it has none, so a
+ * page nobody has reached yet is still dark and still on-brand.
+ */
 .tn-app {
+  position: relative;
+  z-index: 0;
   min-height: 100vh;
   background: var(--tn-hero-bg);
+}
+
+/*
+ * The space backdrop.
+ *
+ * A fixed layer at z-index -1 rather than a background on <body>: the image is
+ * chosen per screen, and a layout in the App Router does not know which screen
+ * it is wrapping. Rendering it from the page keeps the choice on the server and
+ * costs no flash of the wrong sky.
+ *
+ * `background-attachment: fixed` would do the same job with one fewer element
+ * and is skipped on purpose — it forces a repaint of the whole image on every
+ * scroll frame on most engines, and this image is full-bleed.
+ */
+.tn-space {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--tn-bg);
+  background-position: center top;
+  background-size: cover;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.tn-space-1 {
+  background-image: url('/redesign/space-1.jpg');
+}
+.tn-space-2 {
+  background-image: url('/redesign/space-2.jpg');
+}
+.tn-space-3 {
+  background-image: url('/redesign/space-3.jpg');
+}
+.tn-space-4 {
+  background-image: url('/redesign/space-4.jpg');
+}
+.tn-space-5 {
+  background-image: url('/redesign/space-5.jpg');
+}
+.tn-space-6 {
+  background-image: url('/redesign/space-6.jpg');
+}
+
+/*
+ * Below the fold the sky is gone and cards would sit on flat black. This fades
+ * the image into the page background instead of ending it at the viewport edge.
+ */
+.tn-space::after {
+  content: '';
+  position: absolute;
+  inset: 55% 0 0;
+  background: linear-gradient(180deg, rgba(4, 7, 12, 0) 0%, var(--tn-bg) 78%);
 }
 
 /* Prices, percentages and any figure that must not jitter between renders. */
@@ -104,8 +163,8 @@ svg {
   top: 0;
   z-index: 100;
   padding: 10px 18px;
-  background: var(--tn-text);
-  color: #fff;
+  background: var(--tn-mint);
+  color: var(--tn-gradient-cta-text);
   border-radius: 0 0 var(--tn-radius-option) 0;
   font-size: 13.5px;
   font-weight: 700;
@@ -115,10 +174,24 @@ svg {
   left: 0;
 }
 
+/* Mint rather than blue: on a near-black page the blue ring is the harder of
+   the two to find, and a focus ring nobody can find is not one. */
 :focus-visible {
-  outline: 2px solid var(--tn-blue);
+  outline: 2px solid var(--tn-mint);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+::selection {
+  background: rgba(46, 230, 168, 0.26);
+  color: var(--tn-text);
+}
+
+/* The browser default is a light-theme scrollbar, which on this page reads as a
+   white stripe down the side of the window. */
+html {
+  color-scheme: dark;
+  scrollbar-color: #22303f transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,0 +1,654 @@
+/*
+ * The public home.
+ *
+ * Geometry follows the handoff. Two decisions worth naming:
+ *
+ * The accent classes at the bottom exist so a card's colour is data rather than
+ * markup — `accent: 'mint'` in the content file, one class here. Adding a card
+ * never means writing a colour again, and a card can never quietly acquire a
+ * seventh accent that means nothing.
+ *
+ * The four-step path is a real <ol> with the connectors as pseudo-elements on
+ * the list items. The prototype interleaved seven grid children — card, dash,
+ * card, dash — which reads to a screen reader as seven things, three of which
+ * are nothing.
+ */
+
+.page {
+  max-width: var(--tn-page-max);
+  margin: 0 auto;
+  padding: 0 var(--tn-page-pad);
+}
+
+/* ---- Hero ---- */
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: clamp(24px, 3vw, 56px);
+  align-items: center;
+  padding: 52px 0 44px;
+}
+
+.h1 {
+  margin: 0;
+  font-size: clamp(40px, 4.6vw, 62px);
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1.1;
+}
+
+/* The one gradient headline on this screen. */
+.h1Accent {
+  background: var(--tn-gradient-headline);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.heroSub {
+  margin: 22px 0 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--tn-text-secondary);
+  max-width: 520px;
+}
+
+.heroCtas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.ctaPrimary,
+.ctaGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 26px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  transition: filter var(--tn-transition-hover), border-color var(--tn-transition-hover);
+}
+
+.ctaPrimary {
+  background: var(--tn-gradient-cta);
+  color: var(--tn-gradient-cta-text);
+}
+
+.ctaPrimary:hover {
+  filter: brightness(1.08);
+}
+
+.ctaGhost {
+  padding: 14px 24px;
+  border: 1px solid #24564b;
+  background: var(--tn-mint-tint);
+  color: #e5eef7;
+  font-weight: 700;
+}
+
+.ctaGhost:hover {
+  border-color: var(--tn-mint);
+}
+
+/* ---- Ask Voyager ---- */
+
+.askCard {
+  position: relative;
+  border-radius: var(--tn-radius-showcase);
+  border: 1px solid #16303a;
+  background: linear-gradient(160deg, #071018 0%, #050a10 100%);
+  padding: 26px 28px;
+  overflow: hidden;
+}
+
+.askGlow {
+  position: absolute;
+  top: -60px;
+  right: -40px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 230, 168, 0.14), transparent 65%);
+  pointer-events: none;
+}
+
+.askBody {
+  position: relative;
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.askText {
+  flex: 1;
+  min-width: 0;
+}
+
+.askHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.askSparkle {
+  color: var(--tn-cyan);
+}
+
+.askTitle {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.askSub {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  color: var(--tn-text-soft);
+}
+
+.askForm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 6px 6px 6px 16px;
+  background: var(--tn-input-bg);
+  border: 1px solid var(--tn-border-input);
+  border-radius: 12px;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.askForm:focus-within {
+  border-color: var(--tn-mint-border);
+}
+
+/*
+ * 16px, not the 14px in the prototype. Below 16 iOS zooms the page when the
+ * field takes focus, and the first thing this box would do on a phone is throw
+ * the layout sideways.
+ */
+.askInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #e5eef7;
+  font-size: 16px;
+  padding: 8px 0;
+}
+
+.askInput::placeholder {
+  color: var(--tn-text-faint);
+}
+
+.askSend {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--tn-gradient-cta-blue);
+  color: #fff;
+  transition: filter var(--tn-transition-fast);
+}
+
+.askSend:hover {
+  filter: brightness(1.1);
+}
+
+.askTryLabel {
+  margin-top: 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #6e8195;
+}
+
+.askChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.askChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--tn-border-input);
+  background: #081120;
+  color: #c3d2e0;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.askChip:hover {
+  border-color: var(--tn-mint);
+}
+
+.robot {
+  flex-shrink: 0;
+  width: 236px;
+  height: auto;
+  margin: -12px -14px -12px -30px;
+  pointer-events: none;
+}
+
+/* ---- Sections ---- */
+
+.section {
+  margin-top: 40px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+.h2Sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tn-text-muted);
+  margin-left: 6px;
+}
+
+.sectionLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--tn-blue);
+}
+
+.sectionLink:hover {
+  color: var(--tn-blue-hover);
+}
+
+/* ---- Intent cards ---- */
+
+.intentGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.intentCard {
+  display: flex;
+  flex-direction: column;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 20px 18px;
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-hover);
+}
+
+.intentCard:hover {
+  border-color: var(--tn-mint);
+}
+
+.intentTitle {
+  font-size: 14.5px;
+  font-weight: 700;
+  margin-top: 14px;
+  line-height: 1.35;
+}
+
+.intentBody {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--tn-text-muted);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.intentGo {
+  align-self: flex-end;
+  width: 28px;
+  height: 28px;
+  margin-top: 12px;
+  border-radius: 50%;
+  border: 1px solid #24303e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tn-text-secondary);
+}
+
+.intentCard:hover .intentGo {
+  border-color: var(--tn-mint-border);
+  color: var(--tn-mint);
+}
+
+/* ---- Today in 3 minutes ---- */
+
+.todayGrid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr 1.1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.todayCard {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 20px 22px;
+  min-width: 0;
+}
+
+.todayText {
+  flex: 1;
+  min-width: 0;
+}
+
+.todayHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stepDot {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.todayTitle {
+  font-size: 15.5px;
+  font-weight: 800;
+}
+
+.todayBody {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--tn-text-soft);
+  line-height: 1.55;
+}
+
+.todayIcon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.todayQuote {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.spark {
+  width: 140px;
+  height: 44px;
+  display: block;
+}
+
+.quoteName {
+  font-size: 11.5px;
+  color: var(--tn-text-soft);
+  margin-top: 4px;
+}
+
+.quoteValue {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.quoteChange {
+  font-size: 12.5px;
+  color: var(--tn-red);
+}
+
+.quoteNote {
+  font-size: 10.5px;
+  color: var(--tn-text-faint);
+  margin-top: 2px;
+}
+
+/* ---- Start with confidence ---- */
+
+.pathRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px;
+  margin-top: 16px;
+}
+
+.pathItem {
+  position: relative;
+  min-width: 0;
+}
+
+/* The dashed connector, drawn in the gap rather than as a grid child of its
+   own — see the note at the top of the file. */
+.pathLink {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: 28px;
+  border-top: 2px dashed #1d3a4a;
+}
+
+.pathCard {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  height: 100%;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 20px 22px;
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-hover);
+}
+
+.pathCard:hover {
+  border-color: var(--tn-mint);
+}
+
+.pathStep {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: var(--tn-radius-chip);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 800;
+  border: 1.5px solid;
+}
+
+.pathText {
+  flex: 1;
+  min-width: 0;
+}
+
+.pathTitle {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.pathBody {
+  display: block;
+  font-size: 12.5px;
+  color: var(--tn-text-soft);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+/* ---- Trust bar ---- */
+
+.trustBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 18px;
+  flex-wrap: wrap;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 18px 26px;
+  margin-bottom: 8px;
+}
+
+.trustItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #dbe6f0;
+}
+
+.tvMark {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--tn-chip-bg);
+  border: 1px solid var(--tn-border-control);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+}
+
+/* ---- Accents ----
+ * One class per meaning, applied from the content file. */
+
+.accent_mint {
+  color: var(--tn-mint);
+}
+.accent_blue {
+  color: var(--tn-blue);
+}
+.accent_purple {
+  color: var(--tn-purple);
+}
+.accent_amber {
+  color: var(--tn-yellow);
+}
+.accent_lime {
+  color: var(--tn-lime);
+}
+.accent_cyan {
+  color: var(--tn-cyan);
+}
+
+.dot_mint {
+  background: var(--tn-green-tint);
+  color: var(--tn-green);
+}
+.dot_blue {
+  background: var(--tn-blue-tint);
+  color: var(--tn-blue);
+}
+.dot_purple {
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple);
+}
+
+.step_mint {
+  border-color: #10b981;
+  background: var(--tn-green-tint);
+  color: var(--tn-green);
+}
+.step_blue {
+  border-color: var(--tn-blue-strong);
+  background: var(--tn-blue-tint);
+  color: var(--tn-blue);
+}
+.step_purple {
+  border-color: #7c3aed;
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple);
+}
+
+/* ---- Narrower screens ----
+ * The handoff is desktop-only and says so; this is the reduction that keeps the
+ * page usable below it, not the mobile design, which is its own pass. */
+
+@media (max-width: 1180px) {
+  .intentGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .todayGrid,
+  .pathRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* With two per row the connector would point at the card above. */
+  .pathLink {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .robot {
+    width: 160px;
+    margin: -12px -14px -12px 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .intentGrid,
+  .todayGrid,
+  .pathRow {
+    grid-template-columns: 1fr;
+  }
+
+  .h1 {
+    letter-spacing: -1.2px;
+  }
+
+  .todayQuote {
+    display: none;
+  }
+
+  .askBody {
+    flex-direction: column-reverse;
+  }
+
+  .robot {
+    align-self: center;
+    margin: 0;
+  }
+}

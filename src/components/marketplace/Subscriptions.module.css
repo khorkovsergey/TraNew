@@ -303,7 +303,7 @@
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  background: radial-gradient(circle at 34% 30%, #b79bff, #7c4dff 62%, #4a3a7a);
+  background: radial-gradient(circle at 34% 30%, #d6c8ff, var(--tn-purple) 62%, var(--tn-purple-deep));
 }
 
 .voyagerDescription {

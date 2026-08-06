@@ -37,7 +37,7 @@
 }
 
 .crumbSep {
-  color: #c3cad8;
+  color: var(--tn-text-secondary);
 }
 
 /* ---- Headings ---- */
@@ -126,7 +126,7 @@
 }
 
 .secondary:hover {
-  background: #f4f6fa;
+  background: var(--tn-chip-bg);
 }
 
 .textLink {
@@ -151,7 +151,7 @@
 .progressTrack {
   flex: 1;
   height: 6px;
-  background: #eef0f5;
+  background: var(--tn-chip-bg);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -384,12 +384,12 @@
 .nextActionTitle {
   font-size: 15px;
   font-weight: 800;
-  color: #0e6e44;
+  color: var(--tn-green-deep);
 }
 
 .nextActionText {
   font-size: 14px;
-  color: #2b6a4d;
+  color: var(--tn-green-deep);
   margin-top: 6px;
   line-height: 1.6;
 }
@@ -482,7 +482,7 @@
 
 .term {
   background: var(--tn-surface);
-  border: 1px dashed #b9a5ec;
+  border: 1px dashed var(--tn-purple-border);
   border-radius: var(--tn-radius-option);
   padding: 5px 12px;
   font-size: 12.5px;
@@ -500,7 +500,7 @@
   padding: 12px 16px;
   margin-top: 10px;
   font-size: 13px;
-  color: #4a3a7a;
+  color: var(--tn-purple-deep);
   line-height: 1.6;
 }
 
@@ -514,7 +514,7 @@
 .exampleLabel {
   font-size: 11px;
   font-weight: 700;
-  background: #f0f2f7;
+  background: var(--tn-chip-bg);
   color: var(--tn-text-muted);
   border-radius: 10px;
   padding: 3px 9px;
@@ -602,12 +602,12 @@
 .practiceTitle {
   font-size: 15px;
   font-weight: 800;
-  color: #1f3a8f;
+  color: var(--tn-blue);
 }
 
 .practiceText {
   font-size: 13.5px;
-  color: #2b478f;
+  color: var(--tn-blue);
   margin-top: 6px;
   line-height: 1.6;
 }
@@ -650,12 +650,12 @@
 .completeTitle {
   font-size: 16px;
   font-weight: 800;
-  color: #0e6e44;
+  color: var(--tn-green-deep);
 }
 
 .completeText {
   font-size: 14px;
-  color: #2b6a4d;
+  color: var(--tn-green-deep);
   margin-top: 6px;
   line-height: 1.6;
 }
@@ -682,19 +682,19 @@
 
 .completeGhost {
   background: var(--tn-surface);
-  border: 1px solid #bfe3d0;
+  border: 1px solid var(--tn-heat-up-border);
   border-radius: 20px;
   padding: 10px 18px;
   font-size: 13.5px;
   font-weight: 700;
-  color: #0e6e44;
+  color: var(--tn-green-deep);
 }
 
 /* ---- Ask panel ---- */
 
 .askPanel {
   background: var(--tn-purple-tint-soft);
-  border: 1px solid #e0d5fb;
+  border: 1px solid var(--tn-purple-border);
   border-radius: var(--tn-radius-card);
   padding: 20px 24px;
   margin-top: 16px;
@@ -723,7 +723,7 @@
 
 .askChip {
   background: var(--tn-surface);
-  border: 1px solid #e0d5fb;
+  border: 1px solid var(--tn-purple-border);
   border-radius: 18px;
   padding: 8px 14px;
   font-size: 12.5px;

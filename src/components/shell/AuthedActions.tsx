@@ -10,13 +10,29 @@ import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { useLoginModal } from './LoginModalProvider';
 import styles from './AuthedActions.module.css';
 
-const MENU: Array<{ label: string; href: StaticPathname | null; danger?: boolean }> = [
+/*
+ * The profile menu, in the redesign's words.
+ *
+ * "Wealth Hub" is "My Money" and "Strategy Builder" is "My Plan" here and
+ * nowhere deeper: the routes, the tables and the server actions keep their own
+ * names. `needsWealthFlag` is a field rather than a comparison against the
+ * label, because the label is exactly the thing a rename changes — the old
+ * check matched on the string "Wealth Hub" and would have silently stopped
+ * hiding an unreleased section the moment somebody reworded it.
+ */
+const MENU: Array<{
+  label: string;
+  href: StaticPathname | null;
+  danger?: boolean;
+  needsWealthFlag?: boolean;
+}> = [
   { label: 'My TradingNew', href: '/account' },
-  { label: 'My Workspace', href: '/account/workspace' },
+  { label: 'Saved items', href: '/account/workspace' },
+  { label: 'My Plan', href: '/strategy' },
+  { label: 'My Money', href: '/account/wealth', needsWealthFlag: true },
   { label: 'Voyager', href: '/account/voyager' },
-  { label: 'Wealth Hub', href: '/account/wealth' },
+  { label: 'Plans', href: '/marketplace/subscriptions' },
   { label: 'Purchases', href: '/account/purchases' },
-  { label: 'View Public Profile', href: '/account/settings' },
   { label: 'Settings & Billing', href: '/account/settings' },
   { label: 'Help & Support', href: null },
   { label: 'Log out', href: null, danger: true },
@@ -59,19 +75,25 @@ export function AuthedActions() {
     <>
       <button
         className={styles.bell}
-        aria-label="Notifications"
+        aria-label={read ? 'Notifications' : 'Notifications, unread'}
         aria-expanded={notifOpen}
         onClick={() => {
           setAvatarOpen(false);
           setNotifOpen((value) => !value);
         }}
       >
-        <Icon name="bell" size={19} />
+        <Icon name="bell" size={17} />
+        {/* The dot is a mint pip, and the label above says the same thing in
+            words — a colour alone is not a notification anyone can hear. */}
         {!read && <span className={styles.unreadDot} />}
       </button>
 
+      <Link className={styles.iconLink} href="/account/workspace" aria-label="Saved">
+        <Icon name="bookmark" size={16} />
+      </Link>
+
       <button
-        className={styles.avatar}
+        className={styles.avatarChip}
         aria-label="Account menu"
         aria-expanded={avatarOpen}
         onClick={() => {
@@ -79,7 +101,8 @@ export function AuthedActions() {
           setAvatarOpen((value) => !value);
         }}
       >
-        {initial}
+        <span className={styles.avatar}>{initial}</span>
+        <Icon name="chevronDown" size={12} strokeWidth={2.4} />
       </button>
 
       {(notifOpen || avatarOpen) && <div className={styles.scrim} onClick={closeAll} />}
@@ -122,13 +145,10 @@ export function AuthedActions() {
           </div>
 
           {MENU.map((item) => {
-            const isWealth = item.label === 'Wealth Hub';
-            const wealthOff = isWealth && !FEATURE_FLAGS.wealthHubEnabled;
-
-            if (wealthOff) {
+            if (item.needsWealthFlag && !FEATURE_FLAGS.wealthHubEnabled) {
               return (
                 <span className={`${styles.menuItem} ${styles.menuItemSoon}`} key={item.label}>
-                  Wealth Hub · Soon
+                  {item.label} · Soon
                 </span>
               );
             }

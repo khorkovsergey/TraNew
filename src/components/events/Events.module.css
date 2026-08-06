@@ -72,7 +72,7 @@
 }
 
 .primary:disabled {
-  background: #c3cad8;
+  background: var(--tn-border-control);
   cursor: default;
 }
 
@@ -281,7 +281,7 @@
 }
 
 .activeChip:hover {
-  background: #e6e9f1;
+  background: var(--tn-chip-bg);
 }
 
 .activeChipX {
@@ -696,7 +696,7 @@
   border: 0;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.9);
-  color: #b6bdcb;
+  color: var(--tn-text-faint);
   cursor: pointer;
   transition:
     background var(--tn-transition-fast),
@@ -704,7 +704,7 @@
 }
 
 .saveIcon:hover {
-  background: #fff;
+  background: var(--tn-chip-bg);
   color: var(--tn-text-muted);
 }
 
@@ -800,17 +800,17 @@
 
 .noticeWarn {
   background: var(--tn-amber-tint);
-  color: #7a5407;
+  color: var(--tn-amber-text);
 }
 
 .noticeStop {
   background: var(--tn-orange-tint);
-  color: #8a2f14;
+  color: var(--tn-orange);
 }
 
 .noticeInfo {
   background: var(--tn-blue-tint);
-  color: #1a3a8f;
+  color: var(--tn-blue);
 }
 
 /* ---- Load more ---- */
@@ -897,8 +897,8 @@
   border: 1px solid var(--tn-border-card);
   border-radius: 18px;
   background:
-    repeating-linear-gradient(0deg, transparent 0 39px, #e6eaf2 39px 40px),
-    repeating-linear-gradient(90deg, transparent 0 39px, #e6eaf2 39px 40px),
+    repeating-linear-gradient(0deg, transparent 0 39px, var(--tn-border-hairline) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, var(--tn-border-hairline) 39px 40px),
     var(--tn-chip-bg);
   overflow: hidden;
 }
@@ -1167,8 +1167,8 @@
   margin-top: 12px;
   border-radius: 14px;
   background:
-    repeating-linear-gradient(0deg, transparent 0 29px, #e6eaf2 29px 30px),
-    repeating-linear-gradient(90deg, transparent 0 29px, #e6eaf2 29px 30px),
+    repeating-linear-gradient(0deg, transparent 0 29px, var(--tn-border-hairline) 29px 30px),
+    repeating-linear-gradient(90deg, transparent 0 29px, var(--tn-border-hairline) 29px 30px),
     var(--tn-chip-bg);
   display: flex;
   align-items: center;
@@ -1490,7 +1490,7 @@
   gap: 8px;
   font-size: 13px;
   font-weight: 700;
-  color: #b6bdcb;
+  color: var(--tn-text-faint);
 }
 
 .stepOn {

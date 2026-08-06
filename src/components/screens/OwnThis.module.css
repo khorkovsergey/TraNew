@@ -68,7 +68,7 @@
 
 .summary {
   font-size: 14.5px;
-  color: #1f3a8f;
+  color: var(--tn-blue);
   line-height: 1.6;
   margin-top: 8px;
 }
@@ -96,7 +96,7 @@
 
 .ghost {
   background: var(--tn-surface);
-  border: 1px solid #c9d4f5;
+  border: 1px solid var(--tn-blue-border);
   border-radius: 20px;
   padding: 9px 16px;
   font-size: 13.5px;
@@ -106,5 +106,5 @@
 }
 
 .ghost:hover {
-  background: #eef2ff;
+  background: var(--tn-blue-tint);
 }

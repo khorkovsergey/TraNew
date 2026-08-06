@@ -269,7 +269,7 @@
 
 .chipPurple {
   background: var(--tn-surface);
-  border: 1px solid #e0d5fb;
+  border: 1px solid var(--tn-purple-border);
   border-radius: 18px;
   padding: 9px 15px;
   font-size: 13px;
@@ -289,7 +289,7 @@
   grid-template-columns: 190px 1fr;
   gap: 18px;
   padding: 13px 0;
-  border-bottom: 1px solid #f0f2f7;
+  border-bottom: 1px solid var(--tn-border-hairline);
   font-size: 14px;
 }
 
@@ -356,7 +356,7 @@
 }
 
 .dotLow {
-  background: #c3cad8;
+  background: var(--tn-border-control);
 }
 
 .good {
@@ -441,29 +441,29 @@
 
 .toneGood {
   background: var(--tn-green-tint);
-  border-color: #bfe8d2;
+  border-color: var(--tn-heat-up-border);
 }
 
 .toneWarn {
   background: var(--tn-amber-tint);
-  border-color: #f2e6c9;
+  border-color: var(--tn-amber-border);
 }
 
 .toneBad {
   background: var(--tn-orange-tint);
-  border-color: #f5cdbd;
+  border-color: var(--tn-red-border);
 }
 
 .toneGoodText {
-  color: #0e6e44;
+  color: var(--tn-green-deep);
 }
 
 .toneWarnText {
-  color: #8a6d1a;
+  color: var(--tn-amber-text);
 }
 
 .toneBadText {
-  color: #b0430e;
+  color: var(--tn-orange);
 }
 
 .worldName {
@@ -532,7 +532,7 @@
 
 .voyager {
   background: var(--tn-purple-tint-soft);
-  border: 1px solid #e0d5fb;
+  border: 1px solid var(--tn-purple-border);
   border-radius: var(--tn-radius-card);
   padding: 24px 26px;
   margin-top: 36px;
@@ -600,7 +600,7 @@
   font-size: 14px;
   font-weight: 600;
   padding: 9px 0;
-  border-bottom: 1px solid #f0f2f7;
+  border-bottom: 1px solid var(--tn-border-hairline);
   transition: color var(--tn-transition-fast);
 }
 
@@ -704,7 +704,7 @@
   gap: 14px;
   font-size: 13.5px;
   padding: 10px 0;
-  border-bottom: 1px solid #f0f2f7;
+  border-bottom: 1px solid var(--tn-border-hairline);
 }
 
 .kv:last-child {
@@ -795,12 +795,12 @@
   margin-top: 16px;
   font-size: 14px;
   font-weight: 700;
-  color: #1f3a8f;
+  color: var(--tn-blue);
   transition: background var(--tn-transition-fast);
 }
 
 .wealthCta:hover {
-  background: #dbe4fc;
+  background: var(--tn-blue-tint);
 }
 
 @media (max-width: 860px) {
