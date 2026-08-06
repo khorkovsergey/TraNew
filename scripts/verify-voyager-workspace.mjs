@@ -40,7 +40,12 @@ try {
   await page.goto(`${BASE}/en`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(500);
 
-  const pill = page.locator('header nav').getByRole('link', { name: 'Voyager', exact: true });
+  /*
+   * A dropdown trigger rather than a link since the menus came back. The
+   * section is still one click away — every menu opens with its own section —
+   * so what matters here is that the entry exists and leads to the workspace.
+   */
+  const pill = page.locator('header nav button', { hasText: 'Voyager' }).first();
   check('Voyager is a first-level entry', (await pill.count()) > 0);
 
   const items = await page.locator('header nav a, header nav button').allInnerTexts();
@@ -70,9 +75,14 @@ try {
   const others = await page.locator('header nav a, header nav button').count();
   check('and the rest of the navigation is intact', others >= 5, `${others} nav items`);
 
-  await pill.first().click();
+  await pill.click();
+  await page.waitForTimeout(300);
+  await page
+    .locator('div[class*="panel"] a', { hasText: 'Open the workspace' })
+    .first()
+    .click();
   await page.waitForURL(/\/voyager/, { timeout: 10_000 });
-  check('it leads to the workspace', page.url().includes('/voyager'));
+  check('its menu leads to the workspace', page.url().includes('/voyager'));
 
   group('The empty state holds only what it is allowed to hold');
 

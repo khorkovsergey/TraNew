@@ -10,6 +10,8 @@ import {
   STARTERS,
   type Briefing,
 } from '@/lib/voyager/workspace/landing';
+import { takeDraft } from '@/components/voyager/AskEntry';
+import { contextLabel, parseContext } from '@/lib/voyager/session';
 import { parsePlan, type VoyagerModule, type VoyagerPlan } from '@/lib/voyager/workspace/contract';
 import {
   advance,
@@ -89,6 +91,8 @@ type Props = {
    * set is the state of an answer having been asked for.
    */
   seedQuestion?: string | null;
+  /** `symbol:TSLA`, `explore:bonds` — the page the question came from. */
+  pageContext?: string | null;
 };
 
 /**
@@ -117,8 +121,23 @@ function seeded(question: string | null) {
   };
 }
 
-export function VoyagerWorkspace({ personName, seedQuestion = null }: Props) {
-  const opening = useMemo(() => seeded(seedQuestion), [seedQuestion]);
+export function VoyagerWorkspace({
+  personName,
+  seedQuestion = null,
+  pageContext = null,
+}: Props) {
+  /*
+   * A question typed on another page arrives through storage rather than the
+   * URL, and is consumed on read: a draft that survived being sent would be
+   * re-sent on the next visit, and a question asked twice is a question the
+   * person did not ask.
+   */
+  const opening = useMemo(
+    () => seeded(seedQuestion ?? (typeof window === 'undefined' ? null : takeDraft())),
+    [seedQuestion]
+  );
+
+  const context = useMemo(() => parseContext(pageContext), [pageContext]);
 
   const [stage, setStage] = useState<Stage>(opening ? 'requested' : 'landing');
   const [request, setRequest] = useState(opening?.request ?? '');
@@ -831,6 +850,14 @@ export function VoyagerWorkspace({ personName, seedQuestion = null }: Props) {
               Ask a question, build a chart, analyse an asset or create a financial workspace.
               Voyager shows the data it used and asks before it changes anything.
             </p>
+
+            {/*
+              * What it can see, named. The value is parsed against a closed set
+              * rather than echoed from the URL — a line that repeats whatever a
+              * link put in it could be used to tell somebody their private data
+              * is in the conversation.
+              */}
+            <p className={styles.contextLine}>Voyager sees: {contextLabel(context)}</p>
           </>
         )}
 

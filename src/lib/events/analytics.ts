@@ -73,7 +73,13 @@ export type AnalyticsEvent =
    * written reads later as "nobody registers from the plan" rather than "the
    * step does not exist". It arrives with the migration.
    */
-  | { name: 'plan_resumed'; surface: string; completed: number; ofSteps: number };
+  | { name: 'plan_resumed'; surface: string; completed: number; ofSteps: number }
+  /*
+   * Voyager. The source page and whether a question came with it — never the
+   * question, which is the person's, and never the subject, which is a position
+   * they may hold.
+   */
+  | { name: 'voyager_opened'; source: string; hasQuestion: boolean };
 
 export interface AnalyticsSink {
   track(event: AnalyticsEvent): void;

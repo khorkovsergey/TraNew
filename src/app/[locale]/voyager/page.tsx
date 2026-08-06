@@ -56,10 +56,20 @@ export default async function VoyagerPage({ params, searchParams }: Props) {
   const seed = typeof raw === 'string' ? raw.slice(0, 400).trim() : '';
 
   /*
+   * The page the question came from, as a name rather than its contents. It is
+   * parsed against a closed set on the client — a status strip that echoes
+   * whatever a link put in it is a strip that can be made to tell somebody
+   * their private data is in the conversation.
+   */
+  const context = typeof query.context === 'string' ? query.context.slice(0, 64) : null;
+
+  /*
    * The first name only. The greeting needs one word and the rest is personal
    * data with no reason to be in a client component.
    */
   const personName = session?.user?.name?.trim().split(/\s+/)[0] ?? null;
 
-  return <VoyagerWorkspace personName={personName} seedQuestion={seed || null} />;
+  return (
+    <VoyagerWorkspace personName={personName} seedQuestion={seed || null} pageContext={context} />
+  );
 }

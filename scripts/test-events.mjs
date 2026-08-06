@@ -100,6 +100,7 @@ try {
       'src/content/wealthConnections.ts',
       'src/lib/start/path.ts',
       'src/lib/start/plan.ts',
+      'src/lib/voyager/session.ts',
       'src/lib/academy/summary.ts',
       'src/lib/explore/answers.ts',
       'src/content/wealth.ts',
@@ -228,6 +229,7 @@ try {
   const wc = await load('wealthConnections', 'content');
   const start = await load('path', 'start');
   const plan = await load('plan', 'start');
+  const session = await load('session', 'voyager');
   const learn = await load('summary', 'academy');
   const answers = await load('answers', 'explore');
   const wealth = await load('wealth', 'content');
@@ -5004,6 +5006,173 @@ try {
     assert.ok(lines.length >= 4, lines.join(' | '));
     assert.ok(lines.some((line) => /growth/i.test(line)));
     assert.ok(lines.some((line) => /inferred, not asked/i.test(line)));
+  });
+
+  /* ===================== Voyager: the rules of a conversation =============== */
+
+  group('Nothing that changes something runs unasked');
+
+  check('every mutating action needs a confirmation', () => {
+    /*
+     * The rule the sixth caller forgets. It lives in one place and is consulted
+     * for every action rather than remembered at each call site.
+     */
+    for (const [id, spec] of Object.entries(session.VOYAGER_ACTIONS)) {
+      assert.equal(session.requiresConfirmation(id), spec.mutates, id);
+    }
+    assert.equal(session.requiresConfirmation('watchlist'), true);
+    assert.equal(session.requiresConfirmation('create_alert'), true);
+    assert.equal(session.requiresConfirmation('open_chart'), false);
+  });
+
+  check('and an action nobody described asks anyway', () => {
+    /*
+     * The failure of a wrong `true` is one extra click. The failure of a wrong
+     * `false` is something changing in an account without permission, so the
+     * default goes the safe way.
+     */
+    assert.equal(session.requiresConfirmation('some_new_action'), true);
+    assert.equal(session.requiresAccount('some_new_action'), true);
+  });
+
+  group('The free counter belongs to a day');
+
+  const day = (iso) => new Date(iso);
+
+  check('yesterday’s count is not today’s', () => {
+    const spent = { used: 9, day: '2026-08-05' };
+    assert.equal(session.remaining(spent, day('2026-08-06T09:00:00Z')), 10);
+    assert.equal(session.remaining(spent, day('2026-08-05T23:00:00Z')), 1);
+  });
+
+  check('a count with no day at all is a fresh day', () => {
+    // The state a browser starts in, and the one a corrupt record decays to.
+    assert.equal(session.remaining(session.EMPTY_ALLOWANCE, day('2026-08-06T09:00:00Z')), 10);
+  });
+
+  check('spending rolls the day forward rather than adding to yesterday', () => {
+    const next = session.spend({ used: 9, day: '2026-08-05' }, day('2026-08-06T09:00:00Z'));
+    assert.deepEqual(next, { used: 1, day: '2026-08-06' });
+  });
+
+  check('the tenth question is allowed and the eleventh is not', () => {
+    const at = day('2026-08-06T09:00:00Z');
+    const nine = { used: 9, day: '2026-08-06' };
+    assert.equal(
+      session.canSend({ text: 'why', allowance: nine, at, authed: true, askedInDialog: 0 }).allowed,
+      true
+    );
+    const ten = { used: 10, day: '2026-08-06' };
+    const verdict = session.canSend({ text: 'why', allowance: ten, at, authed: true, askedInDialog: 0 });
+    assert.equal(verdict.allowed, false);
+    assert.equal(verdict.reason, 'limit');
+  });
+
+  group('Who is asked for what, and in which order');
+
+  check('a guest is gated after three questions', () => {
+    const at = day('2026-08-06T09:00:00Z');
+    const fresh = { used: 3, day: '2026-08-06' };
+    assert.equal(
+      session.canSend({ text: 'why', allowance: fresh, at, authed: false, askedInDialog: 2 }).allowed,
+      true
+    );
+    const gated = session.canSend({ text: 'why', allowance: fresh, at, authed: false, askedInDialog: 3 });
+    assert.equal(gated.reason, 'auth');
+  });
+
+  check('and a signed-in person is not', () => {
+    const at = day('2026-08-06T09:00:00Z');
+    assert.equal(
+      session.canSend({
+        text: 'why',
+        allowance: { used: 3, day: '2026-08-06' },
+        at,
+        authed: true,
+        askedInDialog: 9,
+      }).allowed,
+      true
+    );
+  });
+
+  check('the limit is checked before the sign-in gate', () => {
+    /*
+     * Both apply, and only one of them is worth saying. Asking somebody to
+     * register for a message the limit would have refused anyway is asking them
+     * to pay for nothing.
+     */
+    const verdict = session.canSend({
+      text: 'why',
+      allowance: { used: 10, day: '2026-08-06' },
+      at: day('2026-08-06T09:00:00Z'),
+      authed: false,
+      askedInDialog: 5,
+    });
+    assert.equal(verdict.reason, 'limit');
+  });
+
+  check('an empty question is refused before anything else', () => {
+    const verdict = session.canSend({
+      text: '   ',
+      allowance: session.EMPTY_ALLOWANCE,
+      at: day('2026-08-06T09:00:00Z'),
+      authed: false,
+      askedInDialog: 0,
+    });
+    assert.equal(verdict.reason, 'empty');
+  });
+
+  group('A question is never lost');
+
+  check('a queued question round-trips', () => {
+    const pending = { kind: 'question', text: 'Why are markets falling?' };
+    assert.deepEqual(session.parsePending(pending), pending);
+  });
+
+  check('a queued action round-trips, and an invented one does not', () => {
+    assert.deepEqual(session.parsePending({ kind: 'action', id: 'watchlist' }), {
+      kind: 'action',
+      id: 'watchlist',
+    });
+    assert.equal(session.parsePending({ kind: 'action', id: 'drain_account' }), null);
+  });
+
+  check('junk in the queue is discarded rather than replayed', () => {
+    for (const raw of [null, 'a string', 42, {}, { kind: 'question', text: '   ' }]) {
+      assert.equal(session.parsePending(raw), null, JSON.stringify(raw));
+    }
+  });
+
+  check('a very long queued question is bounded', () => {
+    // It comes back out of storage, and storage is writable by anything on the
+    // page.
+    const long = session.parsePending({ kind: 'question', text: 'x'.repeat(5000) });
+    assert.ok(long.text.length <= 2000);
+  });
+
+  group('The status strip cannot be made to lie');
+
+  check('a known context reads back', () => {
+    assert.deepEqual(session.parseContext('symbol:TSLA'), { kind: 'symbol', subject: 'tsla' });
+    assert.deepEqual(session.parseContext('home'), { kind: 'home', subject: null });
+    assert.equal(session.contextLabel(session.parseContext('symbol:TSLA')), 'This asset · TSLA');
+  });
+
+  check('an unknown one is nothing rather than echoed', () => {
+    /*
+     * This is rendered as "what Voyager can see". A strip that repeats whatever
+     * a link put in it is a strip that can be used to tell somebody their
+     * private data is in the conversation.
+     */
+    assert.equal(session.parseContext('your bank account'), null);
+    assert.equal(session.parseContext(''), null);
+    assert.equal(session.parseContext(42), null);
+    assert.equal(session.contextLabel(null), 'This conversation only');
+  });
+
+  check('and a subject is stripped of anything that is not a plain name', () => {
+    const parsed = session.parseContext('symbol:<img src=x onerror=alert(1)>');
+    assert.ok(!/[<>=()]/.test(parsed.subject ?? ''), parsed.subject);
   });
 
   /* ============================ Superchart layouts ============================ */

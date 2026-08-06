@@ -655,3 +655,15 @@
     margin: 0;
   }
 }
+
+/*
+ * The clarity line under an Ask Voyager box. It answers the four questions
+ * somebody hesitating has — what this does, what it costs, what the limit is,
+ * where the history goes — before they have to press anything to find out.
+ */
+.clarity {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--tn-text-faint);
+}

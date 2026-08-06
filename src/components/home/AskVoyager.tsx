@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useLoginModal } from '@/components/shell/LoginModalProvider';
+import { clarityLine, contextParam, stashDraft } from '@/components/voyager/AskEntry';
 import { Icon } from '@/components/ui/Icon';
 import { VOYAGER_SUGGESTIONS } from '@/content/homeV2';
 import { useRouter } from '@/i18n/navigation';
@@ -21,12 +23,21 @@ import styles from './HomeV2.module.css';
  */
 export function AskVoyager() {
   const router = useRouter();
+  const { authed } = useLoginModal();
   const [draft, setDraft] = useState('');
 
+  /*
+   * The question goes through storage, the page it came from goes in the URL.
+   *
+   * A question in a query string is in the browser history, in the referrer of
+   * the next request and in any log along the way. The context is a page name
+   * and can travel openly; the question is the person's and does not have to.
+   */
   const ask = (question: string) => {
     const trimmed = question.trim();
     if (!trimmed) return;
-    router.push({ pathname: '/voyager', query: { q: trimmed } });
+    stashDraft(trimmed, { kind: 'home' });
+    router.push({ pathname: '/voyager', query: { context: contextParam({ kind: 'home' }) } });
   };
 
   return (
@@ -60,6 +71,9 @@ export function AskVoyager() {
               <Icon name="send" size={15} strokeWidth={2.2} />
             </button>
           </form>
+
+          {/* Four facts, in the order somebody hesitating needs them. */}
+          <p className={styles.clarity}>{clarityLine(authed)}</p>
 
           <div className={styles.askTryLabel}>Try asking</div>
           <div className={styles.askChips}>

@@ -10,6 +10,8 @@ import {
   type AssetClassKey,
 } from '@/content/assetClasses';
 import { EXPLORE_MORE, MARKET_TILES, STARTERS } from '@/content/explore';
+import { useLoginModal } from '@/components/shell/LoginModalProvider';
+import { clarityLine, contextParam, stashDraft } from '@/components/voyager/AskEntry';
 import { Link, useRouter } from '@/i18n/navigation';
 import { compareHref } from '@/lib/explore/compareLink';
 import { wave } from '@/lib/wave';
@@ -30,16 +32,24 @@ import styles from './Explore.module.css';
  */
 export function ExploreHub() {
   const router = useRouter();
+  const { authed } = useLoginModal();
   const [key, setKey] = useState<AssetClassKey>('stocks');
   const [question, setQuestion] = useState('');
 
   const category = assetClass(key) ?? ASSET_CLASSES[0];
   const comparison = comparisonSet(key);
 
+  /*
+   * The class being read about travels with the question, so the workspace can
+   * say what it can see rather than opening on "this conversation only" from a
+   * page that was entirely about bonds.
+   */
   const ask = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    router.push({ pathname: '/voyager', query: { q: trimmed } });
+    const source = { kind: 'explore' as const, subject: key };
+    stashDraft(trimmed, source);
+    router.push({ pathname: '/voyager', query: { context: contextParam(source) } });
   };
 
   return (
@@ -155,6 +165,8 @@ export function ExploreHub() {
               <Icon name="send" size={14} strokeWidth={2.2} />
             </button>
           </form>
+
+          <p className={styles.clarity}>{clarityLine(authed)}</p>
 
           <div className={styles.tryLabel}>Try asking</div>
           <div className={styles.questionList}>
