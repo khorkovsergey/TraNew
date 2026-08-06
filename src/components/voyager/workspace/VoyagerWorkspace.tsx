@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Link } from '@/i18n/navigation';
 import { VoyagerOrb } from '@/components/voyager/VoyagerOrb';
@@ -91,13 +91,41 @@ type Props = {
   seedQuestion?: string | null;
 };
 
+/**
+ * The answer to a question that arrived in the URL, computed rather than sent.
+ *
+ * It used to only pre-fill the composer, on the argument that a link should not
+ * be able to ask something on somebody's behalf. That was the wrong trade: the
+ * chips on the home page promise an answer and delivered a text box, and every
+ * one of them dead-ended. The protection is kept by a different means — the
+ * answer opens with "You asked" and the question verbatim, so nothing is put in
+ * a person's mouth out of sight.
+ *
+ * Built in the initialiser rather than an effect, so the answer is in the first
+ * render — including the server's — instead of arriving after a blank landing.
+ */
+function seeded(question: string | null) {
+  const trimmed = question?.trim();
+  if (!trimmed) return null;
+
+  const parsed = parsePlan(responseFor(trimmed));
+  return {
+    request: trimmed,
+    plan: parsed?.plan ?? null,
+    refusals: parsed?.refusals ?? [],
+    name: suggestName(trimmed),
+  };
+}
+
 export function VoyagerWorkspace({ personName, seedQuestion = null }: Props) {
-  const [stage, setStage] = useState<Stage>('landing');
-  const [request, setRequest] = useState('');
-  const [draft, setDraft] = useState(seedQuestion ?? '');
+  const opening = useMemo(() => seeded(seedQuestion), [seedQuestion]);
+
+  const [stage, setStage] = useState<Stage>(opening ? 'requested' : 'landing');
+  const [request, setRequest] = useState(opening?.request ?? '');
+  const [draft, setDraft] = useState('');
   const [showCategories, setShowCategories] = useState(false);
-  const [plan, setPlan] = useState<VoyagerPlan | null>(null);
-  const [refusals, setRefusals] = useState<string[]>([]);
+  const [plan, setPlan] = useState<VoyagerPlan | null>(opening?.plan ?? null);
+  const [refusals, setRefusals] = useState<string[]>(opening?.refusals ?? []);
   const [run, setRun] = useState<Run>(START);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   /** The change waiting to be accepted. Nothing happens while this is set. */
@@ -105,14 +133,15 @@ export function VoyagerWorkspace({ personName, seedQuestion = null }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedWorkspace[]>([]);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [name, setName] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(opening?.name ?? null);
   /*
    * The grant for this workspace. Null means nothing has been shared, which is
    * the state every workspace starts in and returns to on New.
    */
   const [grant, setGrant] = useState<Grant | null>(null);
   const [ticked, setTicked] = useState<string[]>([]);
-  const [asked, setAsked] = useState(0);
+  // The seeded question counts as asked; it produced an answer.
+  const [asked, setAsked] = useState(opening ? 1 : 0);
   const [ctaDismissed, setCtaDismissed] = useState(false);
   const [modal, setModal] = useState<'signup' | 'plans' | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);

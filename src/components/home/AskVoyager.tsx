@@ -14,9 +14,10 @@ import styles from './HomeV2.module.css';
  * consent state, and an answer without those is the thing this product exists
  * not to give.
  *
- * The question arrives in the composer, focused, rather than already sent. One
- * keystroke, and in exchange the person sees what is about to be asked on their
- * behalf before it is.
+ * The question is answered on arrival rather than left in the composer. A chip
+ * that says "What is an ETF?" and delivers a text box is a dead end, and every
+ * one of these was one. The answer opens by repeating the question, so nothing
+ * is attributed to somebody out of sight.
  */
 export function AskVoyager() {
   const router = useRouter();

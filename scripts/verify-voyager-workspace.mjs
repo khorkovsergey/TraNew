@@ -40,11 +40,20 @@ try {
   await page.goto(`${BASE}/en`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(500);
 
-  const pill = page.locator('header nav').getByRole('link', { name: 'AI Voyager' });
-  check('AI Voyager is a first-level entry', (await pill.count()) > 0);
+  const pill = page.locator('header nav').getByRole('link', { name: 'Voyager', exact: true });
+  check('Voyager is a first-level entry', (await pill.count()) > 0);
 
   const items = await page.locator('header nav a, header nav button').allInnerTexts();
-  check('and the last one, beside the others', items[items.length - 1] === 'AI Voyager', items.join(' · '));
+  /*
+   * Last among the destinations, with Marketplace — the one dropdown — after
+   * it. Before the redesign this was a violet pill outside the row; as an
+   * ordinary item it stops asking for attention the other sections do not get.
+   */
+  check(
+    'and sits among the others rather than outside them',
+    items.includes('Voyager') && items[items.length - 1] === 'Marketplace',
+    items.join(' · ')
+  );
   check('styled like them, not as a pill', (await page.locator('[class*="voyagerPill"]').count()) === 0);
 
   /*
@@ -105,7 +114,9 @@ try {
   await page.getByRole('button', { name: 'More things I can do' }).click();
   await page.waitForTimeout(400);
 
-  const categories = await page.locator('h2').allInnerTexts();
+  // Scoped to the workspace: the site footer carries five column headings of its
+  // own, and counting every h2 on the page counted those too.
+  const categories = await page.locator('#main h2').allInnerTexts();
   check('five editorial categories appear', categories.length === 5, categories.join(' | '));
   check(
     'and the gated ones say so before the click',
@@ -115,7 +126,8 @@ try {
 
   await page.getByRole('button', { name: 'Hide examples' }).click();
   await page.waitForTimeout(300);
-  check('the link closes them again', (await page.locator('h2').count()) === 0);
+  // Same scope as above — the footer's headings are not the workspace's.
+  check('the link closes them again', (await page.locator('#main h2').count()) === 0);
 
   group('A request assembles the workspace, and New goes back');
 

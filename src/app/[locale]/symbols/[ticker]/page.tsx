@@ -39,11 +39,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'symbol' });
   const name = pick(symbol.name, locale);
 
+  /*
+   * No price in the title.
+   *
+   * It read `Tesla (TSLA) — $317.42` from the authored fixture while the page
+   * below it showed the live quote, so the tab and the page disagreed with each
+   * other in front of the reader. A title is also cached by search engines and
+   * shared as a link: a number in it is stale the moment it is written, and it
+   * is stale in a place nobody can correct.
+   */
   return pageMetadata({
     href: { pathname: '/symbols/[ticker]', params: { ticker: key } },
     locale,
-    title: `${name} (${symbol.ticker}) — ${symbol.price}`,
-    description: `${t('whyTitle')}: ${pick(symbol.why, locale).slice(0, 150)}…`,
+    title: `${symbol.ticker} — ${name} price, chart and news`,
+    description: `What ${name} is, why it moves, what it risks, and how it fits a portfolio — in plain language, with the data each figure came from.`,
   });
 }
 

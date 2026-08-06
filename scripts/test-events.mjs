@@ -3634,6 +3634,64 @@ try {
     assert.equal(scenarios.scenarioFor('What is happening today?'), 'market');
   });
 
+  check('a question about what something is gets taught, not given a market summary', () => {
+    /*
+     * Before this branch existed every one of these fell through to the market
+     * summary: somebody asking what an ETF is was told where the S&P closed.
+     * The concept words collide with almost every other test, which is why the
+     * educational check has to run first.
+     */
+    assert.equal(scenarios.scenarioFor('What is an ETF?'), 'explain');
+    assert.equal(scenarios.scenarioFor('What are bonds?'), 'explain');
+    assert.equal(scenarios.scenarioFor('How does inflation affect my savings?'), 'explain');
+    assert.equal(scenarios.scenarioFor('What is the difference between an ETF and a stock?'), 'explain');
+    assert.equal(scenarios.scenarioFor('Explain diversification'), 'explain');
+  });
+
+  check('and asking about today still gets today', () => {
+    // The educational branch runs first, so it has to be narrow enough not to
+    // swallow the questions the other scenarios exist for.
+    assert.equal(scenarios.scenarioFor('Why are markets falling?'), 'selloff');
+    assert.equal(scenarios.scenarioFor('What is happening today?'), 'market');
+    assert.equal(scenarios.scenarioFor('Compare NVIDIA and AMD'), 'compare');
+    assert.equal(scenarios.scenarioFor('What are the main risks in my portfolio?'), 'portfolio');
+  });
+
+  check('the answer repeats the question that was asked', () => {
+    /*
+     * The question can arrive in a URL rather than from somebody's keyboard, so
+     * it has to be visible on the answer. Nothing is put in a person's mouth
+     * out of sight.
+     */
+    const plan = contract.parsePlan(scenarios.responseFor('What is an ETF?'))?.plan;
+    const asked = plan.modules.find((module) => module.title === 'You asked');
+    assert.ok(asked, 'no module carries the question');
+    assert.equal(asked.data.body, 'What is an ETF?');
+  });
+
+  check('an explanation carries the half that usually gets left out', () => {
+    // The part that costs people money is a module of its own, so it cannot be
+    // skimmed past as a caveat at the end of a paragraph.
+    for (const question of ['what is an ETF', 'what are bonds', 'explain diversification']) {
+      const plan = contract.parsePlan(scenarios.responseFor(question))?.plan;
+      assert.ok(
+        plan.modules.some((module) => module.title === 'What that leaves out'),
+        question
+      );
+    }
+  });
+
+  check('a concept nobody wrote up is admitted, not improvised', () => {
+    /*
+     * A demo that invents a definition of something it was never taught is
+     * worse than one that admits the gap — this is a product that tells people
+     * how money works.
+     */
+    const plan = contract.parsePlan(scenarios.responseFor('what is a covered call'))?.plan;
+    assert.ok(plan, 'the fallback did not parse');
+    assert.match(plan.modules[0].title, /do not have a written explanation/i);
+  });
+
   check('every scenario parses, with nothing refused', () => {
     /*
      * The whole reason they are written behind the contract. Ten hand-written
@@ -3647,7 +3705,8 @@ try {
           chart: 'build a chart with RSI', screen: 'find companies with growth',
           portfolio: 'risks in my portfolio', monitor: 'monitor NVDA and tell me if it falls',
           beginner: 'I am a beginner investing every month', gold: 'why has gold risen',
-          pine: 'create a Pine Script indicator', market: 'what is happening today' }[id]
+          pine: 'create a Pine Script indicator', market: 'what is happening today',
+          explain: 'what is an ETF' }[id]
       );
       const out = contract.parsePlan(raw);
       if (!out) broken.push(`${id}: did not parse`);
@@ -3715,7 +3774,8 @@ try {
           chart: 'build a chart with RSI', screen: 'find companies with growth',
           portfolio: 'risks in my portfolio', monitor: 'monitor NVDA and tell me if it falls',
           beginner: 'I am a beginner investing every month', gold: 'why has gold risen',
-          pine: 'create a Pine Script indicator', market: 'what is happening today' }[id])
+          pine: 'create a Pine Script indicator', market: 'what is happening today',
+          explain: 'what is an ETF' }[id])
       );
       for (const module of out.plan.modules) {
         if (!module.actions.some((a) => a.mutates)) continue;
@@ -3841,7 +3901,8 @@ try {
         chart: 'build a chart with RSI', screen: 'find companies with growth',
         portfolio: 'risks in my portfolio', monitor: 'monitor NVDA and tell me if it falls',
         beginner: 'I am a beginner investing every month', gold: 'why has gold risen',
-        pine: 'create a Pine Script indicator', market: 'what is happening today' }[id];
+        pine: 'create a Pine Script indicator', market: 'what is happening today',
+        explain: 'what is an ETF' }[id];
 
       const out = contract.parsePlan(scenarios.responseFor(question));
       for (const module of out.plan.modules) {
