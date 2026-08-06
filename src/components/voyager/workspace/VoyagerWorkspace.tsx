@@ -190,23 +190,39 @@ export function VoyagerWorkspace({
    * the field would tell the model a conversation happened that did not.
    */
   const askModel = useCallback(async (question: string) => {
-    const response = await fetch('/api/voyager', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        question,
-        context: GENERIC_CONTEXT,
-        disabledSources: [],
-        history: [],
-      }),
-    });
+    /*
+     * A bounded wait.
+     *
+     * Without it a request that never returns leaves the canvas saying "asking"
+     * for as long as the tab is open, which is the worst of the failure states:
+     * it looks like the product is working. Forty seconds is longer than a slow
+     * answer and shorter than anybody's patience.
+     */
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 40_000);
 
-    if (!response.ok) throw new Error(`voyager ${response.status}`);
+    try {
+      const response = await fetch('/api/voyager', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          context: GENERIC_CONTEXT,
+          disabledSources: [],
+          history: [],
+        }),
+        signal: abort.signal,
+      });
 
-    const payload = (await response.json()) as { answer?: VoyagerAnswer };
-    if (!payload.answer?.text) throw new Error('empty answer');
+      if (!response.ok) throw new Error(`voyager ${response.status}`);
 
-    return conversationalPlan(question, payload.answer, new Date().toISOString());
+      const payload = (await response.json()) as { answer?: VoyagerAnswer };
+      if (!payload.answer?.text) throw new Error('empty answer');
+
+      return conversationalPlan(question, payload.answer, new Date().toISOString());
+    } finally {
+      clearTimeout(timer);
+    }
   }, []);
 
   const send = useCallback((text: string) => {
@@ -490,17 +506,6 @@ export function VoyagerWorkspace({
               </button>
             </form>
 
-            {/*
-              * Waiting on the model, said rather than left blank. An empty
-              * canvas during a real request is indistinguishable from one that
-              * failed.
-              */}
-            {asking && !plan && (
-              <p className={styles.contextLine} role="status">
-                Asking Voyager…
-              </p>
-            )}
-
             {plan ? (
               <>
                 <span className={styles.modeChip}>
@@ -591,12 +596,16 @@ export function VoyagerWorkspace({
                   </div>
                 )}
               </>
-            ) : (
+            ) : asking ? null : (
+              /*
+               * Only reachable if the model neither answered nor failed, which
+               * the effect does not allow — kept as the honest thing to say if
+               * it ever happens rather than the old copy, which claimed the
+               * scenario was unwritten and was shown for several seconds every
+               * time the model was simply being asked.
+               */
               <div className={styles.refusalCard} role="status">
-                <p>
-                  That scenario is not written yet. Seven of the ten arrive in phase 4; this one
-                  returns nothing rather than answering confidently about the wrong subject.
-                </p>
+                <p>Nothing came back for that. Try asking again.</p>
               </div>
             )}
           </div>
@@ -619,7 +628,9 @@ export function VoyagerWorkspace({
               )}
             </>
           ) : (
-            <p className={styles.zoneStubNote}>Nothing to build for this request yet.</p>
+            <p className={styles.zoneStubNote} role="status">
+              {asking ? 'Asking Voyager…' : 'Nothing to build for this request yet.'}
+            </p>
           )
         }
         inspector={
@@ -656,7 +667,11 @@ export function VoyagerWorkspace({
                   </div>
                 ))}
                 <p className={styles.zoneStubNote}>
-                  Editing these re-runs the result. The editing itself is phase 4.
+                  {/* A note to the team that shipped to the reader. What it
+                      said stopped being true, and "phase 4" was never a thing
+                      anybody outside this repository could interpret. */}
+                  These are the assumptions the answer rests on. Changing one re-runs the
+                  result.
                 </p>
               </div>
 

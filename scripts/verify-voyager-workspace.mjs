@@ -809,6 +809,35 @@ try {
   );
   check('and still cites its sources', (await page.locator('[class*="sourceList"] li').count()) > 0);
 
+  check(
+    'and the old "scenario is not written yet" card is gone',
+    /*
+     * It rendered whenever there was no plan, which since the model was wired
+     * in is the normal state *while the answer is being fetched* — so it showed
+     * for several seconds on every question, beside a line saying the model was
+     * being asked. Two contradictory messages at once.
+     */
+    !/scenario is not written yet/i.test(await page.locator('body').innerText())
+  );
+
+  group('A model that cannot be reached says so');
+
+  await page.route('**/api/voyager', (route) => route.abort());
+  await page.goto(`${BASE}/en/voyager?q=${encodeURIComponent('Tell me something')}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await page.waitForTimeout(4000);
+
+  const downText = await page.locator('body').innerText();
+  check('it is named as unavailable', /temporarily unavailable/i.test(downText));
+  check('the question is kept', /Tell me something/.test(downText));
+  /*
+   * The line that matters. An integration failure disguised as a valid market
+   * answer is worse than an outage, because nobody finds out.
+   */
+  check('and no dashboard is substituted', !/Where the US market closed/.test(downText));
+  await page.unroute('**/api/voyager');
+
   await page.close();
 
   group('The phone gets the same screen, not a squeezed one');
