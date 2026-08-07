@@ -3939,7 +3939,7 @@ try {
 
     assert.ok(!/372|252|311/.test(summary), summary);
     assert.ok(!/Tesla/i.test(summary), summary);
-    assert.match(summary, /generated/i);
+    assert.match(summary, /caption under the chart/i);
   });
 
   check('the question it was written for is left alone', () => {
@@ -4076,9 +4076,21 @@ try {
      * has to survive is the part somebody could be misled by — the prices are
      * generated, and the code was never run.
      */
-    assert.match(output.CHART_PREVIEW_NOTICE, /generated, not a market feed/i);
+    /*
+     * And it must not say where the prices came from. A chart draws real
+     * delayed candles when the provider has the symbol and a generated series
+     * when it does not; this line is written once for both, so whichever it
+     * claimed would be wrong half the time. That claim belongs in the caption
+     * under each chart, which knows which one it drew.
+     *
+     * This line has been wrong in every direction already — it promised a
+     * drawing before one existed, denied the drawing after the engine landed,
+     * and called real candles generated. It says only what is always true now.
+     */
+    assert.ok(!/generated, not a market feed/i.test(output.CHART_PREVIEW_NOTICE));
     assert.ok(!/No chart is drawn/i.test(output.CHART_PREVIEW_NOTICE));
     assert.ok(!/^Drawn from/i.test(output.CHART_PREVIEW_NOTICE));
+    assert.match(output.CHART_PREVIEW_NOTICE, /caption under each chart/i);
   });
 
   group('Many chats instead of one');

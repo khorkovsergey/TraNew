@@ -310,3 +310,74 @@ export async function getMacroSeries(seriesId: string): Promise<MacroSeries | nu
     return null;
   }
 }
+
+/** One daily candle. Matches the chart engine's `Bar`, deliberately. */
+export type DailyBar = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
+};
+
+/**
+ * Real daily candles for a symbol.
+ *
+ * `getSeries` above keeps only the closes, because everything reading it draws
+ * a line. A candlestick chart needs the other three, and the provider was
+ * sending them all along — they were being thrown away on the way in.
+ *
+ * Returns null rather than a shortened series when anything is wrong: an
+ * unknown ticker, a spent rate limit, or fewer than thirty bars. A chart with
+ * eight candles on it claims to show a year and does not, which is worse than a
+ * chart that admits it has no data.
+ */
+export async function getBars(symbol: string, outputsize = 260): Promise<DailyBar[] | null> {
+  if (!quotesConfigured()) return null;
+
+  try {
+    const url = new URL(`${TWELVE_DATA}/time_series`);
+    url.searchParams.set('symbol', symbol);
+    url.searchParams.set('interval', '1day');
+    url.searchParams.set('outputsize', String(outputsize));
+    url.searchParams.set('apikey', process.env.TWELVE_DATA_API_KEY!);
+
+    const response = await fetch(url, { next: { revalidate: SERIES_TTL } });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    // Rate limits and unknown symbols arrive as 200 with a status field, so the
+    // HTTP code alone does not say whether this worked.
+    if (data?.status === 'error' || !Array.isArray(data?.values)) {
+      console.warn(`[market] bars for ${symbol} unavailable: ${data?.message ?? 'no data'}`);
+      return null;
+    }
+
+    const bars: DailyBar[] = [];
+    for (const row of [...data.values].reverse()) {
+      const open = Number.parseFloat(row?.open);
+      const high = Number.parseFloat(row?.high);
+      const low = Number.parseFloat(row?.low);
+      const close = Number.parseFloat(row?.close);
+      const time = Date.parse(`${row?.datetime}T00:00:00Z`) / 1000;
+
+      if (![open, high, low, close, time].every(Number.isFinite)) continue;
+
+      const volume = Number.parseFloat(row?.volume);
+      bars.push({
+        time,
+        open,
+        high,
+        low,
+        close,
+        ...(Number.isFinite(volume) ? { volume } : {}),
+      });
+    }
+
+    return bars.length >= 30 ? bars : null;
+  } catch (error) {
+    console.warn('[market] bars request failed', error);
+    return null;
+  }
+}

@@ -103,8 +103,8 @@ export function retargetChart<T extends Plan>(plan: T, question: string): T {
            */
           summary:
             `Daily bars for ${symbol} over the last year, with a 14-period RSI below and ` +
-            `three horizontal levels the detector found. The series shown here is generated ` +
-            `rather than a market feed, so read the shape and the levels, not the numbers.`,
+            `three horizontal levels the detector found. The caption under the chart says ` +
+            `where its prices came from.`,
         },
       };
     }),

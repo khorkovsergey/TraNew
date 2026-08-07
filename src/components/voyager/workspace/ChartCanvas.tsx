@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CanvasChartEngine } from '@/lib/superchart/chart-engine/canvas';
 import type { ChartPalette } from '@/lib/superchart/chart-engine/types';
 import { DEMO_NOTICE, demoBars } from '@/lib/superchart/datafeed/demo';
@@ -19,11 +19,13 @@ import styles from './VoyagerWorkspace.module.css';
  * renderers in one product is two sets of colours, two ideas of what a candle
  * looks like, and two places to fix anything.
  *
- * **The series is generated, and says so.** These bars come from the demo
- * datafeed, which is deterministic per symbol and interval rather than a market
- * feed — this is a demo portal and drawing invented prices without labelling
- * them is the failure the whole trust-label system exists to prevent. The
- * notice sits under the canvas, not in a tooltip.
+ * **The caption says which series is on screen, every time.** Real candles come
+ * from the market provider through a server route, because the key stays on the
+ * server. When there is no key, no such ticker, or the rate limit is spent, it
+ * falls back to the demo datafeed — and says *that* instead. Drawing invented
+ * prices without labelling them is the failure the whole trust-label system
+ * exists to prevent, and a caption that is right only most of the time is the
+ * same failure with extra steps.
  */
 
 type Props = {
@@ -55,6 +57,8 @@ function readPalette(element: HTMLElement): ChartPalette {
 
 export function ChartCanvas({ symbol, interval, lastPrice = 300 }: Props) {
   const stage = useRef<HTMLDivElement>(null);
+  /** Null until the first draw, so the caption never describes an empty canvas. */
+  const [live, setLive] = useState<boolean | null>(null);
 
   useEffect(() => {
     const element = stage.current;
@@ -63,18 +67,27 @@ export function ChartCanvas({ symbol, interval, lastPrice = 300 }: Props) {
     const engine = new CanvasChartEngine();
     let cancelled = false;
 
-    void engine
-      .initialize(element, {
+    const draw = async () => {
+      await engine.initialize(element, {
         theme: 'dark',
         chartType: 'candles',
         palette: readPalette(element),
-      })
-      .then(() => {
-        // Guarded: initialize is async, and a tab switched away from before it
-        // resolves would otherwise draw into a detached element.
-        if (cancelled) return;
-        engine.setBars(demoBars({ symbol, interval: interval as never, bars: 180, lastPrice }));
       });
+      // Guarded: initialize is async, and a tab switched away from before it
+      // resolves would otherwise draw into a detached element.
+      if (cancelled) return;
+
+      const real = await fetch(`/api/market/bars?symbol=${encodeURIComponent(symbol)}`)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload) => (Array.isArray(payload?.bars) ? payload.bars : null))
+        .catch(() => null);
+      if (cancelled) return;
+
+      engine.setBars(real ?? demoBars({ symbol, interval: interval as never, bars: 180, lastPrice }));
+      setLive(Boolean(real));
+    };
+
+    void draw();
 
     return () => {
       cancelled = true;
@@ -86,7 +99,11 @@ export function ChartCanvas({ symbol, interval, lastPrice = 300 }: Props) {
     <>
       <div className={styles.chartStage} ref={stage} />
       <p className={styles.chartCaption}>
-        {DEMO_NOTICE} {symbol} · {interval}
+        {live === null
+          ? `Loading ${symbol}…`
+          : live
+            ? `Daily candles · ${symbol} · delayed, from our market provider`
+            : `${DEMO_NOTICE} ${symbol} · ${interval}`}
       </p>
     </>
   );
