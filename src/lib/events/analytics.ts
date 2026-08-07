@@ -85,7 +85,13 @@ export type AnalyticsEvent =
   | { name: 'voyager_save_clicked'; authenticated: boolean }
   | { name: 'voyager_auth_required_for_save' }
   | { name: 'voyager_chat_saved' }
-  | { name: 'voyager_new_chat'; chatCount: number };
+  | { name: 'voyager_new_chat'; chatCount: number }
+  /*
+   * The expert-services funnel. Counts and ids only — a brief holds what
+   * somebody is trying to do with their money, and none of that goes here.
+   */
+  | { name: 'voyager_message_sent'; turns: number }
+  | { name: 'expert_brief_saved'; services: string };
 
 export interface AnalyticsSink {
   track(event: AnalyticsEvent): void;

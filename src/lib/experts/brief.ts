@@ -238,3 +238,54 @@ export function relaxations(experts: ExpertLike[], brief: ExpertBrief): string[]
 
   return offers;
 }
+
+/* ------------------------------------------------------- The next question */
+
+/**
+ * What to ask next, chosen from what the brief still lacks.
+ *
+ * Adaptive because it reads the brief rather than walking a list: answer the
+ * location and the location question does not come back. That is the whole
+ * difference from the questionnaire this replaces, which asked eleven fixed
+ * questions whichever of the four services somebody picked.
+ *
+ * Returns null when there is enough — the interview has to end on its own, or
+ * it is a form with better manners.
+ */
+export function nextQuestion(brief: ExpertBrief): { field: string; ask: string } | null {
+  const [missing] = missingFrom(brief);
+  if (!missing) return null;
+
+  switch (missing) {
+    case 'goal':
+      return {
+        field: 'goal',
+        ask: 'What are you trying to achieve? Describe it the way you would to a colleague — I will work out which specialist that needs.',
+      };
+    case 'services':
+      return {
+        field: 'services',
+        ask: 'Is this mainly about building a strategy, reviewing what you already hold, planning your finances, or the tax side of it? More than one is fine.',
+      };
+    case 'location':
+      return {
+        field: 'location',
+        ask: 'Which country are you in? It decides which rules apply to your situation, not just who is nearby.',
+      };
+    case 'language':
+      return {
+        field: 'language',
+        ask: 'Which language would you like the consultation in?',
+      };
+    case 'engagement':
+      return {
+        field: 'engagement',
+        ask: 'Are you after a one-off consultation, a piece of work with an end, or someone ongoing?',
+      };
+    default:
+      return null;
+  }
+}
+
+/** A short line for the brief panel before anything has been said. */
+export const EMPTY_BRIEF_NOTE = 'Voyager will build your request here as you talk.';

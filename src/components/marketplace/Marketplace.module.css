@@ -979,3 +979,194 @@
   color: var(--tn-text-muted);
   vertical-align: 1px;
 }
+
+/* ============================================ Voyager-guided expert briefing */
+
+.consultation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+.dialogue {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 420px;
+}
+
+/* Semantic stages, not "question 3 of 12". */
+.stageRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stageStep {
+  padding: 5px 11px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-chip);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text-faint);
+}
+
+.stageOn {
+  border-color: var(--tn-mint);
+  color: var(--tn-text);
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.voyagerSaid {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0;
+  max-width: 46em;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--tn-text);
+}
+
+.youSaid {
+  align-self: flex-end;
+  margin: 0;
+  max-width: 34em;
+  padding: 9px 13px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 13px;
+  background: var(--tn-surface-inner);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--tn-text);
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 16px floor: below it iOS zooms the page when the field takes focus. */
+.composerInput {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 13px;
+  background: var(--tn-surface-inner);
+  font: inherit;
+  font-size: 16px;
+  color: var(--tn-text);
+}
+
+.composerInput:focus-visible {
+  outline: 2px solid var(--tn-mint);
+  outline-offset: 1px;
+}
+
+.composerSend {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--tn-cta);
+  color: var(--tn-cta-text);
+  cursor: pointer;
+}
+
+.composerSend:disabled {
+  background: var(--tn-chip-bg);
+  color: var(--tn-text-faint);
+  cursor: default;
+}
+
+.briefPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 16px;
+  background: var(--tn-surface);
+  position: sticky;
+  top: 90px;
+}
+
+.briefHead {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}
+
+.briefNote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--tn-text-muted);
+}
+
+.briefList {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.briefList dt {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--tn-text-faint);
+  margin-top: 8px;
+}
+
+.briefList dd {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--tn-text);
+}
+
+.briefCta {
+  margin-top: 6px;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--tn-cta);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--tn-cta-text);
+  cursor: pointer;
+}
+
+.briefCta:disabled {
+  background: var(--tn-chip-bg);
+  color: var(--tn-text-faint);
+  cursor: default;
+}
+
+/* One column below the fold-point: the brief follows the conversation. */
+@media (max-width: 900px) {
+  .consultation {
+    grid-template-columns: 1fr;
+  }
+
+  .briefPanel {
+    position: static;
+  }
+}

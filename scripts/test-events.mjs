@@ -3842,6 +3842,47 @@ try {
     assert.ok(offers.some((o) => /language/i.test(o)), offers.join(' | '));
   });
 
+  check('the next question follows the brief, not a list', () => {
+    /*
+     * The questionnaire asked eleven fixed questions whichever service was
+     * picked. This reads what is missing: answer the location and the location
+     * question does not come back.
+     */
+    assert.equal(brief.nextQuestion(briefOf({})).field, 'goal');
+    assert.equal(brief.nextQuestion(briefOf({ goal: 'g' })).field, 'services');
+    assert.equal(brief.nextQuestion(briefOf({ goal: 'g', services: ['tax'] })).field, 'location');
+    assert.equal(
+      brief.nextQuestion(briefOf({ goal: 'g', services: ['tax'], country: 'Cyprus' })).field,
+      'language'
+    );
+  });
+
+  check('and it ends on its own', () => {
+    // An interview that never stops is a form with better manners.
+    const complete = briefOf({
+      goal: 'g', services: ['tax'], country: 'Cyprus',
+      languages: ['English'], engagement: 'consultation',
+    });
+    assert.equal(brief.nextQuestion(complete), null);
+    assert.equal(brief.stageOf(complete), 'ready');
+  });
+
+  check('every question is a sentence, not a field label', () => {
+    const seen = new Set();
+    let current = briefOf({});
+    const fill = { goal: { goal: 'g' }, services: { services: ['tax'] }, location: { country: 'Cyprus' }, language: { languages: ['English'] }, engagement: { engagement: 'consultation' } };
+    for (let i = 0; i < 6; i += 1) {
+      const question = brief.nextQuestion(current);
+      if (!question) break;
+      assert.ok(!seen.has(question.field), `asked ${question.field} twice`);
+      seen.add(question.field);
+      assert.ok(question.ask.length > 30, question.ask);
+      assert.ok(/\?/.test(question.ask), question.ask);
+      current = { ...current, ...fill[question.field] };
+    }
+    assert.equal(seen.size, 5);
+  });
+
   check('nothing is offered to relax when there are already results', () => {
     assert.deepEqual(brief.relaxations(EXPERTS, briefOf({ goal: 'g', services: ['strategy'] })), []);
   });
