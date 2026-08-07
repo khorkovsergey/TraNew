@@ -70,15 +70,37 @@ try {
   group('Every section carries a dropdown');
 
   /*
-   * Five of them now. The redesign shipped with only Marketplace; the sections
+   * Four of them. The redesign shipped with only Marketplace; the sections
    * underneath then had to be reached through the page they belonged to, and
    * the shortcuts came back. Each menu opens with its own section, so a label
    * that opens a panel is still a way in.
    */
-  for (const section of ['Start Investing', 'Explore', 'Learn', 'Voyager', 'Marketplace']) {
+  for (const section of ['Start Investing', 'Explore', 'Learn', 'Marketplace']) {
     const item = page.locator('header nav button', { hasText: section }).first();
     check(`${section} opens a menu`, (await item.getAttribute('aria-haspopup')) === 'true');
   }
+
+  /*
+   * Voyager is the exception, and deliberately. Its menu held three entries that
+   * all opened `/voyager` plus a duplicate of Marketplace's Subscriptions, so
+   * the label goes straight to the workspace instead of listing ways to get
+   * there.
+   */
+  const voyager = page.locator('header nav a', { hasText: 'Voyager' }).first();
+  check('Voyager is a link, not a menu', (await voyager.count()) === 1);
+  check(
+    'and it opens the workspace',
+    (await voyager.getAttribute('href'))?.endsWith('/voyager') === true,
+    await voyager.getAttribute('href')
+  );
+
+  // Last in the row, after Marketplace.
+  check(
+    'Voyager sits after Marketplace',
+    labels.indexOf('Voyager') === labels.length - 1 &&
+      labels.indexOf('Marketplace') === labels.indexOf('Voyager') - 1,
+    labels.join(', ')
+  );
 
   const trigger = page.locator('header nav button', { hasText: 'Marketplace' });
 

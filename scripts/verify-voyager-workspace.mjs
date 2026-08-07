@@ -41,22 +41,28 @@ try {
   await page.waitForTimeout(500);
 
   /*
-   * A dropdown trigger rather than a link since the menus came back. The
-   * section is still one click away — every menu opens with its own section —
-   * so what matters here is that the entry exists and leads to the workspace.
+   * A plain link again. It briefly carried a dropdown, and every entry in that
+   * dropdown opened this same page — plus one duplicating Marketplace's
+   * Subscriptions. A menu whose options are all one destination is a door with
+   * a list of ways to open it.
    */
-  const pill = page.locator('header nav button', { hasText: 'Voyager' }).first();
-  check('Voyager is a first-level entry', (await pill.count()) > 0);
+  const entry = page.locator('header nav a', { hasText: 'Voyager' }).first();
+  check('Voyager is a first-level entry', (await entry.count()) > 0);
+  check(
+    'and it goes straight to the workspace',
+    (await entry.getAttribute('href'))?.endsWith('/voyager') === true,
+    await entry.getAttribute('href')
+  );
 
   const items = await page.locator('header nav a, header nav button').allInnerTexts();
   /*
-   * Last among the destinations, with Marketplace — the one dropdown — after
-   * it. Before the redesign this was a violet pill outside the row; as an
-   * ordinary item it stops asking for attention the other sections do not get.
+   * Last in the row, after Marketplace. Before the redesign this was a violet
+   * pill outside the row; as an ordinary item it stops asking for attention the
+   * other sections do not get.
    */
   check(
     'and sits among the others rather than outside them',
-    items.includes('Voyager') && items[items.length - 1] === 'Marketplace',
+    items[items.length - 1] === 'Voyager' && items[items.length - 2] === 'Marketplace',
     items.join(' · ')
   );
   check('styled like them, not as a pill', (await page.locator('[class*="voyagerPill"]').count()) === 0);
@@ -75,14 +81,9 @@ try {
   const others = await page.locator('header nav a, header nav button').count();
   check('and the rest of the navigation is intact', others >= 5, `${others} nav items`);
 
-  await pill.click();
-  await page.waitForTimeout(300);
-  await page
-    .locator('div[class*="panel"] a', { hasText: 'Open the workspace' })
-    .first()
-    .click();
+  await entry.click();
   await page.waitForURL(/\/voyager/, { timeout: 10_000 });
-  check('its menu leads to the workspace', page.url().includes('/voyager'));
+  check('one click reaches the workspace', page.url().includes('/voyager'));
 
   group('The empty state holds only what it is allowed to hold');
 

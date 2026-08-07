@@ -3,13 +3,19 @@ import type { AppPathname } from '@/i18n/routing';
 /**
  * The header dropdowns.
  *
- * Five sections carry one: Start Investing, Explore, Learn, Voyager and
- * Marketplace. The redesign shipped with only Marketplace, on the argument that
- * a beginner should be able to read the top of the page rather than navigate
- * it; the sections underneath then had to be reached through the page they
- * belonged to. These bring the shortcuts back without taking the destinations
- * away — every menu opens with the section itself, so the label is still a way
- * in and not only a way to a list.
+ * Four sections carry one: Start Investing, Explore, Learn and Marketplace. The
+ * redesign shipped with only Marketplace, on the argument that a beginner should
+ * be able to read the top of the page rather than navigate it; the sections
+ * underneath then had to be reached through the page they belonged to. These
+ * bring the shortcuts back without taking the destinations away — every menu
+ * opens with the section itself, so the label is still a way in and not only a
+ * way to a list.
+ *
+ * Voyager is not among them. Its menu offered three entries that all opened
+ * `/voyager` and a "Plans and limits" link pointing at the same page as
+ * Marketplace's Subscriptions — a list of ways to reach one destination. The
+ * label now simply goes there. Nothing was lost with it: Voyager settings live
+ * in the account menu, and saved workspaces are on the workspace itself.
  *
  * Copy is literal rather than message keys. The portal is English-only by an
  * explicit decision, and every other file the redesign added carries its
@@ -36,7 +42,7 @@ export type MenuGroup = {
   items: MenuEntry[];
 };
 
-export type MenuKey = 'start' | 'explore' | 'learn' | 'voyager' | 'marketplace';
+export type MenuKey = 'start' | 'explore' | 'learn' | 'marketplace';
 
 const tool = (
   slug: string
@@ -209,42 +215,6 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
         { label: 'Events', sub: 'Meetups, webinars and conferences', kind: 'route', href: '/events' },
         { label: 'Create an event', kind: 'route', href: '/events/create' },
         { label: 'Learning & events hub', kind: 'route', href: '/learning-events' },
-      ],
-    },
-  ],
-
-  voyager: [
-    {
-      title: 'Voyager',
-      items: [
-        {
-          label: 'Open the workspace',
-          sub: 'Ask, build or monitor — with its sources shown',
-          kind: 'route',
-          href: '/voyager',
-        },
-        {
-          label: 'Explain a concept',
-          sub: 'What an ETF is, what inflation does',
-          kind: 'route',
-          href: '/voyager',
-          query: { q: 'What is an ETF?' },
-        },
-        {
-          label: 'What happened today',
-          sub: 'The market, summarised',
-          kind: 'route',
-          href: '/voyager',
-          query: { q: 'What is happening in markets today?' },
-        },
-      ],
-    },
-    {
-      title: 'Your Voyager',
-      items: [
-        { label: 'Saved workspaces', sub: 'Requires an account', kind: 'auth' },
-        { label: 'Voyager settings', kind: 'route', href: '/account/voyager' },
-        { label: 'Plans and limits', kind: 'route', href: '/marketplace/subscriptions' },
       ],
     },
   ],

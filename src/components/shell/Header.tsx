@@ -234,23 +234,6 @@ export function Header() {
                 </Link>
               );
             })}
-
-            <button
-              ref={(element) => {
-                triggers.current.marketplace = element;
-              }}
-              className={`${styles.navItem} ${styles.navTrigger} ${
-                active === 'marketplace' || openMenu === 'marketplace' ? styles.navItemActive : ''
-              }`}
-              aria-expanded={openMenu === 'marketplace'}
-              aria-haspopup="true"
-              onClick={() =>
-                setOpenMenu((current) => (current === 'marketplace' ? null : 'marketplace'))
-              }
-            >
-              {t('nav.marketplace')}
-              <Icon name="chevronDown" size={12} strokeWidth={2.4} />
-            </button>
           </nav>
 
           <div className={styles.actions}>

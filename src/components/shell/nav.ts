@@ -72,12 +72,31 @@ const LEARN: NavItem = {
   menu: 'learn',
 };
 
+const MARKETPLACE: NavItem = {
+  key: 'marketplace',
+  labelKey: 'marketplace',
+  href: '/marketplace',
+  // `/tool` belongs to Explore and does not match `/tools`: a prefix matches the
+  // path exactly or with a slash after it, so the two never collide.
+  prefixes: ['/marketplace', '/tools'],
+  menu: 'marketplace',
+};
+
+/**
+ * Voyager has no dropdown, and is last on purpose.
+ *
+ * It had one, and every entry in it led to `/voyager` — the workspace, a seeded
+ * question, another seeded question — plus a "Plans and limits" link pointing at
+ * the same page as Marketplace's own Subscriptions. A menu whose options are all
+ * one destination is a door with a list of ways to open it.
+ *
+ * Clicking the label opens the workspace, which is where all of it was going.
+ */
 const VOYAGER: NavItem = {
   key: 'voyager',
   labelKey: 'voyager',
   href: '/voyager',
   prefixes: ['/voyager'],
-  menu: 'voyager',
 };
 
 export const GUEST_NAV: NavItem[] = [
@@ -85,6 +104,7 @@ export const GUEST_NAV: NavItem[] = [
   START,
   EXPLORE,
   LEARN,
+  MARKETPLACE,
   VOYAGER,
 ];
 
@@ -94,6 +114,7 @@ export const AUTHED_NAV: NavItem[] = [
   EXPLORE,
   LEARN,
   { key: 'money', labelKey: 'money', href: '/account/wealth', prefixes: ['/account/wealth'] },
+  MARKETPLACE,
   VOYAGER,
 ];
 
