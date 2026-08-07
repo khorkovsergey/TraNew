@@ -97,6 +97,7 @@ try {
       'src/lib/voyager/workspace/record.ts',
       'src/lib/voyager/workspace/scopes.ts',
       'src/lib/voyager/workspace/credits.ts',
+      'src/lib/voyager/workspace/chats.ts',
       'src/content/wealthConnections.ts',
       'src/lib/start/path.ts',
       'src/lib/start/plan.ts',
@@ -226,6 +227,7 @@ try {
   const library = await load('record', 'workspace');
   const scopes = await load('scopes', 'workspace');
   const credits = await load('credits', 'workspace');
+  const chats = await load('chats', 'workspace');
   const wc = await load('wealthConnections', 'content');
   const start = await load('path', 'start');
   const plan = await load('plan', 'start');
@@ -3714,6 +3716,160 @@ try {
     const plan = contract.parsePlan(scenarios.responseFor('what is a covered call'))?.plan;
     assert.ok(plan, 'the fallback did not parse');
     assert.match(plan.modules[0].title, /do not have a written explanation/i);
+  });
+
+  group('Many chats instead of one');
+
+  const CHAT_AT = '2026-08-07T10:00:00.000Z';
+
+  check('a chat takes its name from the first thing asked', () => {
+    let chat = chats.newChat('c1', CHAT_AT);
+    assert.equal(chat.title, chats.UNTITLED);
+
+    chat = chats.withMessage(chat, { id: 'm1', role: 'user', text: 'What is a drawdown?', at: CHAT_AT });
+    assert.equal(chat.title, 'What is a drawdown');
+
+    // The second question does not rename it — the chat is the first thing.
+    chat = chats.withMessage(chat, { id: 'm2', role: 'user', text: 'And volatility?', at: CHAT_AT });
+    assert.equal(chat.title, 'What is a drawdown');
+  });
+
+  check('a long question is cut on a word, not through one', () => {
+    const title = chats.titleFor(
+      'Summarize how the United States stock market closed today and why'
+    );
+    assert.ok(title.length <= 43, title);
+    assert.ok(title.endsWith('…'), title);
+    assert.ok(!/\s…$/.test(title), `space before the ellipsis: ${title}`);
+    // Cut on a boundary, so no word is left as a fragment.
+    assert.ok(!title.includes('Unite…'), title);
+  });
+
+  check('an assistant turn never names the chat', () => {
+    let chat = chats.newChat('c1', CHAT_AT);
+    chat = chats.withMessage(chat, { id: 'm1', role: 'assistant', text: 'Here you go', at: CHAT_AT });
+    assert.equal(chat.title, chats.UNTITLED);
+  });
+
+  check('answering makes a saved chat stale again', () => {
+    /*
+     * The copy on the server no longer matches what is on screen. A Save button
+     * that still reads "Saved" after a new answer is lying about where the
+     * conversation lives.
+     */
+    let chat = { ...chats.newChat('c1', CHAT_AT), saved: true };
+    chat = chats.withMessage(chat, { id: 'm1', role: 'user', text: 'Hello', at: CHAT_AT });
+    assert.equal(chat.saved, false);
+  });
+
+  check('chats group into Today, Yesterday and a date', () => {
+    const now = new Date('2026-08-07T12:00:00.000Z');
+    const at = (iso) => ({ ...chats.newChat(iso, iso), updatedAt: iso });
+
+    const groups = chats.groupByDay(
+      [
+        at('2026-08-07T09:00:00.000Z'),
+        at('2026-08-06T09:00:00.000Z'),
+        at('2026-08-01T09:00:00.000Z'),
+        at('2026-08-07T11:00:00.000Z'),
+      ],
+      now
+    );
+
+    assert.deepEqual(
+      groups.map((g) => g.label),
+      ['Today', 'Yesterday', '1 Aug']
+    );
+    // Newest first inside a day, so the one just used is at the top.
+    assert.deepEqual(
+      groups[0].chats.map((c) => c.updatedAt),
+      ['2026-08-07T11:00:00.000Z', '2026-08-07T09:00:00.000Z']
+    );
+  });
+
+  check('a malformed chat is dropped without taking the rest with it', () => {
+    /*
+     * Storage is writable by anything on the origin and survives deployments.
+     * Losing every conversation over one broken record is the failure people
+     * actually notice.
+     */
+    const stored = {
+      version: chats.CHATS_SCHEMA_VERSION,
+      chats: [
+        { id: 'good', title: 'Kept', createdAt: CHAT_AT, updatedAt: CHAT_AT, messages: [] },
+        { id: 'bad', title: 42, createdAt: CHAT_AT, updatedAt: CHAT_AT, messages: [] },
+        null,
+        { id: 'alsogood', title: 'Also kept', createdAt: CHAT_AT, updatedAt: CHAT_AT, messages: [] },
+      ],
+    };
+    const read = chats.parseChats(stored);
+    assert.deepEqual(read.map((c) => c.id), ['good', 'alsogood']);
+  });
+
+  check('a message with no timestamp is dropped, not defaulted', () => {
+    const stored = {
+      version: chats.CHATS_SCHEMA_VERSION,
+      chats: [
+        {
+          id: 'c1', title: 'T', createdAt: CHAT_AT, updatedAt: CHAT_AT,
+          messages: [
+            { id: 'm1', role: 'user', text: 'kept', at: CHAT_AT },
+            { id: 'm2', role: 'user', text: 'no timestamp' },
+            { id: 'm3', role: 'wizard', text: 'not a role', at: CHAT_AT },
+          ],
+        },
+      ],
+    };
+    const read = chats.parseChats(stored);
+    assert.deepEqual(read[0].messages.map((m) => m.text), ['kept']);
+  });
+
+  check('a library from another schema version is refused whole', () => {
+    assert.equal(chats.parseChats({ version: 99, chats: [] }), null);
+    assert.equal(chats.parseChats(null), null);
+    assert.equal(chats.parseChats({ version: chats.CHATS_SCHEMA_VERSION }), null);
+  });
+
+  check('anything read out of guest storage is unsaved, whatever it claims', () => {
+    /*
+     * The server has never seen it. A record claiming otherwise would put a
+     * "Saved" label on a conversation that exists in one browser tab.
+     */
+    const read = chats.parseChats({
+      version: chats.CHATS_SCHEMA_VERSION,
+      chats: [{ id: 'c1', title: 'T', createdAt: CHAT_AT, updatedAt: CHAT_AT, messages: [], saved: true }],
+    });
+    assert.equal(read[0].saved, false);
+  });
+
+  check('a guest library is capped rather than allowed to fail to write', () => {
+    const many = Array.from({ length: chats.MAX_GUEST_CHATS + 5 }, (_, i) =>
+      chats.newChat(`c${i}`, CHAT_AT)
+    );
+    assert.equal(chats.serializeChats(many).chats.length, chats.MAX_GUEST_CHATS);
+  });
+
+  check('Save refuses a guest and an empty chat for different reasons', () => {
+    /*
+     * They are not the same refusal. A guest is asked to sign in and the chat
+     * survives the trip; an empty chat has nothing to save, and asking somebody
+     * to make an account for it would be the worst version of this product.
+     */
+    const withText = chats.withMessage(chats.newChat('c1', CHAT_AT), {
+      id: 'm1', role: 'user', text: 'Hello', at: CHAT_AT,
+    });
+
+    assert.deepEqual(chats.canSave(withText, false), { allowed: false, reason: 'no-account' });
+    assert.deepEqual(chats.canSave(chats.newChat('c2', CHAT_AT), true), {
+      allowed: false, reason: 'empty',
+    });
+    assert.deepEqual(chats.canSave(null, true), { allowed: false, reason: 'empty' });
+    assert.deepEqual(chats.canSave(withText, true), { allowed: true });
+  });
+
+  check('saving is account-only, and the module says so out loud', () => {
+    // A constant rather than a comment, so the rule is greppable from the UI.
+    assert.equal(chats.SAVE_REQUIRES_ACCOUNT, true);
   });
 
   group('The concept table');
