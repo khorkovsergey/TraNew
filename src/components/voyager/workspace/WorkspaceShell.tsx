@@ -55,6 +55,8 @@ type Props = {
   history?: ReactNode;
   /** What Save currently means here — drives the label and the tooltip. */
   saveState?: 'saved' | 'unsaved' | 'empty';
+  /** True when nothing has been asked yet, which changes where a phone opens. */
+  startEmpty?: boolean;
 };
 
 export function WorkspaceShell({
@@ -75,8 +77,18 @@ export function WorkspaceShell({
   onSave,
   history,
   saveState = 'empty',
+  startEmpty = false,
 }: Props) {
-  const [zones, setZones] = useState<ZoneState>(DEFAULT_ZONES);
+  /*
+   * On a phone one zone is on screen at a time, and which one matters more
+   * since the landing went. The canvas was the default because there was
+   * always a request behind it; now there may not be, and the composer lives in
+   * the conversation — so a phone opened the workspace on a panel saying it was
+   * waiting for a question, with no way to ask one.
+   */
+  const [zones, setZones] = useState<ZoneState>(
+    startEmpty ? { ...DEFAULT_ZONES, mobileTab: 'chat' } : DEFAULT_ZONES
+  );
   const [narrow, setNarrow] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
 

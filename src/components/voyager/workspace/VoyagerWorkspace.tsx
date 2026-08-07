@@ -630,6 +630,7 @@ export function VoyagerWorkspace({
         autoNamed
         onNew={reset}
         saveState={personName && plan ? 'unsaved' : 'empty'}
+        startEmpty={!request}
         /*
          * The sidebar appears once there is a second conversation to choose
          * between. One chat in a history column is furniture: it costs the
@@ -1072,7 +1073,13 @@ export function VoyagerWorkspace({
            * matching space below, so this never covers the last card — nothing
            * floats over content without an allowance for it.
            */
-          !personName && !ctaDismissed ? (
+          /*
+           * And only after something has been asked. The landing used to stand
+           * between arriving and seeing this; without it, a guest opening
+           * Voyager met a signup card before Voyager had done anything for
+           * them. An offer is worth making once there is something to point at.
+           */
+          !personName && !ctaDismissed && request ? (
             <div className={styles.cta}>
               <span className={styles.ctaTile} aria-hidden="true">
                 <Icon name="sparkle" size={15} />
