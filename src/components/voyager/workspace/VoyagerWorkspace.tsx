@@ -613,16 +613,20 @@ export function VoyagerWorkspace({
     setNotice('Undone. The record of it stays in the history.');
   }, []);
 
-  if (stage === 'requested') {
-    /*
-     * The zones exist; what goes inside them does not yet. Each says which
-     * phase brings it rather than showing a convincing empty frame — an empty
-     * panel that looks finished is harder to judge than one that says what it
-     * is waiting for.
-     */
-    return (
+  /*
+   * One view, always.
+   *
+   * There used to be a landing in front of this: a headline, a composer and
+   * five suggested questions, and only after answering one did the workspace
+   * appear. It was a page whose only job was to hand you to another page, and
+   * somebody arriving to ask a second question paid for it every time.
+   *
+   * The composer lives in the conversation column now, where it already was for
+   * follow-ups, and the Output panel says what it is waiting for.
+   */
+  return (
       <WorkspaceShell
-        workspaceName={name ?? 'New workspace'}
+        workspaceName={name ?? 'New chat'}
         autoNamed
         onNew={reset}
         saveState={personName && plan ? 'unsaved' : 'empty'}
@@ -656,7 +660,8 @@ export function VoyagerWorkspace({
         }
         conversation={
           <div className={styles.turn}>
-            <p className={styles.userBubble}>{request}</p>
+            {/* Nothing asked yet means no bubble, rather than an empty one. */}
+            {request && <p className={styles.userBubble}>{request}</p>}
 
             {/*
               The follow-up composer.
@@ -879,7 +884,11 @@ export function VoyagerWorkspace({
             </>
           ) : (
             <p className={styles.zoneStubNote} role="status">
-              {asking ? 'Asking Voyager…' : 'Nothing to build for this request yet.'}
+              {asking
+                ? 'Asking Voyager…'
+                : request
+                  ? 'Nothing to build for this request yet.'
+                  : 'Ask something and the answer appears here, with the data it used.'}
             </p>
           )
         }
@@ -1208,168 +1217,4 @@ export function VoyagerWorkspace({
         onDismissNotice={() => setNotice(null)}
       />
     );
-  }
-
-  return (
-    <div className={styles.landing}>
-      <div className={`${styles.column} ${showCategories ? styles.columnWide : ''}`}>
-        {briefing ? (
-          <>
-            <VoyagerMark size={42} />
-            <h1 className={styles.greeting}>{briefing.greeting}</h1>
-            <p className={styles.supporting}>{briefing.summary}</p>
-
-            <div className={styles.briefingGrid}>
-              {briefing.cards.map((card) => (
-                <button
-                  key={card.id}
-                  className={styles.briefingCard}
-                  onClick={() => send(card.title)}
-                >
-                  <span className={styles.briefingKind}>{card.kind}</span>
-                  <span className={styles.briefingTitle}>{card.title}</span>
-                  {/* Why this card is here. Required, not decorative. */}
-                  <span className={styles.briefingWhy}>{card.because}</span>
-                </button>
-              ))}
-            </div>
-          </>
-        ) : (
-          <>
-            <h1 className={styles.headline}>
-              What would you like to understand, build or monitor?
-            </h1>
-            <p className={styles.supporting}>
-              Ask a question, build a chart, analyse an asset or create a financial workspace.
-              Voyager shows the data it used and asks before it changes anything.
-            </p>
-
-            {/*
-              * What it can see, named. The value is parsed against a closed set
-              * rather than echoed from the URL — a line that repeats whatever a
-              * link put in it could be used to tell somebody their private data
-              * is in the conversation.
-              */}
-            <p className={styles.contextLine}>Voyager sees: {contextLabel(context)}</p>
-          </>
-        )}
-
-        <form
-          className={styles.composer}
-          onSubmit={(event) => {
-            event.preventDefault();
-            send(draft);
-          }}
-        >
-          <textarea
-            ref={composer}
-            className={styles.composerInput}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              // Enter sends; Shift+Enter is a newline. A composer that needs a
-              // mouse to submit is a composer people abandon mid-sentence.
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                send(draft);
-              }
-            }}
-            rows={1}
-            placeholder="Ask anything about markets, a company or your own plan"
-            aria-label="Ask Voyager"
-          />
-
-          <button
-            type="button"
-            className={styles.composerIcon}
-            title="Dictate (not built yet)"
-            aria-label="Dictate — not built yet"
-            disabled
-          >
-            <Icon name="bubble" size={17} />
-          </button>
-          <button
-            type="button"
-            className={styles.composerIcon}
-            title="Attach a file (not built yet)"
-            aria-label="Attach a file — not built yet"
-            disabled
-          >
-            <Icon name="arrowUpRight" size={17} />
-          </button>
-          <button
-            type="submit"
-            className={styles.composerSend}
-            title="Send"
-            aria-label="Send"
-            disabled={!draft.trim()}
-          >
-            <Icon name="arrowRight" size={17} />
-          </button>
-        </form>
-
-        <div className={styles.starters}>
-          {STARTERS.map((starter) => (
-            <button
-              key={starter.id}
-              className={styles.starter}
-              onClick={() => send(starter.text)}
-            >
-              <Icon name={starter.icon as IconName} size={15} className={styles.starterIcon} />
-              <span className={styles.starterText}>{starter.text}</span>
-              <Icon name="chevronDown" size={15} className={styles.starterChevron} />
-            </button>
-          ))}
-        </div>
-
-        <div className={styles.quietRow}>
-          <button
-            className={styles.quietLink}
-            onClick={() => setShowCategories((value) => !value)}
-            aria-expanded={showCategories}
-          >
-            {showCategories ? 'Hide examples' : 'More things I can do'}
-          </button>
-
-          {!personName && (
-            <Link className={styles.quietSignup} href="/sign-up">
-              Sign up and get <strong>3 000</strong> free tokens →
-            </Link>
-          )}
-        </div>
-
-        {showCategories && (
-          <div className={styles.categories}>
-            {PROMPT_CATEGORIES.map((category) => (
-              <section key={category.id} className={styles.category}>
-                <div className={styles.categoryHead}>
-                  <span className={styles.categoryIcon}>
-                    <Icon name={category.icon as IconName} size={14} />
-                  </span>
-                  <span>
-                    <h2 className={styles.categoryTitle}>{category.title}</h2>
-                    <p className={styles.categorySubtitle}>{category.subtitle}</p>
-                  </span>
-                </div>
-
-                <div className={styles.categoryCards}>
-                  {category.cards.map((card) => (
-                    <button
-                      key={card.text}
-                      className={styles.promptCard}
-                      onClick={() => send(card.text)}
-                    >
-                      <span>{card.text}</span>
-                      {/* Said before the click, not after. */}
-                      {card.pro && <span className={styles.proBadge}>Pro</span>}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }

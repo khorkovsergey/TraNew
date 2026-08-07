@@ -225,7 +225,14 @@ export function WorkspaceShell({
                 title="Open the chat history"
                 aria-label="Open the chat history"
               >
-                <Icon name="bubble" size={16} />
+                {/*
+                  * Layers, not a speech bubble. Collapsed, this rail sits
+                  * directly beside the conversation's rail, and when both wore
+                  * a bubble the pair said "message" twice and gave no way to
+                  * tell which one opened what. This one is a stack of things;
+                  * that one is a thing being said.
+                  */}
+                <Icon name="layers" size={16} />
               </button>
             )}
           </aside>

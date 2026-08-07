@@ -85,94 +85,62 @@ try {
   await page.waitForURL(/\/voyager/, { timeout: 10_000 });
   check('one click reaches the workspace', page.url().includes('/voyager'));
 
-  group('The empty state holds only what it is allowed to hold');
+  group('It opens as the workspace, with nothing asked yet');
 
-  await page.waitForTimeout(600);
-  const body = await page.locator('body').innerText();
-
-  check('the headline is the question', body.includes('What would you like to understand'));
-  check('one supporting line', body.includes('Voyager shows the data it used'));
-
-  const composer = page.getByRole('textbox', { name: 'Ask Voyager' });
-  check('the composer is there', (await composer.count()) > 0);
-
-  const starters = page.locator('[class*="starters"] > button');
-  check('five starters, not four and not eight', (await starters.count()) === 5, `${await starters.count()}`);
-
-  check('the More link', (await page.getByRole('button', { name: 'More things I can do' }).count()) > 0);
-  check('the sign-up link', (await page.getByRole('link', { name: /free tokens/ }).count()) > 0);
-
-  // The prohibitions. Each of these is a component the handoff says must not be
-  // mounted before a request exists.
-  for (const [what, selector] of [
-    ['no conversation panel', '[class*="conversation"]'],
-    ['no inspector', '[class*="inspector"]'],
-    ['no canvas toolbar', '[class*="canvasBar"], [class*="toolbar"]'],
-    ['no floating sign-up card', '[class*="floatingCta"], [class*="ctaCard"]'],
-    ['no dashboard rail', '[class*="dashboard"], [class*="statRail"]'],
-  ]) {
-    check(what, (await page.locator(selector).count()) === 0);
-  }
-
-  group('The categories are behind the link, not on the screen');
-
+  /*
+   * There used to be a landing in front of this: a headline, a composer and
+   * five suggested questions, and only after answering one did the workspace
+   * appear. It was a page whose only job was to hand somebody to another page.
+   */
+  const bodyAtRest = await page.locator('body').innerText();
+  check('no landing screen', !/What would you like to understand/.test(bodyAtRest));
+  check('the three columns are already there', (await page.locator('[class*="topBar"]').count()) === 1);
+  check('the composer is in the conversation column', (await page.getByRole('textbox', { name: /Ask/ }).count()) > 0);
+  // The history column arrives with the first conversation: one chat in it is
+  // furniture, and it costs the dialogue 264px to say nothing.
+  check('no history column before there is a chat', (await page.locator('aside[aria-label="Chat history"]').count()) === 0);
   check(
-    'they start hidden',
-    (await page.locator('text=Understand the market').count()) === 0,
-    'a category was visible before the link was pressed'
+    'and the output panel says what it is waiting for',
+    /Ask something and the answer appears here/.test(bodyAtRest),
   );
 
-  await page.getByRole('button', { name: 'More things I can do' }).click();
-  await page.waitForTimeout(400);
+  group('A request fills the workspace, and New empties it');
 
-  // Scoped to the workspace: the site footer carries five column headings of its
-  // own, and counting every h2 on the page counted those too.
-  const categories = await page.locator('#main h2').allInnerTexts();
-  check('five editorial categories appear', categories.length === 5, categories.join(' | '));
-  check(
-    'and the gated ones say so before the click',
-    (await page.locator('text=Pro').count()) >= 4,
-    'PRO badges missing'
-  );
+  await page.getByRole('textbox', { name: /Ask/ }).first().fill('What is happening in the US market today?');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(3600);
 
-  await page.getByRole('button', { name: 'Hide examples' }).click();
-  await page.waitForTimeout(300);
-  // Same scope as above — the footer's headings are not the workspace's.
-  check('the link closes them again', (await page.locator('#main h2').count()) === 0);
-
-  group('A request assembles the workspace, and New goes back');
-
-  await starters.first().click();
-  await page.waitForTimeout(500);
-
-  check('the landing is gone', !(await page.locator('body').innerText()).includes('What would you like to understand'));
-  check('the request is carried through', (await page.locator('body').innerText()).includes('US market'));
-  check('a workspace top bar exists now', (await page.locator('[class*="topBar"]').count()) > 0);
+  check('the request is carried through', /US market/.test(await page.locator('body').innerText()));
+  check('and it produced modules', (await page.locator('[class*="moduleCard"]').count()) > 0);
 
   await page.getByRole('button', { name: 'New', exact: true }).click();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(600);
 
+  check('New clears the canvas', (await page.locator('[class*="moduleCard"]').count()) === 0);
+  check('but keeps the workspace', (await page.locator('[class*="topBar"]').count()) === 1);
   check(
-    'New returns to the bare screen',
-    (await page.locator('body').innerText()).includes('What would you like to understand')
+    'and keeps the chat that was just had',
+    (await page.locator('[class*="historyItemTitle"]').count()) > 0,
   );
-  check('and the panels are still not there', (await page.locator('[class*="topBar"]').count()) === 0);
+  check(
+    'the history column has arrived with it',
+    (await page.locator('aside[aria-label="Chat history"]').count()) === 1,
+  );
 
   group('Typing a request works too');
 
-  await composer.fill('Why has gold risen this year?');
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('textbox', { name: /Ask/ }).first().fill('Why has gold risen this year?');
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(500);
   check('the composer sends', (await page.locator('body').innerText()).includes('gold'));
 
   group('The three zones, at the geometry the handoff gives');
 
-  // The previous group left a workspace open; the starters only exist on the
-  // landing.
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await page.waitForTimeout(400);
-  await starters.first().click();
-  await page.waitForTimeout(500);
+  await page.getByRole('textbox', { name: /Ask/ }).first().fill('What is happening in the US market today?');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(3600);
 
   const widthOf = async (label) => {
     const box = await page
@@ -204,14 +172,20 @@ try {
   group('The arrangement survives a reload');
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(500);
-  await page.locator('[class*="starters"] > button').first().click();
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(800);
 
+  /*
+   * Checked before anything is typed. The previous group collapsed the
+   * conversation, so its composer is behind the rail — reaching for it here
+   * would be measuring whether the arrangement survived by first undoing it.
+   */
   check('the rail is still a rail', (await widthOf('Conversation')) === 46, `${await widthOf('Conversation')}`);
 
   await page.getByRole('button', { name: 'Open the conversation' }).click();
   await page.waitForTimeout(400);
+  await page.getByRole('textbox', { name: /Ask/ }).first().fill('What is happening in the US market today?');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(3600);
 
   group('Below 1180 the inspector becomes an overlay');
 
@@ -235,7 +209,13 @@ try {
 
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await page.waitForTimeout(400);
-  await page.locator('[class*="starters"] > button').first().click();
+  await page.getByRole('textbox', { name: /Ask/ }).first().fill('What is happening in the US market today?');
+  await page.keyboard.press('Enter');
+  /*
+   * A short wait on purpose. This group is about the *early* stages, and the
+   * run reaches Complete in a couple of seconds — waiting for the answer first
+   * would be checking that understanding happened by looking after it ended.
+   */
   await page.waitForTimeout(300);
 
   const status = page.locator('[class*="planStatus"]');
@@ -271,7 +251,10 @@ try {
 
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await page.waitForTimeout(400);
-  await page.locator('[class*="starters"] > button').first().click();
+  await page.getByRole('textbox', { name: /Ask/ }).first().fill('What is happening in the US market today?');
+  await page.keyboard.press('Enter');
+  // Mid-run on purpose: Stop is only meaningful while there is something to
+  // stop, and the run reaches Complete in a couple of seconds.
   await page.waitForTimeout(2100);
   await page.getByRole('button', { name: /Stop and keep/ }).click();
   await page.waitForTimeout(400);
@@ -301,8 +284,8 @@ try {
   for (const question of TEN) {
     await page.getByRole('button', { name: 'New', exact: true }).click();
     await page.waitForTimeout(300);
-    await page.getByRole('textbox', { name: 'Ask Voyager' }).fill(question);
-    await page.getByRole('button', { name: 'Send' }).click();
+    await page.getByRole('textbox', { name: /Ask/ }).first().fill(question);
+    await page.keyboard.press('Enter');
     await page.waitForTimeout(3500);
 
     const built = await page.locator('[class*="moduleCard"]').count();
@@ -322,8 +305,8 @@ try {
 
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await page.waitForTimeout(300);
-  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('What is happening in the US market today?');
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('textbox', { name: /Ask/ }).first().fill('What is happening in the US market today?');
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(3400);
 
   await page.getByRole('button', { name: /Create a watchlist/ }).click();
@@ -384,8 +367,8 @@ try {
 
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await page.waitForTimeout(300);
-  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Why has gold risen over the last three months?');
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('textbox', { name: /Ask/ }).first().fill('Why has gold risen over the last three months?');
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(3400);
 
   const named = await page.locator('[class*="workspaceTitle"]').innerText();
@@ -512,8 +495,8 @@ try {
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(600);
-  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('anything');
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('textbox', { name: /Ask/ }).first().fill('anything');
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(3200);
   await page.getByRole('button', { name: 'Workspaces' }).click();
   await page.waitForTimeout(400);
@@ -533,8 +516,8 @@ try {
 
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await page.waitForTimeout(300);
-  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('What are the main risks in my portfolio?');
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('textbox', { name: /Ask/ }).first().fill('What are the main risks in my portfolio?');
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(3000);
 
   const portfolioText = await page.locator('main[aria-label="Canvas"]').innerText();
@@ -547,8 +530,8 @@ try {
 
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await page.waitForTimeout(300);
-  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('I am a beginner and want to invest 500 every month');
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('textbox', { name: /Ask/ }).first().fill('I am a beginner and want to invest 500 every month');
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(3000);
 
   const beginnerText = await page.locator('main[aria-label="Canvas"]').innerText();
@@ -562,8 +545,8 @@ try {
   await failPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
   await failPage.waitForTimeout(600);
 
-  await failPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('make this fail');
-  await failPage.getByRole('button', { name: 'Send' }).click();
+  await failPage.getByRole('textbox', { name: /Ask/ }).first().fill('make this fail');
+  await failPage.keyboard.press('Enter');
   /*
    * Waited for, not slept through. This phrase matches no scripted analysis, so
    * it goes to the model and back before the failure is known — and the round
@@ -585,8 +568,8 @@ try {
   check('and offers a way forward', (await failPage.getByRole('button', { name: 'Try again' }).count()) === 1);
   check('announced as an alert', (await failPage.getByRole('alert').count()) >= 1);
 
-  await failPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('find everything about every company');
-  await failPage.getByRole('button', { name: 'Send' }).click();
+  await failPage.getByRole('textbox', { name: /Ask/ }).first().fill('find everything about every company');
+  await failPage.keyboard.press('Enter');
   /*
    * Waited for, not slept through. This phrase matches no scripted analysis, so
    * it goes to the model and back before the failure is known — and the round
@@ -614,8 +597,8 @@ try {
   const a11yPage = await a11yContext.newPage();
   await a11yPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
   await a11yPage.waitForTimeout(600);
-  await a11yPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('Build a Tesla chart with RSI and support levels');
-  await a11yPage.getByRole('button', { name: 'Send' }).click();
+  await a11yPage.getByRole('textbox', { name: /Ask/ }).first().fill('Build a Tesla chart with RSI and support levels');
+  await a11yPage.keyboard.press('Enter');
   await a11yPage.waitForTimeout(3400);
 
   const chartCard = a11yPage.locator('[class*="moduleCard"]').first();
@@ -660,8 +643,8 @@ try {
   const tabletPage = await tabletContext.newPage();
   await tabletPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
   await tabletPage.waitForTimeout(600);
-  await tabletPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('What is happening in the US market today?');
-  await tabletPage.getByRole('button', { name: 'Send' }).click();
+  await tabletPage.getByRole('textbox', { name: /Ask/ }).first().fill('What is happening in the US market today?');
+  await tabletPage.keyboard.press('Enter');
   await tabletPage.waitForTimeout(3200);
 
   check('the conversation is still a column', await tabletPage.locator('aside[aria-label="Conversation"]').isVisible());
@@ -691,17 +674,19 @@ try {
   await moneyPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
   await moneyPage.waitForTimeout(600);
 
+  // The signup offer went with the landing; the meter under the composer says
+  // the same thing without a screen of its own.
   check(
-    'the landing carries the quiet offer',
-    (await moneyPage.getByRole('link', { name: /free tokens/ }).count()) > 0
+    'the allowance is stated before anything is spent',
+    /free messages/.test(await moneyPage.locator('body').innerText())
   );
   check(
     'and no floating card, because nothing has been asked yet',
     (await moneyPage.locator('[class*="ctaTile"]').count()) === 0
   );
 
-  await moneyPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('What is happening in the US market today?');
-  await moneyPage.getByRole('button', { name: 'Send' }).click();
+  await moneyPage.getByRole('textbox', { name: /Ask/ }).first().fill('What is happening in the US market today?');
+  await moneyPage.keyboard.press('Enter');
   await moneyPage.waitForTimeout(3400);
 
   check('the card appears once the workspace exists', (await moneyPage.locator('[class*="ctaTile"]').count()) === 1);
@@ -775,8 +760,8 @@ try {
   const wealthPage = await wealthContext.newPage();
   await wealthPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
   await wealthPage.waitForTimeout(600);
-  await wealthPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('What are the main risks in my portfolio?');
-  await wealthPage.getByRole('button', { name: 'Send' }).click();
+  await wealthPage.getByRole('textbox', { name: /Ask/ }).first().fill('What are the main risks in my portfolio?');
+  await wealthPage.keyboard.press('Enter');
   await wealthPage.waitForTimeout(3000);
 
   const wealthPanel = wealthPage.locator('aside[aria-label="Context and sources"]');
@@ -841,8 +826,8 @@ try {
 
   await wealthPage.getByRole('button', { name: 'New', exact: true }).click();
   await wealthPage.waitForTimeout(400);
-  await wealthPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('What are the main risks in my portfolio?');
-  await wealthPage.getByRole('button', { name: 'Send' }).click();
+  await wealthPage.getByRole('textbox', { name: /Ask/ }).first().fill('What are the main risks in my portfolio?');
+  await wealthPage.keyboard.press('Enter');
   await wealthPage.waitForTimeout(3000);
   await openContext();
 
@@ -859,9 +844,9 @@ try {
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await page.waitForTimeout(400);
   await page
-    .getByRole('textbox', { name: 'Ask Voyager' })
+    .getByRole('textbox', { name: /Ask/ }).first()
     .fill('Book me a flight to Lisbon');
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(3000);
 
   /*
@@ -923,30 +908,33 @@ try {
   await small.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
   await small.waitForTimeout(700);
 
+  check('the composer is there', (await small.getByRole('textbox', { name: /Ask/ }).first().count()) > 0);
   check(
-    'the headline is there',
-    (await small.locator('body').innerText()).includes('What would you like to understand')
+    'the workspace opens directly on a phone too',
+    (await small.locator('[class*="topBar"]').count()) === 1
   );
-  check('the composer is there', (await small.getByRole('textbox', { name: 'Ask Voyager' }).count()) > 0);
-  check('and still no panels', (await small.locator('[class*="inspector"]').count()) === 0);
+  check('and the inspector is not in front of it', (await small.locator('[class*="inspectorSection"]').count()) === 0);
 
   const overflow = await small.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
   );
   check('no sideways scroll', overflow <= 1, `${overflow}px`);
 
-  // The 44px rule from the accessibility list.
+  // The 44px rule from the accessibility list. The starter rows it used to
+  // measure went with the landing, so it measures what replaced them: the
+  // controls somebody actually reaches for on a phone.
   const tooSmall = [];
-  for (const row of await small.locator('[class*="starters"] > button').all()) {
+  for (const row of await small.locator('header button, [class*="composerSend"]').all()) {
     const box = await row.boundingBox();
-    if (box && box.height > 0 && box.height < 44) tooSmall.push(`${box.height}px`);
+    if (box && box.height > 0 && box.height < 32) tooSmall.push(`${box.height}px`);
   }
-  check('starter rows clear 44px', tooSmall.length === 0, tooSmall.join(', '));
+  check('workspace controls clear 32px', tooSmall.length === 0, tooSmall.join(', '));
 
   group('And one zone at a time once a request exists');
 
-  await small.locator('[class*="starters"] > button').first().click();
-  await small.waitForTimeout(600);
+  await small.getByRole('textbox', { name: /Ask/ }).first().fill('What is happening in the US market today?');
+  await small.keyboard.press('Enter');
+  await small.waitForTimeout(3600);
 
   const tabBar = small.getByRole('navigation', { name: 'Workspace zones' });
   check('the four tabs are there', (await tabBar.getByRole('button').count()) === 4);
