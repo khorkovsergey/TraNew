@@ -167,6 +167,7 @@ export const VOYAGER_TABS = [
   { id: 'insights', label: 'Saved Insights' },
   { id: 'memory', label: 'Memory' },
   { id: 'permissions', label: 'Permissions' },
+  { id: 'settings', label: 'Settings' },
   { id: 'usage', label: 'Usage' },
 ] as const;
 

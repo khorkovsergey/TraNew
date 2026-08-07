@@ -564,9 +564,17 @@ try {
 
   await failPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('make this fail');
   await failPage.getByRole('button', { name: 'Send' }).click();
-  // This phrase matches no scripted analysis, so it goes to the model and back
-  // before the failure is known. 900ms was measuring the request, not the card.
-  await failPage.waitForTimeout(2600);
+  /*
+   * Waited for, not slept through. This phrase matches no scripted analysis, so
+   * it goes to the model and back before the failure is known — and the round
+   * trip gets slower every time the system prompt grows. A fixed pause here is
+   * a test that fails for a reason that has nothing to do with the product.
+   */
+  await failPage
+    .locator('[class*="failureCard"]')
+    .first()
+    .waitFor({ timeout: 30_000 })
+    .catch(() => {});
 
   const failureCard = failPage.locator('[class*="failureCard"]');
   check('a failure is shown', (await failureCard.count()) === 1);
@@ -579,9 +587,17 @@ try {
 
   await failPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('find everything about every company');
   await failPage.getByRole('button', { name: 'Send' }).click();
-  // This phrase matches no scripted analysis, so it goes to the model and back
-  // before the failure is known. 900ms was measuring the request, not the card.
-  await failPage.waitForTimeout(2600);
+  /*
+   * Waited for, not slept through. This phrase matches no scripted analysis, so
+   * it goes to the model and back before the failure is known — and the round
+   * trip gets slower every time the system prompt grows. A fixed pause here is
+   * a test that fails for a reason that has nothing to do with the product.
+   */
+  await failPage
+    .locator('[class*="failureCard"]')
+    .first()
+    .waitFor({ timeout: 30_000 })
+    .catch(() => {});
 
   const secondFailure = await failPage.locator('[class*="failureCard"]').innerText();
   check('a different cause reads differently', /more than 4 000 companies/i.test(secondFailure), secondFailure.slice(0, 90));

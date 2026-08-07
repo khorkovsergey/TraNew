@@ -17,6 +17,8 @@ import {
   WORKSPACE_TABS,
 } from '@/content/account';
 import { Link } from '@/i18n/navigation';
+import { VoyagerSettings } from './VoyagerSettings';
+import { DEFAULT_SETTINGS, type VoyagerSettings as Settings } from '@/lib/voyager/settings';
 import type { ActivityView, WorkspaceView } from '@/lib/data/accountView';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import {
@@ -344,7 +346,12 @@ export function AccountWorkspace({ data }: { data: WorkspaceView }) {
 
 /* ----------------------------------------------------------------- Voyager */
 
-export function AccountVoyager() {
+/**
+ * The settings arrive from the server rather than being fetched here: they are
+ * the person's own preferences, and a panel that flashes the defaults before
+ * the real values land is a panel that appears to have forgotten them.
+ */
+export function AccountVoyager({ voyagerSettings }: { voyagerSettings?: Settings }) {
   const [tab, setTab] = useState<(typeof VOYAGER_TABS)[number]['id']>('conversations');
   const [memoryOff, setMemoryOff] = useState<Record<string, boolean>>({});
   const [memoryDeleted, setMemoryDeleted] = useState<Record<string, boolean>>({});
@@ -475,6 +482,8 @@ export function AccountVoyager() {
           })}
         </div>
       )}
+
+      {tab === 'settings' && <VoyagerSettings initial={voyagerSettings ?? DEFAULT_SETTINGS} />}
 
       {tab === 'usage' && (
         <div className={styles.card} style={{ marginTop: 18 }}>

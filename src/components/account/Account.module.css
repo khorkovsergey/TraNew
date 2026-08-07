@@ -590,3 +590,34 @@
   font-size: 14px;
   font-weight: 800;
 }
+
+/* ================================================ Voyager settings controls */
+
+.h2 {
+  margin: 22px 0 2px;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--tn-text);
+}
+
+/*
+ * 16px is the floor, not a preference: below it iOS zooms the page when the
+ * field takes focus, and the person loses their place in the list.
+ */
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 12px;
+  background: var(--tn-surface-inner);
+  font: inherit;
+  font-size: 16px;
+  color: var(--tn-text);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--tn-mint);
+  outline-offset: 1px;
+}

@@ -5,6 +5,7 @@ import { AccountVoyager } from '@/components/account/AccountSections';
 import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
 import { requireUser } from '@/lib/session';
+import { loadVoyagerSettings } from '@/app/actions/voyagerSettings';
 
 type Props = { params: Promise<{ locale: Locale }> };
 
@@ -26,9 +27,13 @@ export default async function Page({ params }: Props) {
   // Middleware only checks that a cookie exists; this is the real gate.
   await requireUser();
 
+  // Read on the server: a panel that flashes the defaults before the real
+  // values land is a panel that appears to have forgotten them.
+  const voyagerSettings = await loadVoyagerSettings();
+
   return (
     <AccountLayout>
-      <AccountVoyager />
+      <AccountVoyager voyagerSettings={voyagerSettings} />
     </AccountLayout>
   );
 }
