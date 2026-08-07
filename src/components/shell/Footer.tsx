@@ -13,11 +13,14 @@ import styles from './Footer.module.css';
  * rest live, and where every one of them is reachable from any page.
  *
  * Entries marked `soon` open a page that says it is still being built. Saying so
- * here costs nothing and saves a click that ends in disappointment.
+ * here costs nothing and saves a click that ends in disappointment. An entry
+ * with no `href` is further along that thought: nothing is being built behind
+ * it, so it is named without being clickable.
  */
 type FooterLink = {
   label: string;
-  href: AppPathname;
+  /** Absent when the entry names something that has no page at all. */
+  href?: AppPathname;
   params?: Record<string, string>;
   soon?: boolean;
 };
@@ -62,7 +65,8 @@ const COLUMNS: Array<{ title: string; links: FooterLink[] }> = [
       { label: 'Plans', href: '/marketplace/subscriptions' },
       { label: 'Marketplace', href: '/marketplace' },
       { label: 'Brokers', href: '/brokers' },
-      tool('merchandise', 'Merchandise'),
+      // No store yet, and no placeholder standing in for one.
+      { label: 'Merchandise', soon: true },
     ],
   },
   {
@@ -125,27 +129,41 @@ export function Footer() {
             <div key={column.title}>
               <h2 className={styles.columnTitle}>{column.title}</h2>
               <ul className={styles.list}>
-                {column.links.map((link) => (
-                  <li key={`${column.title}-${link.label}`}>
-                    <Link
-                      className={styles.link}
-                      href={{ pathname: link.href, params: link.params } as never}
-                      /*
-                       * A footer is a directory, not a path anybody is about to
-                       * take. Left to prefetch, these twenty-five links fired an
-                       * RSC request each on every page in the portal — 112 of
-                       * them on the home page alone, several URLs four to six
-                       * times over — and the host started answering 503 to its
-                       * own pages. The one thing a footer must not do is make
-                       * the page above it slower.
-                       */
-                      prefetch={false}
-                    >
+                {column.links.map((link) => {
+                  const body = (
+                    <>
                       {link.label}
                       {link.soon && <span className={styles.soon}>Soon</span>}
-                    </Link>
-                  </li>
-                ))}
+                    </>
+                  );
+
+                  return (
+                    <li key={`${column.title}-${link.label}`}>
+                      {link.href ? (
+                        <Link
+                          className={styles.link}
+                          href={{ pathname: link.href, params: link.params } as never}
+                          /*
+                           * A footer is a directory, not a path anybody is about
+                           * to take. Left to prefetch, these twenty-five links
+                           * fired an RSC request each on every page in the
+                           * portal — 112 of them on the home page alone, several
+                           * URLs four to six times over — and the host started
+                           * answering 503 to its own pages. The one thing a
+                           * footer must not do is make the page above it slower.
+                           */
+                          prefetch={false}
+                        >
+                          {body}
+                        </Link>
+                      ) : (
+                        <span className={`${styles.link} ${styles.linkInert}`} aria-disabled="true">
+                          {body}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}

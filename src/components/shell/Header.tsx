@@ -116,6 +116,20 @@ export function Header() {
       </>
     );
 
+    // Named, and that is all. Not a link, not a button, not focusable — the
+    // "Soon" badge is the whole entry.
+    if (entry.kind === 'inert') {
+      return (
+        <div
+          key={index}
+          className={`${styles.menuItem} ${styles.menuItemInert}`}
+          aria-disabled="true"
+        >
+          {body}
+        </div>
+      );
+    }
+
     if (entry.kind === 'route') {
       return (
         <Link

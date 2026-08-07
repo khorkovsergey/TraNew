@@ -69,6 +69,13 @@
   color: var(--tn-mint);
 }
 
+/* Named, not linked — so it does not answer to the cursor either. */
+.linkInert,
+.linkInert:hover {
+  color: var(--tn-text-muted);
+  cursor: default;
+}
+
 .soon {
   border-radius: var(--tn-radius-chip-sm);
   background: #101c2a;

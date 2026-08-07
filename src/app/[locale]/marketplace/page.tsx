@@ -29,14 +29,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  * broker. Two lists describing one thing will always end up disagreeing, so
  * changing a destination now means changing it here and in `menu.ts`, and the
  * verification script compares the two.
+ *
+ * Merchandise has no `href` in either list. The store does not exist, and the
+ * placeholder screen it used to open was a click spent to be told so; the card
+ * names the category and says "Soon" without being clickable.
  */
 const CATEGORIES: Array<{
   key: 'expert' | 'tools' | 'learning' | 'merch' | 'subscriptions';
-  href: StaticPathname | { pathname: '/tool/[slug]'; params: { slug: string } };
+  /** Absent when the category has no screen behind it at all. */
+  href?: StaticPathname;
   icon: IconName;
   color: string;
   tile: string;
-  /** Routed, but the screen behind it is still being built. */
+  /** Carries the "Soon" badge. */
   soon?: boolean;
 }> = [
   {
@@ -69,7 +74,6 @@ const CATEGORIES: Array<{
   },
   {
     key: 'merch',
-    href: { pathname: '/tool/[slug]', params: { slug: 'merchandise' } },
     icon: 'star',
     color: 'var(--tn-orange)',
     tile: 'var(--tn-orange-tint)',
@@ -97,24 +101,47 @@ export default async function MarketplaceHubPage({ params }: Props) {
       <p className={styles.lead}>{tScreens('marketplace.subtitle')}</p>
 
       <div className={styles.cardGrid}>
-        {CATEGORIES.map((category) => (
-          <Link className={styles.taskCard} href={category.href as never} key={category.key}>
-            <div className={styles.categoryIcon} style={{ background: category.tile }}>
-              <Icon
-                name={category.icon}
-                size={22}
-                strokeWidth={1.9}
-                style={{ color: category.color }}
-              />
+        {CATEGORIES.map((category) => {
+          const body = (
+            <>
+              <div className={styles.categoryIcon} style={{ background: category.tile }}>
+                <Icon
+                  name={category.icon}
+                  size={22}
+                  strokeWidth={1.9}
+                  style={{ color: category.color }}
+                />
+              </div>
+              <div className={styles.taskTitle}>
+                {t(`${category.key}Title`)}
+                {category.soon && <span className={styles.soon}>Soon</span>}
+              </div>
+              <div className={styles.taskDesc}>{t(`${category.key}Text`)}</div>
+              {/* The arrow is a promise about what the click does, so it only
+                  appears on the cards that click. */}
+              <span
+                className={`${styles.categoryCta} ${category.href ? '' : styles.categoryCtaInert}`}
+              >
+                {t(`${category.key}Cta`)}
+                {category.href && ' →'}
+              </span>
+            </>
+          );
+
+          return category.href ? (
+            <Link className={styles.taskCard} href={category.href as never} key={category.key}>
+              {body}
+            </Link>
+          ) : (
+            <div
+              className={`${styles.taskCard} ${styles.taskCardInert}`}
+              aria-disabled="true"
+              key={category.key}
+            >
+              {body}
             </div>
-            <div className={styles.taskTitle}>
-              {t(`${category.key}Title`)}
-              {category.soon && <span className={styles.soon}>Soon</span>}
-            </div>
-            <div className={styles.taskDesc}>{t(`${category.key}Text`)}</div>
-            <span className={styles.categoryCta}>{t(`${category.key}Cta`)} →</span>
-          </Link>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

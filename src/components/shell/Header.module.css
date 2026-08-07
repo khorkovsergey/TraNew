@@ -245,6 +245,17 @@
   background: var(--tn-chip-bg);
 }
 
+/* An entry that goes nowhere must not look like one that does. */
+.menuItemInert,
+.menuItemInert:hover {
+  background: transparent;
+  cursor: default;
+}
+
+.menuItemInert .menuItemLabel {
+  color: var(--tn-text-muted);
+}
+
 .menuItemLabel {
   font-size: 14px;
   font-weight: 600;

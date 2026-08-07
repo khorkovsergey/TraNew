@@ -123,6 +123,14 @@
   box-shadow: 0 8px 24px rgba(41, 98, 255, 0.08);
 }
 
+/* A card with nothing behind it: no lift, no pointer, no invitation. */
+.taskCardInert,
+.taskCardInert:hover {
+  border-color: var(--tn-border-control);
+  box-shadow: none;
+  cursor: default;
+}
+
 .taskTitle {
   font-size: 16px;
   font-weight: 800;
@@ -177,6 +185,13 @@
   font-weight: 700;
   color: var(--tn-blue);
   margin-top: 14px;
+}
+
+/* Nothing to click, so it reads as a status line rather than a call to action.
+   Declared after `.categoryCta`: same specificity, so order decides. */
+.categoryCtaInert {
+  color: var(--tn-text-muted);
+  font-weight: 600;
 }
 
 .chips {

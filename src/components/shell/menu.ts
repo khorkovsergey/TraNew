@@ -25,7 +25,7 @@ import type { AppPathname } from '@/i18n/routing';
 export type MenuEntry = {
   label: string;
   sub?: string;
-  /** Routed, but the screen behind it is still being built. */
+  /** Carries the "Soon" badge. */
   soon?: boolean;
 } & (
   | {
@@ -35,6 +35,12 @@ export type MenuEntry = {
       query?: Record<string, string>;
     }
   | { kind: 'auth' }
+  /**
+   * Announced but not routed: the entry names something that does not exist
+   * yet, so it does not click at all. A badge that warns and then navigates to
+   * a placeholder still spends the click it warned about.
+   */
+  | { kind: 'inert' }
 );
 
 export type MenuGroup = {
@@ -254,7 +260,9 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
           kind: 'route',
           href: '/events/create',
         },
-        { label: 'Merchandise', ...tool('merchandise') },
+        // There is no store, so there is nowhere for this to go. It used to
+        // open the generic placeholder screen.
+        { label: 'Merchandise', sub: 'Physical goods and limited editions', kind: 'inert', soon: true },
       ],
     },
   ],
