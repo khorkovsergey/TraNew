@@ -215,14 +215,12 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
         },
       ],
     },
-    {
-      title: 'Events',
-      items: [
-        { label: 'Events', sub: 'Meetups, webinars and conferences', kind: 'route', href: '/events' },
-        { label: 'Create an event', kind: 'route', href: '/events/create' },
-        { label: 'Learning & events hub', kind: 'route', href: '/learning-events' },
-      ],
-    },
+    /*
+     * Events is not here. It had a group of its own, which put the section in
+     * two menus at once and read as though meetups were part of the syllabus.
+     * They are a marketplace of other people's events, and that is the menu
+     * that carries them.
+     */
   ],
 
   marketplace: [
@@ -237,11 +235,34 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
         },
         {
           label: 'Tools and data',
-          sub: 'Indicators, screeners, data feeds',
+          sub: 'Chart Market, Supercharts and what is coming',
           kind: 'route',
-          href: '/tools',
+          href: '/marketplace/tools',
         },
-        { label: 'Academy', sub: 'Courses and learning paths', kind: 'route', href: '/academy' },
+        {
+          label: 'Chart Market',
+          sub: 'Pine Script indicators and strategies',
+          kind: 'route',
+          href: '/marketplace/tools/chart-market',
+        },
+        {
+          label: 'Supercharts',
+          sub: 'Ready-made chart workspaces',
+          kind: 'route',
+          href: '/marketplace/tools/supercharts',
+        },
+        {
+          label: 'Academy',
+          sub: 'Paid courses from checked providers',
+          kind: 'route',
+          href: '/marketplace/academy',
+        },
+        {
+          label: 'My Learning',
+          sub: 'Courses you are enrolled in',
+          kind: 'route',
+          href: '/marketplace/academy/my-learning',
+        },
         {
           label: 'Events near you',
           sub: 'Meetups, webinars and conferences',

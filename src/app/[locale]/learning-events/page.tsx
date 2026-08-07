@@ -3,7 +3,6 @@ import { setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { EventSection } from '@/components/events/EventSection';
-import { EventsHubHeader } from '@/components/events/EventsHubHeader';
 import { summaries } from '@/lib/data/events';
 import { rankEvents } from '@/lib/events/recommend';
 import { NO_SIGNALS } from '@/lib/events/recommend';
@@ -49,13 +48,35 @@ export default async function LearningEventsPage({ params }: Props) {
 
   return (
     <div className={styles.wrap}>
-      <EventsHubHeader active="events" />
+      {/*
+        * Its own header, not the Events one.
+        *
+        * This page is the only place that really is both halves at once, so it
+        * says so. The Events header stopped describing learning when the tab
+        * strip came off, and borrowing it here would have put "Create an event"
+        * above a section about lessons.
+        */}
+      <header>
+        <Link className={styles.backHome} href="/">
+          ← Home
+        </Link>
+
+        <p className={styles.eyebrow}>LEARNING &amp; EVENTS</p>
+        <h1 className={styles.h1}>
+          Learn, connect and navigate the markets{' '}
+          <span className={styles.h1Accent}>with confidence</span>
+        </h1>
+        <p className={styles.lede}>
+          Build your knowledge with practical courses or join financial events hosted by TradingNew
+          and the community.
+        </p>
+      </header>
 
       <section className={styles.section}>
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>Learning</h2>
           <Link className={styles.sectionLink} href="/academy">
-            Open Academy →
+            Open Learn →
           </Link>
         </div>
 
@@ -63,15 +84,21 @@ export default async function LearningEventsPage({ params }: Props) {
           <div className={styles.prose}>
             <p>
               A personal learning path tied to what you actually do on the platform — start with
-              the basics or jump to the topic you are stuck on.
+              the basics or jump to the topic you are stuck on. Free, and free permanently.
+            </p>
+            {/* The two halves of learning are named apart here, because they
+                are priced apart: Learn is free, Academy is bought. */}
+            <p>
+              Academy is the other half: structured paid programmes from TradingNew and outside
+              providers, with certificates and live cohorts.
             </p>
           </div>
           <div className={styles.heroActions} style={{ marginTop: 16 }}>
             <Link className={styles.primary} href="/academy">
               Start learning
             </Link>
-            <Link className={styles.secondary} href="/academy/path">
-              See the path
+            <Link className={styles.secondary} href="/marketplace/academy">
+              Browse Academy courses
             </Link>
           </div>
         </div>

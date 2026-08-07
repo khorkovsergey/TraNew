@@ -68,7 +68,9 @@ const LEARN: NavItem = {
   key: 'learn',
   labelKey: 'learn',
   href: '/academy',
-  prefixes: ['/academy', '/events', '/learning-events', '/organizers', '/portfolio'],
+  // Lessons and the practice portfolio. Events used to be here too, which lit
+  // Learn while someone was reading about a meetup in Berlin.
+  prefixes: ['/academy', '/portfolio'],
   menu: 'learn',
 };
 
@@ -76,9 +78,13 @@ const MARKETPLACE: NavItem = {
   key: 'marketplace',
   labelKey: 'marketplace',
   href: '/marketplace',
-  // `/tool` belongs to Explore and does not match `/tools`: a prefix matches the
+  // Tools & Data lives under `/marketplace/tools`, so the one prefix covers it.
+  // `/tool/[slug]` belongs to Explore and does not match: a prefix matches the
   // path exactly or with a slash after it, so the two never collide.
-  prefixes: ['/marketplace', '/tools'],
+  //
+  // Events, their organizers and the combined hub sit here: they are things
+  // other people offer, which is what this section is.
+  prefixes: ['/marketplace', '/events', '/organizers', '/learning-events'],
   menu: 'marketplace',
 };
 

@@ -113,13 +113,17 @@
   border-color: var(--tn-border-hover);
 }
 
-/* ---- Learning / Events tabs ---- */
+/* ---- Tabs ---- */
 
 /*
- * Two tabs, marked by an underline rather than a filled pill.
+ * Marked by an underline rather than a filled pill.
  *
- * The pill read as a button and sat beside two real buttons, so the row had
- * four things that looked pressable and two that were a place you already are.
+ * The pill read as a button and sat beside real buttons, so the row had four
+ * things that looked pressable and two that were a place you already are.
+ *
+ * Used by My events. The hub's Learning|Events strip is gone: Learn has its own
+ * section in the navigation, and a tab that leaves the page you just picked is
+ * not a tab.
  */
 .hubTabs {
   display: flex;
@@ -549,6 +553,17 @@
   position: relative;
   height: 150px;
   flex-shrink: 0;
+}
+
+/* A wash at the top of the cover, so a trust badge stays readable over a bright
+   photograph rather than only over the dark ones. */
+.cardCover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, var(--tn-overlay), transparent 58%);
+  pointer-events: none;
 }
 
 .cardCompact .cardCover {

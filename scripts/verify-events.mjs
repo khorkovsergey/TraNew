@@ -38,12 +38,21 @@ try {
     'curated sections appear when nothing is filtered',
     (await page.getByRole('heading', { name: 'Recommended for you' }).count()) === 1
   );
-  check('the hub tabs are present', (await page.getByRole('link', { name: 'Learning' }).count()) >= 1);
+  // No Learning tab: Learn is its own section in the navigation, and the strip
+  // only offered a way off the page someone had just chosen.
+  check(
+    'the section header is about events and nothing else',
+    (await page.getByRole('heading', { level: 1, name: /Meet the people behind the markets/ }).count()) === 1 &&
+      (await page.getByRole('link', { name: 'Learning', exact: true }).count()) === 0
+  );
 
   console.log('\nFilters live in the URL');
   await page.getByRole('button', { name: 'Filters' }).click();
   await page.getByRole('button', { name: 'Online', exact: true }).first().click();
-  await page.waitForTimeout(700);
+  // Waits for the thing being asserted rather than for a guess at how long the
+  // transition takes. A fixed 700ms passed or failed depending on how busy the
+  // dev server was, which is a coin toss reported as a result.
+  await page.waitForURL(/format=online/, { timeout: 5000 }).catch(() => {});
 
   check('a filter is written to the query string', page.url().includes('format=online'), page.url());
 
@@ -72,7 +81,7 @@ try {
     .locator('form[role="search"]')
     .getByRole('button', { name: 'Search' })
     .click();
-  await page.waitForTimeout(800);
+  await page.waitForURL(/q=Limassol/, { timeout: 5000 }).catch(() => {});
   check('search narrows the list', page.url().includes('q=Limassol'));
 
   await page.goto(`${EVENTS}?view=calendar`, { waitUntil: 'networkidle' });
