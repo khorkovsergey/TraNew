@@ -1,0 +1,592 @@
+# Fundamentals terms a beginner meets
+
+533 terms across 12 sections, taken from the field list a
+mature market product exposes on a symbol page.
+
+**This is a checklist, not content.** Only the names and their grouping are here —
+a list of which terms exist is a fact about the domain. The definitions are ours to
+write, and have to be: our voice rules ask for probabilistic language and no
+promises, which is not how a data dictionary is written.
+
+Use it two ways. As an Academy syllabus, to see which concepts we cover and which
+we do not. And as a backlog for Voyager's `explain` branch, which today answers
+from the hand-written `CONCEPTS` table in
+`src/lib/voyager/workspace/scenarios.ts` — **5 entries against the 533 below.**
+Anything not in that table falls through to the model with no house definition
+behind it.
+
+Not all 533 are worth writing. "Beneish M-score" is not a beginner's first
+question. Sequence them by what somebody actually meets: the Overview and Key data
+points sections first, then Statistics, then the statement-level fields.
+
+Source: crawl of tradingview.com, 6 August 2026.
+
+## Statistics (124)
+
+- Accruals
+- Altman Z-score
+- Analyst rating
+- Asset turnover
+- Assets to equity ratio
+- Average basic shares outstanding
+- Beneish M-score
+- Beta
+- Buyback yield
+- COGS to revenue ratio
+- Capital expenditures growth %
+- Cash conversion cycle
+- Cash dividend coverage ratio
+- Cash ratio
+- Cash to debt ratio
+- Continuous dividend growth
+- Continuous dividend payout
+- Current ratio
+- Days inventory
+- Days payable
+- Days sales outstanding
+- Debt to EBITDA ratio
+- Debt to assets ratio
+- Debt to equity ratio
+- Debt to revenue ratio
+- Diluted shares outstanding
+- Dividend payout ratio
+- Dividend yield
+- Dividends per share - common stock primary issue
+- Dividends per share growth %
+- EBITDA growth %
+- EBITDA interest coverage
+- EBITDA less capex interest coverage
+- EBITDA margin
+- EBITDA per employee
+- EPS basic one year growth
+- EPS diluted growth %
+- EPS diluted one year growth
+- EPS estimates
+- Earnings yield
+- Effective interest rate on debt
+- Enterprise value
+- Enterprise value to EBIT ratio
+- Enterprise value to EBITDA ratio
+- Enterprise value to free cash flow
+- Enterprise value to gross profit ratio
+- Enterprise value to revenue ratio
+- Equity to assets ratio
+- Fixed assets turnover
+- Forward non-GAAP price to earnings
+- Forward price to earnings ratio
+- Forward price to sales ratio
+- Free cash flow growth %
+- Free cash flow margin
+- Free cash flow per employee
+- Free float
+- Fulmer H factor
+- Goodwill to assets ratio
+- Graham's number
+- Gross margin
+- Gross profit growth %
+- Gross profit to assets ratio
+- Interest coverage
+- Inventory to revenue ratio
+- Inventory turnover
+- KZ index
+- Long term debt to total assets ratio
+- Market capitalization
+- Market capitalization performance %
+- Net current asset value per share
+- Net debt to EBITDA
+- Net income growth %
+- Net income per employee
+- Net margin
+- Number of employees
+- Operating earnings yield %
+- Operating income per employee
+- Operating margin
+- PEG ratio
+- Piotroski F-score
+- Pretax margin %
+- Price to book ratio
+- Price to cash flow ratio
+- Price to cash ratio
+- Price to earnings ratio
+- Price to free cash flow ratio
+- Price to net working capital
+- Price to sales ratio
+- Price to tangible book ratio
+- Quality ratio
+- Quick ratio
+- Research & development per employee
+- Research & development to revenue ratio
+- Return on assets
+- Return on capital employed %
+- Return on common equity
+- Return on equity
+- Return on equity adjusted to book value
+- Return on invested capital
+- Return on tangible assets
+- Return on tangible equity
+- Return on total capital %
+- Revenue estimates
+- Revenue growth %
+- Revenue one year growth
+- Revenue per employee
+- Selling, general & admin expenses ratio
+- Shares buyback ratio
+- Sloan ratio
+- Springate score
+- Sustainable growth rate
+- Tangible common equity ratio
+- Target price
+- Target price performance %
+- Tobin's Q (approximate)
+- Total assets growth %
+- Total assets per employee
+- Total common shares outstanding
+- Total debt growth %
+- Total debt per employee
+- Total debt to capital
+- Total receivables turnover
+- Working capital per share
+- Zmijewski score
+
+## Bonds (87)
+
+- Accrued coupon interest (ACI)
+- Ask %
+- Ask (issue currency)
+- Bid %
+- Bid (issue currency)
+- Bid ask spread %
+- Bond type
+- Call frequency
+- Conversion option
+- Country of risk
+- Coupon change type
+- Coupon date
+- Coupon day count basis
+- Coupon exdate gap
+- Coupon frequency
+- Coupon link
+- Coupon next reset date
+- Coupon payment date type
+- Coupon rate and type
+- Coupon reset frequency
+- Coupon underlying index
+- Covenant
+- Credit enhancement status
+- Credit enhancement type
+- Credit parent
+- Current coupon type
+- Current yield
+- Debt type
+- Denomination increment
+- Duration type
+- Face value
+- Final redemption amount
+- Fitch long-term Issuer outlook
+- Fitch long-term issue outlook
+- Fitch long-term issue rating
+- Fitch long-term issuer rating
+- Fitch short-term issuer rating
+- Floating rate
+- Inflation protection
+- Is Deepest History Symbol
+- Issue allocation
+- Issue amount
+- Issue date
+- Issue rating
+- Issue status
+- Issuer
+- Issuer S&P Rating
+- Issuer rating
+- Issuer сountry
+- Make whole call dates
+- Make whole call option
+- Make whole call spread
+- Maturity date
+- Maturity type
+- Minimum call notice days
+- Minimum denomination
+- Minimum put notice days
+- Minimum redemption amount
+- Next call date
+- Next call price
+- Next put date
+- Next put price
+- Offer date
+- Offer price
+- Outstanding amount
+- Ownership form
+- Paid amount
+- Placement type
+- Pledge status
+- Poison put option
+- Premature redemption option
+- Principal redemption type
+- Put frequency
+- Redemption type
+- S&P Rating
+- S&P rating outlook
+- Seniority rank
+- Sinking fund
+- Sinking fund next date
+- Social responsibility
+- Tenor
+- Term to maturity
+- Use of proceeds
+- Yield to call %
+- Yield to maturity
+- Yield to put %
+- Yield to worst %
+
+## Balance Sheet (69)
+
+- Account receivables, gross
+- Accounts Payable
+- Accounts Receivables, Net
+- Accrued Payroll
+- Accumulated Depreciation, Total
+- Additional Paid-in Capital/Capital Surplus
+- Bad debt / Doubtful accounts
+- Book value per share
+- Capital and Operating Lease Obligations
+- Capitalized Lease Obligations
+- Cash & Equivalents
+- Cash & Short Term Investments
+- Common Equity, Total
+- Common Stock Par/Carrying Value
+- Current Portion of Long Term Debt
+- Deferred Income, Current
+- Deferred Income, Non-Current
+- Deferred Tax Assets
+- Deferred Tax Liabilities
+- Dividends Payable
+- Goodwill
+- Gross Property/Plant/Equipment
+- Income Tax Payable
+- Inventories
+- Inventories - Finished Goods
+- Inventories - Progress Payments & Other
+- Inventories - Raw Materials
+- Inventories - Work In Progress
+- Investments in Unconsolidated Subsidiaries
+- Long Term Debt
+- Long Term Debt Excluding Lease Liabilities
+- Long Term Investments
+- Minority Interest
+- Net Debt
+- Net Intangible Assets
+- Net Other Intangibles
+- Net Property/Plant/Equipment
+- Note Receivable - Long Term
+- Notes Payable
+- Operating Lease Liabilities
+- Other Common Equity
+- Other Current Assets
+- Other Current Liabilities
+- Other Investments
+- Other Long Term Assets, Total
+- Other Non-Current Liabilities, Total
+- Other Receivables
+- Other Short Term Debt
+- Paid in Capital
+- Preferred Stock, Carrying Value
+- Prepaid Expenses
+- Provision for Risks & Charge
+- Retained Earnings
+- Shareholders' Equity
+- Short Term Debt
+- Short Term Debt excl. Current Portion of LT Debt
+- Short Term Investments, Total
+- Tangible book value per share
+- Total Assets
+- Total Current Assets
+- Total Current Liabilities
+- Total Debt
+- Total Equity
+- Total Liabilities
+- Total Liabilities & Shareholders' Equity
+- Total Non-Current Assets
+- Total Non-Current Liabilities
+- Total Receivables, Net
+- Treasury Stock
+
+## Crypto (63)
+
+- Active addresses ratio
+- Addresses with balance
+- Addresses with zero balance
+- All-time high
+- AltRank
+- Altcoins market cap chart
+- At the money addresses %
+- Average balance in USD
+- Average transaction in USD
+- Blockchain ecosystems
+- Break-even addresses %
+- Category
+- Circulating supply
+- Community
+- Consensus Algorithms
+- Contract
+- Contributors
+- Daily active addresses
+- Dominance by market cap
+- Engagements
+- Explorers
+- Fully Diluted Valuation (FDV)
+- Fully diluted market capitalization
+- Galaxy Score
+- GitHub commits
+- In the money addresses %
+- Large transaction in USD
+- Large transactions
+- Liquidity on crypto DEXs
+- Losses addresses %
+- Market cap / TVL
+- Market capitalization
+- Maximum supply
+- NVT
+- Network
+- New funded addresses
+- Number of transactions
+- Out of the money addresses %
+- Posts
+- Profit addresses %
+- Rank
+- Sentiment %
+- Social dominance %
+- Social volume
+- Source code
+- Telegram members
+- Telegram sentiment
+- Total addresses
+- Total market cap chart
+- Total market cap chart excluding BTC
+- Total supply
+- Total value locked (TVL)
+- Traders / Unique buyers / Unique sellers
+- Trading volume / Buy volume / Sell volume
+- Transaction volume
+- Transaction volume in USD
+- Transactions / Buys / Sells
+- Tweets
+- Velocity
+- Volume / Market Cap
+- Volume in USD 24h
+- Website
+- Whitepaper
+
+## Income Statements (55)
+
+- After Tax Other Income/Expense
+- Amortization of deferred charges
+- Amortization of intangibles
+- Cost of Goods Sold (COGS)
+- Depreciation
+- Depreciation and Amortization
+- Diluted Earnings per Share (Diluted EPS)
+- Diluted Net Income Available to Common Stockholders
+- Dilution Adjustment
+- Discontinued Operations
+- Earnings Before Interest and Taxes (EBIT)
+- Earnings Before Interest, Taxes, Depreciation, and Amortization (EBITDA)
+- Earnings Per Share (EPS), Basic
+- Equity In Earnings
+- Gross profit
+- Impairments
+- Income tax, Credits
+- Income tax, current
+- Income tax, current - domestic
+- Income tax, current - foreign
+- Income tax, deferred
+- Income tax, deferred - domestic
+- Income tax, deferred - foreign
+- Interest Capitalized
+- Interest Expense on Debt
+- Interest Expense, Net of Interest Capitalized
+- Legal claim expense
+- Net Income
+- Net Income Before Discontinued Operations
+- Net income from continuing operations
+- Net revenue
+- Net revenue after provisions
+- Non-Controlling/Minority interest
+- Non-Operating Income, Total
+- Non-Operating Income, excl. Interest Expenses
+- Non-Operating Interest Income
+- Operating Expenses (excl. COGS)
+- Operating Income
+- Other Costs of Goods Sold (Other COGS)
+- Other Income/Expense
+- Other Operating Expenses
+- Other exceptional charges
+- Preferred Dividends
+- Pretax Equity In Earnings
+- Pretax Income
+- Reported EPS
+- Research & Development (R&D)
+- Restructuring charge
+- Revenue
+- Selling, General & Administrative Expenses, Others (SG&A, Others)
+- Selling, General & Administrative Expenses, Total (Total SG&A)
+- Taxes
+- Total Operating Expenses
+- Unrealized gain/loss
+- Unusual Expenses
+
+## Cash Flow (46)
+
+- Amortization of Intangible Assets
+- Capital Expenditures - Fixed Assets
+- Capital Expenditures - Other Assets
+- Capital Expenditures, Total
+- Cash From Financing Activities
+- Cash From Investing Activities
+- Cash From Operating Activities
+- Change in Accounts Payable
+- Change in Accounts Receivable
+- Change in Accrued Expenses
+- Change in Inventories
+- Change in Other Assets/Liabilities
+- Change in Taxes Payable
+- Changes in Working Capital
+- Common Dividends Paid
+- Deferred Taxes (Cash Flow)
+- Depreciation & Amortization (Cash Flow)
+- Depreciation/Depletion
+- Extraordinary Item
+- Financing Activities - Other Sources
+- Financing Activities - Other Uses
+- Free Cash Flow
+- Funds from Operations
+- Investing Activities - Other Sources
+- Investing Activities - Other Uses
+- Issuance (Retirement) of Debt, Net
+- Issuance (Retirement) of Long Term Debt
+- Issuance (Retirement) of Other Debt
+- Issuance (Retirement) of Short Term Debt
+- Issuance (Retirement) of Stock, Net
+- Issuance of Long Term Debt
+- Net Income (Cash Flow)
+- Non-Cash Items
+- Other Financing Cash Flow Items, Total
+- Other Investing Cash Flow Items, Total
+- Preferred Dividends Paid
+- Purchase of Investments
+- Purchase/Acquisition of a Business
+- Purchase/Sale of Business, Net
+- Purchase/Sale of Investments, Net
+- Reduction of Long Term Debt
+- Repurchase of Common & Preferred Stock
+- Sale of Common & Preferred Stock
+- Sale of Fixed Assets & Businesses
+- Sale/Maturity of Investments
+- Total Cash Dividends Paid
+
+## ETF (39)
+
+- AUM performance %
+- Asset class: Alternatives
+- Asset class: Asset Allocation
+- Asset class: Commodities
+- Asset class: Fixed Income
+- Asset сlass
+- Asset сlass: Currency
+- Asset сlass: Equity
+- Currency hedged
+- Derivative holdings
+- Distribution tax treatment
+- Distributor
+- Dividend treatment
+- Dividend yield
+- Dividends frequency
+- ETF classification: Categories, Focuses, and Niches
+- Expense ratio %
+- Fund flows
+- Geography
+- Holdings region
+- Home page
+- Inception date
+- Income tax type
+- Issuers, Brands, and Providers
+- Leveraged, Leverage ratio, Leverage
+- Management style
+- Max capital gains rates
+- NAV performance %
+- Net asset value (NAV)
+- Net asset value (NAV) total return
+- Portfolio transparency
+- Primary advisor
+- Selection сriteria
+- Shares outstanding
+- Strategy
+- Structure (Legal structure)
+- Tax form
+- UCITS compliance
+- Weighting scheme
+
+## Overview (21)
+
+- Capital adequacy analysis
+- Debt level and debt coverage
+- Dividend history
+- Dividend summary
+- Earnings estimates
+- Financial position
+- Growth and profitability
+- Ownership
+- Revenue breakdown by country
+- Revenue breakdown by source
+- Revenue estimates
+- Revenue or Total Income to Profit conversion
+- Revenue to profit conversion
+- Sector & Industry
+- Sector & Industry - Durables
+- Sector & Industry - Infrastructure
+- Sector & Industry - Miscellaneous
+- Sector & Industry - Non-durables
+- Sector & Industry - Services
+- Valuation
+- Valuation ratios
+
+## Key data points (11)
+
+- Assets under Management (AUM)
+- Country of registration
+- Coupon
+- Day's range
+- Identifiers (ISIN, CUSIP, FIGI)
+- Maturity date
+- Open
+- Premium/Discount to Net Asset Value (NAV)
+- Previous close
+- Time to maturity
+- What is a CFI Code
+
+## Common questions about financial data (8)
+
+- Earnings report date
+- Fundamental Graphs: learn to chart financial metrics
+- How to access financial data on TradingView
+- How to read financial statements
+- Introduction to fundamental analysis on TradingView
+- What are GAAP and non-GAAP?
+- Why does Financial Data differ from other sources?
+- Why is there no quarterly Financial Data?
+
+## Earnings, Splits, and Dividends (6)
+
+- Dividends
+- Earnings
+- Estimates
+- Rolling estimates
+- Rolling multi-period estimates
+- Splits
+
+## Futures (4)
+
+- Contract size
+- Expiration month
+- Front month
+- Settlement day
+
