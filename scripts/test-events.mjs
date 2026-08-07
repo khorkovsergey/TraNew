@@ -62,6 +62,7 @@ try {
       'src/lib/studies/registry.ts',
       'src/lib/voyager/answerSchema.ts',
       'src/lib/voyager/research.ts',
+      'src/lib/experts/brief.ts',
       'src/lib/voyager/settings.ts',
       'src/lib/markets/sessions.ts',
       'src/content/markets.ts',
@@ -236,6 +237,7 @@ try {
   const retarget = await load('retarget', 'workspace');
   const research = await load('research', 'voyager');
   const settings = await load('settings', 'voyager');
+  const brief = await load('brief', 'experts');
   const wc = await load('wealthConnections', 'content');
   const start = await load('path', 'start');
   const plan = await load('plan', 'start');
@@ -3724,6 +3726,124 @@ try {
     const plan = contract.parsePlan(scenarios.responseFor('what is a covered call'))?.plan;
     assert.ok(plan, 'the fallback did not parse');
     assert.match(plan.modules[0].title, /do not have a written explanation/i);
+  });
+
+  group('The expert brief, and who it finds');
+
+  const EXPERTS = [
+    { id: 'e1', name: 'Anna Keller', services: ['strategy', 'review'], jurisdiction: 'Cyprus', languages: 'English, Greek', currency: 'EUR' },
+    { id: 'e2', name: 'Ben Ortiz', services: ['tax'], jurisdiction: 'Cyprus', languages: 'English', currency: 'EUR' },
+    { id: 'e3', name: 'Chen Wu', services: ['strategy'], jurisdiction: 'Singapore', languages: 'English, Mandarin', currency: 'USD' },
+  ];
+  const briefOf = (patch) => ({ ...brief.EMPTY_BRIEF, ...patch });
+
+  check('a goal and one service is enough to search', () => {
+    /*
+     * Not a budget, not a country, not a timeline. Those narrow a search that
+     * has not happened yet, and demanding them is the questionnaire again with
+     * a chat bubble on it.
+     */
+    assert.equal(brief.readyToMatch(briefOf({ goal: 'Restructure my portfolio', services: ['review'] })), true);
+    assert.equal(brief.readyToMatch(briefOf({ goal: 'Restructure my portfolio' })), false);
+    assert.equal(brief.readyToMatch(briefOf({ services: ['review'] })), false);
+  });
+
+  check('preferences are only asked for once there is something to refine', () => {
+    const early = brief.missingFrom(briefOf({ goal: '', services: [] }));
+    assert.deepEqual(early, ['goal', 'services']);
+    assert.ok(!early.includes('location'), 'asked where before asking what');
+
+    const later = brief.missingFrom(briefOf({ goal: 'g', services: ['review'] }));
+    assert.deepEqual(later, ['location', 'language', 'engagement']);
+  });
+
+  check('the stage is semantic, not a counter', () => {
+    // "Question 3 of 12" promises a length an adaptive interview cannot honour.
+    assert.equal(brief.stageOf(briefOf({})), 'understanding');
+    assert.equal(brief.stageOf(briefOf({ goal: 'g', services: ['review'] })), 'clarifying');
+    assert.equal(
+      brief.stageOf(briefOf({ goal: 'g', services: ['review'], country: 'Cyprus', languages: ['English'], engagement: 'consultation' })),
+      'ready'
+    );
+    for (const stage of Object.keys(brief.STAGE_LABEL)) {
+      assert.ok(brief.STAGE_LABEL[stage].length > 5, stage);
+    }
+  });
+
+  check('an expert who does not do the service is excluded, not demoted', () => {
+    /*
+     * The hard constraint. An adviser who does not do tax cannot do tax, and a
+     * search that ranks them lower instead of dropping them is how somebody
+     * books the wrong person.
+     */
+    const found = brief.matchExperts(EXPERTS, briefOf({ goal: 'g', services: ['tax'] }));
+    assert.deepEqual(found.map((m) => m.expert.id), ['e2']);
+  });
+
+  check('a language nobody speaks is a hard constraint too', () => {
+    // A consultation neither party can hold is not a consultation.
+    const found = brief.matchExperts(EXPERTS, briefOf({ goal: 'g', services: ['strategy'], languages: ['Greek'] }));
+    assert.deepEqual(found.map((m) => m.expert.id), ['e1']);
+  });
+
+  check('country and currency rank rather than filter', () => {
+    /*
+     * Hard-filtering everything returns nobody. Somebody in Cyprus should see
+     * the Singapore specialist below the local one, not lose them.
+     */
+    const found = brief.matchExperts(
+      EXPERTS,
+      briefOf({ goal: 'g', services: ['strategy'], country: 'Cyprus', currency: 'EUR' })
+    );
+    assert.deepEqual(found.map((m) => m.expert.id), ['e1', 'e3']);
+    assert.equal(found[0].tier, 'best');
+    assert.notEqual(found[1].tier, 'best');
+  });
+
+  check('the reasons come from the request, not from the expert record', () => {
+    /*
+     * `EXPERTS` ships a hardcoded `reasons` list, so every visitor saw the same
+     * "why this expert matches" whatever they had asked for. These are computed.
+     */
+    const [top] = brief.matchExperts(
+      EXPERTS,
+      briefOf({ goal: 'g', services: ['review'], country: 'Cyprus', languages: ['Greek'] })
+    );
+    assert.ok(top.reasons.some((r) => /service/i.test(r)), top.reasons.join(' | '));
+    assert.ok(top.reasons.some((r) => /Cyprus/.test(r)), top.reasons.join(' | '));
+    assert.ok(top.reasons.some((r) => /Greek/.test(r)), top.reasons.join(' | '));
+  });
+
+  check('a card never carries more than four reasons', () => {
+    const [top] = brief.matchExperts(
+      EXPERTS,
+      briefOf({ goal: 'g', services: ['strategy', 'review'], country: 'Cyprus', languages: ['English', 'Greek'], currency: 'EUR' })
+    );
+    assert.ok(top.reasons.length <= 4, top.reasons.join(' | '));
+  });
+
+  check('no score is exposed, only a tier and its words', () => {
+    // "97.4% match" is precision with no model behind it.
+    const [top] = brief.matchExperts(EXPERTS, briefOf({ goal: 'g', services: ['strategy'] }));
+    assert.ok(!('score' in top), Object.keys(top).join(','));
+    assert.ok(brief.TIER_LABEL[top.tier].length > 0);
+  });
+
+  check('an empty result names the constraint that emptied it', () => {
+    /*
+     * "No experts found" is a dead end. And the constraint is never relaxed
+     * silently — somebody stated it on purpose.
+     */
+    const impossible = briefOf({ goal: 'g', services: ['tax'], languages: ['Mandarin'] });
+    assert.deepEqual(brief.matchExperts(EXPERTS, impossible), []);
+
+    const offers = brief.relaxations(EXPERTS, impossible);
+    assert.ok(offers.length > 0);
+    assert.ok(offers.some((o) => /language/i.test(o)), offers.join(' | '));
+  });
+
+  check('nothing is offered to relax when there are already results', () => {
+    assert.deepEqual(brief.relaxations(EXPERTS, briefOf({ goal: 'g', services: ['strategy'] })), []);
   });
 
   group('Voyager settings, which only an account can have');
