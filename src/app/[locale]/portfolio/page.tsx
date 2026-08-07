@@ -8,7 +8,10 @@ import styles from '@/components/content/Content.module.css';
 import { VoyagerPageContext } from '@/components/voyager/VoyagerProvider';
 import { buildContext } from '@/lib/voyager/context';
 
-type Props = { params: Promise<{ locale: Locale }> };
+type Props = {
+  params: Promise<{ locale: Locale }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -22,7 +25,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function PortfolioPage({ params }: Props) {
+export default async function PortfolioPage({ params, searchParams }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
@@ -39,7 +42,7 @@ export default async function PortfolioPage({ params }: Props) {
       <h1 className={styles.h1}>{t('portfolio.title')}</h1>
       <p className={styles.lead}>{t('portfolio.subtitle')}</p>
 
-      <Portfolio />
+      <Portfolio startOnSample={(await searchParams).start === 'sample'} />
     </div>
   );
 }

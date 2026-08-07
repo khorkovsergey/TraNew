@@ -17,11 +17,21 @@ const ALLOCATION = [
   { key: 'alts', label: { en: 'Alternatives', ru: 'Альтернативные активы' }, share: 8, color: 'var(--tn-orange)' },
 ];
 
-export function Portfolio() {
+export function Portfolio({ startOnSample = false }: { startOnSample?: boolean }) {
   const t = useTranslations('portfolio');
   const locale = useLocale() as Locale;
   const { openLogin } = useLoginModal();
-  const [view, setView] = useState<'onboarding' | 'sample'>('onboarding');
+  /*
+   * Opened straight on the sample when the link asked for it.
+   *
+   * The home card promises to show how investments work and this screen opened
+   * on a chooser asking which broker to connect — one tile of four matched the
+   * promise, and it was the last one. Somebody who wants to see the thing
+   * should see the thing; the import options are still here, below it.
+   */
+  const [view, setView] = useState<'onboarding' | 'sample'>(
+    startOnSample ? 'sample' : 'onboarding'
+  );
 
   if (view === 'onboarding') {
     return (

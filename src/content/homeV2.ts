@@ -20,8 +20,19 @@ export type IntentCard = {
   accent: Accent;
   title: string;
   body: string;
-  href: AppPathname;
+  /** Where it goes inside the portal. Omitted when `external` is set. */
+  href?: AppPathname;
   params?: Record<string, string>;
+  /**
+   * The state the destination should open in.
+   *
+   * The section asks what brings somebody here and then has to act on the
+   * answer. Without this the three cards that opened Explore all landed on the
+   * same tab, which is a labelled door into an unlabelled room.
+   */
+  query?: Record<string, string>;
+  /** A full URL, when the card leaves TradingNew. Marked as such on the card. */
+  external?: string;
 };
 
 /**
@@ -45,20 +56,19 @@ export const INTENT_CARDS: IntentCard[] = [
     icon: 'wallet',
     accent: 'mint',
     title: 'I have money and want to explore options',
-    body: 'See ways to grow my savings.',
+    body: 'See what the choices are, starting with the safest.',
     href: '/explore',
+    /*
+     * Cash, not stocks. Somebody with money in hand is deciding what to do with
+     * it, and the first honest answer is how much should stay reachable — which
+     * is also where our own plan builder starts them.
+     */
+    query: { tab: 'cash' },
   },
   {
     id: 'markets',
     icon: 'bars',
     accent: 'blue',
-    /*
-     * The one card here that names a place rather than an intent. It goes to
-     * Explore, which is where markets, symbols and economy now live, and the
-     * subtitle lists them by their old names — somebody looking for "Symbols"
-     * should recognise it from the home page rather than have to open a menu to
-     * find out which section absorbed it.
-     */
     title: 'Research',
     body: 'Markets, symbols, economy.',
     href: '/explore',
@@ -68,24 +78,36 @@ export const INTENT_CARDS: IntentCard[] = [
     icon: 'flask',
     accent: 'purple',
     title: 'I want to see how investments work',
-    body: 'Try simulations and real-world examples.',
+    body: 'Watch a sample portfolio react to real market events.',
     href: '/portfolio',
+    /*
+     * Straight into the sample. The card promises to show how investing works
+     * and the page opened on a chooser asking which broker to connect — the one
+     * tile of four that matched the promise was the last one.
+     */
+    query: { start: 'sample' },
   },
   {
     id: 'improve',
     icon: 'trendUp',
     accent: 'lime',
     title: 'I already invest and want to improve',
-    body: 'Sharpen my strategy and make better decisions.',
-    href: '/strategy',
+    body: 'Four questions, and a plan that says why each step is on it.',
+    /*
+     * The four-question funnel, not the seven-question interview. That one
+     * opened by asking a stranger how much money they have, in five bands up to
+     * half a million; it is still reachable from the plan, for somebody who has
+     * decided to give numbers.
+     */
+    href: '/start',
   },
   {
-    id: 'browsing',
-    icon: 'venn',
+    id: 'pro',
+    icon: 'chart',
     accent: 'cyan',
-    title: 'I am just looking around',
-    body: 'Explore and learn at my own pace.',
-    href: '/explore',
+    title: 'Trading Pro',
+    body: 'Advanced charts, indicators and screeners on TradingView.',
+    external: 'https://www.tradingview.com',
   },
 ];
 

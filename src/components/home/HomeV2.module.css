@@ -667,3 +667,23 @@
   line-height: 1.55;
   color: var(--tn-text-faint);
 }
+
+/*
+ * A card that leaves TradingNew says where it goes, in place of the chevron the
+ * others carry. Five tiles that stay and one that hands somebody to another
+ * company should not look identical at the moment of pressing.
+ */
+.intentAway {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tn-text-muted);
+}
+
+.intentCard:hover .intentAway {
+  color: var(--tn-mint);
+}

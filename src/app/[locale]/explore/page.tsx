@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ExploreHub } from '@/components/explore/ExploreHub';
+import { assetClass } from '@/content/assetClasses';
 import { SpaceBackdrop } from '@/components/shell/SpaceBackdrop';
 import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
@@ -14,7 +15,10 @@ import { pageMetadata } from '@/lib/metadata';
  * screener still finds one.
  */
 
-type Props = { params: Promise<{ locale: Locale }> };
+type Props = {
+  params: Promise<{ locale: Locale }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -28,14 +32,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function ExplorePage({ params }: Props) {
+export default async function ExplorePage({ params, searchParams }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
+
+  // Checked against the real list rather than trusted: it arrives in a URL.
+  const { tab } = await searchParams;
+  const initial = typeof tab === 'string' ? assetClass(tab)?.key : undefined;
 
   return (
     <>
       <SpaceBackdrop tone={4} />
-      <ExploreHub />
+      <ExploreHub initialClass={initial} />
     </>
   );
 }

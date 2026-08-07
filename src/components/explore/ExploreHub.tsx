@@ -30,10 +30,15 @@ import styles from './Explore.module.css';
  * and is not one — it sits in "Explore more" at the foot of the page with the
  * other sections that were dressed as tabs and are not.
  */
-export function ExploreHub() {
+export function ExploreHub({ initialClass }: { initialClass?: AssetClassKey }) {
   const router = useRouter();
   const { authed } = useLoginModal();
-  const [key, setKey] = useState<AssetClassKey>('stocks');
+  /*
+   * The class the arriving link asked for. Somebody who pressed "I have money
+   * and want to explore options" is deciding what to do with cash, and opening
+   * them on Stocks answers a question they did not ask.
+   */
+  const [key, setKey] = useState<AssetClassKey>(initialClass ?? 'stocks');
   const [question, setQuestion] = useState('');
 
   const category = assetClass(key) ?? ASSET_CLASSES[0];
