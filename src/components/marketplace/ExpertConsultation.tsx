@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { VoyagerMark } from '@/components/voyager/VoyagerMark';
-import { useRouter } from '@/i18n/navigation';
+import { Matches } from './Matches';
 import { track } from '@/lib/events/analytics';
 import { saveExpertBriefAction } from '@/app/actions/expertBrief';
 import {
@@ -51,7 +51,15 @@ function opening(category: string | null): string {
 }
 
 export function ExpertConsultation({ category }: { category: string | null }) {
-  const router = useRouter();
+  /*
+   * One screen with states, as the mockup has it, rather than a navigation.
+   *
+   * Sending somebody to another route to see the results loses the
+   * conversation that produced them — and the mockup keeps both, so "Edit
+   * request" is a step back rather than a page load. `/matches` stays a real
+   * route for anyone arriving with a bookmark.
+   */
+  const [showing, setShowing] = useState<'brief' | 'matches'>('brief');
   const [brief, setBrief] = useState<ExpertBrief>({
     ...EMPTY_BRIEF,
     initialCategory: category ?? undefined,
@@ -176,8 +184,19 @@ export function ExpertConsultation({ category }: { category: string | null }) {
      */
     void saveExpertBriefAction(brief).catch(() => null);
 
-    router.push('/marketplace/experts/matches');
+    setShowing('matches');
   };
+
+  if (showing === 'matches') {
+    return (
+      <>
+        <button className={styles.editRequest} onClick={() => setShowing('brief')}>
+          ← Back to your brief
+        </button>
+        <Matches />
+      </>
+    );
+  }
 
   return (
     <div className={styles.consultation}>
