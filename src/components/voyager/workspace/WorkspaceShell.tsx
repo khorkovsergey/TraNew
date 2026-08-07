@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { VoyagerOrb } from '@/components/voyager/VoyagerOrb';
+import { VoyagerMark } from '@/components/voyager/VoyagerMark';
 import {
   DEFAULT_ZONES,
   MOBILE_TAB_LABEL,
@@ -136,7 +136,7 @@ export function WorkspaceShell({
     <div className={styles.shell}>
       <header className={styles.topBar}>
         <span className={styles.brand}>
-          <VoyagerOrb size={20} />
+          <VoyagerMark size={20} />
           <span className={styles.wordmark}>AI Voyager</span>
         </span>
 

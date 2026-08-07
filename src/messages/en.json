@@ -1,7 +1,7 @@
 {
   "meta": {
     "siteName": "TradingNew",
-    "homeTitle": "TradingNew — Know more. Invest better.",
+    "homeTitle": "TradingNew — Explore. Analyze. Invest.",
     "homeDescription": "Learn, research and compare investments with the tools trusted by millions."
   },
   "common": {
@@ -779,8 +779,6 @@
   },
   "home": {
     "badge": "Join 100M+ investors and traders who use TradingNew to make better decisions.",
-    "h1a": "Know more.",
-    "h1b": "Invest better.",
     "sub": "Learn, research and compare investments with the tools trusted by millions.",
     "ctaPrimary": "Start free",
     "ctaSecondary": "Explore markets",

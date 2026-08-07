@@ -14,7 +14,8 @@ import { routeFor } from './actionRoutes';
 import { hasSeenIntro, markIntroSeen } from '@/lib/voyager/introSeen';
 import { onVoyagerOpenRequest } from '@/lib/voyager/openRequest';
 import { VoyagerIntro } from './VoyagerIntro';
-import { VoyagerOrb, VoyagerWordmark } from './VoyagerOrb';
+import { VoyagerMark } from './VoyagerMark';
+import { VoyagerWordmark } from './VoyagerOrb';
 import { InvestmentAssessmentCard } from './InvestmentAssessment';
 import { useChartStudies, useVoyagerContext } from './VoyagerProvider';
 import styles from './Voyager.module.css';
@@ -298,7 +299,7 @@ export function VoyagerWidget({ chartWorkspaceLive = false }: { chartWorkspaceLi
           setMode(hasSeenIntro() || state?.introSeen ? 'peek' : 'intro');
         }}
       >
-        <VoyagerOrb size={26} className={styles.mark} />
+        <VoyagerMark size={26} />
         <span className={styles.pillLabel}>{context.prompt}</span>
       </button>
     );
@@ -316,7 +317,7 @@ export function VoyagerWidget({ chartWorkspaceLive = false }: { chartWorkspaceLi
         />
         <div className={styles.peek}>
           <div className={styles.peekHead}>
-            <VoyagerOrb size={24} className={styles.mark} />
+            <VoyagerMark size={24} />
             <VoyagerWordmark className={styles.nameSmall} />
             <span className={styles.tier} style={tierStyle}>
               {state?.tierLabel ?? 'Voyager Basic'}
@@ -349,7 +350,7 @@ export function VoyagerWidget({ chartWorkspaceLive = false }: { chartWorkspaceLi
       aria-label="Voyager assistant"
     >
       <div className={styles.head}>
-        <VoyagerOrb size={26} className={styles.mark} />
+        <VoyagerMark size={26} />
         <VoyagerWordmark className={styles.name} />
         <span className={styles.tier} style={tierStyle}>
           {state?.tierLabel ?? 'Voyager Basic'}

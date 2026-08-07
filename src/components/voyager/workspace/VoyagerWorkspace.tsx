@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Link } from '@/i18n/navigation';
-import { VoyagerOrb } from '@/components/voyager/VoyagerOrb';
+import { VoyagerMark } from '@/components/voyager/VoyagerMark';
 import {
   briefingFor,
   PROMPT_CATEGORIES,
@@ -912,7 +912,7 @@ export function VoyagerWorkspace({
       <div className={`${styles.column} ${showCategories ? styles.columnWide : ''}`}>
         {briefing ? (
           <>
-            <VoyagerOrb size={42} />
+            <VoyagerMark size={42} />
             <h1 className={styles.greeting}>{briefing.greeting}</h1>
             <p className={styles.supporting}>{briefing.summary}</p>
 
