@@ -73,7 +73,19 @@ export type AnalyticsEvent =
    * question, which is the person's, and never the subject, which is a position
    * they may hold.
    */
-  | { name: 'voyager_opened'; source: string; hasQuestion: boolean };
+  | { name: 'voyager_opened'; source: string; hasQuestion: boolean }
+  /*
+   * The save funnel. Three events because they are three different outcomes and
+   * the interesting one is the middle: how often somebody wants to keep a
+   * conversation and is stopped by not having an account.
+   *
+   * None of them carry the chat. Titles are the person's own words about their
+   * money, which is exactly what does not go to analytics.
+   */
+  | { name: 'voyager_save_clicked'; authenticated: boolean }
+  | { name: 'voyager_auth_required_for_save' }
+  | { name: 'voyager_chat_saved' }
+  | { name: 'voyager_new_chat'; chatCount: number };
 
 export interface AnalyticsSink {
   track(event: AnalyticsEvent): void;

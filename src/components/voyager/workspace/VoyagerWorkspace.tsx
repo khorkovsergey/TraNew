@@ -11,6 +11,9 @@ import {
   type Briefing,
 } from '@/lib/voyager/workspace/landing';
 import { takeDraft } from '@/components/voyager/AskEntry';
+import { track } from '@/lib/events/analytics';
+import { ChatHistory } from './ChatHistory';
+import type { Chat } from '@/lib/voyager/workspace/chats';
 import { GENERIC_CONTEXT } from '@/lib/voyager/context';
 import { contextLabel, parseContext } from '@/lib/voyager/session';
 import type { VoyagerAnswer } from '@/lib/voyager/types';
@@ -155,6 +158,8 @@ export function VoyagerWorkspace({
   const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedWorkspace[]>([]);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  /** Open when a guest asked to save. The conversation stays behind it. */
+  const [authPrompt, setAuthPrompt] = useState(false);
   const [name, setName] = useState<string | null>(opening?.name ?? null);
   /*
    * The grant for this workspace. Null means nothing has been shared, which is
@@ -350,6 +355,23 @@ export function VoyagerWorkspace({
   const saveWorkspace = useCallback(() => {
     if (!plan || !request) return;
 
+    track({ name: 'voyager_save_clicked', authenticated: Boolean(personName) });
+
+    /*
+     * A guest is asked to sign in rather than told it worked.
+     *
+     * This used to write to localStorage and say "Saved to your workspaces" to
+     * anybody who clicked it. That is a saved workspace in one browser, on one
+     * device, until the person clears their storage — and they had been told
+     * otherwise. The conversation survives the trip: `next` brings them back
+     * here.
+     */
+    if (!personName) {
+      track({ name: 'voyager_auth_required_for_save' });
+      setAuthPrompt(true);
+      return;
+    }
+
     const at = new Date().toISOString();
     persist(
       upsert(saved, {
@@ -372,8 +394,9 @@ export function VoyagerWorkspace({
       })
     );
 
+    track({ name: 'voyager_chat_saved' });
     setNotice('Saved to your workspaces.');
-  }, [plan, request, name, saved, persist]);
+  }, [plan, request, name, saved, persist, personName]);
 
   useEffect(() => {
     if (!plan || !isRunning(run)) return;
@@ -385,6 +408,7 @@ export function VoyagerWorkspace({
 
   /** "New" returns to the bare screen, which is the other half of the rule. */
   const reset = useCallback(() => {
+    track({ name: 'voyager_new_chat', chatCount: saved.length });
     setStage('landing');
     setRequest('');
     setDraft('');
@@ -401,7 +425,9 @@ export function VoyagerWorkspace({
     // about.
     setGrant(null);
     setTicked([]);
-  }, []);
+    // `saved.length` is read above, so it belongs here: with an empty array the
+    // count would be whatever it was when this component mounted.
+  }, [saved.length]);
 
   /*
    * Actions are declared by the module and resolved against a closed set.
@@ -463,6 +489,28 @@ export function VoyagerWorkspace({
         workspaceName={name ?? 'New workspace'}
         autoNamed
         onNew={reset}
+        saveState={personName && plan ? 'unsaved' : 'empty'}
+        /*
+         * The sidebar appears once there is a second conversation to choose
+         * between. One chat in a history column is furniture: it costs the
+         * dialogue 264px to tell somebody about the thing they are looking at.
+         */
+        history={
+          saved.length > 0 ? (
+            <ChatHistory
+              chats={saved.map(asChat)}
+              activeId={null}
+              signedIn={Boolean(personName)}
+              now={new Date()}
+              onOpen={(id) => {
+                const found = saved.find((workspace) => workspace.id === id);
+                if (found) send(found.request);
+              }}
+              onNew={reset}
+              onSignIn={() => setAuthPrompt(true)}
+            />
+          ) : undefined
+        }
         conversation={
           <div className={styles.turn}>
             <p className={styles.userBubble}>{request}</p>
@@ -837,7 +885,59 @@ export function VoyagerWorkspace({
           ) : null
         }
         modal={
-          modal && (
+          authPrompt ? (
+            /*
+             * A guest asked to save. The chat is still on screen behind this,
+             * and `next` brings them back to it rather than to the home page —
+             * losing the conversation as the price of keeping it would be the
+             * joke version of this flow.
+             */
+            <div
+              className={styles.confirmScrim}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Sign in to save chat history"
+            >
+              <div className={styles.libraryCard}>
+                <header className={styles.libraryHead}>
+                  <h2 className={styles.confirmTitle}>Sign in to save chat history</h2>
+                  <span className={styles.spacer} />
+                  <button
+                    className={styles.noticeClose}
+                    onClick={() => setAuthPrompt(false)}
+                    title="Close"
+                    aria-label="Close"
+                  >
+                    <Icon name="close" size={14} />
+                  </button>
+                </header>
+
+                <p className={styles.confirmBody}>
+                  Create an account or sign in to save this chat and open it again on another
+                  device. Your conversation stays open while you do.
+                </p>
+
+                <div className={styles.confirmActions}>
+                  <Link
+                    className={styles.primaryLink}
+                    href={{ pathname: '/sign-in', query: { next: '/voyager' } } as never}
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    className={styles.topAction}
+                    href={{ pathname: '/sign-up', query: { next: '/voyager' } } as never}
+                  >
+                    Create account
+                  </Link>
+                  <button className={styles.topAction} onClick={() => setAuthPrompt(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            modal && (
             <div
               className={styles.confirmScrim}
               role="dialog"
@@ -899,6 +999,7 @@ export function VoyagerWorkspace({
                 )}
               </div>
             </div>
+            )
           )
         }
         notice={notice}
@@ -1069,4 +1170,28 @@ export function VoyagerWorkspace({
       </div>
     </div>
   );
+}
+
+/**
+ * A saved workspace, read as a chat.
+ *
+ * The sidebar and the library are two views of one list rather than two lists.
+ * A second store would be a second thing to keep in step, and the first time
+ * they disagreed somebody would lose a conversation.
+ *
+ * The request is the transcript here: a workspace is one question and the
+ * answer it produced, which is what its row in the sidebar stands for.
+ */
+function asChat(workspace: SavedWorkspace): Chat {
+  return {
+    id: workspace.id,
+    title: workspace.name,
+    createdAt: workspace.createdAt,
+    updatedAt: workspace.updatedAt,
+    messages: [
+      { id: `${workspace.id}_q`, role: 'user', text: workspace.request, at: workspace.createdAt },
+    ],
+    // Written by the account copy, not by this view.
+    saved: true,
+  };
 }

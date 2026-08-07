@@ -392,19 +392,73 @@ try {
   check('Voyager names the workspace from the request', /gold/i.test(named), named);
   check('and says the name is a suggestion', (await page.locator('[class*="namedBadge"]').count()) > 0);
 
+  /*
+   * A guest saving is asked to sign in, and is not told it worked.
+   *
+   * This used to write to localStorage and report "Saved to your workspaces" to
+   * anybody who clicked — a workspace in one browser, on one device, until the
+   * storage was cleared, and the person had been told otherwise.
+   */
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.waitForTimeout(500);
+
+  const gate = page.getByRole('dialog', { name: 'Sign in to save chat history' });
+  check('a guest saving is asked for an account', await gate.isVisible());
+
+  const gateText = await gate.innerText();
+  check('the offer is both doors, not only one', /Sign in/.test(gateText) && /Create account/.test(gateText));
+  check('and it can be dismissed', /Cancel/.test(gateText));
+  check(
+    'the conversation is still behind it',
+    /gold/i.test(await page.locator('[class*="workspaceTitle"]').innerText())
+  );
+
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.waitForTimeout(300);
+  check('cancelling returns to the workspace', (await gate.count()) === 0);
 
   await page.getByRole('button', { name: 'Workspaces' }).click();
   await page.waitForTimeout(400);
 
   const dialogLib = page.getByRole('dialog', { name: 'Your workspaces' });
   check('the library opens', await dialogLib.isVisible());
-  check('with the saved workspace in it', /gold/i.test(await dialogLib.innerText()));
-  check(
-    'showing what was asked, not only what it was called',
-    /Why has gold risen/i.test(await dialogLib.innerText())
-  );
+  check('and nothing was saved behind the gate', !/Why has gold risen/i.test(await dialogLib.innerText()));
+
+  /*
+   * The library's own behaviour — search, rename, pin — is a signed-in feature
+   * now that saving is. Seeding storage exercises that interface without
+   * pretending a guest can put something in it, which is the thing the gate
+   * above exists to prevent.
+   */
+  await page.evaluate(() => {
+    const at = new Date().toISOString();
+    localStorage.setItem(
+      'tn_voyager_workspaces_v1',
+      JSON.stringify({
+        schemaVersion: 1,
+        workspaces: [
+          {
+            id: 'ws_seed',
+            name: 'Gold this quarter',
+            autoNamed: true,
+            kind: 'research',
+            request: 'Why has gold risen this quarter?',
+            summary: '4 modules · 3 sources',
+            pinned: false,
+            createdAt: at,
+            updatedAt: at,
+          },
+        ],
+      })
+    );
+  });
+  // Back into the workspace stage: the top bar only exists once a request does.
+  await page.goto(`${BASE}/en/voyager?q=${encodeURIComponent('Why has gold risen this quarter?')}`, {
+    waitUntil: 'networkidle',
+  });
+  await page.waitForTimeout(3400);
+  await page.getByRole('button', { name: 'Workspaces' }).click();
+  await page.waitForTimeout(400);
 
   await dialogLib.getByRole('textbox', { name: 'Search your workspaces' }).fill('gold');
   await page.waitForTimeout(300);
@@ -510,7 +564,9 @@ try {
 
   await failPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('make this fail');
   await failPage.getByRole('button', { name: 'Send' }).click();
-  await failPage.waitForTimeout(900);
+  // This phrase matches no scripted analysis, so it goes to the model and back
+  // before the failure is known. 900ms was measuring the request, not the card.
+  await failPage.waitForTimeout(2600);
 
   const failureCard = failPage.locator('[class*="failureCard"]');
   check('a failure is shown', (await failureCard.count()) === 1);
@@ -523,7 +579,9 @@ try {
 
   await failPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('find everything about every company');
   await failPage.getByRole('button', { name: 'Send' }).click();
-  await failPage.waitForTimeout(900);
+  // This phrase matches no scripted analysis, so it goes to the model and back
+  // before the failure is known. 900ms was measuring the request, not the card.
+  await failPage.waitForTimeout(2600);
 
   const secondFailure = await failPage.locator('[class*="failureCard"]').innerText();
   check('a different cause reads differently', /more than 4 000 companies/i.test(secondFailure), secondFailure.slice(0, 90));

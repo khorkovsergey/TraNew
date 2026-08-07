@@ -48,6 +48,13 @@ type Props = {
   cta?: ReactNode;
   onOpenLibrary?: () => void;
   onSave?: () => void;
+  /**
+   * The chat list. Omitted until there is more than one conversation, so the
+   * column appears when it has something to say rather than on arrival.
+   */
+  history?: ReactNode;
+  /** What Save currently means here — drives the label and the tooltip. */
+  saveState?: 'saved' | 'unsaved' | 'empty';
 };
 
 export function WorkspaceShell({
@@ -66,9 +73,12 @@ export function WorkspaceShell({
   cta,
   onOpenLibrary,
   onSave,
+  history,
+  saveState = 'empty',
 }: Props) {
   const [zones, setZones] = useState<ZoneState>(DEFAULT_ZONES);
   const [narrow, setNarrow] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
 
   /*
    * Restored once, on arrival, and through the parser rather than straight into
@@ -159,8 +169,23 @@ export function WorkspaceShell({
         <button className={styles.topAction} onClick={onOpenLibrary}>
           Workspaces
         </button>
-        <button className={styles.topAction} onClick={onSave}>
-          Save
+        {/*
+          * The label reports where the conversation actually lives.
+          *
+          * "Saved" while an unsaved answer sits on screen is the one thing this
+          * button must never say — somebody closes the tab on the strength of
+          * it. It goes back to "Save" the moment a new turn arrives.
+          */}
+        <button
+          className={styles.topAction}
+          onClick={onSave}
+          title={
+            saveState === 'saved'
+              ? 'This chat is saved to your account'
+              : 'Save this chat to your account'
+          }
+        >
+          {saveState === 'saved' ? 'Saved' : 'Save'}
         </button>
         <button className={styles.topAction} onClick={onNew}>
           New
@@ -168,6 +193,44 @@ export function WorkspaceShell({
       </header>
 
       <div className={styles.zones}>
+        {/*
+          * Zone 0. Present only once there is more than one conversation to
+          * choose between — a history sidebar holding a single chat is a column
+          * of furniture, and it costs the dialogue 264px to say nothing.
+          */}
+        {history && (
+          <aside
+            className={`${styles.history} ${historyOpen ? '' : styles.historyRail}`}
+            aria-label="Chat history"
+          >
+            {historyOpen ? (
+              <>
+                <div className={styles.zoneHead}>
+                  <span className={styles.zoneLabel}>Chat history</span>
+                  <button
+                    className={styles.zoneIcon}
+                    onClick={() => setHistoryOpen(false)}
+                    title="Collapse the history"
+                    aria-label="Collapse the history"
+                  >
+                    <Icon name="close" size={14} />
+                  </button>
+                </div>
+                {history}
+              </>
+            ) : (
+              <button
+                className={styles.railButton}
+                onClick={() => setHistoryOpen(true)}
+                title="Open the chat history"
+                aria-label="Open the chat history"
+              >
+                <Icon name="bubble" size={16} />
+              </button>
+            )}
+          </aside>
+        )}
+
         <aside
           className={`${styles.conversation} ${zones.conversationOpen ? '' : styles.conversationRail} ${
             zones.mobileTab === 'chat' ? styles.mobileActive : ''

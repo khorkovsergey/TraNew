@@ -1890,3 +1890,211 @@
   font-size: 12.5px;
   color: var(--tn-text-faint);
 }
+
+/* ===================================================== Zone 0: chat history */
+
+/*
+ * Narrower than the conversation at 348px, because a list of titles needs less
+ * room than a dialogue and the middle column is where the work happens.
+ */
+.history {
+  flex: 0 0 264px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--tn-border-card);
+  transition: flex-basis 180ms ease;
+}
+
+.historyRail {
+  flex-basis: 46px;
+  align-items: center;
+  padding-top: 10px;
+}
+
+.historyBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The guest notice. Said before anybody types, not after they lose something. */
+.historyNotice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 12px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 12px;
+  background: var(--tn-surface-inner);
+}
+
+.historyNoticeHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+.historyNoticeBody {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--tn-text-muted);
+}
+
+.historyNoticeAction {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 5px 12px;
+  border: 1px solid var(--tn-border-control);
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tn-text);
+  cursor: pointer;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.historyNoticeAction:hover {
+  border-color: var(--tn-mint);
+}
+
+.newChat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid var(--tn-border-control);
+  border-radius: 11px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text);
+  cursor: pointer;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.newChat:hover {
+  border-color: var(--tn-mint);
+}
+
+.historyEmpty {
+  margin: 0;
+  padding: 4px 4px 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+.historyGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.historyGroupLabel {
+  padding: 6px 4px 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--tn-text-faint);
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  font: inherit;
+  color: var(--tn-text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--tn-transition-fast), color var(--tn-transition-fast);
+}
+
+.historyItem:hover {
+  background: var(--tn-surface-inner);
+  color: var(--tn-text);
+}
+
+/* The current chat is marked by more than colour — it keeps a border too. */
+.historyItemActive {
+  border-color: var(--tn-border-card);
+  background: var(--tn-surface-inner);
+  color: var(--tn-text);
+}
+
+.historyItemTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.historyItemTime {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--tn-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.historyAbout {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 12px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 12px;
+}
+
+.historyAboutHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+.historyAboutBody {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+/*
+ * Below the wide breakpoint the history folds to its rail. Three columns of
+ * content plus an inspector does not fit, and the list is the one a person can
+ * reach again in one click.
+ */
+@media (max-width: 1360px) {
+  .history {
+    flex-basis: 46px;
+    align-items: center;
+    padding-top: 10px;
+  }
+
+  .historyBody {
+    display: none;
+  }
+}
