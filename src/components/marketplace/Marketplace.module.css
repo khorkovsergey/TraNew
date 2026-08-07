@@ -1236,3 +1236,69 @@
   line-height: 1.7;
   color: var(--tn-text-secondary);
 }
+
+/* ------------------------------------------------------ Editing the brief */
+
+.editFields {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.editLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--tn-text-faint);
+}
+
+/* 16px floor: below it iOS zooms the page when the field takes focus. */
+.editInput,
+.editArea {
+  padding: 8px 10px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: 10px;
+  background: var(--tn-surface-inner);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--tn-text);
+  resize: vertical;
+}
+
+.editInput:focus-visible,
+.editArea:focus-visible {
+  outline: 2px solid var(--tn-mint);
+  outline-offset: 1px;
+}
+
+.editGroup {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.editCheck {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--tn-text);
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+}

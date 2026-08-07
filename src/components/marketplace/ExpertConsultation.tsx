@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { VoyagerMark } from '@/components/voyager/VoyagerMark';
 import { useRouter } from '@/i18n/navigation';
@@ -66,6 +66,35 @@ export function ExpertConsultation({ category }: { category: string | null }) {
   });
   const [turns, setTurns] = useState<Turn[]>([{ role: 'voyager', text: opening(category) }]);
   const [draft, setDraft] = useState('');
+  const [editing, setEditing] = useState(false);
+
+  /*
+   * A brief already in progress is picked up rather than started over.
+   *
+   * "Edit request" on the results page comes back here, and it used to open a
+   * blank conversation — so changing one word meant answering everything again.
+   * §23 asks for the opposite: editing returns somebody to their request, not
+   * to the beginning of it.
+   */
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('tn_expert_brief_v1');
+      if (!raw) return;
+      const stored = JSON.parse(raw) as ExpertBrief;
+      if (!stored?.goal) return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBrief(stored);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTurns([
+        {
+          role: 'voyager',
+          text: 'Here is the request we built. Change anything in it directly, or tell me what is wrong and I will adjust it.',
+        },
+      ]);
+    } catch {
+      /* Unreadable storage means a fresh conversation, which still works. */
+    }
+  }, []);
 
   const stage = stageOf(brief);
   const question = nextQuestion(brief);
@@ -185,7 +214,86 @@ export function ExpertConsultation({ category }: { category: string | null }) {
       <aside className={styles.briefPanel} aria-label="Your brief">
         <h2 className={styles.briefHead}>Your brief</h2>
 
-        {!brief.goal ? (
+        {editing ? (
+          /*
+           * Editable fields, not another conversation.
+           *
+           * Somebody whose country was recorded wrong should be able to fix the
+           * word, and making them talk Voyager round to it is worse than the
+           * questionnaire this replaced — at least a form let you correct a
+           * field. §14 asks for this, and it is right.
+           */
+          <div className={styles.editFields}>
+            <label className={styles.editLabel}>
+              Goal
+              <textarea
+                className={styles.editArea}
+                value={brief.goal}
+                rows={3}
+                onChange={(event) => setBrief({ ...brief, goal: event.target.value })}
+              />
+            </label>
+
+            <fieldset className={styles.editGroup}>
+              <legend className={styles.editLabel}>Looking for</legend>
+              {Object.entries(SERVICE_LABEL).map(([id, label]) => (
+                <label className={styles.editCheck} key={id}>
+                  <input
+                    type="checkbox"
+                    checked={brief.services.includes(id)}
+                    onChange={(event) =>
+                      setBrief({
+                        ...brief,
+                        services: event.target.checked
+                          ? [...brief.services, id]
+                          : brief.services.filter((service) => service !== id),
+                      })
+                    }
+                  />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
+
+            <label className={styles.editLabel}>
+              Country
+              <input
+                className={styles.editInput}
+                value={brief.country ?? ''}
+                onChange={(event) => setBrief({ ...brief, country: event.target.value || undefined })}
+              />
+            </label>
+
+            <label className={styles.editLabel}>
+              Language
+              <input
+                className={styles.editInput}
+                value={brief.languages.join(', ')}
+                onChange={(event) =>
+                  setBrief({
+                    ...brief,
+                    languages: event.target.value.split(',').map((v) => v.trim()).filter(Boolean),
+                  })
+                }
+              />
+            </label>
+
+            <label className={styles.editCheck}>
+              <input
+                type="checkbox"
+                checked={brief.remoteAccepted}
+                onChange={(event) => setBrief({ ...brief, remoteAccepted: event.target.checked })}
+              />
+              Remote specialists are fine
+            </label>
+
+            <div className={styles.editActions}>
+              <button className={styles.briefCta} onClick={() => setEditing(false)}>
+                Save changes
+              </button>
+            </div>
+          </div>
+        ) : !brief.goal ? (
           <p className={styles.briefNote}>{EMPTY_BRIEF_NOTE}</p>
         ) : (
           <dl className={styles.briefList}>
@@ -227,10 +335,16 @@ export function ExpertConsultation({ category }: { category: string | null }) {
           * when every field is filled. The remaining questions refine a
           * shortlist; waiting for them is the questionnaire's mistake.
           */}
+        {brief.goal && !editing && (
+          <button className={styles.editRequest} onClick={() => setEditing(true)}>
+            Edit brief
+          </button>
+        )}
+
         <button
           className={styles.briefCta}
           onClick={findExperts}
-          disabled={!readyToMatch(brief)}
+          disabled={!readyToMatch(brief) || editing}
         >
           Save &amp; find experts
         </button>
