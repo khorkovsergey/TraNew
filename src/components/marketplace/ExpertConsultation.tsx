@@ -227,7 +227,14 @@ export function ExpertConsultation({ category }: { category: string | null }) {
       </section>
 
       <aside className={styles.briefPanel} aria-label="Your brief">
-        <h2 className={styles.briefHead}>Your brief</h2>
+        <div className={styles.briefTitleRow}>
+          <h2 className={styles.briefHead}>Your brief</h2>
+          {/* The mockup's badge. It only appears once there is something to
+              have saved, because a panel announcing it saved nothing is worse
+              than silent. */}
+          {brief.goal && <span className={styles.autoSaved}>Auto-saved</span>}
+        </div>
+        <p className={styles.briefSub}>Built live from our conversation</p>
 
         {editing ? (
           /*
@@ -363,9 +370,9 @@ export function ExpertConsultation({ category }: { category: string | null }) {
         >
           Save &amp; find experts
         </button>
-        {!readyToMatch(brief) && (
+        {!readyToMatch(brief) && brief.goal && (
           <p className={styles.briefNote}>
-            Tell Voyager your goal and roughly what kind of help it needs, and this opens.
+            A couple more answers and your brief is ready to search with.
           </p>
         )}
       </aside>

@@ -1312,3 +1312,34 @@
   line-height: 1.5;
   color: var(--tn-text-muted);
 }
+
+.briefTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* From the mockup. Green because it reports a state that is true, not an action. */
+.autoSaved {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: var(--tn-radius-chip);
+  background: var(--tn-green-tint);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--tn-green);
+}
+
+.briefSub {
+  margin: -4px 0 2px;
+  font-size: 11.5px;
+  color: var(--tn-text-faint);
+}
+
+.matchedOn {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--tn-text-faint);
+}

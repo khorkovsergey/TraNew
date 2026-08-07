@@ -310,7 +310,7 @@
       "merchCta": "View store"
     },
     "landing": {
-      "sub": "Tell Voyager what you are trying to achieve. It will ask a few questions, turn your answer into a professional request, and match you with the specialists who take that work on.",
+      "sub": "Describe your goal, let Voyager prepare your brief, then choose the right specialist. You do not need to know which kind of expert you need.",
       "find": "Find an expert",
       "browse": "Browse experts",
       "otherTitle": "Something else",
@@ -709,7 +709,7 @@
       "subtitle": "Experts, tools and data, learning and events, and exclusive products."
     },
     "experts": {
-      "title": "Find the right expert for what you need",
+      "title": "Expert Services",
       "subtitle": "Start from the task you need help with — we'll structure the rest."
     },
     "expertsIntake": {

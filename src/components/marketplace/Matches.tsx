@@ -43,6 +43,14 @@ const BAND_KEY: Record<MatchBand, 'bandBest' | 'bandStrong' | 'bandSuitable'> = 
   suitable: 'bandSuitable',
 };
 
+/** Service ids as the chips read them. The mockup shows the work, not the key. */
+const SERVICE_CHIP: Record<string, string> = {
+  strategy: 'Investment strategy',
+  review: 'Portfolio review',
+  finances: 'Financial planning',
+  tax: 'Tax and residency',
+};
+
 /** The brief-driven tiers, mapped onto the badge classes that already exist. */
 const TIER_CARD: Record<MatchTier, string> = {
   best: styles.matchCardBest,
@@ -121,12 +129,26 @@ export function Matches() {
     <>
       {brief && (
         <div className={styles.briefStrip}>
+          {/*
+            * "Matched on", from the mockup — the chips are what the search used,
+            * not a restatement of the goal. The goal is a paragraph and does not
+            * belong in a row of chips; what belongs there is the handful of
+            * things somebody can see were applied.
+            */}
+          <span className={styles.matchedOn}>Matched on</span>
           <div className={styles.briefChips}>
-            {[brief.goal, brief.country, ...brief.languages].filter(Boolean).map((chip) => (
-              <span className={styles.briefChip} key={chip}>
-                {chip}
-              </span>
-            ))}
+            {[
+              ...brief.services.map((id) => SERVICE_CHIP[id] ?? id),
+              brief.country,
+              ...brief.languages,
+              brief.remoteAccepted ? 'Remote accepted' : null,
+            ]
+              .filter(Boolean)
+              .map((chip) => (
+                <span className={styles.briefChip} key={chip as string}>
+                  {chip}
+                </span>
+              ))}
           </div>
           <Link className={styles.editRequest} href="/marketplace/experts/intake">
             Edit request
