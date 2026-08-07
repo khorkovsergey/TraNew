@@ -5,6 +5,7 @@ import { Icon } from '@/components/ui/Icon';
 import { VoyagerMark } from '@/components/voyager/VoyagerMark';
 import { useRouter } from '@/i18n/navigation';
 import { track } from '@/lib/events/analytics';
+import { saveExpertBriefAction } from '@/app/actions/expertBrief';
 import {
   EMPTY_BRIEF,
   EMPTY_BRIEF_NOTE,
@@ -156,11 +157,25 @@ export function ExpertConsultation({ category }: { category: string | null }) {
 
   const findExperts = () => {
     track({ name: 'expert_brief_saved', services: brief.services.join(',') });
+
+    /*
+     * Session storage first, always. It is what the next page reads, and it
+     * works for a guest — who has nowhere else to keep a brief.
+     */
     try {
       sessionStorage.setItem('tn_expert_brief_v1', JSON.stringify(brief));
     } catch {
       /* Private mode. The matches page falls back to an unfiltered list. */
     }
+
+    /*
+     * And to the account when there is one, fire-and-forget. Somebody signed in
+     * closes the tab expecting their request to still exist; a guest is not
+     * stopped to be told they cannot have that, because the button promises
+     * experts and delivering them is the point.
+     */
+    void saveExpertBriefAction(brief).catch(() => null);
+
     router.push('/marketplace/experts/matches');
   };
 
