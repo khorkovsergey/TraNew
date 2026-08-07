@@ -4003,8 +4003,15 @@ try {
      * out of bounds. The brief agrees and says not to fake execution, so the
      * limitation is stated on screen rather than left for somebody to discover.
      */
-    assert.match(output.CHART_PREVIEW_NOTICE, /not the output of running the script/i);
     assert.match(output.CHART_PREVIEW_NOTICE, /does not execute Pine/i);
+    /*
+     * And it must not claim a drawing that is not there. The first version of
+     * this line said the chart was "drawn from our own market data" while the
+     * chart module renders no chart at all — a caveat that invents the thing it
+     * is being careful about.
+     */
+    assert.match(output.CHART_PREVIEW_NOTICE, /No chart is drawn here yet/i);
+    assert.ok(!/^Drawn from/i.test(output.CHART_PREVIEW_NOTICE));
   });
 
   group('Many chats instead of one');

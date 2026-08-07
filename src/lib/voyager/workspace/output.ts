@@ -119,4 +119,4 @@ export function keepOrOpen(plan: MinimalPlan | null, current: OutputTab): Output
  * This is a product limitation to state on screen, not a detail to leave out.
  */
 export const CHART_PREVIEW_NOTICE =
-  'Drawn from our own market data to show what this script is meant to produce. It is not the output of running the script — Voyager does not execute Pine.';
+  'No chart is drawn here yet. Voyager decides what to plot — the instrument, the interval and the levels below — and the drawing itself comes from the Supercharts engine, which this tab is not yet joined to. Voyager does not execute Pine either, so when the picture arrives it will show what a script is meant to produce rather than the result of running one.';
