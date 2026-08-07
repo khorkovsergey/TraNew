@@ -310,7 +310,7 @@
       "merchCta": "View store"
     },
     "landing": {
-      "sub": "Describe what you need help with. TradingNew AI will structure your request and match you with suitable professionals.",
+      "sub": "Tell Voyager what you are trying to achieve. It will ask a few questions, turn your answer into a professional request, and match you with the specialists who take that work on.",
       "find": "Find an expert",
       "browse": "Browse experts",
       "otherTitle": "Something else",
@@ -709,12 +709,12 @@
       "subtitle": "Experts, tools and data, learning and events, and exclusive products."
     },
     "experts": {
-      "title": "Find the right expert for your next financial decision",
+      "title": "Find the right expert for what you need",
       "subtitle": "Start from the task you need help with — we'll structure the rest."
     },
     "expertsIntake": {
-      "title": "Tell us what you need",
-      "subtitle": "Seven questions so experts see a clear brief instead of a blank request."
+      "title": "Tell Voyager what you need",
+      "subtitle": "A short conversation instead of a form. Your request takes shape beside it as you answer, and you can edit it before anyone sees it."
     },
     "expertsMatches": {
       "title": "Your best matches",
