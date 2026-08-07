@@ -9,9 +9,9 @@ write, and have to be: our voice rules ask for probabilistic language and no
 promises, which is not how a data dictionary is written.
 
 Use it two ways. As an Academy syllabus, to see which concepts we cover and which
-we do not. And as a backlog for Voyager's `explain` branch, which today answers
-from the hand-written `CONCEPTS` table in
-`src/lib/voyager/workspace/scenarios.ts` — **5 entries against the 533 below.**
+we do not. And as a backlog for Voyager's `explain` branch, which answers from
+the hand-written `CONCEPTS` table in
+`src/lib/voyager/workspace/scenarios.ts` — **31 entries against the 533 below.**
 Anything not in that table falls through to the model with no house definition
 behind it.
 

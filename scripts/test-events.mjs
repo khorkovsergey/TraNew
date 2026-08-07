@@ -3716,6 +3716,134 @@ try {
     assert.match(plan.modules[0].title, /do not have a written explanation/i);
   });
 
+  group('The concept table');
+
+  check('every concept is complete', () => {
+    for (const concept of scenarios.CONCEPTS) {
+      assert.ok(concept.words.length, concept.title);
+      assert.ok(concept.title.length > 5, concept.title);
+      assert.ok(concept.body.length > 80, concept.title);
+      // The catch is the reason the table exists rather than a dictionary.
+      assert.ok(concept.catch.length > 80, concept.title);
+      assert.equal(concept.next.length, 3, concept.title);
+    }
+  });
+
+  check('no concept promises anybody a return', () => {
+    /*
+     * The same rule the written answers are held to. These are claims about how
+     * money works, made to somebody who came to be taught, and "will rise" is
+     * not a thing anyone can say truthfully.
+     */
+    const forbidden =
+      /\byou should (buy|sell|invest)\b|\bguaranteed\b|\bwill (rise|fall)\b|\brisk[- ]free\b/i;
+    for (const concept of scenarios.CONCEPTS) {
+      for (const field of [concept.body, concept.catch, ...concept.next]) {
+        assert.ok(!forbidden.test(field), `${concept.title}: ${field}`);
+      }
+    }
+  });
+
+  check('no concept claims a word another branch of the router needs', () => {
+    /*
+     * The educational check runs before the rest of the router, so a concept
+     * claiming `risk` would answer "what are the main risks in my portfolio"
+     * with a definition instead of looking at the portfolio. Adding a term
+     * without noticing this is the easy mistake, so it is asserted rather than
+     * left in a comment.
+     */
+    const reserved = [
+      'risk', 'risks', 'portfolio',
+      'market', 'markets', 'today', 'happening', 'now', 'session', 'sectors',
+      'compare', 'versus', 'vs',
+      'chart', 'rsi', 'support',
+      'pine', 'script', 'indicator',
+      'screen', 'screener', 'find', 'companies', 'company',
+      'monitor', 'alert', 'beginner', 'gold', 'falling', 'fell', 'selloff',
+    ];
+    for (const concept of scenarios.CONCEPTS) {
+      for (const word of concept.words) {
+        assert.ok(!reserved.includes(word), `${concept.title} claims "${word}"`);
+      }
+    }
+  });
+
+  check('a phrase sits above the general word inside it', () => {
+    /*
+     * `conceptFor` returns the first entry that matches, so "price to earnings"
+     * has to be found before "earnings" or the ratio is answered with the
+     * definition of profit.
+     */
+    const positionOf = (word) =>
+      scenarios.CONCEPTS.findIndex((concept) => concept.words.includes(word));
+
+    for (const [phrase, general] of [
+      ['price to earnings', 'earnings'],
+      ['free cash flow', 'revenue'],
+      ['total return', 'yield'],
+      ['market cap', 'stock'],
+      ['assets under management', 'fee'],
+    ]) {
+      const a = positionOf(phrase);
+      const b = positionOf(general);
+      assert.ok(a >= 0 && b >= 0, `${phrase} / ${general} not both present`);
+      assert.ok(a < b, `"${phrase}" must be found before "${general}"`);
+    }
+  });
+
+  check('the terms written up actually route to the educational branch', () => {
+    const questions = [
+      'What is the price to earnings ratio?',
+      'What is market cap?',
+      'What is an index?',
+      'What is a share?',
+      'How does compounding work?',
+      'What is volatility?',
+      'What is a yield?',
+      'What does an expense ratio cost?',
+      'What is liquidity?',
+      'What are earnings?',
+      'What is free cash flow?',
+      'What is beta?',
+      'What is correlation?',
+      'What is a drawdown?',
+      'What is total return?',
+      'What is rebalancing?',
+      'What is a broker?',
+      'What is a limit order?',
+      'What is a ticker?',
+      'What is net asset value?',
+      'What is a coupon?',
+      'What is an analyst rating?',
+      'What is dollar cost averaging?',
+    ];
+    for (const question of questions) {
+      assert.equal(scenarios.scenarioFor(question), 'explain', question);
+      const plan = contract.parsePlan(scenarios.responseFor(question))?.plan;
+      assert.ok(plan, `${question} did not parse`);
+      assert.ok(
+        plan.modules.some((module) => module.title === 'What that leaves out'),
+        question
+      );
+    }
+  });
+
+  check('and the questions the other branches own are still theirs', () => {
+    /*
+     * Twenty-six new entries is twenty-six new chances to swallow a question
+     * that belonged somewhere else. This is the guard.
+     */
+    assert.equal(scenarios.scenarioFor('What are the main risks in my portfolio?'), 'portfolio');
+    assert.equal(scenarios.scenarioFor('What is happening today?'), 'market');
+    assert.equal(scenarios.scenarioFor('What is happening in the US market today?'), 'market');
+    assert.equal(scenarios.scenarioFor('Why are technology stocks falling?'), 'selloff');
+    assert.equal(scenarios.scenarioFor('Compare NVIDIA and AMD'), 'compare');
+    assert.equal(scenarios.scenarioFor('Build a Tesla chart with RSI'), 'chart');
+    assert.equal(scenarios.scenarioFor('find companies with growing revenue'), 'screen');
+    assert.equal(scenarios.scenarioFor('What can you help me with?'), null);
+    assert.equal(scenarios.scenarioFor('Should I worry about my mortgage?'), null);
+  });
+
   check('every scenario parses, with nothing refused', () => {
     /*
      * The whole reason they are written behind the contract. Ten hand-written
