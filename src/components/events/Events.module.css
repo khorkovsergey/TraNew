@@ -21,18 +21,24 @@
 .eyebrow {
   margin-top: 18px;
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 1.5px;
-  color: var(--tn-text-faint);
+  text-transform: uppercase;
+  color: var(--tn-mint);
+}
+
+/* The one accent phrase in the headline. */
+.h1Accent {
+  color: var(--tn-accent-fill);
 }
 
 .h1 {
   margin: 10px 0 0;
-  max-width: 720px;
-  font-size: clamp(30px, 4.4vw, 46px);
+  max-width: 760px;
+  font-size: clamp(30px, 4.2vw, 44px);
   line-height: 1.12;
   font-weight: 800;
-  letter-spacing: -1.2px;
+  letter-spacing: -1.4px;
   color: var(--tn-text);
 }
 
@@ -55,20 +61,24 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--tn-purple);
+  /*
+   * Mint, not violet. Violet is Voyager's colour everywhere else in the portal,
+   * and a violet button here read as "this opens the assistant".
+   */
+  background: var(--tn-cta);
   border: 0;
-  border-radius: var(--tn-radius-pill);
+  border-radius: 11px;
   padding: 13px 24px;
   font: inherit;
   font-size: 14px;
-  font-weight: 700;
-  color: #fff;
+  font-weight: 800;
+  color: var(--tn-cta-text);
   cursor: pointer;
-  transition: background var(--tn-transition-fast);
+  transition: filter var(--tn-transition-fast);
 }
 
 .primary:hover {
-  background: var(--tn-purple-hover);
+  filter: brightness(1.08);
 }
 
 .primary:disabled {
@@ -98,31 +108,41 @@
 
 /* ---- Learning / Events tabs ---- */
 
+/*
+ * Two tabs, marked by an underline rather than a filled pill.
+ *
+ * The pill read as a button and sat beside two real buttons, so the row had
+ * four things that looked pressable and two that were a place you already are.
+ */
 .hubTabs {
   display: flex;
-  gap: 10px;
-  margin-top: 26px;
+  gap: 28px;
+  margin-top: 30px;
+  border-bottom: 1px solid var(--tn-border-hairline);
 }
 
 .hubTab {
-  background: var(--tn-surface);
-  border: 1px solid var(--tn-border-input);
-  border-radius: var(--tn-radius-pill);
-  padding: 12px 28px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 10px 2px 12px;
   font: inherit;
   font-size: 14.5px;
-  font-weight: 700;
-  color: var(--tn-text);
+  font-weight: 600;
+  color: var(--tn-text-secondary);
   cursor: pointer;
-  transition:
-    background var(--tn-transition-fast),
-    color var(--tn-transition-fast);
+  transition: color var(--tn-transition-fast);
+}
+
+.hubTab:hover {
+  color: var(--tn-text);
 }
 
 .hubTabActive {
-  background: var(--tn-text);
-  border-color: var(--tn-text);
   color: #fff;
+  font-weight: 700;
+  border-bottom-color: var(--tn-mint);
 }
 
 /* ---- Toolbar ---- */
@@ -162,13 +182,13 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background: var(--tn-surface);
-  border: 1px solid var(--tn-border-input);
-  border-radius: var(--tn-radius-pill);
+  background: var(--tn-surface-inner);
+  border: 1.5px solid #1e2a3a;
+  border-radius: 10px;
   padding: 10px 16px;
   font: inherit;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--tn-text);
   cursor: pointer;
   white-space: nowrap;
@@ -178,17 +198,22 @@
 }
 
 .control:hover {
-  border-color: var(--tn-purple);
+  border-color: var(--tn-border-hover);
 }
 
+/*
+ * The selected view or filter. Mint border and tint rather than an inverted
+ * fill: an inverted control on a dark page is a white slab, and there are six
+ * of these in a row.
+ */
 .controlOn {
-  background: var(--tn-text);
-  border-color: var(--tn-text);
+  background: var(--tn-mint-tint);
+  border-color: var(--tn-mint);
   color: #fff;
 }
 
 .controlOn:hover {
-  border-color: var(--tn-text);
+  border-color: var(--tn-mint);
 }
 
 .controlCount {
@@ -477,9 +502,15 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 12px;
+  font-weight: 800;
+  /* The day is what the eye scans for; the time follows it, quieter. */
+  color: var(--tn-mint);
+}
+
+.cardTime {
+  color: var(--tn-text-soft);
   font-weight: 700;
-  color: var(--tn-purple);
 }
 
 .cardDot {
@@ -611,25 +642,31 @@
   display: inline-flex;
   align-items: center;
   border-radius: var(--tn-radius-chip-sm);
-  padding: 5px 10px;
-  font-size: 11px;
-  font-weight: 700;
+  padding: 5px 9px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
+/*
+ * One tint per level of trust, each readable on the darkened cover beneath it.
+ * `badgeFor()` still decides which; this only says what each looks like.
+ */
 .badgeOfficial {
-  background: var(--tn-text);
-  color: #fff;
+  background: rgba(46, 230, 168, 0.14);
+  color: var(--tn-mint);
 }
 
 .badgeVerified {
-  background: var(--tn-green-tint);
-  color: var(--tn-green);
+  background: var(--tn-blue-tint);
+  color: var(--tn-blue-hover);
 }
 
 .badgeCommunity {
-  background: var(--tn-amber-tint);
-  color: var(--tn-amber-text);
+  background: var(--tn-purple-tint);
+  color: var(--tn-purple-deep);
 }
 
 .badgeExternal {
@@ -665,6 +702,13 @@
   color: var(--tn-green);
 }
 
+/* A price is not a warning and not a saving — amber, so it is neither read as
+   "free" nor as "careful". */
+.chipPaid {
+  background: var(--tn-amber-tint);
+  color: var(--tn-amber-text);
+}
+
 .formatInPerson {
   background: var(--tn-blue-tint);
   color: var(--tn-blue);
@@ -693,10 +737,14 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--tn-text-faint);
+  border: 1px solid #1e2a3a;
+  border-radius: 9px;
+  /*
+   * Dark, over the cover. A white square was the brightest thing on the card
+   * and pulled the eye to a secondary action four times a row.
+   */
+  background: rgba(4, 7, 12, 0.7);
+  color: var(--tn-text-secondary);
   cursor: pointer;
   transition:
     background var(--tn-transition-fast),
@@ -704,8 +752,8 @@
 }
 
 .saveIcon:hover {
-  background: var(--tn-chip-bg);
-  color: var(--tn-text-muted);
+  border-color: var(--tn-border-hover);
+  color: var(--tn-text);
 }
 
 .saveLabelled {
@@ -723,8 +771,9 @@
   cursor: pointer;
 }
 
+/* Saved: mint, matching every other "you did this" state in the portal. */
 .saveOn {
-  color: var(--tn-orange-star);
+  color: var(--tn-mint);
 }
 
 .saveLabelled.saveOn {

@@ -74,7 +74,11 @@ export function FormatChip({ format, city }: { format: EventFormat; city: string
 
 export function PriceChip({ label }: { label: string }) {
   const free = label === 'Free';
-  return <span className={`${styles.chip} ${free ? styles.chipFree : ''}`}>{label}</span>;
+  // Free is green, a price is amber. Left neutral, a €45 ticket sat in the same
+  // grey as the topic beside it and read as another tag rather than a cost.
+  return (
+    <span className={`${styles.chip} ${free ? styles.chipFree : styles.chipPaid}`}>{label}</span>
+  );
 }
 
 export function Chip({ children }: { children: React.ReactNode }) {

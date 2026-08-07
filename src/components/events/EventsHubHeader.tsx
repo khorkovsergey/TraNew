@@ -18,7 +18,10 @@ export function EventsHubHeader({ active }: { active: 'learning' | 'events' }) {
       </Link>
 
       <p className={styles.eyebrow}>LEARNING &amp; EVENTS</p>
-      <h1 className={styles.h1}>Learn, connect and navigate the markets with confidence</h1>
+      <h1 className={styles.h1}>
+        Learn, connect and navigate the markets{' '}
+        <span className={styles.h1Accent}>with confidence</span>
+      </h1>
       <p className={styles.lede}>
         Build your knowledge with practical courses or join financial events hosted by TradingNew
         and the community.

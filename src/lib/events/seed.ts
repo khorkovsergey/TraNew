@@ -248,7 +248,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'How economic regimes shape returns across asset classes.',
     description:
       'A practical introduction to market cycles: expansion, peak, contraction and recovery — and how each regime historically treated stocks, bonds, cash and gold.\n\nBuilt on the same labelled data you see across TradingNew, so every chart in the session is one you can open yourself afterwards.',
-    coverGradient: 'linear-gradient(135deg,#2962ff,#8b5cf6)',
+    coverGradient: 'linear-gradient(135deg,#0a1c33,#081018)',
     status: 'published',
     format: 'online',
     eventType: 'webinar',
@@ -303,7 +303,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'Hands-on session: build a diversified allocation step by step.',
     description:
       'Three hours at a table with a spreadsheet and a real set of constraints. You leave with an allocation you wrote yourself and can defend.\n\nBring a laptop. No prior modelling experience needed.',
-    coverGradient: 'linear-gradient(135deg,#1aa966,#2962ff)',
+    coverGradient: 'linear-gradient(135deg,#0b2620,#081018)',
     status: 'published',
     format: 'in_person',
     eventType: 'workshop',
@@ -358,7 +358,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'Monthly community evening: markets talk, no sales pitches.',
     description:
       'A relaxed evening with other private investors. One short talk, then conversation.\n\nThe club has one rule and enforces it: nobody sells anything.',
-    coverGradient: 'linear-gradient(135deg,#f4a71f,#e0492f)',
+    coverGradient: 'linear-gradient(135deg,#241a10,#081018)',
     status: 'published',
     format: 'in_person',
     eventType: 'meetup',
@@ -406,7 +406,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'Watch analysts interpret the inflation release in real time.',
     description:
       'The US CPI release, read live as it lands. Forty-five minutes, no slides — the number arrives and two analysts work through what it changes and what it does not.',
-    coverGradient: 'linear-gradient(135deg,#7c4dff,#2962ff)',
+    coverGradient: 'linear-gradient(135deg,#1c1430,#081018)',
     status: 'published',
     format: 'online',
     eventType: 'live_market_session',
@@ -457,7 +457,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'Weekly online circle working through options fundamentals.',
     description:
       'A study group, not a class. Twelve regulars work through one chapter a week and argue about it.\n\nNew members welcome at any point — the current run is on payoff diagrams.',
-    coverGradient: 'linear-gradient(135deg,#1aa966,#f4a71f)',
+    coverGradient: 'linear-gradient(135deg,#0b2620,#081018)',
     status: 'published',
     format: 'online',
     eventType: 'meetup',
@@ -502,7 +502,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'Estate, tax and long-horizon planning for private investors.',
     description:
       'What to put in place before it matters: structure, succession and the tax questions people usually ask five years too late.',
-    coverGradient: 'linear-gradient(135deg,#8b5cf6,#e0492f)',
+    coverGradient: 'linear-gradient(135deg,#2a1220,#081018)',
     status: 'published',
     format: 'hybrid',
     eventType: 'masterclass',
@@ -555,7 +555,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'A day on what higher-for-longer did to portfolios, and what comes next.',
     description:
       'Eight sessions across one day: policy, bonds, currencies and the long-run consequences of the last rate cycle.\n\nRun by the Thames Macro Institute, whose lectures are open to the public.',
-    coverGradient: 'linear-gradient(135deg,#131722,#2962ff)',
+    coverGradient: 'linear-gradient(135deg,#0a1c33,#081018)',
     status: 'published',
     format: 'in_person',
     eventType: 'conference',
@@ -612,7 +612,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'A working session on account access, data sharing and what it means for investors.',
     description:
       'Half a day with people building the plumbing: what open finance actually enables, what it does not, and where the regulation is heading.',
-    coverGradient: 'linear-gradient(135deg,#2962ff,#1aa966)',
+    coverGradient: 'linear-gradient(135deg,#0b2620,#081018)',
     status: 'published',
     format: 'in_person',
     eventType: 'workshop',
@@ -663,7 +663,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'Four hours online: structure, levels and what indicators can and cannot tell you.',
     description:
       'A full session on reading a chart properly — and on the limits of doing so. Includes an honest hour on what technical analysis does not do.',
-    coverGradient: 'linear-gradient(135deg,#7c4dff,#1aa966)',
+    coverGradient: 'linear-gradient(135deg,#1c1430,#081018)',
     status: 'published',
     format: 'online',
     eventType: 'masterclass',
@@ -714,7 +714,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'Index construction, currency hedging and the Japanese ETF market.',
     description:
       'An evening seminar on how index funds are actually built, and what currency hedging costs a yen-based investor.',
-    coverGradient: 'linear-gradient(135deg,#e0492f,#f4a71f)',
+    coverGradient: 'linear-gradient(135deg,#2a1220,#081018)',
     status: 'published',
     format: 'in_person',
     eventType: 'conference',
@@ -764,7 +764,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'Salaried professionals comparing notes on saving, tax and first investments.',
     description:
       'A monthly evening for people who earn a salary and want to do something sensible with it. Practical, local and specific.',
-    coverGradient: 'linear-gradient(135deg,#f4a71f,#7c4dff)',
+    coverGradient: 'linear-gradient(135deg,#241a10,#081018)',
     status: 'published',
     format: 'in_person',
     eventType: 'meetup',
@@ -812,7 +812,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'A closed-room session on concentration, correlation and what breaks in a drawdown.',
     description:
       'Small-group session with risk consultants. Bring a portfolio you actually hold; leave with a list of what you had not measured.',
-    coverGradient: 'linear-gradient(135deg,#131722,#7c4dff)',
+    coverGradient: 'linear-gradient(135deg,#1c1430,#081018)',
     status: 'published',
     format: 'hybrid',
     eventType: 'workshop',
@@ -864,7 +864,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'Two-day conference: payments, digital assets and regulation.',
     description:
       'An industry conference run outside TradingNew. Registration, payment and attendance are handled entirely by the organizer.',
-    coverGradient: 'linear-gradient(135deg,#131722,#2962ff)',
+    coverGradient: 'linear-gradient(135deg,#0a1c33,#081018)',
     status: 'published',
     format: 'hybrid',
     eventType: 'conference',
@@ -908,7 +908,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'Index investing, factor strategies and the European ETF market.',
     description:
       'Run by an organizer TradingNew has not verified. Registration happens on their website.',
-    coverGradient: 'linear-gradient(135deg,#2962ff,#1aa966)',
+    coverGradient: 'linear-gradient(135deg,#0b2620,#081018)',
     status: 'published',
     format: 'in_person',
     eventType: 'conference',
@@ -952,7 +952,7 @@ const SEEDS: SeedInput[] = [
     title: 'Algorithmic Signals Evening',
     shortDescription: 'This event was cancelled by the organizer.',
     description: 'The organizer cancelled this event. Everyone registered has been notified.',
-    coverGradient: 'linear-gradient(135deg,#8a93a6,#cdd4e0)',
+    coverGradient: 'linear-gradient(135deg,#141b24,#081018)',
     status: 'cancelled',
     cancellationReason: 'The speaker withdrew and no replacement could be arranged in time.',
     format: 'online',
@@ -995,7 +995,7 @@ const SEEDS: SeedInput[] = [
     shortDescription: 'What a disposal is, and when one happened without you noticing.',
     description:
       'A past session on the tax treatment of digital assets. The recording is with the organizer.',
-    coverGradient: 'linear-gradient(135deg,#1aa966,#2962ff)',
+    coverGradient: 'linear-gradient(135deg,#0b2620,#081018)',
     status: 'completed',
     format: 'online',
     eventType: 'webinar',

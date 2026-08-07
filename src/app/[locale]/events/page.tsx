@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 import { EventsBrowser } from '@/components/events/EventsBrowser';
+import { SpaceBackdrop } from '@/components/shell/SpaceBackdrop';
 import { EventsHubHeader } from '@/components/events/EventsHubHeader';
 import { EventSection } from '@/components/events/EventSection';
 import { bookmarkedIds, findEvents, registrationsFor, summaries } from '@/lib/data/events';
@@ -122,6 +123,8 @@ export default async function EventsPage({ params, searchParams }: Props) {
     : [];
 
   return (
+    <>
+      <SpaceBackdrop tone={4} />
     <div className={styles.wrap}>
       <EventsHubHeader active="events" />
 
@@ -159,5 +162,6 @@ export default async function EventsPage({ params, searchParams }: Props) {
           />
         ))}
     </div>
+    </>
   );
 }
