@@ -11,9 +11,7 @@ import type {
   VoyagerTier,
 } from '@/lib/voyager/types';
 import { routeFor } from './actionRoutes';
-import { hasSeenIntro, markIntroSeen } from '@/lib/voyager/introSeen';
 import { onVoyagerOpenRequest } from '@/lib/voyager/openRequest';
-import { VoyagerIntro } from './VoyagerIntro';
 import { VoyagerMark } from './VoyagerMark';
 import { VoyagerWordmark } from './VoyagerOrb';
 import { InvestmentAssessmentCard } from './InvestmentAssessment';
@@ -21,7 +19,7 @@ import { useChartStudies, useVoyagerContext } from './VoyagerProvider';
 import styles from './Voyager.module.css';
 
 /**
- * The Voyager widget — one component, four states, present on every page.
+ * The Voyager widget — one component, three states, present on every page.
  *
  * It knows almost nothing on its own. Tier, sources and limits are fetched from
  * the server, because a widget that decided its own entitlements would be
@@ -41,7 +39,6 @@ type State = {
   remaining: number | null;
   signedIn: boolean;
   personalization: boolean | null;
-  introSeen: boolean;
 };
 
 const TIER_STYLE: Record<VoyagerTier, { background: string; color: string }> = {
@@ -89,7 +86,7 @@ export function VoyagerWidget({ chartWorkspaceLive = false }: { chartWorkspaceLi
   const { applyStudy, requestPine } = useChartStudies();
   const router = useRouter();
 
-  const [mode, setMode] = useState<'collapsed' | 'intro' | 'peek' | 'panel'>('collapsed');
+  const [mode, setMode] = useState<'collapsed' | 'peek' | 'panel'>('collapsed');
   const [full, setFull] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -133,20 +130,9 @@ export function VoyagerWidget({ chartWorkspaceLive = false }: { chartWorkspaceLi
 
   /*
    * Opened from elsewhere on the page — today the "Ask AI Voyager" card on the home
-   * page. It lands on the panel rather than the peek because the button said "ask",
-   * but a first-ever open still plays the introduction: which door someone came
-   * through should not decide whether they get introduced to the thing.
+   * page. It lands on the panel rather than the peek, because the button said "ask".
    */
-  useEffect(
-    () =>
-      onVoyagerOpenRequest(() => {
-        setMode((current) => {
-          if (current === 'collapsed' && !(hasSeenIntro() || state?.introSeen)) return 'intro';
-          return 'panel';
-        });
-      }),
-    [state?.introSeen]
-  );
+  useEffect(() => onVoyagerOpenRequest(() => setMode('panel')), []);
 
   // Escape closes the panel — a fixed overlay that traps people is a bad overlay.
   useEffect(() => {
@@ -272,33 +258,11 @@ export function VoyagerWidget({ chartWorkspaceLive = false }: { chartWorkspaceLi
 
   if (onChartWorkspace) return null;
 
-  /* ------------------------------------------------------------------ Intro */
-
-  if (mode === 'intro') {
-    return (
-      <VoyagerIntro
-        onFinish={() => {
-          markIntroSeen();
-          // Straight into the conversation, which is what they clicked for.
-          setMode('panel');
-        }}
-      />
-    );
-  }
-
   /* -------------------------------------------------------------- Collapsed */
 
   if (mode === 'collapsed') {
     return (
-      <button
-        className={styles.pill}
-        onClick={() => {
-          // First open plays the introduction, then hands over to the assistant.
-          // hasSeenIntro reads localStorage, so a returning visitor never sees a
-          // flash of video while a network check resolves.
-          setMode(hasSeenIntro() || state?.introSeen ? 'peek' : 'intro');
-        }}
-      >
+      <button className={styles.pill} onClick={() => setMode('peek')}>
         <VoyagerMark size={26} />
         <span className={styles.pillLabel}>{context.prompt}</span>
       </button>

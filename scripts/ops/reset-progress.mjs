@@ -44,7 +44,7 @@ const sql = postgres(url, {
 });
 
 /** Preference keys that mean "has been here before", as opposed to a setting. */
-const ONBOARDING_KEYS = ['voyager.intro_seen', 'academy.setup_done', 'events.onboarded'];
+const ONBOARDING_KEYS = ['academy.setup_done', 'events.onboarded'];
 
 const wiped = [];
 
