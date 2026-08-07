@@ -3883,6 +3883,28 @@ try {
     assert.equal(seen.size, 5);
   });
 
+  check('the closed questions offer their answers, the open ones do not', () => {
+    /*
+     * "Review" is our word for portfolio work, and nobody guesses it. But
+     * suggesting a goal or a country would be putting words in somebody's mouth
+     * about their own situation.
+     */
+    assert.ok(brief.SUGGESTED.services.length >= 4);
+    assert.ok(brief.SUGGESTED.language.length > 0);
+    assert.equal(brief.SUGGESTED.goal, undefined);
+    assert.equal(brief.SUGGESTED.location, undefined);
+  });
+
+  check('every suggested answer is a phrase somebody would say', () => {
+    for (const [field, options] of Object.entries(brief.SUGGESTED)) {
+      for (const option of options) {
+        assert.ok(option.length > 2, `${field}: ${option}`);
+        // Not a field key leaking into the interface.
+        assert.ok(!/^[a-z_]+$/.test(option), `${field}: ${option}`);
+      }
+    }
+  });
+
   check('nothing is offered to relax when there are already results', () => {
     assert.deepEqual(brief.relaxations(EXPERTS, briefOf({ goal: 'g', services: ['strategy'] })), []);
   });

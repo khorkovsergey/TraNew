@@ -180,7 +180,20 @@ export function Matches() {
       )}
 
       <div className={styles.matchList}>
-        {EXPERTS.filter((expert) => shown.includes(expert.id)).map((expert) => (
+        {EXPERTS.filter((expert) => shown.includes(expert.id)).map((expert, index, list) => {
+          /*
+           * A heading before the first of each tier, as the mockup groups them.
+           * The list is already ordered by tier, so this reads the change
+           * rather than re-sorting — one ordering, in the matcher, and nothing
+           * here that can disagree with it.
+           */
+          const tier = byId.get(expert.id)?.tier;
+          const previous = index > 0 ? byId.get(list[index - 1].id)?.tier : undefined;
+          const heading = tier && tier !== previous ? TIER_LABEL[tier] : null;
+
+          return (
+            <div className={styles.tierGroup} key={`g-${expert.id}`}>
+              {heading && <h2 className={styles.tierHeading}>{heading}</h2>}
           <article
             className={`${styles.matchCard} ${
               byId.get(expert.id) ? TIER_CARD[byId.get(expert.id)!.tier] : BAND_CARD[expert.band]
@@ -255,7 +268,9 @@ export function Matches() {
               </button>
             </div>
           </article>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       <p className={styles.disclaimer}>{t('matches.noPercentages')}</p>

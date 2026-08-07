@@ -287,5 +287,29 @@ export function nextQuestion(brief: ExpertBrief): { field: string; ask: string }
   }
 }
 
+/**
+ * Answers worth offering as buttons, per question.
+ *
+ * The mockup's click-through is "answer with the suggested replies (or type
+ * freely)", and the reason is that some of these are our vocabulary, not the
+ * person's: nobody guesses that "review" is the word this marketplace files
+ * portfolio work under. Offering the words removes a guessing game without
+ * taking the text box away.
+ *
+ * The open questions — the goal, the country — have none, because suggesting
+ * answers to those would be putting words in somebody's mouth about their own
+ * situation.
+ */
+export const SUGGESTED: Record<string, string[]> = {
+  services: [
+    'Building a strategy',
+    'Reviewing what I hold',
+    'Planning my finances',
+    'Tax and residency',
+  ],
+  language: ['English', 'Greek', 'Russian'],
+  engagement: ['A one-off consultation', 'A project with an end', 'Someone ongoing'],
+};
+
 /** A short line for the brief panel before anything has been said. */
 export const EMPTY_BRIEF_NOTE = 'Voyager will build your request here as you talk.';

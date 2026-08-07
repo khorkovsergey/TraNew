@@ -13,6 +13,7 @@ import {
   readyToMatch,
   STAGE_LABEL,
   stageOf,
+  SUGGESTED,
   type ExpertBrief,
 } from '@/lib/experts/brief';
 import styles from './Marketplace.module.css';
@@ -146,8 +147,8 @@ export function ExpertConsultation({ category }: { category: string | null }) {
   const stage = stageOf(brief);
   const question = nextQuestion(brief);
 
-  const send = () => {
-    const said = draft.trim();
+  const send = (value?: string) => {
+    const said = (value ?? draft).trim();
     if (!said) return;
     setDraft('');
 
@@ -289,6 +290,27 @@ export function ExpertConsultation({ category }: { category: string | null }) {
             </p>
           ))}
         </div>
+
+        {/*
+          * The suggested answers, from the mockup's click-through. They exist
+          * because some of these are our vocabulary rather than the person's —
+          * nobody guesses that "review" is what this marketplace calls
+          * portfolio work. The text box stays; this removes a guessing game
+          * rather than a choice.
+          */}
+        {question && SUGGESTED[question.field] && (
+          <div className={styles.suggestRow}>
+            {SUGGESTED[question.field].map((option) => (
+              <button
+                key={option}
+                className={styles.askChip}
+                onClick={() => send(option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
 
         <form
           className={styles.composer}

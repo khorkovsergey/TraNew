@@ -1419,3 +1419,25 @@
   border-color: var(--tn-mint);
   color: var(--tn-text);
 }
+
+.suggestRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.tierGroup {
+  display: contents;
+}
+
+/* The mockup groups the shortlist rather than only sorting it: "Best match"
+   above the ones that are, so the ordering is legible instead of implied. */
+.tierHeading {
+  grid-column: 1 / -1;
+  margin: 10px 0 2px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--tn-text-faint);
+}
