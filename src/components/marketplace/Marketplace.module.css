@@ -1170,3 +1170,69 @@
     position: static;
   }
 }
+
+/* ------------------------------------------- Brief-driven matching results */
+
+.briefStrip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.briefChips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.briefChip {
+  padding: 5px 11px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-chip);
+  font-size: 12px;
+  color: var(--tn-text-secondary);
+}
+
+.editRequest {
+  padding: 7px 14px;
+  border: 1px solid var(--tn-border-control);
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+  text-decoration: none;
+}
+
+.editRequest:hover {
+  border-color: var(--tn-mint);
+}
+
+/* Never "no experts found": a dead end with nothing to do next. */
+.noMatches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 18px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 16px;
+  margin-bottom: 18px;
+}
+
+.noMatchesHead {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.relaxList {
+  margin: 4px 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--tn-text-secondary);
+}

@@ -21,6 +21,15 @@ export type Expert = {
   provider: Localized;
   credential: CredentialStatus;
   band: MatchBand;
+  /**
+   * Marketplace task ids this expert actually takes on.
+   *
+   * A hard constraint when matching: an adviser who does not do tax cannot do
+   * tax, and ranking them lower instead of excluding them is how somebody books
+   * the wrong person. `band` above is the old static badge — it says nothing
+   * about any particular request and the brief-driven matching ignores it.
+   */
+  services: string[];
   jurisdiction: Localized;
   languages: string;
   rating: string;
@@ -50,6 +59,7 @@ export const EXPERTS: Expert[] = [
     },
     credential: 'verified',
     band: 'best',
+    services: ['strategy', 'review'],
     jurisdiction: { en: 'Cyprus / EU' },
     languages: 'EN · RU',
     rating: '4.9',
@@ -149,6 +159,7 @@ export const EXPERTS: Expert[] = [
     provider: { en: 'Financial planner' },
     credential: 'self_declared',
     band: 'strong',
+    services: ['finances', 'strategy'],
     jurisdiction: { en: 'United Kingdom' },
     languages: 'EN · FR',
     rating: '4.8',
@@ -250,6 +261,7 @@ export const EXPERTS: Expert[] = [
     },
     credential: 'not_applicable',
     band: 'suitable',
+    services: ['review'],
     jurisdiction: { en: 'Sweden / EU' },
     languages: 'EN · SV',
     rating: '5.0',
