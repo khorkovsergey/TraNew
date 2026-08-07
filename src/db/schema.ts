@@ -478,6 +478,44 @@ export const voyagerWorkspace = pgTable(
   }
 );
 
+/**
+ * Documents somebody uploaded as Voyager's standing context.
+ *
+ * Their notes about their own money, so the body is encrypted with their key
+ * exactly as a wealth note is — the same rule, because it is the same kind of
+ * material. Nothing here is readable without the account it belongs to.
+ *
+ * Text in a column rather than a file on a disk: these are notes, watchlists
+ * and theses, capped at 2 MB, and only formats the server can actually read are
+ * accepted. It moves to object storage the day binaries are, without the
+ * interface above it changing.
+ */
+export const voyagerFile = pgTable(
+  'voyager_file',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+
+    name: text('name').notNull(),
+    /** txt | md | csv — what the parser was told it is. */
+    kind: text('kind').notNull(),
+    bytes: integer('bytes').notNull(),
+    /** The document itself, sealed with the owner's data key. */
+    bodyEnc: text('body_enc').notNull(),
+    /** always | referenced | off */
+    mode: text('mode').notNull(),
+
+    createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  },
+  (table) => [
+    index('voyager_file_user_idx').on(table.userId, table.createdAt),
+    // Uploading the same name twice replaces rather than duplicates.
+    uniqueIndex('voyager_file_user_name_idx').on(table.userId, table.name),
+  ]
+);
+
 export const savedObject = pgTable(
   'saved_object',
   {
