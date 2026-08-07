@@ -87,8 +87,10 @@ export function EventCard({
       <div className={styles.cardBody}>
         <div className={styles.cardWhen}>
           <span>{times.dayLabel}</span>
-          <span className={styles.cardDot}>·</span>
-          <span>{times.local}</span>
+          <span className={styles.cardDot} aria-hidden="true">
+            ·
+          </span>
+          <span className={styles.cardTime}>{times.local}</span>
         </div>
 
         {/*

@@ -66,7 +66,12 @@ try {
   console.log('\nSearch and views');
   await page.goto(EVENTS, { waitUntil: 'networkidle' });
   await page.getByLabel('Search events').fill('Limassol');
-  await page.getByRole('button', { name: 'Search' }).click();
+  // Scoped to the form: the site header has a Search button of its own, and an
+  // unqualified role lookup matches both.
+  await page
+    .locator('form[role="search"]')
+    .getByRole('button', { name: 'Search' })
+    .click();
   await page.waitForTimeout(800);
   check('search narrows the list', page.url().includes('q=Limassol'));
 

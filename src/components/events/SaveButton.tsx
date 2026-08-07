@@ -90,7 +90,7 @@ export function SaveButton({
         data-slug={slug}
         disabled={pending}
       >
-        <Star filled={isSaved} />
+        <Bookmark filled={isSaved} />
         {isSaved ? 'Saved' : 'Save'}
       </button>
     );
@@ -106,27 +106,27 @@ export function SaveButton({
       data-slug={slug}
       disabled={pending}
     >
-      <Star filled={isSaved} />
+      <Bookmark filled={isSaved} />
     </button>
   );
 }
 
 /* Filled versus outlined, not colour alone — the state has to survive a
    greyscale screen and colour-blind vision. */
-function Star({ filled }: { filled: boolean }) {
+function Bookmark({ filled }: { filled: boolean }) {
   return (
     <svg
-      width={16}
-      height={16}
+      width={15}
+      height={15}
       viewBox="0 0 24 24"
       fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
-      strokeWidth={1.8}
+      strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M12 3l2.6 5.3 5.9.9-4.3 4.2 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.2l5.9-.9z" />
+      <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
     </svg>
   );
 }
