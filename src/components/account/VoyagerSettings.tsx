@@ -3,7 +3,17 @@
 import { useState, useTransition } from 'react';
 import { saveVoyagerSettings } from '@/app/actions/voyagerSettings';
 import {
+  deleteVoyagerFile,
+  setVoyagerFileMode,
+  uploadVoyagerFile,
+  type StoredFile,
+} from '@/app/actions/voyagerFiles';
+import {
+  ACCEPTED_FILES,
   CITATION_OPTIONS,
+  FILE_MODE_LABEL,
+  FILE_REFUSALS,
+  checkFile,
   DEPTH_OPTIONS,
   MAX_CUSTOM_SOURCES,
   SOURCE_OPTIONS,
@@ -26,13 +36,16 @@ import styles from './Account.module.css';
  * thing somebody can act on.
  */
 
-type Props = { initial: Settings };
+type Props = { initial: Settings; initialFiles: StoredFile[] };
 
-export function VoyagerSettings({ initial }: Props) {
+export function VoyagerSettings({ initial, initialFiles }: Props) {
   const [settings, setSettings] = useState<Settings>(initial);
   const [draft, setDraft] = useState('');
   const [urlError, setUrlError] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [files, setFiles] = useState<StoredFile[]>(initialFiles);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [saving, startSaving] = useTransition();
 
   const commit = (next: Settings) => {
@@ -167,6 +180,93 @@ export function VoyagerSettings({ initial }: Props) {
             >
               Remove
             </button>
+          </div>
+        ))
+      )}
+
+      <h2 className={styles.h2}>Your files</h2>
+      <p className={styles.note}>
+        Notes, watchlists and theses Voyager can read as your standing context. Stored encrypted
+        against your account — {ACCEPTED_FILES.map((f) => f.ext).join(', ')}, up to 2 MB.
+      </p>
+
+      <div className={styles.row}>
+        <label className={styles.primary}>
+          Choose a file
+          <input
+            type="file"
+            className="tn-sr-only"
+            accept={ACCEPTED_FILES.map((f) => f.ext).join(',')}
+            disabled={uploading}
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              // Cleared straight away so the same file can be picked twice —
+              // a re-upload after a failure is the common case, not a rare one.
+              event.target.value = '';
+              if (!file) return;
+
+              const local = checkFile(file.name, file.size);
+              if (!local.ok) {
+                setFileError(FILE_REFUSALS[local.reason]);
+                return;
+              }
+
+              setFileError(null);
+              setUploading(true);
+              const body = await file.text();
+              const result = await uploadVoyagerFile(file.name, body).catch(() => null);
+              setUploading(false);
+
+              if (!result || result.status !== 'stored') {
+                setFileError(
+                  result?.status === 'rejected' ? result.because : 'That upload did not go through.'
+                );
+                return;
+              }
+              setFiles(result.files);
+            }}
+          />
+        </label>
+        {uploading && <span className={styles.note}>Reading it…</span>}
+      </div>
+
+      {fileError && (
+        <p className={styles.note} role="alert">
+          {fileError}
+        </p>
+      )}
+
+      {files.length === 0 ? (
+        <p className={styles.note}>No files yet. Voyager answers from the sources above.</p>
+      ) : (
+        files.map((file) => (
+          <div className={styles.row} key={file.id}>
+            <div>
+              <strong>{file.name}</strong>
+              <span className={styles.note}>
+                {(file.bytes / 1024).toFixed(0)} KB · added {file.at.slice(0, 10)}
+              </span>
+            </div>
+            <div>
+              {(Object.keys(FILE_MODE_LABEL) as (keyof typeof FILE_MODE_LABEL)[]).map((mode) => (
+                <button
+                  key={mode}
+                  className={`${styles.primary} ${
+                    file.mode === mode ? styles.chipPurple : styles.chipGrey
+                  }`}
+                  aria-pressed={file.mode === mode}
+                  onClick={async () => setFiles(await setVoyagerFileMode(file.id, mode))}
+                >
+                  {FILE_MODE_LABEL[mode]}
+                </button>
+              ))}
+              <button
+                className={styles.primary}
+                onClick={async () => setFiles(await deleteVoyagerFile(file.id))}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         ))
       )}

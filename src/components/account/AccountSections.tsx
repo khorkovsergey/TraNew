@@ -18,6 +18,7 @@ import {
 } from '@/content/account';
 import { Link } from '@/i18n/navigation';
 import { VoyagerSettings } from './VoyagerSettings';
+import type { StoredFile } from '@/app/actions/voyagerFiles';
 import { DEFAULT_SETTINGS, type VoyagerSettings as Settings } from '@/lib/voyager/settings';
 import type { ActivityView, WorkspaceView } from '@/lib/data/accountView';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
@@ -351,7 +352,13 @@ export function AccountWorkspace({ data }: { data: WorkspaceView }) {
  * the person's own preferences, and a panel that flashes the defaults before
  * the real values land is a panel that appears to have forgotten them.
  */
-export function AccountVoyager({ voyagerSettings }: { voyagerSettings?: Settings }) {
+export function AccountVoyager({
+  voyagerSettings,
+  voyagerFiles,
+}: {
+  voyagerSettings?: Settings;
+  voyagerFiles?: StoredFile[];
+}) {
   const [tab, setTab] = useState<(typeof VOYAGER_TABS)[number]['id']>('conversations');
   const [memoryOff, setMemoryOff] = useState<Record<string, boolean>>({});
   const [memoryDeleted, setMemoryDeleted] = useState<Record<string, boolean>>({});
@@ -483,7 +490,7 @@ export function AccountVoyager({ voyagerSettings }: { voyagerSettings?: Settings
         </div>
       )}
 
-      {tab === 'settings' && <VoyagerSettings initial={voyagerSettings ?? DEFAULT_SETTINGS} />}
+      {tab === 'settings' && <VoyagerSettings initial={voyagerSettings ?? DEFAULT_SETTINGS} initialFiles={voyagerFiles ?? []} />}
 
       {tab === 'usage' && (
         <div className={styles.card} style={{ marginTop: 18 }}>

@@ -6,6 +6,7 @@ import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
 import { requireUser } from '@/lib/session';
 import { loadVoyagerSettings } from '@/app/actions/voyagerSettings';
+import { listVoyagerFiles } from '@/app/actions/voyagerFiles';
 
 type Props = { params: Promise<{ locale: Locale }> };
 
@@ -29,11 +30,14 @@ export default async function Page({ params }: Props) {
 
   // Read on the server: a panel that flashes the defaults before the real
   // values land is a panel that appears to have forgotten them.
-  const voyagerSettings = await loadVoyagerSettings();
+  const [voyagerSettings, voyagerFiles] = await Promise.all([
+    loadVoyagerSettings(),
+    listVoyagerFiles(),
+  ]);
 
   return (
     <AccountLayout>
-      <AccountVoyager voyagerSettings={voyagerSettings} />
+      <AccountVoyager voyagerSettings={voyagerSettings} voyagerFiles={voyagerFiles} />
     </AccountLayout>
   );
 }
