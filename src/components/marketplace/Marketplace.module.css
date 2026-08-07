@@ -1302,3 +1302,13 @@
   display: flex;
   gap: 8px;
 }
+
+/* The brief's actual content in the sharing preview — consent to a heading is
+   not consent, so what goes is shown before it goes. */
+.previewBrief {
+  display: block;
+  margin: 3px 0 6px 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
