@@ -4003,14 +4003,22 @@ try {
      * out of bounds. The brief agrees and says not to fake execution, so the
      * limitation is stated on screen rather than left for somebody to discover.
      */
-    assert.match(output.CHART_PREVIEW_NOTICE, /does not execute Pine/i);
+    assert.match(output.CHART_PREVIEW_NOTICE, /Pine is never executed/i);
     /*
      * And it must not claim a drawing that is not there. The first version of
      * this line said the chart was "drawn from our own market data" while the
      * chart module renders no chart at all — a caveat that invents the thing it
      * is being careful about.
      */
-    assert.match(output.CHART_PREVIEW_NOTICE, /No chart is drawn here yet/i);
+    /*
+     * And it must describe the chart that is actually there. This line has been
+     * wrong in both directions: it once claimed a drawing that did not exist,
+     * and then went on saying none existed after the engine was wired in. What
+     * has to survive is the part somebody could be misled by — the prices are
+     * generated, and the code was never run.
+     */
+    assert.match(output.CHART_PREVIEW_NOTICE, /generated, not a market feed/i);
+    assert.ok(!/No chart is drawn/i.test(output.CHART_PREVIEW_NOTICE));
     assert.ok(!/^Drawn from/i.test(output.CHART_PREVIEW_NOTICE));
   });
 

@@ -111,12 +111,20 @@ export function keepOrOpen(plan: MinimalPlan | null, current: OutputTab): Output
 /**
  * What the Chart tab is allowed to claim.
  *
- * We cannot execute Pine Script. That engine belongs to TradingView and copying
- * it is out of bounds for this project — the brief agrees, and says not to fake
- * execution. So a chart shown next to generated code is a preview of what the
- * script is meant to produce, drawn from our own data, and it says so.
+ * Two things somebody could be misled by, and both are said.
  *
- * This is a product limitation to state on screen, not a detail to leave out.
+ * The series is generated. This is a demo portal and the bars come from the
+ * demo datafeed — deterministic per instrument, not what actually traded.
+ * Drawing invented prices without labelling them is exactly the failure the
+ * trust labels exist to prevent.
+ *
+ * And Pine is never executed. That engine belongs to TradingView and copying it
+ * is out of bounds here, so a chart beside generated code shows what the script
+ * is meant to produce rather than the result of running it.
+ *
+ * This line has now been wrong in both directions — it claimed a drawing before
+ * there was one, then went on denying the drawing after the engine was wired
+ * in. Whatever it says next has to be checked against what is on the screen.
  */
 export const CHART_PREVIEW_NOTICE =
-  'No chart is drawn here yet. Voyager decides what to plot — the instrument, the interval and the levels below — and the drawing itself comes from the Supercharts engine, which this tab is not yet joined to. Voyager does not execute Pine either, so when the picture arrives it will show what a script is meant to produce rather than the result of running one.';
+  'The series here is generated, not a market feed — this is a demo portal, and the shape is deterministic per instrument rather than what actually traded. Voyager decides what to plot and the Supercharts engine draws it. Pine is never executed, so a chart beside generated code shows what that script is meant to produce, not the result of running it.';

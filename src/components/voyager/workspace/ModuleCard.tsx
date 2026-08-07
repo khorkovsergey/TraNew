@@ -7,6 +7,7 @@ import {
   type Source,
   type VoyagerModule,
 } from '@/lib/voyager/workspace/contract';
+import { ChartCanvas } from './ChartCanvas';
 import styles from './VoyagerWorkspace.module.css';
 
 /**
@@ -338,12 +339,15 @@ function Body({ module, scopeState }: { module: VoyagerModule; scopeState?: Prop
           <p className={styles.cardBody}>
             {String(data.summary ?? '')}
           </p>
-          <p className={styles.cardNote}>
-          The chart renders through the Supercharts engine rather than a second one, so this card
-          is wired when the two are joined in phase 5. Its parameters —{' '}
-          <strong>{String(data.symbol ?? '')} {String(data.interval ?? '')}</strong> — are already
-            decided and shown in the assumptions.
-          </p>
+          {/*
+            The picture, drawn by the Supercharts engine rather than a second
+            one. The paragraph above it stays: a canvas is one opaque element,
+            and the series has to be readable without seeing it.
+          */}
+          <ChartCanvas
+            symbol={String(data.symbol ?? 'TSLA')}
+            interval={String(data.interval ?? '1D')}
+          />
         </>
       );
 
