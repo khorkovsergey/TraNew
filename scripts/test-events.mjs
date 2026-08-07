@@ -62,6 +62,7 @@ try {
       'src/lib/studies/registry.ts',
       'src/lib/voyager/answerSchema.ts',
       'src/lib/voyager/research.ts',
+      'src/lib/voyager/settings.ts',
       'src/lib/markets/sessions.ts',
       'src/content/markets.ts',
       'src/lib/investment/calculations/index.ts',
@@ -232,6 +233,7 @@ try {
   const chats = await load('chats', 'workspace');
   const output = await load('output', 'workspace');
   const research = await load('research', 'voyager');
+  const settings = await load('settings', 'voyager');
   const wc = await load('wealthConnections', 'content');
   const start = await load('path', 'start');
   const plan = await load('plan', 'start');
@@ -3720,6 +3722,110 @@ try {
     const plan = contract.parsePlan(scenarios.responseFor('what is a covered call'))?.plan;
     assert.ok(plan, 'the fallback did not parse');
     assert.match(plan.modules[0].title, /do not have a written explanation/i);
+  });
+
+  group('Voyager settings, which only an account can have');
+
+  check('a custom source is stored as a domain, not as one article', () => {
+    /*
+     * Somebody pasting a link to one piece means "look at this publication".
+     * Keeping the path would pin them to a page that goes stale.
+     */
+    assert.deepEqual(settings.checkUrl('https://www.ft.com/content/abc-123', []), {
+      ok: true, domain: 'ft.com',
+    });
+    assert.deepEqual(settings.checkUrl('reuters.com', []), { ok: true, domain: 'reuters.com' });
+  });
+
+  check('http is refused rather than quietly upgraded', () => {
+    // Rewriting what somebody typed is how you fetch a different thing than
+    // they asked for.
+    assert.deepEqual(settings.checkUrl('http://example.com', []), {
+      ok: false, reason: 'not-https',
+    });
+  });
+
+  check('the server does the fetching, so private hosts are refused', () => {
+    /*
+     * An allowlist entry of localhost or 169.254.169.254 is a request for our
+     * own infrastructure wearing the shape of a research preference.
+     */
+    for (const host of [
+      'localhost', '127.0.0.1', '10.0.0.5', '192.168.1.1', '169.254.169.254',
+      '172.16.0.1', 'box.local',
+    ]) {
+      const verdict = settings.checkUrl(host, []);
+      assert.equal(verdict.ok, false, host);
+      assert.equal(verdict.reason, 'not-public', host);
+    }
+  });
+
+  check('nonsense and duplicates are named separately', () => {
+    assert.equal(settings.checkUrl('', []).reason, 'empty');
+    assert.equal(settings.checkUrl('not a url at all', []).reason, 'not-a-url');
+    assert.equal(settings.checkUrl('ft.com', ['ft.com']).reason, 'duplicate');
+    assert.equal(settings.checkUrl('www.FT.com', ['ft.com']).reason, 'duplicate');
+    // Every refusal has something to say to the person.
+    for (const reason of Object.keys(settings.URL_REFUSALS)) {
+      assert.ok(settings.URL_REFUSALS[reason].length > 10, reason);
+    }
+  });
+
+  check('only file types the server can actually read are accepted', () => {
+    /*
+     * Offering a format we cannot parse produces a file that sits in the list
+     * contributing nothing, and looks identical to one that works.
+     */
+    assert.deepEqual(settings.checkFile('notes.txt', 100), { ok: true });
+    assert.deepEqual(settings.checkFile('watchlist.csv', 100), { ok: true });
+    assert.equal(settings.checkFile('thesis.pdf', 100).reason, 'type');
+    assert.equal(settings.checkFile('notes.txt', 0).reason, 'empty');
+    assert.equal(settings.checkFile('notes.txt', 5 * 1024 * 1024).reason, 'size');
+    // The PDF refusal says what to do instead rather than only saying no.
+    assert.match(settings.FILE_REFUSALS.type, /pasting the text works/i);
+  });
+
+  check('settings fall back per field, not wholesale', () => {
+    /*
+     * Somebody who set their answer depth two releases ago keeps it even if a
+     * field added since is missing. Throwing the record away over one bad key
+     * silently resets a deliberate choice.
+     */
+    const read = settings.parseSettings({ depth: 'detailed', citations: 'nonsense' });
+    assert.equal(read.depth, 'detailed');
+    assert.equal(read.citations, settings.DEFAULT_SETTINGS.citations);
+    assert.deepEqual(read.customSources, []);
+  });
+
+  check('an unknown source id is dropped, not carried', () => {
+    const read = settings.parseSettings({ sources: ['news', 'wiretap', 'filings'] });
+    assert.deepEqual(read.sources, ['news', 'filings']);
+  });
+
+  check('nothing readable at all falls all the way back', () => {
+    assert.deepEqual(settings.parseSettings(null), settings.DEFAULT_SETTINGS);
+    assert.deepEqual(settings.parseSettings('nope'), settings.DEFAULT_SETTINGS);
+  });
+
+  check('portfolio and watchlist access are not in the settings shape', () => {
+    /*
+     * They are consents, not preferences. Permission to read a wealth record is
+     * recorded where permissions are recorded and can be withdrawn and audited,
+     * not as a toggle among the others.
+     */
+    assert.ok(!('portfolio' in settings.DEFAULT_SETTINGS));
+    assert.ok(!('watchlists' in settings.DEFAULT_SETTINGS));
+  });
+
+  check('every source option explains itself', () => {
+    for (const option of settings.SOURCE_OPTIONS) {
+      assert.ok(option.label.length > 0, option.id);
+      // A toggle without a description is a guess.
+      assert.ok(option.detail.length > 15, option.id);
+    }
+    assert.ok(settings.DEFAULT_SOURCES.length > 0);
+    // Personal files are off until somebody turns them on.
+    assert.ok(!settings.DEFAULT_SOURCES.includes('personal-files'));
   });
 
   group('Looking things up costs money, so the gate is narrow');
