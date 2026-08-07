@@ -13,7 +13,14 @@ import {
 import { takeDraft } from '@/components/voyager/AskEntry';
 import { track } from '@/lib/events/analytics';
 import { ChatHistory } from './ChatHistory';
-import type { Chat } from '@/lib/voyager/workspace/chats';
+import {
+  CHATS_SESSION_KEY,
+  newChat,
+  parseChats,
+  serializeChats,
+  withMessage,
+  type Chat,
+} from '@/lib/voyager/workspace/chats';
 import {
   CHART_PREVIEW_NOTICE,
   keepOrOpen,
@@ -175,6 +182,15 @@ export function VoyagerWorkspace({
    * the code, not one click away from it.
    */
   const [tab, setTab] = useState<OutputTab>(() => openingTab(opening?.plan ?? null));
+  /*
+   * Every conversation this browser has had, and which one is on screen.
+   *
+   * Guests keep them in session storage and lose them with the tab — said out
+   * loud in the sidebar rather than discovered. Signing in is what makes a chat
+   * outlive the tab, which is the whole of the Save rule.
+   */
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [activeChat, setActiveChat] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(opening?.name ?? null);
   /*
    * The grant for this workspace. Null means nothing has been shared, which is
@@ -413,7 +429,87 @@ export function VoyagerWorkspace({
     setNotice('Saved to your workspaces.');
   }, [plan, request, name, saved, persist, personName]);
 
+  /*
+   * Restored once, on arrival, and through the parser rather than straight into
+   * state. Read in an effect because the server has no session storage: reading
+   * it during render would build markup that hydration then disagrees with.
+   */
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(CHATS_SESSION_KEY);
+      if (!raw) return;
+      const restored = parseChats(JSON.parse(raw));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (restored?.length) setChats(restored);
+    } catch {
+      /* Unreadable storage means starting empty, which is survivable. */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Writes a turn into the current chat, opening one if there is none.
+   *
+   * Called when an answer settles rather than when a question is sent: a chat
+   * whose row appears before it has anything in it is a list that fills up with
+   * blanks every time somebody changes their mind mid-sentence.
+   */
+  const remember = useCallback((question: string, answer: VoyagerPlan | null) => {
+    const at = new Date().toISOString();
+
+    setChats((current) => {
+      const id = activeRef.current ?? `chat_${at}`;
+      activeRef.current = id;
+
+      const existing = current.find((chat) => chat.id === id) ?? newChat(id, at);
+      const withQuestion = withMessage(existing, {
+        id: `${id}_q${existing.messages.length}`,
+        role: 'user',
+        text: question,
+        at,
+      });
+      const updated = answer
+        ? withMessage(withQuestion, {
+            id: `${id}_a${existing.messages.length}`,
+            role: 'assistant',
+            text: answer.because,
+            at,
+            output: answer,
+          })
+        : withQuestion;
+
+      const next = [updated, ...current.filter((chat) => chat.id !== id)];
+
+      try {
+        sessionStorage.setItem(CHATS_SESSION_KEY, JSON.stringify(serializeChats(next)));
+      } catch {
+        /* Private mode, or full. The list still works for this visit. */
+      }
+
+      return next;
+    });
+
+    setActiveChat(activeRef.current);
+  }, []);
+
   const tabs = useMemo(() => tabsFor(plan), [plan]);
+
+  /*
+   * The chat a turn belongs to, held in a ref rather than state.
+   *
+   * `remember` runs inside a state updater and needs the id that is current
+   * *now*, not the one captured when the callback was built — reading it from
+   * state would file the second question of a chat into a new one.
+   */
+  const activeRef = useRef<string | null>(null);
+
+  // An answer settling is what makes a turn worth keeping.
+  useEffect(() => {
+    if (!request || asking) return;
+    remember(request, plan);
+    // Keyed on the answer, not on every render of it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request, plan, asking]);
 
   /**
    * Whether the person picked this tab, as opposed to arriving on it.
@@ -457,6 +553,14 @@ export function VoyagerWorkspace({
     // about.
     setGrant(null);
     setTicked([]);
+    /*
+     * New means a new conversation, so the next answer opens its own chat
+     * rather than appending to the one just left. The chats themselves stay:
+     * New is not Delete, and somebody clicking it has not asked to lose
+     * anything.
+     */
+    activeRef.current = null;
+    setActiveChat(null);
     // `saved.length` is read above, so it belongs here: with an empty array the
     // count would be whatever it was when this component mounted.
   }, [saved.length]);
@@ -528,15 +632,22 @@ export function VoyagerWorkspace({
          * dialogue 264px to tell somebody about the thing they are looking at.
          */
         history={
-          saved.length > 0 ? (
+          chats.length > 0 ? (
             <ChatHistory
-              chats={saved.map(asChat)}
-              activeId={null}
+              chats={chats}
+              activeId={activeChat}
               signedIn={Boolean(personName)}
               now={new Date()}
               onOpen={(id) => {
-                const found = saved.find((workspace) => workspace.id === id);
-                if (found) send(found.request);
+                const found = chats.find((chat) => chat.id === id);
+                const asked = found?.messages.find((message) => message.role === 'user');
+                if (!asked) return;
+                // Re-opening puts that chat back in front and re-answers it —
+                // the answer is not carried in storage, and a row that opens a
+                // blank workspace is a row that lost the conversation.
+                activeRef.current = id;
+                setActiveChat(id);
+                send(asked.text);
               }}
               onNew={reset}
               onSignIn={() => setAuthPrompt(true)}
@@ -1261,28 +1372,4 @@ export function VoyagerWorkspace({
       </div>
     </div>
   );
-}
-
-/**
- * A saved workspace, read as a chat.
- *
- * The sidebar and the library are two views of one list rather than two lists.
- * A second store would be a second thing to keep in step, and the first time
- * they disagreed somebody would lose a conversation.
- *
- * The request is the transcript here: a workspace is one question and the
- * answer it produced, which is what its row in the sidebar stands for.
- */
-function asChat(workspace: SavedWorkspace): Chat {
-  return {
-    id: workspace.id,
-    title: workspace.name,
-    createdAt: workspace.createdAt,
-    updatedAt: workspace.updatedAt,
-    messages: [
-      { id: `${workspace.id}_q`, role: 'user', text: workspace.request, at: workspace.createdAt },
-    ],
-    // Written by the account copy, not by this view.
-    saved: true,
-  };
 }
