@@ -1,3 +1,4 @@
+import { retargetChart } from './retarget';
 import { findAnswer } from '../../explore/answers';
 import type { VoyagerPlan } from './contract';
 import {
@@ -883,7 +884,17 @@ export function responseFor(question: string): unknown | null {
   // The explanation depends on which concept was named, so it is built rather
   // than looked up. Everything else is one fixed response per scenario.
   if (id === 'explain') return explainFor(question);
-  return SCENARIOS[id] ?? null;
+
+  const scripted = SCENARIOS[id] ?? null;
+  /*
+   * The build scenario is written about Tesla. Asked to chart Nvidia it drew
+   * Tesla and said nothing about it — somebody else's stock wearing the right
+   * question. Retargeting takes the instrument that was named and drops the
+   * sentences that asserted Tesla's prices, because renaming those would be an
+   * invented claim about a real company.
+   */
+  if (id === 'chart' && scripted) return retargetChart(scripted as never, question);
+  return scripted;
 }
 
 export type { VoyagerPlan };

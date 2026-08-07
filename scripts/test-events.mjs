@@ -94,6 +94,7 @@ try {
       'src/lib/voyager/workspace/contract.ts',
       'src/lib/voyager/workspace/lifecycle.ts',
       'src/lib/voyager/workspace/scenarioData.ts',
+      'src/lib/voyager/workspace/retarget.ts',
       'src/lib/voyager/workspace/scenarios.ts',
       'src/lib/voyager/workspace/actions.ts',
       'src/lib/voyager/workspace/record.ts',
@@ -232,6 +233,7 @@ try {
   const credits = await load('credits', 'workspace');
   const chats = await load('chats', 'workspace');
   const output = await load('output', 'workspace');
+  const retarget = await load('retarget', 'workspace');
   const research = await load('research', 'voyager');
   const settings = await load('settings', 'voyager');
   const wc = await load('wealthConnections', 'content');
@@ -3899,6 +3901,63 @@ try {
     assert.match(research.PINE_NOT_EXECUTED, /test on a chart yourself/i);
     // Never phrased as a feature that is coming.
     assert.ok(!/coming soon|not yet|in a future/i.test(research.PINE_NOT_EXECUTED));
+  });
+
+  group('The chart plots what was asked for');
+
+  check('a company named in the question is recognised', () => {
+    assert.equal(retarget.symbolIn('Could you create a chart of Nvidia stocks for 2026?'), 'NVDA');
+    assert.equal(retarget.symbolIn('Build a Tesla chart with RSI'), 'TSLA');
+    assert.equal(retarget.symbolIn('chart NVDA please'), 'NVDA');
+    assert.equal(retarget.symbolIn('chart AMD'), 'AMD');
+    assert.equal(retarget.symbolIn('Build me a chart'), null);
+  });
+
+  check('the scripted answer follows the instrument', () => {
+    /*
+     * Asked for an Nvidia chart it drew Tesla and said nothing about it —
+     * somebody else's stock wearing the right question.
+     */
+    const plan = contract.parsePlan(
+      scenarios.responseFor('Could you create a chart of Nvidia stocks for 2026 year?')
+    )?.plan;
+    const chart = plan.modules.find((module) => module.kind === 'chart');
+    assert.equal(chart.data.symbol, 'NVDA');
+    assert.match(chart.title, /NVDA/);
+  });
+
+  check("and never puts one company's prices under another's name", () => {
+    /*
+     * The written summary named Tesla's year — "fell from roughly 372 in
+     * February to a low near 252 in late May". Renaming that is not a smaller
+     * problem than drawing the wrong stock; it is a fabricated claim about a
+     * real company.
+     */
+    const plan = contract.parsePlan(scenarios.responseFor('chart Nvidia'))?.plan;
+    const chart = plan.modules.find((module) => module.kind === 'chart');
+    const summary = String(chart.data.summary);
+
+    assert.ok(!/372|252|311/.test(summary), summary);
+    assert.ok(!/Tesla/i.test(summary), summary);
+    assert.match(summary, /generated/i);
+  });
+
+  check('the question it was written for is left alone', () => {
+    const plan = contract.parsePlan(
+      scenarios.responseFor('Build a Tesla chart with RSI and support levels')
+    )?.plan;
+    const chart = plan.modules.find((module) => module.kind === 'chart');
+    assert.equal(chart.data.symbol, 'TSLA');
+    // The written prose is accurate for Tesla, so it survives untouched.
+    assert.match(String(chart.data.summary), /372/);
+  });
+
+  check('a retargeted plan still passes the contract', () => {
+    // The whole point of the boundary: a rewrite that produced an unrenderable
+    // module would be refused here rather than on somebody's screen.
+    for (const question of ['chart Nvidia', 'chart AMD', 'chart Microsoft', 'Build a chart']) {
+      assert.ok(contract.parsePlan(scenarios.responseFor(question)), question);
+    }
   });
 
   group('The Output panel is four views of one answer');
