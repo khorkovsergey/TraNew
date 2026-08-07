@@ -43,6 +43,44 @@ const SERVICE_LABEL: Record<string, string> = {
 
 type Turn = { role: 'voyager' | 'you'; text: string };
 
+/** The four steps the mockup shows across the top of this flow. */
+const STEPS = ['Describe', 'Your brief', 'Experts', 'Book'];
+
+/**
+ * Where somebody is, with a tick behind them rather than a number.
+ *
+ * The mockup swaps the digit for a check once a step is done, which is the
+ * detail that stops this reading as "4 of 4 forms to fill" — a finished step
+ * should look finished.
+ */
+function Stepper({ at }: { at: number }) {
+  return (
+    <ol className={styles.stepper}>
+      {STEPS.map((label, index) => {
+        const n = index + 1;
+        const done = n < at;
+        return (
+          <li
+            key={label}
+            className={`${styles.step} ${n === at ? styles.stepOn : ''} ${done ? styles.stepDone : ''}`}
+            aria-current={n === at ? 'step' : undefined}
+          >
+            <span className={styles.stepNum}>{done ? '✓' : n}</span>
+            {label}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** Questions worth asking about a shortlist, not about the marketplace. */
+const ASK_ABOUT = [
+  'Which of these also covers tax?',
+  'Who is available soonest?',
+  'What is the difference between them?',
+];
+
 function opening(category: string | null): string {
   const known = category && SERVICE_LABEL[category];
   return known
@@ -190,10 +228,35 @@ export function ExpertConsultation({ category }: { category: string | null }) {
   if (showing === 'matches') {
     return (
       <>
+        <Stepper at={3} />
         <button className={styles.editRequest} onClick={() => setShowing('brief')}>
           ← Back to your brief
         </button>
         <Matches />
+
+        {/*
+          * Voyager stays reachable after the matching, as the mockup has it.
+          * The questions are about the shortlist on screen, which is the moment
+          * somebody actually has one — before it, "ask about these experts"
+          * refers to nothing.
+          */}
+        <section className={styles.askRow} aria-label="Ask Voyager about these experts">
+          <span className={styles.matchedOn}>Ask Voyager about these experts</span>
+          <div className={styles.briefChips}>
+            {ASK_ABOUT.map((question) => (
+              <button
+                key={question}
+                className={styles.askChip}
+                onClick={() => {
+                  setShowing('brief');
+                  setDraft(question);
+                }}
+              >
+                {question}
+              </button>
+            ))}
+          </div>
+        </section>
       </>
     );
   }
@@ -201,6 +264,8 @@ export function ExpertConsultation({ category }: { category: string | null }) {
   return (
     <div className={styles.consultation}>
       <section className={styles.dialogue} aria-label="Consultation">
+        <Stepper at={stage === 'ready' ? 2 : 1} />
+
         <div className={styles.stageRow}>
           {(['understanding', 'clarifying', 'ready'] as const).map((step) => (
             <span

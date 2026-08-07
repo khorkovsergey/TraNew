@@ -1343,3 +1343,79 @@
   text-transform: uppercase;
   color: var(--tn-text-faint);
 }
+
+/* ------------------------------------------------------ The flow's stepper */
+
+.stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tn-text-faint);
+}
+
+.stepNum {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.stepOn {
+  color: var(--tn-text);
+}
+
+.stepOn .stepNum {
+  border-color: var(--tn-mint);
+  color: var(--tn-mint);
+}
+
+/* A finished step looks finished, so this does not read as forms left to fill. */
+.stepDone {
+  color: var(--tn-text-secondary);
+}
+
+.stepDone .stepNum {
+  border-color: var(--tn-green);
+  color: var(--tn-green);
+}
+
+.askRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--tn-border-card);
+}
+
+.askChip {
+  padding: 7px 13px;
+  border: 1px solid var(--tn-border-control);
+  border-radius: var(--tn-radius-chip);
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tn-text-secondary);
+  cursor: pointer;
+}
+
+.askChip:hover {
+  border-color: var(--tn-mint);
+  color: var(--tn-text);
+}
