@@ -61,6 +61,7 @@ try {
       'src/lib/events/related.ts',
       'src/lib/studies/registry.ts',
       'src/lib/voyager/answerSchema.ts',
+      'src/lib/voyager/research.ts',
       'src/lib/markets/sessions.ts',
       'src/content/markets.ts',
       'src/lib/investment/calculations/index.ts',
@@ -230,6 +231,7 @@ try {
   const credits = await load('credits', 'workspace');
   const chats = await load('chats', 'workspace');
   const output = await load('output', 'workspace');
+  const research = await load('research', 'voyager');
   const wc = await load('wealthConnections', 'content');
   const start = await load('path', 'start');
   const plan = await load('plan', 'start');
@@ -3718,6 +3720,79 @@ try {
     const plan = contract.parsePlan(scenarios.responseFor('what is a covered call'))?.plan;
     assert.ok(plan, 'the fallback did not parse');
     assert.match(plan.modules[0].title, /do not have a written explanation/i);
+  });
+
+  group('Looking things up costs money, so the gate is narrow');
+
+  check('a question about an event opens it', () => {
+    for (const q of [
+      'What do analysts forecast for Tesla?',
+      'Summarize how the US stock market closed today',
+      'Why has gold risen recently?',
+      'What were the latest earnings for Nvidia?',
+      'Any news on the Fed this week?',
+    ]) {
+      assert.equal(research.wantsSearch(q, true), true, q);
+    }
+  });
+
+  check('a question about how something works does not', () => {
+    /*
+     * "What is a drawdown" is answered from a table written in this repository.
+     * Paying to search the open web for it would spend somebody's money to get
+     * a worse answer.
+     */
+    for (const q of [
+      'What is a drawdown?',
+      'Explain diversification',
+      'What is the difference between an ETF and a stock?',
+      'How does compounding work?',
+    ]) {
+      assert.equal(research.wantsSearch(q, false || true), false, q);
+    }
+  });
+
+  check('a definition wearing a recent-sounding word is still a definition', () => {
+    // "current" is in the fresh list, and this is not a research question.
+    assert.equal(research.wantsSearch('What is the current ratio?', true), false);
+    assert.equal(research.wantsSearch('What does a price target mean?', true), false);
+  });
+
+  check('the operator switch beats everything', () => {
+    // A feature billed per use needs a stop that does not require a deploy.
+    assert.equal(research.wantsSearch('What happened in markets today?', false), false);
+  });
+
+  check('one answer cannot run away with the bill', () => {
+    assert.equal(typeof research.MAX_SEARCHES, 'number');
+    assert.ok(research.MAX_SEARCHES > 0 && research.MAX_SEARCHES <= 6, research.MAX_SEARCHES);
+  });
+
+  group('Pine is written, never run');
+
+  check('a Pine request is recognised', () => {
+    for (const q of [
+      'Build a Pine Script EMA crossover indicator',
+      'Write me an indicator for RSI',
+      'Convert this pine script to a strategy',
+    ]) {
+      assert.equal(research.mentionsPine(q), true, q);
+    }
+    assert.equal(research.mentionsPine('What is a drawdown?'), false);
+  });
+
+  check('and the limit is stated as permanent, not as unfinished', () => {
+    /*
+     * The engine that runs Pine belongs to TradingView and this project does
+     * not reimplement it. Somebody who believes the code was tested against
+     * live data before they saw it is somebody who will trade on an untested
+     * script.
+     */
+    assert.match(research.PINE_NOT_EXECUTED, /cannot run it/i);
+    assert.match(research.PINE_NOT_EXECUTED, /TradingView/);
+    assert.match(research.PINE_NOT_EXECUTED, /test on a chart yourself/i);
+    // Never phrased as a feature that is coming.
+    assert.ok(!/coming soon|not yet|in a future/i.test(research.PINE_NOT_EXECUTED));
   });
 
   group('The Output panel is four views of one answer');

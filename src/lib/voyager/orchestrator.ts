@@ -4,6 +4,7 @@ import { analyze } from '@/lib/investment/graph';
 import { summarise } from '@/lib/investment/summary';
 import { clampSpec } from '@/lib/studies/registry';
 import { ANSWER_SCHEMA, CONTENT_TYPES } from './answerSchema';
+import { MAX_SEARCHES, wantsSearch } from './research';
 import { scriptedAnswer } from './scenarios';
 import {
   VOYAGER_ACTIONS,
@@ -63,6 +64,14 @@ export function isModelConfigured(): boolean {
 const RULES = `You are Voyager, the assistant built into the TradingNew investment research platform.
 
 You explain, analyse, navigate and help people act. You are talking to someone who is researching investments — often a beginner. Your job is to leave them better informed and more capable of deciding for themselves.
+
+## Pine Script: you write it, you never run it
+
+You can write, explain, modify and debug Pine Script. You cannot execute it, and there is no version of this platform where you can — running it needs TradingView's own engine, which this product does not reimplement.
+
+So whenever you produce or discuss Pine, say plainly that it has not been run. Word it as a permanent limit, never as a feature that has not arrived: not "not yet supported", but "I cannot run it here". Tell the person the code is a draft to review and test on a chart themselves, and never describe it as verified, backtested or checked against live data. Somebody who believes it was tested is somebody who will trade on an untested script.
+
+If they ask you to run, backtest or execute a script, say that you cannot and offer what you can do instead: write it, walk through what each line does, or explain what to look for when they test it.
 
 ## How you talk about markets
 
@@ -308,14 +317,47 @@ export async function askVoyager(options: {
     return scripted();
   }
 
+  /*
+   * Whether this question is worth going to look something up for.
+   *
+   * Search runs on Anthropic's infrastructure — nothing is fetched from the
+   * browser, which is what §11 of the brief asks for — and it is billed per
+   * search on top of tokens. So it opens for questions that turn on something
+   * that happened and stays shut for questions about how things work, which do
+   * not change and are already answered from this repository.
+   *
+   * `VOYAGER_WEB_SEARCH=off` stops it without a deploy. A feature that spends
+   * money per use needs a switch that is not a git push.
+   */
+  const searching = wantsSearch(question, process.env.VOYAGER_WEB_SEARCH !== 'off');
+
   try {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 8000,
+      ...(searching
+        ? {
+            tools: [
+              {
+                type: 'web_search_20260209' as const,
+                name: 'web_search' as const,
+                max_uses: MAX_SEARCHES,
+              },
+            ],
+          }
+        : {}),
       system: [
         // Stable across every request, so it caches; the volatile brief follows it.
         { type: 'text', text: RULES, cache_control: { type: 'ephemeral' } },
         { type: 'text', text: requestBrief(context, tier, sources, allowed) },
+        ...(searching
+          ? [
+              {
+                type: 'text' as const,
+                text: `You may search the web for this question. Use it for facts that changed — prices, filings, forecasts, dates — and not for definitions. Every claim that came from a search must name where it came from in the sources field. Do not present a searched claim as more certain than the source made it, and if the searches do not answer the question, say what is missing rather than filling the gap.`,
+              },
+            ]
+          : []),
       ],
       output_config: {
         effort: EFFORT,
@@ -342,7 +384,17 @@ export async function askVoyager(options: {
       };
     }
 
-    const block = response.content.find((entry) => entry.type === 'text');
+    /*
+     * The last text block, not the first.
+     *
+     * Without tools there is exactly one and the distinction is academic. With
+     * web search the content array also carries the search calls and their
+     * results, and any text the model wrote on the way — so `find` would return
+     * a sentence about what it was about to look up, and the answer would be
+     * dropped for failing to parse as JSON.
+     */
+    const texts = response.content.filter((entry) => entry.type === 'text');
+    const block = texts[texts.length - 1];
     if (!block || block.type !== 'text') {
       return scripted();
     }
