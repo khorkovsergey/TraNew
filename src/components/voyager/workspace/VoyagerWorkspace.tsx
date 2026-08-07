@@ -14,6 +14,15 @@ import { takeDraft } from '@/components/voyager/AskEntry';
 import { track } from '@/lib/events/analytics';
 import { ChatHistory } from './ChatHistory';
 import type { Chat } from '@/lib/voyager/workspace/chats';
+import {
+  CHART_PREVIEW_NOTICE,
+  keepOrOpen,
+  modulesFor,
+  openingTab,
+  TAB_LABEL,
+  tabsFor,
+  type OutputTab,
+} from '@/lib/voyager/workspace/output';
 import { GENERIC_CONTEXT } from '@/lib/voyager/context';
 import { contextLabel, parseContext } from '@/lib/voyager/session';
 import type { VoyagerAnswer } from '@/lib/voyager/types';
@@ -160,6 +169,12 @@ export function VoyagerWorkspace({
   const [libraryOpen, setLibraryOpen] = useState(false);
   /** Open when a guest asked to save. The conversation stays behind it. */
   const [authPrompt, setAuthPrompt] = useState(false);
+  /*
+   * The Output tab being read. Initialised from the opening answer rather than
+   * hardcoded to Summary: a seeded question that produced Pine should land on
+   * the code, not one click away from it.
+   */
+  const [tab, setTab] = useState<OutputTab>(() => openingTab(opening?.plan ?? null));
   const [name, setName] = useState<string | null>(opening?.name ?? null);
   /*
    * The grant for this workspace. Null means nothing has been shared, which is
@@ -397,6 +412,23 @@ export function VoyagerWorkspace({
     track({ name: 'voyager_chat_saved' });
     setNotice('Saved to your workspaces.');
   }, [plan, request, name, saved, persist, personName]);
+
+  const tabs = useMemo(() => tabsFor(plan), [plan]);
+
+  /**
+   * Whether the person picked this tab, as opposed to arriving on it.
+   *
+   * The distinction decides what a new answer does. A tab somebody chose is
+   * kept while it still holds something — that is their decision and a new
+   * answer should not overrule it. A tab they merely defaulted onto is not a
+   * decision, and holding it is how "build me an indicator" lands on Summary
+   * because Summary happened to be where the workspace started.
+   */
+  const chosen = useRef(false);
+
+  useEffect(() => {
+    setTab((current) => (chosen.current ? keepOrOpen(plan, current) : openingTab(plan)));
+  }, [plan]);
 
   useEffect(() => {
     if (!plan || !isRunning(run)) return;
@@ -661,17 +693,76 @@ export function VoyagerWorkspace({
         canvas={
           plan ? (
             <>
-              {plan.modules.slice(0, run.revealed).map((module) => (
-                <ModuleCard
-                  key={module.id}
-                  module={module}
-                  sources={plan.sources}
-                  onAction={onAction}
-                  scopeState={module.kind === 'permission-request' ? { ticked, setTicked } : undefined}
-                />
-              ))}
+              {/*
+                * Four views of one answer, not four places an answer is written
+                * to. Which tabs exist is computed from the plan the contract
+                * already validated, so a tab is never present and empty — that
+                * reads as a feature that failed rather than one this question
+                * did not need.
+                */}
+              {tabs.length > 1 && (
+                <div className={styles.outputTabs} role="tablist" aria-label="Output">
+                  {tabs.map((id) => (
+                    <button
+                      key={id}
+                      role="tab"
+                      aria-selected={id === tab}
+                      className={`${styles.outputTab} ${id === tab ? styles.outputTabOn : ''}`}
+                      onClick={() => {
+                        chosen.current = true;
+                        setTab(id);
+                      }}
+                    >
+                      {TAB_LABEL[id]}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-              {run.revealed === 0 && (
+              {tab === 'sources' ? (
+                <ul className={styles.sourceList}>
+                  {plan.sources.map((source) => (
+                    <li key={source.id}>
+                      <span>
+                        <strong>{source.kind}</strong> · {source.provider} ·{' '}
+                        {source.at.slice(0, 16).replace('T', ' ')} UTC
+                        {source.delayed && ' · delayed'}
+                      </span>
+                      <span className={styles.sourceDetail}>{source.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <>
+                  {/*
+                    * Said before the chart, not under it. We cannot run Pine —
+                    * that engine is TradingView's — so a chart beside generated
+                    * code is a preview of the intent, and hiding that would be
+                    * the fabrication the brief's own §15 warns against.
+                    */}
+                  {tab === 'chart' && (
+                    <p className={styles.previewNotice} role="note">
+                      {CHART_PREVIEW_NOTICE}
+                    </p>
+                  )}
+
+                  {modulesFor<VoyagerModule>(plan, tab)
+                    .slice(0, tab === 'summary' ? run.revealed : undefined)
+                    .map((module) => (
+                      <ModuleCard
+                        key={module.id}
+                        module={module}
+                        sources={plan.sources}
+                        onAction={onAction}
+                        scopeState={
+                          module.kind === 'permission-request' ? { ticked, setTicked } : undefined
+                        }
+                      />
+                    ))}
+                </>
+              )}
+
+              {tab === 'summary' && run.revealed === 0 && (
                 <p className={styles.zoneStubNote}>{statusFor(run, plan)}</p>
               )}
             </>

@@ -2098,3 +2098,50 @@
     display: none;
   }
 }
+
+/* ================================================== The Output panel's tabs */
+
+.outputTabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--tn-border-card);
+}
+
+.outputTab {
+  padding: 9px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text-muted);
+  cursor: pointer;
+  transition: color var(--tn-transition-fast), border-color var(--tn-transition-fast);
+}
+
+.outputTab:hover {
+  color: var(--tn-text);
+}
+
+/* Marked by an underline as well as colour, so it survives a colourblind read. */
+.outputTabOn {
+  color: var(--tn-text);
+  border-bottom-color: var(--tn-mint);
+}
+
+/*
+ * The chart caveat. Amber, which in this product means "opinion or limitation",
+ * never mint and never red — this is neither a success nor an error.
+ */
+.previewNotice {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--tn-border-card);
+  border-left: 2px solid var(--tn-amber-text);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--tn-text-muted);
+}

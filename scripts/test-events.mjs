@@ -98,6 +98,7 @@ try {
       'src/lib/voyager/workspace/scopes.ts',
       'src/lib/voyager/workspace/credits.ts',
       'src/lib/voyager/workspace/chats.ts',
+      'src/lib/voyager/workspace/output.ts',
       'src/content/wealthConnections.ts',
       'src/lib/start/path.ts',
       'src/lib/start/plan.ts',
@@ -228,6 +229,7 @@ try {
   const scopes = await load('scopes', 'workspace');
   const credits = await load('credits', 'workspace');
   const chats = await load('chats', 'workspace');
+  const output = await load('output', 'workspace');
   const wc = await load('wealthConnections', 'content');
   const start = await load('path', 'start');
   const plan = await load('plan', 'start');
@@ -3716,6 +3718,112 @@ try {
     const plan = contract.parsePlan(scenarios.responseFor('what is a covered call'))?.plan;
     assert.ok(plan, 'the fallback did not parse');
     assert.match(plan.modules[0].title, /do not have a written explanation/i);
+  });
+
+  group('The Output panel is four views of one answer');
+
+  const planWith = (kinds, sources = 1) => ({
+    modules: kinds.map((kind) => ({ kind })),
+    sources: Array.from({ length: sources }, (_, i) => ({ id: `s${i}` })),
+  });
+
+  check('a tab appears only when the answer has something to put on it', () => {
+    /*
+     * A tab that is present but empty reads as a feature that failed rather
+     * than one this question did not need.
+     */
+    assert.deepEqual(output.tabsFor(planWith(['text-insight'], 0)), ['summary']);
+    assert.deepEqual(output.tabsFor(planWith(['text-insight'], 2)), ['summary', 'sources']);
+    assert.deepEqual(output.tabsFor(planWith(['text-insight', 'chart'], 1)), [
+      'summary', 'chart', 'sources',
+    ]);
+  });
+
+  check('Summary is not automatic, because an empty Summary opens first', () => {
+    /*
+     * A request for an indicator produces one module and it is the code. A
+     * Summary tab there is an empty panel wearing a label, and because it sorts
+     * first it is the one that opens — which is how "build me an indicator"
+     * ends on a blank screen with the answer one click away. Found in a
+     * browser, not in this file, which is why the assertion exists now.
+     */
+    assert.deepEqual(output.tabsFor(planWith(['pine-editor'], 1)), ['pine', 'sources']);
+    assert.deepEqual(output.tabsFor(planWith(['chart'], 0)), ['chart']);
+  });
+
+  check('but there is always at least one tab to be on', () => {
+    assert.deepEqual(output.tabsFor(null), ['summary']);
+    assert.deepEqual(output.tabsFor(planWith([], 0)), ['summary']);
+    // Sources alone is evidence with nothing to be evidence for.
+    assert.deepEqual(output.tabsFor(planWith([], 3)), ['summary', 'sources']);
+  });
+
+  check('an unknown module kind shows up rather than vanishing', () => {
+    /*
+     * The default is "show it". A new module kind landing on Summary is a
+     * misfiling; one that disappears until this table is updated is lost work.
+     */
+    assert.equal(output.tabOf('something-invented-later'), 'summary');
+    assert.deepEqual(
+      output.modulesFor(planWith(['something-invented-later']), 'summary').map((m) => m.kind),
+      ['something-invented-later']
+    );
+  });
+
+  check('modules are filed by kind, and Sources is not made of modules', () => {
+    const plan = planWith(['text-insight', 'chart', 'pine-editor', 'heatmap', 'metric-row']);
+    assert.deepEqual(
+      output.modulesFor(plan, 'summary').map((m) => m.kind),
+      ['text-insight', 'metric-row']
+    );
+    assert.deepEqual(output.modulesFor(plan, 'chart').map((m) => m.kind), ['chart', 'heatmap']);
+    assert.deepEqual(output.modulesFor(plan, 'pine').map((m) => m.kind), ['pine-editor']);
+    // Sources come from the plan's own list, which the contract already validated.
+    assert.deepEqual(output.modulesFor(plan, 'sources'), []);
+  });
+
+  check('it opens on the most specific thing the answer produced', () => {
+    /*
+     * Somebody who asked for an indicator wants the code. Opening on a summary
+     * of the code is an extra click on the way to what was asked for.
+     */
+    assert.equal(output.openingTab(planWith(['text-insight', 'pine-editor', 'chart'])), 'pine');
+    assert.equal(output.openingTab(planWith(['text-insight', 'chart'])), 'chart');
+    assert.equal(output.openingTab(planWith(['text-insight'])), 'summary');
+  });
+
+  check('Sources is never the opening tab', () => {
+    // It is the evidence for an answer, not the answer.
+    for (const kinds of [['text-insight'], ['chart'], ['pine-editor'], []]) {
+      assert.notEqual(output.openingTab(planWith(kinds, 5)), 'sources');
+    }
+  });
+
+  check('a follow-up keeps the tab when it still holds something', () => {
+    const before = planWith(['pine-editor'], 1);
+    const after = planWith(['pine-editor', 'chart'], 1);
+    assert.equal(output.keepOrOpen(after, 'pine'), 'pine');
+    assert.equal(output.keepOrOpen(after, 'sources'), 'sources');
+    assert.equal(output.keepOrOpen(before, 'chart'), 'pine', 'chart is gone; fall to the opening tab');
+    assert.equal(output.keepOrOpen(planWith(['text-insight'], 0), 'sources'), 'summary');
+  });
+
+  check('every tab has a label and a place in the order', () => {
+    for (const tab of output.TAB_ORDER) {
+      assert.equal(typeof output.TAB_LABEL[tab], 'string');
+      assert.ok(output.TAB_LABEL[tab].length > 0, tab);
+    }
+    assert.equal(output.TAB_ORDER.length, Object.keys(output.TAB_LABEL).length);
+  });
+
+  check('the chart preview says it is not the script running', () => {
+    /*
+     * We cannot execute Pine — that engine is TradingView's and copying it is
+     * out of bounds. The brief agrees and says not to fake execution, so the
+     * limitation is stated on screen rather than left for somebody to discover.
+     */
+    assert.match(output.CHART_PREVIEW_NOTICE, /not the output of running the script/i);
+    assert.match(output.CHART_PREVIEW_NOTICE, /does not execute Pine/i);
   });
 
   group('Many chats instead of one');
