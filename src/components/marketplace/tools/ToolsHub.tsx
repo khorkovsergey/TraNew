@@ -3,7 +3,6 @@ import { SUPERCHART_PRESETS } from '@/content/superchartCatalog';
 import { Icon } from '@/components/ui/Icon';
 import { Link } from '@/i18n/navigation';
 import { ChartPreview } from './ChartPreview';
-import { ToolsRail } from './ToolsRail';
 import styles from './Tools.module.css';
 
 /**
@@ -26,10 +25,7 @@ export function ToolsHub() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.shell}>
-        <ToolsRail active="tools" />
-
-        <div className={styles.main}>
+      <div className={styles.main}>
           <div className={styles.breadcrumb}>
             <Link href="/marketplace">Marketplace</Link>
             <span className={styles.breadcrumbSep}>/</span>
@@ -143,7 +139,6 @@ export function ToolsHub() {
                 is the workspace, free with your plan.
               </div>
             </div>
-          </div>
         </div>
       </div>
     </div>

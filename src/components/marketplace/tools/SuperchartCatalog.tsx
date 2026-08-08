@@ -11,7 +11,6 @@ import { Icon } from '@/components/ui/Icon';
 import { Link } from '@/i18n/navigation';
 import { INDICATORS } from '@/lib/superchart/indicators';
 import { ChartPreview } from './ChartPreview';
-import { ToolsRail } from './ToolsRail';
 import styles from './Tools.module.css';
 
 /**
@@ -117,10 +116,7 @@ export function SuperchartCatalog({
 
   return (
     <div className={styles.page}>
-      <div className={styles.shell}>
-        <ToolsRail active="supercharts" />
-
-        <div className={styles.main}>
+      <div className={styles.main}>
           <div className={styles.breadcrumb}>
             <Link href="/marketplace">Marketplace</Link>
             <span className={styles.breadcrumbSep}>/</span>
@@ -272,7 +268,6 @@ export function SuperchartCatalog({
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }

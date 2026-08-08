@@ -7,7 +7,6 @@ import {
   PurchaseDone,
 } from '@/components/marketplace/tools/CheckoutDialog';
 import { ScriptDetail } from '@/components/marketplace/tools/ScriptDetail';
-import { ToolsRail } from '@/components/marketplace/tools/ToolsRail';
 import { SpaceBackdrop } from '@/components/shell/SpaceBackdrop';
 import { findProduct } from '@/content/chartMarket';
 import { Link } from '@/i18n/navigation';
@@ -100,10 +99,7 @@ export default async function ChartMarketPage({ params, searchParams }: Props) {
       <SpaceBackdrop tone={4} />
 
       <div className={styles.page}>
-        <div className={styles.shell}>
-          <ToolsRail active="chart-market" />
-
-          <div className={styles.main}>
+        <div className={styles.main}>
             <div className={styles.breadcrumb}>
               <Link href="/marketplace">Marketplace</Link>
               <span className={styles.breadcrumbSep}>/</span>
@@ -135,7 +131,6 @@ export default async function ChartMarketPage({ params, searchParams }: Props) {
                 ownedIds={ownedIds}
               />
             )}
-          </div>
         </div>
       </div>
 
