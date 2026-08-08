@@ -6,6 +6,7 @@ import { SearchForm } from '@/components/shared/SearchForm';
 import { Icon } from '@/components/ui/Icon';
 import { Link, usePathname } from '@/i18n/navigation';
 import { AuthedActions } from './AuthedActions';
+import { ExploreIcon, ExploreMenuSprite } from './ExploreMenuIcons';
 import { useLoginModal } from './LoginModalProvider';
 import { MENUS, type MenuEntry, type MenuKey } from './menu';
 import { AUTHED_NAV, GUEST_NAV, activeNavKey } from './nav';
@@ -14,9 +15,14 @@ import styles from './Header.module.css';
 /**
  * The shared shell.
  *
- * Marketplace is the only dropdown left. The other five headings became
- * destinations, which is the point of the redesign: a beginner should be able to
- * read the top of the page rather than navigate it.
+ * Four headings carry a dropdown and the rest are plain destinations, which is
+ * the point of the redesign: a beginner should be able to read the top of the
+ * page rather than navigate it.
+ *
+ * Explore is the widest of the four and the only one whose entries do not click
+ * — see `menu.ts`. Everything that makes it different is a class here, not a
+ * second component: one panel that can be a list, three columns, or a
+ * full-screen drawer is easier to keep honest than three that drift apart.
  */
 export function Header() {
   const t = useTranslations('header');
@@ -30,19 +36,43 @@ export function Header() {
 
   const triggers = useRef<Partial<Record<MenuKey, HTMLButtonElement | null>>>({});
   const panelRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const [panelLeft, setPanelLeft] = useState<number | null>(null);
+  const [panelTop, setPanelTop] = useState<number | null>(null);
 
   const items = authed ? AUTHED_NAV : GUEST_NAV;
   const active = activeNavKey(items, pathname);
+
+  /*
+   * Explore is the wide one: three columns across the page rather than a list
+   * under its own label, because it is read as a whole and a panel that hangs
+   * off one trigger cannot hold it.
+   */
+  const mega = openMenu === 'explore';
 
   /*
    * A dropdown belongs under the thing that opened it. The panel is fixed, so
    * that means measuring the trigger and writing a pixel `left` — and clamping
    * it, because Marketplace sits near the right edge and its panel would
    * otherwise hang off the screen at narrow widths.
+   *
+   * The top is measured too, and was not before: below 860px the header wraps
+   * to two rows, and a panel pinned at a hardcoded 64px opened across the
+   * navigation it belongs to.
+   *
+   * Both are handed to CSS as custom properties rather than as inline `top` and
+   * `left`. An inline value wins over every rule in the stylesheet, including
+   * the media query that turns this panel into a full-screen drawer on a phone —
+   * a variable lets that rule simply not read it.
    */
   const placePanel = useCallback(() => {
     if (!openMenu) return;
+
+    const head = headerRef.current?.getBoundingClientRect();
+    if (head) setPanelTop(Math.round(head.bottom + 8));
+
+    if (mega) return;
+
     const anchor = triggers.current[openMenu]?.getBoundingClientRect();
     const panel = panelRef.current;
     if (!anchor || !panel) return;
@@ -53,7 +83,7 @@ export function Header() {
     const rightmost = Math.max(margin, window.innerWidth - width - margin);
 
     setPanelLeft(Math.round(Math.min(Math.max(centred, margin), rightmost)));
-  }, [openMenu]);
+  }, [openMenu, mega]);
 
   // Before paint, so the panel is never seen at the position it starts from.
   useLayoutEffect(placePanel, [placePanel]);
@@ -105,26 +135,43 @@ export function Header() {
   }, [openMenu, searchOpen, closeAll]);
 
   const renderEntry = (entry: MenuEntry, index: number) => {
+    const row = `${styles.menuItem} ${entry.icon ? styles.menuItemWide : ''}`;
+
     const body = (
       <>
-        <div className={styles.menuItemLabel}>
-          {entry.label}
-          {/* Said before the click rather than after it. */}
-          {entry.soon && <span className={styles.soon}>Soon</span>}
-        </div>
-        {entry.sub && <div className={styles.menuItemSub}>{entry.sub}</div>}
+        {entry.icon && (
+          <span className={styles.menuIcon}>
+            <ExploreIcon name={entry.icon} />
+          </span>
+        )}
+        <span className={styles.menuItemText}>
+          <span className={styles.menuItemLabel}>
+            {entry.label}
+            {/*
+              * Said before the click rather than after it — and after the label
+              * rather than before, so the labels down a column stay aligned on
+              * their first letter.
+              */}
+            {entry.soon && (
+              <span className={styles.soon}>
+                {/* Two spellings, one shown at a time. A 390px row has no width
+                    for the long one, and CSS cannot rewrite text. */}
+                <span className={styles.soonLong}>Coming soon</span>
+                <span className={styles.soonShort}>Soon</span>
+              </span>
+            )}
+          </span>
+          {entry.sub && <span className={styles.menuItemSub}>{entry.sub}</span>}
+        </span>
       </>
     );
 
     // Named, and that is all. Not a link, not a button, not focusable — the
-    // "Soon" badge is the whole entry.
+    // badge is the whole entry, and it stays fully legible: a row nobody can
+    // read is not a roadmap.
     if (entry.kind === 'inert') {
       return (
-        <div
-          key={index}
-          className={`${styles.menuItem} ${styles.menuItemInert}`}
-          aria-disabled="true"
-        >
+        <div key={index} className={`${row} ${styles.menuItemInert}`} aria-disabled="true">
           {body}
         </div>
       );
@@ -134,7 +181,7 @@ export function Header() {
       return (
         <Link
           key={index}
-          className={styles.menuItem}
+          className={row}
           href={{ pathname: entry.href, params: entry.params, query: entry.query } as never}
           onClick={closeAll}
         >
@@ -148,7 +195,7 @@ export function Header() {
       return (
         <button
           key={index}
-          className={styles.menuItem}
+          className={row}
           onClick={() => {
             closeAll();
             openLogin();
@@ -160,7 +207,7 @@ export function Header() {
     }
 
     return (
-      <Link key={index} className={styles.menuItem} href="/research" onClick={closeAll}>
+      <Link key={index} className={row} href="/research" onClick={closeAll}>
         {body}
       </Link>
     );
@@ -172,7 +219,7 @@ export function Header() {
           menu. The scrim stays outside it: a full-viewport child would mean the
           pointer never leaves, and the close would never fire. */}
       <div className={styles.headerDock} onPointerLeave={scheduleClose} onPointerEnter={cancelClose}>
-        <header className={styles.header}>
+        <header className={styles.header} ref={headerRef}>
           <Link className={styles.logo} href="/" aria-label={t('homeLink')} onClick={closeAll}>
             {/* The mark is a rising line that turns into an arrow — the mint
                 stroke is the line, the blue one the corner it leaves through. */}
@@ -205,8 +252,24 @@ export function Header() {
 
           <nav className={styles.nav} aria-label={t('nav.home')}>
             {items.map((item) => {
-              const on = active === item.key || (item.menu && openMenu === item.menu);
-              const className = `${styles.navItem} ${on ? styles.navItemActive : ''}`;
+              /*
+               * Two conventions, never the same one.
+               *
+               * Where you are is mint and stays mint while a menu is open over
+               * it; what you have opened is blue. They used to share a class, so
+               * opening Explore from Marketplace moved the underline and the
+               * page you were on stopped being marked anywhere — the menu
+               * answered "what am I looking at" by erasing "where am I".
+               */
+              const current = active === item.key;
+              const open = Boolean(item.menu) && openMenu === item.menu;
+              const className = [
+                styles.navItem,
+                current ? styles.navItemCurrent : '',
+                open ? styles.navItemOpen : '',
+              ]
+                .filter(Boolean)
+                .join(' ');
 
               /*
                * A section with a dropdown is a button, not a link. The section
@@ -231,7 +294,12 @@ export function Header() {
                     }
                   >
                     {t(`nav.${item.labelKey}`)}
-                    <Icon name="chevronDown" size={12} strokeWidth={2.4} />
+                    <Icon
+                      className={styles.chevron}
+                      name="chevronDown"
+                      size={12}
+                      strokeWidth={2.4}
+                    />
                   </button>
                 );
               }
@@ -291,13 +359,45 @@ export function Header() {
           <div
             ref={panelRef}
             className={`${styles.panel} ${
-              MENUS[openMenu].length > 1 ? styles.panelWide : styles.panelNarrow
+              mega
+                ? styles.panelMega
+                : MENUS[openMenu].length > 1
+                  ? styles.panelWide
+                  : styles.panelNarrow
             }`}
-            style={panelLeft === null ? undefined : { left: panelLeft }}
+            style={
+              {
+                '--panel-top': panelTop === null ? undefined : `${panelTop}px`,
+                '--panel-left': panelLeft === null ? undefined : `${panelLeft}px`,
+              } as React.CSSProperties
+            }
           >
+            {mega && <ExploreMenuSprite />}
+
+            {/* Only on a phone, where the panel is the screen and needs a way
+                out that is not "press the label again behind the drawer". */}
+            <div className={styles.drawerHead}>
+              <span className={styles.drawerTitle}>
+                {t(`nav.${items.find((item) => item.menu === openMenu)?.labelKey ?? 'home'}`)}
+              </span>
+              <button
+                className={styles.drawerClose}
+                aria-label={t('closeMenu')}
+                onClick={closeAll}
+              >
+                <Icon name="close" size={15} strokeWidth={2.2} />
+              </button>
+            </div>
+
             {MENUS[openMenu].map((group) => (
               <div className={styles.group} key={group.title}>
-                <div className={styles.groupTitle}>{group.title}</div>
+                {/* Both stay `div`s: `verify-header.mjs` finds the groups by
+                    `div[class*="groupTitle"]`, and an element swap here is a red
+                    suite in a file that is not mine to edit. */}
+                <div className={styles.groupHead}>
+                  <div className={styles.groupTitle}>{group.title}</div>
+                  {group.hint && <div className={styles.groupHint}>{group.hint}</div>}
+                </div>
                 <div className={styles.groupItems}>{group.items.map(renderEntry)}</div>
               </div>
             ))}

@@ -61,7 +61,7 @@
 }
 
 /*
- * The active item takes a mint underline, not a colour swap alone. Colour is the
+ * The current item takes a mint underline, not a colour swap alone. Colour is the
  * first thing to go for a person who cannot separate these two blues, and "which
  * section am I in" is not a decorative question.
  */
@@ -69,7 +69,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--tn-text-secondary);
+  color: #8ba0b5;
   font-size: clamp(12.5px, 1.1vw, 14.5px);
   font-weight: 600;
   padding: 8px 2px 10px;
@@ -78,14 +78,36 @@
   transition: color var(--tn-transition-fast);
 }
 
+/* No underline and no movement on hover: both belong to states that mean
+   something, and a row that shifts under the pointer is a row you can miss. */
 .navItem:hover {
-  color: var(--tn-text);
+  color: #e8f0f7;
 }
 
-.navItemActive {
-  color: #fff;
+.navItemCurrent {
+  color: #e8f0f7;
   font-weight: 700;
   border-bottom-color: var(--tn-mint);
+}
+
+/*
+ * After `.navItemCurrent` on purpose. Opening the menu of the section you are
+ * already in turns that one label blue, and the mint stays on every other
+ * current item — the two conventions never collide because they can never be
+ * the same item twice.
+ */
+.navItemOpen {
+  color: #fff;
+  font-weight: 700;
+  border-bottom-color: var(--tn-blue);
+}
+
+.chevron {
+  transition: transform var(--tn-transition-fast);
+}
+
+.navItemOpen .chevron {
+  transform: rotate(180deg);
 }
 
 .navTrigger {
@@ -164,21 +186,33 @@
  * the scrim. Under the header, the trigger toggles and the scrim catches
  * everything else.
  */
+/*
+ * The page underneath is dimmed, not put out. A menu this size covers most of
+ * the screen, and a reader should still be able to see the page they are
+ * deciding whether to leave.
+ */
 .scrim {
   position: fixed;
   inset: 0;
   z-index: 35;
+  background: rgba(3, 6, 11, 0.62);
 }
 
 /*
- * `left` is written by the header once the panel has been measured, so it sits
- * under the item that opened it. The 12px here is only what it starts at for the
- * one layout pass before that happens.
+ * `--panel-left` and `--panel-top` are written by the header once the panel and
+ * the header row have been measured, so the panel sits under the item that
+ * opened it and under the header even at the widths where the header wraps to
+ * two rows. The fallbacks are only what it starts at for the one layout pass
+ * before that happens.
+ *
+ * They are custom properties rather than inline `top`/`left` because an inline
+ * value beats every rule in this file — including the one that turns the panel
+ * into a full-screen drawer on a phone.
  */
 .panel {
   position: fixed;
-  top: 64px;
-  left: 12px;
+  top: var(--panel-top, 64px);
+  left: var(--panel-left, 12px);
   z-index: 50;
   padding: 22px 26px;
   background: var(--tn-surface);
@@ -195,11 +229,9 @@
 }
 
 /*
- * Several groups: columns side by side rather than one long scroll. Explore
- * carries five — investment types, and the three sections that used to be
- * top-level headings of their own, named so somebody who knew where Market or
- * Economy lived finds them by that name rather than by guessing which tab
- * absorbed them.
+ * Several groups: columns side by side rather than one long scroll. Start,
+ * Learn and Marketplace are short lists that wrap into as many columns as they
+ * need.
  */
 .panelWide {
   display: flex;
@@ -217,6 +249,54 @@
   margin-top: 18px;
 }
 
+/*
+ * Explore: three fixed columns across the page, not a list under a label.
+ *
+ * It is centred on the window rather than anchored to its trigger, because at
+ * this width "under the thing that opened it" would mean hanging off one edge
+ * or the other on every screen narrower than the panel.
+ */
+.panelMega {
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1200px, calc(100vw - 48px));
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 36px;
+  padding: 34px 40px 32px;
+  background: #060d16;
+  border-color: #16283a;
+  border-radius: 20px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.62);
+}
+
+.panelMega .group {
+  position: relative;
+  min-width: 0;
+}
+
+/*
+ * The column rules, drawn as gradients so they fade out instead of ending in a
+ * hard stop against the padding. A pseudo-element rather than a grid track: a
+ * 1px track would still be there at the widths where the columns stack, and an
+ * empty stripe between two rows reads as a mistake.
+ */
+.panelMega .group + .group::before {
+  content: '';
+  position: absolute;
+  left: -18px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, #16283a 12%, #16283a 88%, transparent);
+}
+
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
 .groupTitle {
   font-size: 11.5px;
   font-weight: 700;
@@ -224,6 +304,27 @@
   text-transform: uppercase;
   color: var(--tn-text-faint);
   margin-bottom: 10px;
+}
+
+.panelMega .groupHead {
+  margin-bottom: 16px;
+}
+
+.panelMega .groupTitle {
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #7f97ad;
+  margin-bottom: 0;
+}
+
+/*
+ * The question the column answers. Deliberately quieter than the rows under it:
+ * it is there for the person scanning three headings, and once they have picked
+ * a column it should stop competing with the things in it.
+ */
+.groupHint {
+  font-size: 11.5px;
+  color: #4d6480;
 }
 
 .groupItems {
@@ -245,46 +346,334 @@
   background: var(--tn-chip-bg);
 }
 
-/* An entry that goes nowhere must not look like one that does. */
-.menuItemInert,
-.menuItemInert:hover {
-  background: transparent;
+/* A row with a glyph: icon, then everything else. */
+.menuItemWide {
+  display: flex;
+  gap: 15px;
+  border-radius: 12px;
+}
+
+.menuIcon {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: #0b1520;
+  border: 1px solid #172736;
+  color: #8ba7c2;
+}
+
+.menuIcon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.menuItemText {
+  display: block;
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * An entry that goes nowhere must not look like one that does — no pointer, no
+ * arrow, no lift. It does still light up under the pointer, because a row that
+ * ignores you entirely reads as broken rather than as unfinished.
+ *
+ * What it must not do is dim: this menu is a public roadmap of what is being
+ * built, and a greyed-out list of twenty things nobody can quite read announces
+ * nothing.
+ */
+.menuItemInert {
   cursor: default;
 }
 
-.menuItemInert .menuItemLabel {
-  color: var(--tn-text-muted);
+.menuItemInert:hover {
+  background: rgba(20, 34, 48, 0.4);
 }
 
 .menuItemLabel {
+  display: block;
   font-size: 14px;
   font-weight: 600;
   color: var(--tn-text);
 }
 
+.panelMega .menuItemLabel {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 11px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #e2ebf3;
+}
+
 .menuItemSub {
+  display: block;
   font-size: 12px;
   color: var(--tn-text-muted);
   margin-top: 2px;
 }
 
+.panelMega .menuItemSub {
+  font-size: 12.5px;
+  color: #6d8399;
+}
+
 /*
- * "Soon" beside a menu label — a word, not only a colour: the point is to be
+ * The availability badge — a word, not only a colour: the point is to be
  * readable, and a grey dot would mean nothing to anyone not told what it means.
+ *
+ * Blue-grey and never mint, amber or red. Those three carry meaning elsewhere in
+ * the portal, and "not built yet" is neither a success, a warning nor a
+ * promotion. It sits after the label so the labels down a column stay aligned on
+ * their first letter.
  */
 .soon {
   display: inline-block;
   margin-left: 8px;
-  border-radius: var(--tn-radius-chip-sm);
-  background: #101c2a;
-  border: 1px solid #1e2c3c;
-  padding: 1px 7px;
+  border-radius: 6px;
+  background: #0d1b2a;
+  border: 1px solid #1e364d;
+  padding: 2.5px 8px;
   font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--tn-text-muted);
+  white-space: nowrap;
+  color: #7ea6c9;
   vertical-align: 1px;
+}
+
+/* Inside a mega row the label is a flex line with its own gap. */
+.panelMega .soon {
+  margin-left: 0;
+  vertical-align: baseline;
+}
+
+.soonShort {
+  display: none;
+}
+
+/* The drawer's own header. Nothing to show until the panel becomes the screen. */
+.drawerHead {
+  display: none;
+}
+
+/* ---- Tablet: two columns, and the third across the bottom ---- */
+
+/*
+ * Three columns of this width stop being three columns and become three
+ * gutters. Market and Symbols keep the split — they are the two a reader
+ * chooses between — and Economy, the shortest, takes the full width under them.
+ *
+ * The descriptions go. At 13.5px with a 32px glyph the row is the label, and a
+ * second line of grey under each of twenty rows is what makes the panel taller
+ * than the screen it opened on.
+ */
+@media (max-width: 1024px) {
+  .panelMega {
+    width: min(834px, calc(100vw - 24px));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 28px;
+    padding: 22px 24px;
+  }
+
+  .panelMega .group:last-child {
+    grid-column: 1 / -1;
+    padding-top: 20px;
+    border-top: 1px solid #101c28;
+  }
+
+  /* Its rule would now be a stripe across the top of a full-width row. */
+  .panelMega .group:last-child::before {
+    display: none;
+  }
+
+  /* Full width, so its rows split in two rather than running the whole way
+     across with a badge stranded at the far end. */
+  .panelMega .group:last-child .groupItems {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px 28px;
+  }
+
+  .panelMega .groupItems {
+    gap: 1px;
+  }
+
+  .panelMega .menuItemWide {
+    align-items: center;
+    gap: 12px;
+    padding: 7px 8px;
+    border-radius: 10px;
+  }
+
+  .panelMega .menuIcon {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+  }
+
+  .panelMega .menuIcon svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .panelMega .menuItemLabel {
+    font-size: 13.5px;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+  }
+
+  .panelMega .menuItemSub {
+    display: none;
+  }
+}
+
+/* ---- Phones: the panel is the screen ---- */
+
+/*
+ * A dropdown positioned under its trigger has nowhere to go at 390px — it either
+ * covers the page it is anchored to or runs off the bottom of it. So it stops
+ * being a dropdown: full screen, its own title, its own way out.
+ *
+ * This is the whole panel, not only Explore. A phone that opens one menu as a
+ * drawer and the next as a floating card is two products.
+ */
+@media (max-width: 640px) {
+  .panel {
+    inset: 0;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    transform: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0 14px 22px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .panelWide,
+  .panelMega {
+    display: block;
+  }
+
+  .drawerHead {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0 -14px;
+    padding: 12px 14px;
+    background: #060d16;
+    border-bottom: 1px solid #101c28;
+  }
+
+  .drawerTitle {
+    flex: 1;
+    min-width: 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--tn-text);
+  }
+
+  .drawerClose {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #1a2b3d;
+    border-radius: 9px;
+    color: #8ba0b5;
+  }
+
+  .panelWide .group + .group {
+    margin-top: 18px;
+  }
+
+  .panelMega .group + .group::before {
+    display: none;
+  }
+
+  .panelMega .group:last-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .panelMega .groupHead {
+    margin-bottom: 8px;
+    padding: 16px 6px 8px;
+  }
+
+  .panelMega .groupItems {
+    gap: 0;
+  }
+
+  /* One column again — the tablet rule above still matches at this width, and
+     it is the more specific of the two. */
+  .panelMega .group:last-child .groupItems {
+    display: flex;
+    gap: 0;
+  }
+
+  /*
+   * Separators instead of gaps, and 11px of padding around a 30px glyph: 52px of
+   * row, which is a target a thumb can hit.
+   */
+  .panelMega .menuItemWide {
+    align-items: center;
+    gap: 12px;
+    padding: 11px 6px;
+    border-radius: 0;
+    border-bottom: 1px solid #0c1520;
+  }
+
+  .panelMega .menuIcon {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+
+  .panelMega .menuIcon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .panelMega .menuItemLabel {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    font-size: 14px;
+  }
+
+  /* The descriptions come back — a phone reader has one column and the room for
+     them, which the tablet's two do not. */
+  .panelMega .menuItemSub {
+    display: block;
+    font-size: 11.5px;
+  }
+
+  .soon {
+    font-size: 8.5px;
+    letter-spacing: 0.08em;
+    padding: 2px 7px;
+  }
+
+  .soonLong {
+    display: none;
+  }
+
+  .soonShort {
+    display: inline;
+  }
 }
 
 /*
