@@ -251,9 +251,10 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
         },
         {
           label: 'Academy',
-          sub: 'Paid courses from checked providers',
+          // Learn, until the paid catalogue at /marketplace/academy is merged.
+          sub: 'Courses and learning paths',
           kind: 'route',
-          href: '/marketplace/academy',
+          href: '/academy',
         },
         {
           label: 'Events near you',

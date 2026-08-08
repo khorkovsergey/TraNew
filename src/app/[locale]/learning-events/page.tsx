@@ -97,9 +97,6 @@ export default async function LearningEventsPage({ params }: Props) {
             <Link className={styles.primary} href="/academy">
               Start learning
             </Link>
-            <Link className={styles.secondary} href="/marketplace/academy">
-              Browse Academy courses
-            </Link>
           </div>
         </div>
       </section>
