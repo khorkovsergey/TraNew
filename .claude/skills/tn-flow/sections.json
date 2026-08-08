@@ -1,0 +1,145 @@
+{
+  "$comment": "The authoritative section registry. One section = one branch = one worktree = one port. Edited by hand when a section is added; read by scripts/ops/worktree.mjs and by the tn-flow skill.",
+  "integrationTree": "tradingnew-portal",
+  "worktreeRoot": "worktrees",
+  "deployBranch": "main",
+  "productionUrl": "https://tradingnew.space",
+  "railway": {
+    "service": "tradingnew-portal",
+    "trigger": "push to main; Railway builds from GitHub automatically",
+    "healthcheck": "/api/health"
+  },
+  "sections": {
+    "voyager": {
+      "branch": "feat/voyager",
+      "port": 3401,
+      "owns": [
+        "src/app/[locale]/voyager/",
+        "src/app/api/voyager/",
+        "src/app/actions/voyager*.ts",
+        "src/components/voyager/",
+        "src/lib/voyager/",
+        "scripts/verify-voyager-*.mjs",
+        "docs/voyager-workspace-plan.md"
+      ],
+      "smoke": ["/en/voyager", "/en/voyager/research"]
+    },
+    "experts": {
+      "branch": "feat/experts",
+      "port": 3402,
+      "owns": [
+        "src/app/[locale]/marketplace/experts/",
+        "src/components/marketplace/Expert*.tsx",
+        "src/components/marketplace/Match*.tsx",
+        "src/components/marketplace/ProfileSidebar.tsx",
+        "src/content/experts.ts",
+        "src/lib/experts/",
+        "src/lib/expertFlow.ts"
+      ],
+      "smoke": ["/en/marketplace/experts", "/en/marketplace/experts/matches"]
+    },
+    "academy": {
+      "branch": "feat/academy",
+      "port": 3403,
+      "owns": [
+        "src/app/[locale]/academy/",
+        "src/app/[locale]/marketplace/academy/",
+        "src/app/actions/academy.ts",
+        "src/components/academy/",
+        "src/content/academy*.ts",
+        "src/lib/academy/",
+        "src/lib/academyProgress.ts",
+        "scripts/verify-academy.mjs"
+      ],
+      "smoke": ["/en/academy", "/en/marketplace/academy"]
+    },
+    "tools-data": {
+      "branch": "feat/tools-data",
+      "port": 3404,
+      "owns": [
+        "src/app/[locale]/marketplace/tools/",
+        "src/components/marketplace/tools/",
+        "scripts/verify-tools-data.mjs",
+        "scripts/verify-superchart-*.mjs"
+      ],
+      "smoke": ["/en/marketplace/tools", "/en/marketplace/tools/chart-market"]
+    },
+    "events": {
+      "branch": "feat/events",
+      "port": 3405,
+      "owns": [
+        "src/app/[locale]/events/",
+        "src/app/api/events/",
+        "src/components/events/",
+        "src/lib/events/",
+        "scripts/verify-events.mjs",
+        "scripts/test-events.mjs"
+      ],
+      "smoke": ["/en/events"]
+    },
+    "markets": {
+      "branch": "feat/markets",
+      "port": 3406,
+      "owns": [
+        "src/app/[locale]/markets/",
+        "src/app/[locale]/news/",
+        "src/app/[locale]/economy/",
+        "src/app/api/market/",
+        "src/components/markets/",
+        "src/components/economy/",
+        "src/content/markets.ts"
+      ],
+      "smoke": ["/en/markets", "/en/economy"]
+    },
+    "account": {
+      "branch": "feat/account",
+      "port": 3407,
+      "owns": [
+        "src/app/[locale]/account/",
+        "src/app/[locale]/sign-in/",
+        "src/app/[locale]/sign-up/",
+        "src/app/api/auth/",
+        "src/components/account/",
+        "src/components/wealth/",
+        "src/lib/auth/",
+        "src/lib/data/"
+      ],
+      "smoke": ["/en/account", "/en/sign-in"]
+    }
+  },
+  "shared": {
+    "$comment": "Touched by every section. Append-only protocol — see SKILL.md. A change here is a conflict waiting to happen; keep it to the smallest possible addition at the end of your own block.",
+    "files": [
+      "src/messages/en.json",
+      "src/components/ui/Icon.tsx",
+      "src/i18n/routing.ts",
+      "src/app/sitemap.ts",
+      "src/lib/events/analytics.ts",
+      "src/components/shell/Header.tsx",
+      "src/components/shell/Footer.tsx",
+      "next.config.ts"
+    ]
+  },
+  "orchestratorOnly": {
+    "$comment": "Never changed inside a section worktree. A change to any of these is requested from the orchestrator, applied once in the integration tree, and picked up by every worktree on the next sync.",
+    "files": [
+      "package.json",
+      "package-lock.json",
+      "src/db/schema.ts",
+      "drizzle/",
+      "railway.json",
+      ".env.example",
+      "tsconfig.json",
+      "eslint.config.mjs"
+    ]
+  },
+  "lintBaseline": {
+    "$comment": "Pre-existing eslint errors on main as of 2026-08-08. `npm run check` is red because of these. Do not fix them inside a section branch — they belong to whoever owns the file, and a drive-by fix is a merge conflict in somebody else's work.",
+    "errors": [
+      "src/components/economy/EconomyScreen.tsx:116 react-hooks/set-state-in-effect",
+      "src/lib/academyProgress.ts:94 react-hooks/set-state-in-effect",
+      "src/components/voyager/workspace/VoyagerWorkspace.tsx:562 react-hooks/immutability",
+      "src/components/voyager/workspace/VoyagerWorkspace.tsx:653 react-hooks/immutability"
+    ]
+  }
+}
