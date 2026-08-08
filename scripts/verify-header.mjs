@@ -168,9 +168,10 @@ try {
     '/en/marketplace',
     '/en/marketplace/experts',
     '/en/marketplace/subscriptions',
-    // The localised slugs, not the internal keys: `/tools` is served at
-    // `/professional-tools` and `/trust` at `/trust-center`.
-    '/en/professional-tools',
+    '/en/marketplace/tools',
+    '/en/marketplace/tools/chart-market',
+    // The localised slug, not the internal key: `/trust` is served at
+    // `/trust-center`.
     '/en/trust-center',
     '/en/why-tradingnew',
   ];

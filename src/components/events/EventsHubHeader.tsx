@@ -3,28 +3,32 @@ import { CreateEventButton } from './CreateEventButton';
 import styles from './Events.module.css';
 
 /**
- * The hub header, shared by Learning and Events.
+ * The Events header.
  *
- * The two tabs are links rather than a client-side toggle: Academy and Events are
- * separate pages with separate data, and pretending they are one component that
- * swaps its contents would mean loading both to show one.
+ * It used to be a shared hub header with Learning and Events tabs across the
+ * top. The Learning half was a second door to Academy, which has its own
+ * section in the main navigation — so the tab strip offered a way to leave the
+ * page you had just chosen, and the headline had to describe both halves at
+ * once and therefore described neither.
+ *
+ * What is left says what this section is, and the two actions are the two
+ * things someone can do here that they cannot do by scrolling.
  */
 
-export function EventsHubHeader({ active }: { active: 'learning' | 'events' }) {
+export function EventsHubHeader() {
   return (
     <header>
       <Link className={styles.backHome} href="/">
         ← Home
       </Link>
 
-      <p className={styles.eyebrow}>LEARNING &amp; EVENTS</p>
+      <p className={styles.eyebrow}>EVENTS NEAR YOU</p>
       <h1 className={styles.h1}>
-        Learn, connect and navigate the markets{' '}
-        <span className={styles.h1Accent}>with confidence</span>
+        Meet the people behind <span className={styles.h1Accent}>the markets</span>
       </h1>
       <p className={styles.lede}>
-        Build your knowledge with practical courses or join financial events hosted by TradingNew
-        and the community.
+        Workshops, meetups and webinars hosted by TradingNew and verified organizers — online and
+        near you.
       </p>
 
       <div className={styles.heroActions}>
@@ -33,23 +37,6 @@ export function EventsHubHeader({ active }: { active: 'learning' | 'events' }) {
           My events
         </Link>
       </div>
-
-      <nav className={styles.hubTabs} aria-label="Learning and events">
-        <Link
-          className={`${styles.hubTab} ${active === 'learning' ? styles.hubTabActive : ''}`}
-          href="/academy"
-          aria-current={active === 'learning' ? 'page' : undefined}
-        >
-          Learning
-        </Link>
-        <Link
-          className={`${styles.hubTab} ${active === 'events' ? styles.hubTabActive : ''}`}
-          href="/events"
-          aria-current={active === 'events' ? 'page' : undefined}
-        >
-          Events
-        </Link>
-      </nav>
     </header>
   );
 }

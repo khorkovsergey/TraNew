@@ -207,6 +207,43 @@ const BASE: Pick<
     'Sessions are educational and never contain investment recommendations. Recording availability depends on the organizer.',
 };
 
+/**
+ * Event covers.
+ *
+ * One table rather than a line inside each seed: what sixteen events look like
+ * is a thing you want to read in one place, and a photograph repeated on two
+ * cards in the same row is only visible when the list is written as a list.
+ *
+ * Only the rendered half of `public/redesign/courses` is used. That folder also
+ * holds flat vector illustrations, and a grid of photographs with one diagram
+ * in it does not read as a set — the diagram reads as a card that failed to
+ * load its picture. Sixteen events against eleven renders means a few repeat;
+ * they are placed at least six apart, and two of them are on the cancelled and
+ * completed events, which are rarely in a list at all.
+ *
+ * The gradient stays underneath as the fallback — an event created through the
+ * wizard has no photograph, and a card whose cover is a hole is worse than a
+ * card whose cover is a colour.
+ */
+const COVERS: Record<string, string> = {
+  'understanding-market-cycles': 'economics.jpg',
+  'portfolio-construction-workshop-limassol': 'portfolio-mgmt.jpg',
+  'limassol-investors-meetup': 'investing-foundations.jpg',
+  'live-market-session-cpi-print': 'live-markets.jpg',
+  'options-basics-study-group': 'options.jpg',
+  'wealth-planning-masterclass': 'fundamental.jpg',
+  'london-macroeconomics-conference': 'forex.jpg',
+  'berlin-open-finance-workshop': 'ai-trading.jpg',
+  'technical-analysis-masterclass-online': 'technical-analysis.jpg',
+  'tokyo-etf-seminar': 'portfolio-mgmt.jpg',
+  'mumbai-personal-finance-meetup': 'investing-foundations.jpg',
+  'new-york-portfolio-risk-session': 'risk-mgmt.jpg',
+  'cyprus-fintech-summit': 'crypto.jpg',
+  'etf-investing-conference-athens': 'economics.jpg',
+  'algorithmic-signals-evening-cancelled': 'ai-trading.jpg',
+  'crypto-tax-basics-completed': 'crypto.jpg',
+};
+
 const DEFAULT_OUTCOMES = [
   'How this topic applies to real portfolios',
   'Common beginner mistakes and how to avoid them',
@@ -1062,8 +1099,11 @@ export function seedEvents(now: Date): TradingEvent[] {
     const end = new Date(start.getTime() + durationHours * HOUR);
     const created = new Date(start.getTime() - 30 * DAY);
 
+    const cover = COVERS[event.slug];
+
     return {
       ...event,
+      coverImageUrl: cover ? `/redesign/courses/${cover}` : event.coverImageUrl,
       startsAt: start.toISOString(),
       endsAt: end.toISOString(),
       createdAt: created.toISOString(),

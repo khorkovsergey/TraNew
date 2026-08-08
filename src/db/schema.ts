@@ -629,12 +629,19 @@ export const purchase = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
 
-    /** subscription | consultation | report | course */
+    /** subscription | consultation | report | course | script */
     kind: text('kind').notNull(),
     title: text('title').notNull(),
     amountCents: integer('amount_cents').notNull(),
     currency: text('currency').$defaultFn(() => 'EUR').notNull(),
-    /** paid | pending | refunded | failed */
+    /**
+     * paid | pending | refunded | failed | demo
+     *
+     * `demo` is an entitlement granted without money changing hands, because no
+     * payment provider is connected yet. It is its own status rather than
+     * `paid` so that anything counting revenue off this table cannot count it
+     * by accident — and so the screens can say which one a row is.
+     */
     status: text('status').notNull(),
 
     /** Provider reference for reconciliation. Never card details. */

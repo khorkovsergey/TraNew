@@ -215,14 +215,12 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
         },
       ],
     },
-    {
-      title: 'Events',
-      items: [
-        { label: 'Events', sub: 'Meetups, webinars and conferences', kind: 'route', href: '/events' },
-        { label: 'Create an event', kind: 'route', href: '/events/create' },
-        { label: 'Learning & events hub', kind: 'route', href: '/learning-events' },
-      ],
-    },
+    /*
+     * Events is not here. It had a group of its own, which put the section in
+     * two menus at once and read as though meetups were part of the syllabus.
+     * They are a marketplace of other people's events, and that is the menu
+     * that carries them.
+     */
   ],
 
   marketplace: [
@@ -235,13 +233,28 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
           kind: 'route',
           href: '/marketplace/experts',
         },
+        /*
+         * One entry per section, not one per screen.
+         *
+         * Chart Market and Supercharts were listed here beside Tools & Data,
+         * and My Learning beside Academy. Both pairs put a section and its own
+         * inside on the same level, which reads as four products rather than
+         * two — and the first thing either section shows is the way to the
+         * screens that were listed. A menu that names what is behind a door as
+         * well as the door is a longer menu, not a shorter path.
+         */
         {
           label: 'Tools and data',
-          sub: 'Indicators, screeners, data feeds',
+          sub: 'Chart Market, Supercharts and what is coming',
           kind: 'route',
-          href: '/tools',
+          href: '/marketplace/tools',
         },
-        { label: 'Academy', sub: 'Courses and learning paths', kind: 'route', href: '/academy' },
+        {
+          label: 'Academy',
+          sub: 'Paid courses from checked providers',
+          kind: 'route',
+          href: '/marketplace/academy',
+        },
         {
           label: 'Events near you',
           sub: 'Meetups, webinars and conferences',

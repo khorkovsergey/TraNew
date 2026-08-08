@@ -28,6 +28,9 @@ export function CreateEventButton() {
       }}
     >
       Create an event
+      <span className={styles.plus} aria-hidden="true">
+        +
+      </span>
     </button>
   );
 }

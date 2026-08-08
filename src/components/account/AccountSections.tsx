@@ -600,7 +600,21 @@ export function AccountAcademy() {
 
 /* --------------------------------------------------------------- Purchases */
 
-export function AccountPurchases() {
+/**
+ * A script bought in Chart Market, as this screen needs it.
+ *
+ * Passed in from the page rather than fetched here: entitlement is a server
+ * question, and a client component that asked it would be asking the wrong side.
+ */
+export type PurchasedScript = {
+  productId: string;
+  title: string;
+  meta: string;
+  /** Granted without a payment, because no provider is connected. Said, not hidden. */
+  demo: boolean;
+};
+
+export function AccountPurchases({ scripts = [] }: { scripts?: PurchasedScript[] }) {
   const [tab, setTab] = useState<(typeof PURCHASE_TABS)[number]['id']>('expert');
   const purchases = getPurchases();
 
@@ -641,14 +655,41 @@ export function AccountPurchases() {
       )}
 
       {/* Empty states say what would be here and how to get there. */}
-      {tab === 'tools' && (
-        <>
-          <div className={styles.emptyState}>{purchases.toolsEmpty}</div>
-          <Link className={styles.primary} href="/marketplace">
-            Browse Marketplace
-          </Link>
-        </>
-      )}
+      {tab === 'tools' &&
+        (scripts.length > 0 ? (
+          scripts.map((script) => (
+            <div className={styles.row} style={{ marginTop: 18 }} key={script.productId}>
+              <span>
+                <span className={styles.itemTitle}>
+                  {script.title}
+                  {script.demo && <span className={styles.badge}>Demo purchase</span>}
+                </span>
+                <span className={styles.itemMeta}>{script.meta}</span>
+              </span>
+              <span className={styles.rowActions}>
+                <Link
+                  className={styles.ghost}
+                  href={{
+                    pathname: '/marketplace/tools/chart-market',
+                    query: { script: script.productId },
+                  }}
+                >
+                  View source
+                </Link>
+                <Link className={styles.ghost} href="/supercharts">
+                  Add to a chart
+                </Link>
+              </span>
+            </div>
+          ))
+        ) : (
+          <>
+            <div className={styles.emptyState}>{purchases.toolsEmpty}</div>
+            <Link className={styles.primary} href="/marketplace/tools/chart-market">
+              Browse Chart Market
+            </Link>
+          </>
+        ))}
 
       {tab === 'learning' && (
         <div className={styles.row} style={{ marginTop: 18 }}>

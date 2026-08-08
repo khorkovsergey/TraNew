@@ -33,6 +33,16 @@ const STATIC_PAGES: Array<{ href: Parameters<typeof getPathname>[0]['href']; pri
   { href: '/community', priority: 0.6 },
   { href: '/marketplace', priority: 0.5 },
   { href: '/marketplace/experts', priority: 0.5 },
+  { href: '/marketplace/tools', priority: 0.6 },
+  /*
+   * The catalogue, not a product.
+   *
+   * `?script=…` is a state of this URL rather than a page of its own, so
+   * listing nine query strings would be listing one page nine times. The
+   * catalogue is what a search result should land on.
+   */
+  { href: '/marketplace/tools/chart-market', priority: 0.6 },
+  { href: '/marketplace/tools/supercharts', priority: 0.6 },
   { href: '/brokers', priority: 0.5 },
   { href: '/trust', priority: 0.4 },
   { href: '/how-we-explain', priority: 0.4 },

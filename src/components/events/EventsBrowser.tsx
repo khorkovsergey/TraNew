@@ -176,8 +176,12 @@ export function EventsBrowser(props: EventsBrowserProps) {
         </div>
       </div>
 
-      <form className={styles.searchRow} onSubmit={submitSearch} role="search">
-        <div className={styles.search}>
+      {/* One line: what to look for on the left, how to look at it on the right.
+          The submit button sits inside the field rather than beside it, so the
+          field is the width of the row minus its own button and not minus a
+          gap and a button. */}
+      <div className={styles.searchRow}>
+        <form className={styles.search} onSubmit={submitSearch} role="search">
           <Magnifier />
           <input
             className={styles.searchInput}
@@ -188,39 +192,39 @@ export function EventsBrowser(props: EventsBrowserProps) {
             placeholder="Search events, topics, organizers or cities"
             aria-label="Search events"
           />
-        </div>
-        <button type="submit" className={styles.secondary}>
-          Search
-        </button>
-      </form>
-
-      <div className={styles.viewSwitch} role="group" aria-label="View">
-        {(['cards', 'calendar', 'map'] as ViewMode[]).map((view) => (
-          <button
-            key={view}
-            type="button"
-            className={`${styles.control} ${filters.view === view ? styles.controlOn : ''}`}
-            aria-pressed={filters.view === view}
-            onClick={() => setView(view)}
-          >
-            {view === 'cards' ? 'Cards' : view === 'calendar' ? 'Calendar' : 'Map'}
+          <button type="submit" className={styles.searchSubmit}>
+            Search
           </button>
-        ))}
+        </form>
 
-        <select
-          className={styles.control}
-          aria-label="Sort by"
-          value={filters.sort}
-          onChange={(event) =>
-            apply({ ...filters, sort: event.target.value as EventFilters['sort'] })
-          }
-        >
-          <option value="recommended">Recommended</option>
-          <option value="soonest">Soonest</option>
-          <option value="nearest">Nearest</option>
-          <option value="popular">Most popular</option>
-          <option value="newest">Recently added</option>
-        </select>
+        <div className={styles.viewSwitch} role="group" aria-label="View">
+          {(['cards', 'calendar', 'map'] as ViewMode[]).map((view) => (
+            <button
+              key={view}
+              type="button"
+              className={`${styles.control} ${filters.view === view ? styles.controlOn : ''}`}
+              aria-pressed={filters.view === view}
+              onClick={() => setView(view)}
+            >
+              {view === 'cards' ? 'Cards' : view === 'calendar' ? 'Calendar' : 'Map'}
+            </button>
+          ))}
+
+          <select
+            className={styles.control}
+            aria-label="Sort by"
+            value={filters.sort}
+            onChange={(event) =>
+              apply({ ...filters, sort: event.target.value as EventFilters['sort'] })
+            }
+          >
+            <option value="recommended">Recommended</option>
+            <option value="soonest">Soonest</option>
+            <option value="nearest">Nearest</option>
+            <option value="popular">Most popular</option>
+            <option value="newest">Recently added</option>
+          </select>
+        </div>
       </div>
 
       {chips.length > 0 && (
