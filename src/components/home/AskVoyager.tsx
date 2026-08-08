@@ -4,27 +4,25 @@ import { useState } from 'react';
 import { useLoginModal } from '@/components/shell/LoginModalProvider';
 import { clarityLine, contextParam, stashDraft } from '@/components/voyager/AskEntry';
 import { Icon } from '@/components/ui/Icon';
-import { VOYAGER_SUGGESTIONS } from '@/content/homeV2';
+import { TODAY_VOYAGER_QUESTION, VOYAGER_SUGGESTIONS } from '@/content/homeV2';
 import { useRouter } from '@/i18n/navigation';
 import styles from './HomeV2.module.css';
 
 /**
- * The Ask Voyager card in the hero.
+ * The two Voyager entry points on Home — the hero card and the fourth card in
+ * "Today in 3 minutes".
  *
- * It carries the question to the workspace rather than answering here. The
+ * Both carry the question to the workspace rather than answering here. The
  * workspace is where an answer can show its sources, its refusals and its
  * consent state, and an answer without those is the thing this product exists
  * not to give.
  *
- * The question is answered on arrival rather than left in the composer. A chip
- * that says "What is an ETF?" and delivers a text box is a dead end, and every
- * one of these was one. The answer opens by repeating the question, so nothing
- * is attributed to somebody out of sight.
+ * They share one hook so the second one cannot quietly forget the context and
+ * leave the workspace saying it can see a page it was never told about.
  */
-export function AskVoyager() {
+
+function useAsk() {
   const router = useRouter();
-  const { authed } = useLoginModal();
-  const [draft, setDraft] = useState('');
 
   /*
    * The question goes through storage, the page it came from goes in the URL.
@@ -33,25 +31,29 @@ export function AskVoyager() {
    * the next request and in any log along the way. The context is a page name
    * and can travel openly; the question is the person's and does not have to.
    */
-  const ask = (question: string) => {
+  return (question: string) => {
     const trimmed = question.trim();
     if (!trimmed) return;
     stashDraft(trimmed, { kind: 'home' });
     router.push({ pathname: '/voyager', query: { context: contextParam({ kind: 'home' }) } });
   };
+}
+
+/** The hero card: the AI layer across the product, not a beginner's help desk. */
+export function AskVoyager() {
+  const { authed } = useLoginModal();
+  const [draft, setDraft] = useState('');
+  const ask = useAsk();
 
   return (
     <div className={styles.askCard}>
-      {/* Decoration: a glow and three stars, none of which carry meaning. */}
-      <span className={styles.askGlow} aria-hidden="true" />
-
       <div className={styles.askBody}>
         <div className={styles.askText}>
           <div className={styles.askHead}>
             <Icon name="sparkle" size={20} className={styles.askSparkle} />
             <span className={styles.askTitle}>Ask Voyager</span>
           </div>
-          <p className={styles.askSub}>Your friendly guide to markets and investing.</p>
+          <p className={styles.askSub}>Your AI guide across finance.</p>
 
           <form
             className={styles.askForm}
@@ -64,7 +66,7 @@ export function AskVoyager() {
               className={styles.askInput}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="Ask anything about investing or the markets…"
+              placeholder="Ask anything about markets, investing or finance"
               aria-label="Ask Voyager"
             />
             <button className={styles.askSend} type="submit" aria-label="Ask Voyager">
@@ -78,17 +80,8 @@ export function AskVoyager() {
           <div className={styles.askTryLabel}>Try asking</div>
           <div className={styles.askChips}>
             {VOYAGER_SUGGESTIONS.map((suggestion) => (
-              <button
-                key={suggestion.text}
-                className={styles.askChip}
-                onClick={() => ask(suggestion.text)}
-              >
-                <Icon
-                  name={suggestion.icon}
-                  size={13}
-                  className={styles[`accent_${suggestion.accent}`]}
-                />
-                {suggestion.text}
+              <button key={suggestion} className={styles.askChip} onClick={() => ask(suggestion)}>
+                {suggestion}
               </button>
             ))}
           </div>
@@ -101,5 +94,30 @@ export function AskVoyager() {
         <img className={styles.robot} src="/redesign/voyager-robot.png" alt="" aria-hidden="true" />
       </div>
     </div>
+  );
+}
+
+/**
+ * The fourth card in "Today in 3 minutes".
+ *
+ * A button rather than a link, because it does not navigate to a page so much
+ * as arrive at one with a question already asked. The three cards beside it say
+ * what moved, why, and what people are saying; this one is the only place on
+ * the row that can answer "so what does that mean for me".
+ */
+export function AskVoyagerToday() {
+  const ask = useAsk();
+
+  return (
+    <button className={styles.todayAsk} onClick={() => ask(TODAY_VOYAGER_QUESTION)}>
+      <span className={styles.todayAskHead}>
+        <Icon name="sparkle" size={18} className={styles.askSparkle} />
+        <span className={styles.eyebrow}>Voyager</span>
+      </span>
+      <span className={styles.todayAskCta}>
+        Ask Voyager what this means for you
+        <Icon name="arrowRight" size={14} strokeWidth={2.2} />
+      </span>
+    </button>
   );
 }
