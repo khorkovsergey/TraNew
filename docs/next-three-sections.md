@@ -19,7 +19,36 @@ This is the real build of the three. It needs a catalogue model, a product
 card, and a purchase path — and a purchase path touches money, so it wants a
 clear head rather than the end of a long session.
 
-## 2. Lessons — this prompt is already implemented
+## 2. Lessons — built: Academy is the paid catalogue
+
+**Done.** The folder's genuinely new screens were the course marketplace, and
+they are now in the repository:
+
+| Route | Mockup |
+| --- | --- |
+| `/marketplace/academy` | `Academy.dc.html` |
+| `/marketplace/academy/[slug]` | `Course Detail.dc.html` |
+| `/marketplace/academy/my-learning` | `My Learning.dc.html` |
+
+The IA decision worth knowing: **Learn (`/academy`) stays free and unchanged;
+Academy is the paid half and lives under Marketplace.** The Marketplace menu
+entry called "Academy" now points at the catalogue rather than at Learn, and
+each side links to the other in one place.
+
+Content is `src/content/academyCourses.ts` — twelve courses, declared as sample
+content on the screen. Every duration, lesson count and percentage is counted
+from the curriculum in that file; there is no stored "8h 45m". Enrolment is a
+`purchase` row with `kind: 'course'` and status `demo`, the convention Chart
+Market set, and lesson progress is written into the existing
+`academyProgress.lessonsDone` array under a `course:` prefix — no migration.
+`scripts/verify-academy.mjs` walks the whole loop.
+
+Not built, deliberately: the lesson video player. `Lesson.dc.html` shows a play
+button over a still, and no footage exists — the rest of the section refuses to
+fake what it does not have, so marking a lesson watched is what moves progress,
+and the course page says so.
+
+### What the original prompt asked for is still mostly done
 
 `Lessons_Redesign/CLAUDE_CODE_PROMPT.md` is the **original full-portal redesign
 brief**, the one this session opened with: the `design_handoff` folder, the

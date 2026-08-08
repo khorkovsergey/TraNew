@@ -31,6 +31,7 @@ const KIND_LABEL: Record<SavedKind, string> = {
   chart: 'Chart',
   expert: 'Expert',
   lesson: 'Lesson',
+  course: 'Course',
   screener: 'Screener',
   idea: 'Idea',
 };

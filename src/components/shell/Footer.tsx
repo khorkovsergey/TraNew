@@ -62,6 +62,7 @@ const COLUMNS: Array<{ title: string; links: FooterLink[] }> = [
     links: [
       { label: 'Expert services', href: '/marketplace/experts' },
       { label: 'Tools and data', href: '/tools' },
+      { label: 'Academy courses', href: '/marketplace/academy' },
       { label: 'Plans', href: '/marketplace/subscriptions' },
       { label: 'Marketplace', href: '/marketplace' },
       { label: 'Brokers', href: '/brokers' },

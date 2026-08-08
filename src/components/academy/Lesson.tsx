@@ -30,8 +30,7 @@ export function Lesson() {
   const [openTerm, setOpenTerm] = useState<string | null>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [askAnswer, setAskAnswer] = useState<string | null>(null);
-  const [savePromptOpen, setSavePromptOpen] = useState(false);
-  const [savePromptSeen, setSavePromptSeen] = useState(false);
+  const [savePromptDismissed, setSavePromptDismissed] = useState(false);
 
   const interOk = Boolean(state?.inter?.ok);
   const practiced = Boolean(state?.practiced);
@@ -45,13 +44,13 @@ export function Lesson() {
     // Intentionally runs once per state identity change; update is stable.
   }, [state, update]);
 
-  // The account ask arrives only after the first lesson delivered its value.
-  useEffect(() => {
-    if (complete && !savePromptSeen) {
-      setSavePromptOpen(true);
-      setSavePromptSeen(true);
-    }
-  }, [complete, savePromptSeen]);
+  /*
+   * The account ask arrives only after the first lesson delivered its value —
+   * and only once. Derived rather than set from an effect: "the lesson is
+   * finished and this has not been waved away" is the whole condition, and
+   * storing it separately only creates a second copy to keep in step.
+   */
+  const savePromptOpen = complete && !savePromptDismissed;
 
   const chooseInteractive = (index: number, correct: boolean) => {
     update({ inter: { i: index, ok: correct } });
@@ -299,7 +298,7 @@ export function Lesson() {
 
       {savePromptOpen && (
         <>
-          <div className={modal.overlay} onClick={() => setSavePromptOpen(false)} />
+          <div className={modal.overlay} onClick={() => setSavePromptDismissed(true)} />
           <div className={modal.dialog} role="dialog" aria-modal="true">
             <div className={modal.title}>{t('save.title')}</div>
             <div className={modal.reassurance}>{t('save.text')}</div>
@@ -307,7 +306,7 @@ export function Lesson() {
               className={modal.primary}
               style={{ background: 'var(--tn-purple)' }}
               onClick={() => {
-                setSavePromptOpen(false);
+                setSavePromptDismissed(true);
                 openLogin();
               }}
             >
@@ -316,7 +315,7 @@ export function Lesson() {
             <button
               className={modal.social}
               style={{ width: '100%', marginTop: 10 }}
-              onClick={() => setSavePromptOpen(false)}
+              onClick={() => setSavePromptDismissed(true)}
             >
               {t('save.guestCta')}
             </button>

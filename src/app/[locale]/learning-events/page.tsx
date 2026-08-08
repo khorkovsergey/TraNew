@@ -55,7 +55,7 @@ export default async function LearningEventsPage({ params }: Props) {
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>Learning</h2>
           <Link className={styles.sectionLink} href="/academy">
-            Open Academy →
+            Open Learn →
           </Link>
         </div>
 
@@ -63,15 +63,21 @@ export default async function LearningEventsPage({ params }: Props) {
           <div className={styles.prose}>
             <p>
               A personal learning path tied to what you actually do on the platform — start with
-              the basics or jump to the topic you are stuck on.
+              the basics or jump to the topic you are stuck on. Free, and free permanently.
+            </p>
+            {/* The two halves of learning are named apart here, because they
+                are priced apart: Learn is free, Academy is bought. */}
+            <p>
+              Academy is the other half: structured paid programmes from TradingNew and outside
+              providers, with certificates and live cohorts.
             </p>
           </div>
           <div className={styles.heroActions} style={{ marginTop: 16 }}>
             <Link className={styles.primary} href="/academy">
               Start learning
             </Link>
-            <Link className={styles.secondary} href="/academy/path">
-              See the path
+            <Link className={styles.secondary} href="/marketplace/academy">
+              Browse Academy courses
             </Link>
           </div>
         </div>

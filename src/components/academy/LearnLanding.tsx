@@ -232,6 +232,24 @@ export function LearnLanding({ summary }: { summary: LearnSummary }) {
         </section>
       </div>
 
+      {/* Learn is free and stays free; Academy is the paid catalogue. Saying so
+          here is the only way somebody finds the longer courses without being
+          made to wonder whether the free lessons were a trial. */}
+      <div className={styles.academyStrip}>
+        <Icon name="grad" size={22} strokeWidth={1.8} />
+        <div>
+          <div className={styles.academyTitle}>Want something longer?</div>
+          <div className={styles.academyText}>
+            Academy has structured paid programmes — technical analysis, risk, options — from
+            TradingNew and checked providers. Everything on this page stays free.
+          </div>
+        </div>
+        <Link className={styles.academyLink} href="/marketplace/academy" prefetch={false}>
+          Browse Academy
+          <Icon name="arrowRight" size={14} strokeWidth={2.2} />
+        </Link>
+      </div>
+
       <div className={styles.trustBar}>
         {LEARN_TRUST.map((item) => (
           <div key={item.label} className={styles.trustItem}>

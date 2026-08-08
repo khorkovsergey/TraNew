@@ -100,6 +100,15 @@ export const routing = defineRouting({
     '/marketplace/experts/[id]': '/marketplace/experts/[id]',
     '/marketplace/experts/[id]/sharing': '/marketplace/experts/[id]/sharing',
     '/marketplace/experts/[id]/booking': '/marketplace/experts/[id]/booking',
+    /*
+     * Academy — the paid course catalogue. It sits under Marketplace rather
+     * than under `/academy`, which is Learn and stays free: two things called
+     * Academy on one route would leave nobody able to say which one a link
+     * meant.
+     */
+    '/marketplace/academy': '/marketplace/academy',
+    '/marketplace/academy/my-learning': '/marketplace/academy/my-learning',
+    '/marketplace/academy/[slug]': '/marketplace/academy/[slug]',
     '/marketplace/consultations/[id]': '/marketplace/consultations/[id]',
     '/marketplace/consultations/[id]/summary': '/marketplace/consultations/[id]/summary',
 

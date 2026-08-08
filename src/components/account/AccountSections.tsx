@@ -600,7 +600,22 @@ export function AccountAcademy() {
 
 /* --------------------------------------------------------------- Purchases */
 
-export function AccountPurchases() {
+/**
+ * An Academy enrolment, as this screen needs it.
+ *
+ * Passed in from the page rather than fetched here: ownership is a server
+ * question, and a client component that asked it would be asking the wrong
+ * side.
+ */
+export type PurchasedCourse = {
+  slug: string;
+  title: string;
+  meta: string;
+  /** Granted without a payment, because no provider is connected. Said, not hidden. */
+  demo: boolean;
+};
+
+export function AccountPurchases({ courses = [] }: { courses?: PurchasedCourse[] }) {
   const [tab, setTab] = useState<(typeof PURCHASE_TABS)[number]['id']>('expert');
   const purchases = getPurchases();
 
@@ -650,14 +665,42 @@ export function AccountPurchases() {
         </>
       )}
 
-      {tab === 'learning' && (
-        <div className={styles.row} style={{ marginTop: 18 }}>
-          <span>
-            <span className={styles.itemTitle}>{purchases.learning.title}</span>
-            <span className={styles.itemMeta}>{purchases.learning.meta}</span>
-          </span>
-        </div>
-      )}
+      {/* Empty states say what would be here and how to get there. */}
+      {tab === 'learning' &&
+        (courses.length > 0 ? (
+          courses.map((course) => (
+            <div className={styles.row} style={{ marginTop: 18 }} key={course.slug}>
+              <span>
+                <span className={styles.itemTitle}>
+                  {course.title}
+                  {course.demo && <span className={styles.badge}>Demo purchase</span>}
+                </span>
+                <span className={styles.itemMeta}>{course.meta}</span>
+              </span>
+              <span className={styles.rowActions}>
+                <Link
+                  className={styles.ghost}
+                  href={{ pathname: '/marketplace/academy/[slug]', params: { slug: course.slug } }}
+                >
+                  Open course
+                </Link>
+                <Link className={styles.ghost} href="/marketplace/academy/my-learning">
+                  My Learning
+                </Link>
+              </span>
+            </div>
+          ))
+        ) : (
+          <>
+            <div className={styles.emptyState}>
+              Nothing bought in Academy yet. Courses you enrol in are listed here with their
+              receipts.
+            </div>
+            <Link className={styles.primary} href="/marketplace/academy">
+              Browse Academy
+            </Link>
+          </>
+        ))}
 
       {tab === 'merch' && <div className={styles.emptyState}>{purchases.merchEmpty}</div>}
 

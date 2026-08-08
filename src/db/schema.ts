@@ -524,7 +524,7 @@ export const savedObject = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
 
-    /** symbol | country | news | research | chart | expert | lesson | screener | idea */
+    /** symbol | country | news | research | chart | expert | lesson | course | screener | idea */
     kind: text('kind').notNull(),
     /** Stable identifier within the kind: "TSLA", "us-cpi", "exp_014". */
     ref: text('ref').notNull(),

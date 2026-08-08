@@ -435,6 +435,64 @@
 
 /* ---- Trust ---- */
 
+/*
+ * The one place Learn mentions the paid catalogue.
+ *
+ * Neutral rather than accented: it is a door to another section, not the next
+ * step in this one, and the mint on this page belongs to "continue learning".
+ */
+.academyStrip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 34px;
+  padding: 18px 22px;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+}
+
+.academyStrip > svg {
+  color: var(--tn-icon);
+  flex-shrink: 0;
+}
+
+.academyStrip > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.academyTitle {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.academyText {
+  font-size: 13px;
+  color: var(--tn-text-soft);
+  line-height: 1.55;
+  margin-top: 3px;
+}
+
+.academyLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 11px 20px;
+  border-radius: var(--tn-radius-pill-sm);
+  border: 1px solid var(--tn-border-control);
+  color: var(--tn-text-nav);
+  font-size: 13px;
+  font-weight: 700;
+  transition: border-color var(--tn-transition-fast), color var(--tn-transition-fast);
+}
+
+.academyLink:hover {
+  border-color: var(--tn-border-hover);
+  color: var(--tn-text);
+}
+
 .trustBar {
   display: flex;
   align-items: center;

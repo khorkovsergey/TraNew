@@ -21,6 +21,7 @@ export type SavedKind =
   | 'chart'
   | 'expert'
   | 'lesson'
+  | 'course'
   | 'screener'
   | 'idea';
 

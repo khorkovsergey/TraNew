@@ -241,7 +241,18 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
           kind: 'route',
           href: '/tools',
         },
-        { label: 'Academy', sub: 'Courses and learning paths', kind: 'route', href: '/academy' },
+        {
+          label: 'Academy',
+          sub: 'Paid courses from checked providers',
+          kind: 'route',
+          href: '/marketplace/academy',
+        },
+        {
+          label: 'My Learning',
+          sub: 'Courses you are enrolled in',
+          kind: 'route',
+          href: '/marketplace/academy/my-learning',
+        },
         {
           label: 'Events near you',
           sub: 'Meetups, webinars and conferences',
