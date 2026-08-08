@@ -135,13 +135,25 @@ export function Header() {
   }, [openMenu, searchOpen, closeAll]);
 
   const renderEntry = (entry: MenuEntry, index: number) => {
-    const row = `${styles.menuItem} ${entry.icon ? styles.menuItemWide : ''}`;
+    /*
+     * Every row in every menu now has a glyph, so `menuItemWide` is what a row
+     * looks like rather than a variant of one. The class stays because the two
+     * sources of a glyph are different elements — the Explore sprite and `Icon`
+     * — and a row could still be written without either.
+     */
+    const row = `${styles.menuItem} ${entry.icon || entry.glyph ? styles.menuItemWide : ''}`;
 
     const body = (
       <>
-        {entry.icon && (
+        {(entry.icon || entry.glyph) && (
           <span className={styles.menuIcon}>
-            <ExploreIcon name={entry.icon} />
+            {entry.icon ? (
+              <ExploreIcon name={entry.icon} />
+            ) : (
+              // 21px inside a 42px box, stroke 1.6: the sprite's weight, so a
+              // Learn row and an Explore row read as the same row.
+              <Icon name={entry.glyph!} size={21} strokeWidth={1.6} />
+            )}
           </span>
         )}
         <span className={styles.menuItemText}>
@@ -182,7 +194,14 @@ export function Header() {
         <Link
           key={index}
           className={row}
-          href={{ pathname: entry.href, params: entry.params, query: entry.query } as never}
+          href={
+            {
+              pathname: entry.href,
+              params: entry.params,
+              query: entry.query,
+              hash: entry.hash,
+            } as never
+          }
           onClick={closeAll}
         >
           {body}
@@ -304,6 +323,34 @@ export function Header() {
                 );
               }
 
+              /*
+               * Community is TradingView's, and leaves the portal. A plain
+               * anchor rather than the locale router, which would prefix an
+               * absolute URL with `/en`, and a glyph that says so before the
+               * click rather than after it — the tab does not come back on its
+               * own, and a reader deserves to know that beforehand.
+               */
+              if (item.external) {
+                return (
+                  <a
+                    key={item.key}
+                    className={className}
+                    href={item.external}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={closeAll}
+                  >
+                    {t(`nav.${item.labelKey}`)}
+                    <Icon
+                      className={styles.external}
+                      name="arrowUpRight"
+                      size={12}
+                      strokeWidth={2.4}
+                    />
+                  </a>
+                );
+              }
+
               return (
                 <Link
                   key={item.key}
@@ -358,13 +405,14 @@ export function Header() {
         {openMenu && (
           <div
             ref={panelRef}
-            className={`${styles.panel} ${
-              mega
-                ? styles.panelMega
-                : MENUS[openMenu].length > 1
-                  ? styles.panelWide
-                  : styles.panelNarrow
-            }`}
+            /*
+             * Two shapes, not four. Explore is three columns across the window;
+             * Ideas, Learn and Marketplace are the same panel anchored under
+             * their trigger, however many groups they hold. The single-column
+             * variant went with them — a menu that was narrow because it had
+             * one group looked like a different component to the one beside it.
+             */
+            className={`${styles.panel} ${mega ? styles.panelMega : styles.panelWide}`}
             style={
               {
                 '--panel-top': panelTop === null ? undefined : `${panelTop}px`,

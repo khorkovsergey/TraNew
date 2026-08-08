@@ -38,7 +38,9 @@
       "learn": "Learn",
       "money": "My Money",
       "voyager": "Voyager",
-      "marketplace": "Marketplace"
+      "marketplace": "Marketplace",
+      "ideas": "Ideas",
+      "community": "Community"
     },
     "login": "Sign in",
     "openApp": "Get started",

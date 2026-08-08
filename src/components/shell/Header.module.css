@@ -18,10 +18,17 @@
  * the logo and the buttons happen to leave. With `space-between` and a flexible
  * middle the row looks centred and is not: the logo is about 175px and the
  * action group rather more, so the nav sits left of centre by the difference.
+ *
+ * The outer tracks are content-sized and the nav is the flexible one, which is
+ * the reverse of what it was. With `1fr auto 1fr` and seven items the middle
+ * track pushed both `1fr`s below their own content between roughly 1080px and
+ * 1280px, and the search button ended up drawn on top of the Community and
+ * Voyager labels. `auto` tracks refuse to go under min-content, so the nav is
+ * the thing that gives — it scrolls inside itself instead.
  */
 .header {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: clamp(6px, 1vw, 20px);
   padding: 14px var(--tn-page-pad);
@@ -58,6 +65,14 @@
   gap: clamp(10px, 2vw, 30px);
   justify-content: safe center;
   min-width: 0;
+  /* The one track allowed to run out of room, so it is the one that scrolls.
+     No visible bar: this is a row of seven labels, not a pane. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
 }
 
 /*
@@ -102,6 +117,15 @@
   border-bottom-color: var(--tn-blue);
 }
 
+/*
+ * The trailing glyph on Community. It says the link leaves the portal, which is
+ * the one thing about that item a reader cannot work out from the label — and it
+ * is quieter than the label so it does not read as a second word.
+ */
+.external {
+  opacity: 0.65;
+}
+
 .chevron {
   transition: transform var(--tn-transition-fast);
 }
@@ -120,12 +144,17 @@
 
 /* ---- Right-hand actions ---- */
 
+/*
+ * No `min-width: 0` here, and that is the fix rather than an omission. It let
+ * the grid's `auto` track shrink past the buttons' own min-content, so the
+ * search button, `Sign in` and `Get started` overlapped the last nav labels
+ * before the header ever reached the width where it wraps.
+ */
 .actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  min-width: 0;
 }
 
 .iconButton {
@@ -209,29 +238,35 @@
  * value beats every rule in this file — including the one that turns the panel
  * into a full-screen drawer on a phone.
  */
+/*
+ * One panel, two shapes.
+ *
+ * The shell is identical for all four menus — Explore's, which was the only one
+ * that had been designed as a surface rather than as a list. Everything that
+ * separates Explore from the other three is below and is about *layout*: how
+ * many columns, and whether the panel hangs off a trigger or off the window.
+ */
 .panel {
   position: fixed;
   top: var(--panel-top, 64px);
   left: var(--panel-left, 12px);
   z-index: 50;
-  padding: 22px 26px;
-  background: var(--tn-surface);
-  border: 1px solid #1c2836;
-  border-radius: 16px;
-  box-shadow: var(--tn-shadow-dropdown);
+  background: #060d16;
+  border: 1px solid #16283a;
+  border-radius: 20px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.62);
   max-height: calc(100vh - 90px);
   overflow-y: auto;
 }
 
-/* One group: a single column, at a width a sentence reads well in. */
-.panelNarrow {
-  width: 340px;
-}
-
 /*
- * Several groups: columns side by side rather than one long scroll. Start,
- * Learn and Marketplace are short lists that wrap into as many columns as they
- * need.
+ * Ideas, Learn and Marketplace: anchored under their own trigger, as wide as
+ * their content and no wider, wrapping into columns when they have more than
+ * one group.
+ *
+ * The column width is bounded at both ends. Under 330px a description folds onto
+ * three lines; over 372px the eye has to travel back across a mostly empty row
+ * to reach the next label.
  */
 .panelWide {
   display: flex;
@@ -239,14 +274,12 @@
   gap: 26px 40px;
   width: max-content;
   max-width: min(940px, calc(100vw - 40px));
+  padding: 26px 30px 24px;
 }
 
 .panelWide .group {
-  min-width: 190px;
-}
-
-.panelNarrow .group + .group {
-  margin-top: 18px;
+  min-width: 330px;
+  max-width: 372px;
 }
 
 /*
@@ -264,10 +297,6 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0 36px;
   padding: 34px 40px 32px;
-  background: #060d16;
-  border-color: #16283a;
-  border-radius: 20px;
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.62);
 }
 
 .panelMega .group {
@@ -291,30 +320,25 @@
   background: linear-gradient(180deg, transparent, #16283a 12%, #16283a 88%, transparent);
 }
 
+/*
+ * One section heading for all four menus. It used to be two — a lighter one in
+ * the list panels and Explore's own — which is the kind of difference nobody
+ * chooses and everybody sees: the same word set two ways in two menus one click
+ * apart.
+ */
 .groupHead {
   display: flex;
   align-items: baseline;
   gap: 12px;
+  margin-bottom: 16px;
 }
 
 .groupTitle {
   font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--tn-text-faint);
-  margin-bottom: 10px;
-}
-
-.panelMega .groupHead {
-  margin-bottom: 16px;
-}
-
-.panelMega .groupTitle {
   font-weight: 800;
   letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: #7f97ad;
-  margin-bottom: 0;
 }
 
 /*
@@ -394,14 +418,11 @@
   background: rgba(20, 34, 48, 0.4);
 }
 
+/*
+ * The label is a flex line rather than a block, so a badge sits beside it and
+ * wraps under it when the row is too narrow to hold both.
+ */
 .menuItemLabel {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--tn-text);
-}
-
-.panelMega .menuItemLabel {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -413,14 +434,9 @@
 
 .menuItemSub {
   display: block;
-  font-size: 12px;
-  color: var(--tn-text-muted);
-  margin-top: 2px;
-}
-
-.panelMega .menuItemSub {
   font-size: 12.5px;
   color: #6d8399;
+  margin-top: 2px;
 }
 
 /*
@@ -434,7 +450,6 @@
  */
 .soon {
   display: inline-block;
-  margin-left: 8px;
   border-radius: 6px;
   background: #0d1b2a;
   border: 1px solid #1e364d;
@@ -445,13 +460,6 @@
   text-transform: uppercase;
   white-space: nowrap;
   color: #7ea6c9;
-  vertical-align: 1px;
-}
-
-/* Inside a mega row the label is a flex line with its own gap. */
-.panelMega .soon {
-  margin-left: 0;
-  vertical-align: baseline;
 }
 
 .soonShort {
@@ -596,8 +604,9 @@
     color: #8ba0b5;
   }
 
-  .panelWide .group + .group {
-    margin-top: 18px;
+  .panelWide .group {
+    min-width: 0;
+    max-width: none;
   }
 
   .panelMega .group + .group::before {
@@ -609,12 +618,21 @@
     padding-top: 0;
   }
 
-  .panelMega .groupHead {
+  /*
+   * `.panel` on every one of these, and it is not decoration.
+   *
+   * The tablet block above is written as `.panelMega .x`, and it still matches
+   * at 390px. A bare `.menuItemSub` here loses to it on specificity rather than
+   * on order, and the descriptions this rule exists to bring back stayed hidden
+   * on Explore. One class in front puts the two on equal terms, and then the
+   * later block — this one — wins.
+   */
+  .panel .groupHead {
     margin-bottom: 8px;
     padding: 16px 6px 8px;
   }
 
-  .panelMega .groupItems {
+  .panel .groupItems {
     gap: 0;
   }
 
@@ -629,7 +647,7 @@
    * Separators instead of gaps, and 11px of padding around a 30px glyph: 52px of
    * row, which is a target a thumb can hit.
    */
-  .panelMega .menuItemWide {
+  .panel .menuItemWide {
     align-items: center;
     gap: 12px;
     padding: 11px 6px;
@@ -637,18 +655,18 @@
     border-bottom: 1px solid #0c1520;
   }
 
-  .panelMega .menuIcon {
+  .panel .menuIcon {
     width: 30px;
     height: 30px;
     border-radius: 9px;
   }
 
-  .panelMega .menuIcon svg {
+  .panel .menuIcon svg {
     width: 16px;
     height: 16px;
   }
 
-  .panelMega .menuItemLabel {
+  .panel .menuItemLabel {
     flex-wrap: nowrap;
     justify-content: space-between;
     font-size: 14px;
@@ -656,7 +674,7 @@
 
   /* The descriptions come back — a phone reader has one column and the room for
      them, which the tablet's two do not. */
-  .panelMega .menuItemSub {
+  .panel .menuItemSub {
     display: block;
     font-size: 11.5px;
   }
@@ -676,15 +694,20 @@
   }
 }
 
+/* ---- Two rows: logo and actions above, navigation below ---- */
+
 /*
- * Phones.
+ * 1340px, not 860px.
  *
- * The desktop row at 390px pushed the document wider than the viewport, so every
- * page scrolled sideways a little. This is the contained fix, not a phone
- * design: the navigation scrolls inside itself so every item stays reachable,
- * and the action group is allowed to shrink instead of forcing the page wider.
+ * The threshold used to be a phone rule — six items fitted one row down to
+ * roughly there, and below it the header pushed the document wider than the
+ * viewport so every page scrolled sideways a little. Seven items do not fit one
+ * row anywhere near 860px: between about 1080 and 1280 the row was still
+ * nominally intact while the labels and the buttons were drawn over each other.
+ * So the wrap happens while there is still room to wrap into, and the navigation
+ * below scrolls inside itself rather than forcing the page wider.
  */
-@media (max-width: 860px) {
+@media (max-width: 1340px) {
   /* Back to a wrapping row: three columns on a 390px screen give the middle one
      nothing to work with. */
   .header {
@@ -697,15 +720,9 @@
     flex: 1 0 100%;
     order: 10;
     gap: 18px;
-    overflow-x: auto;
     justify-content: flex-start;
-    scrollbar-width: none;
     /* Room for a focus ring on the first and last item. */
     padding: 2px;
-  }
-
-  .nav::-webkit-scrollbar {
-    display: none;
   }
 
   .actions {

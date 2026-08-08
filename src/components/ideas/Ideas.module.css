@@ -1,0 +1,786 @@
+/*
+ * Ideas.
+ *
+ * Every card on this page is a button — the themes it names do not have pages of
+ * their own yet, so a card hands its subject to Voyager instead of pretending to
+ * a route. That is why so much of this file sets `display` and `text-align` on
+ * things that would inherit them from a `div`: a `<button>` centres its content
+ * and shrinks to it, and a card has to do neither.
+ */
+
+.page {
+  max-width: var(--tn-page-max);
+  margin: 0 auto;
+  padding: 0 var(--tn-page-pad);
+}
+
+/* ---- Page header ---- */
+
+.head {
+  padding: 52px 0 8px;
+  max-width: 720px;
+}
+
+.h1 {
+  font-size: clamp(36px, 3.4vw, 48px);
+  font-weight: 800;
+  letter-spacing: -1.4px;
+  line-height: 1.1;
+}
+
+.lead {
+  margin-top: 16px;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--tn-text-secondary);
+}
+
+/* ---- Sections ---- */
+
+.section {
+  margin-top: 40px;
+  /* The dropdown lands on these by anchor, and the sticky header is 68px tall
+     over a header that has already scrolled away with it. */
+  scroll-margin-top: 92px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.h2 {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+/*
+ * The framing sentence, beside the heading rather than under it. Several of them
+ * carry the section's honesty — "a signal worth investigating, not evidence of a
+ * good investment" — and a caption under a heading is read after the content it
+ * was supposed to qualify.
+ */
+.h2Sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tn-text-muted);
+  margin-left: 6px;
+}
+
+.sectionLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--tn-blue);
+  transition: color var(--tn-transition-fast);
+}
+
+.sectionLink:hover {
+  color: var(--tn-blue-hover);
+}
+
+/* ---- Explore an idea ---- */
+
+/*
+ * The same treatment as the Ask Voyager card on Home: a darker ground and a
+ * cyan-leaning border, which is what an entry point looks like in this portal.
+ */
+.askSection {
+  margin-top: 28px;
+}
+
+.askCard {
+  background: #060d15;
+  border: 1px solid #16303a;
+  border-radius: var(--tn-radius-showcase);
+  padding: 24px 26px;
+}
+
+.askHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sparkle {
+  color: var(--tn-cyan);
+  flex-shrink: 0;
+}
+
+.askTitle {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.askSub {
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--tn-text-soft);
+}
+
+.askForm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 6px 6px 6px 16px;
+  background: var(--tn-input-bg);
+  border: 1px solid var(--tn-border-input);
+  border-radius: 12px;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.askForm:focus-within {
+  border-color: var(--tn-mint-border);
+}
+
+/* 16px and not a decimal below it: iOS zooms the whole page when a field it is
+   about to focus is smaller than that, and the reader loses the page. */
+.askInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--tn-text);
+  font-size: 16px;
+  padding: 10px 0;
+}
+
+.askInput::placeholder {
+  color: var(--tn-text-faint);
+}
+
+.askSubmit {
+  flex-shrink: 0;
+  padding: 10px 18px;
+  border-radius: 9px;
+  background: var(--tn-mint);
+  color: #04211a;
+  font-size: 13.5px;
+  font-weight: 800;
+  transition: filter var(--tn-transition-fast);
+}
+
+.askSubmit:hover {
+  filter: brightness(1.08);
+}
+
+.askStartersLabel {
+  margin-top: 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tn-text-faint);
+}
+
+/* ---- Chips ---- */
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--tn-border-input);
+  background: #081120;
+  color: #c3d2e0;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.chip:hover {
+  border-color: var(--tn-mint);
+}
+
+.chipSmall {
+  padding: 7px 11px;
+  font-size: 12px;
+}
+
+/* ---- Trending now ---- */
+
+.trendGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.trendCard,
+.oppCard {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-hover);
+}
+
+.trendCard {
+  padding: 20px 20px 18px;
+}
+
+.trendCard:hover,
+.oppCard:hover {
+  border-color: var(--tn-mint);
+}
+
+.trendTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/*
+ * How much attention the theme is getting — not how it has performed. Mint
+ * because it is a state, not a direction; the number in the footer is where
+ * green and red mean up and down.
+ */
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3.5px 9px;
+  border-radius: 7px;
+  background: var(--tn-mint-tint);
+  border: 1px solid #24564b;
+  color: #6ee7b7;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.spark {
+  width: 88px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.cardTitle {
+  display: block;
+  font-size: 17px;
+  font-weight: 800;
+  margin-top: 14px;
+  line-height: 1.3;
+}
+
+.cardBody {
+  display: block;
+  font-size: 13.5px;
+  color: var(--tn-text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+/* ---- The ecosystem chain ---- */
+
+.chain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.chainStep {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chainArrow {
+  color: #35485c;
+  flex-shrink: 0;
+}
+
+.chainChip,
+.kindChip,
+.versusChip,
+.themeChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 7px;
+  background: var(--tn-chip-bg);
+  border: 1px solid #1b2836;
+  color: var(--tn-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Pushes everything after it to the bottom of a card, so four cards of unequal
+   copy still line their footers up. */
+.spacer {
+  flex: 1;
+}
+
+.trendFootRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--tn-border-hairline);
+  font-size: 12px;
+  color: var(--tn-text-muted);
+}
+
+/* Tabular figures, so a column of them does not shift as the digits change. */
+.up,
+.down {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.up {
+  color: var(--tn-green);
+}
+
+.down {
+  color: var(--tn-red);
+}
+
+.trendFoot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.note {
+  font-size: 10.5px;
+  color: var(--tn-text-faint);
+}
+
+/* ---- Explore by theme ---- */
+
+.themeCard {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 20px 28px;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 24px 26px;
+  margin-top: 16px;
+}
+
+.columnTitle {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7f97ad;
+  margin-bottom: 12px;
+}
+
+.themeList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.themeChip {
+  padding: 6px 11px;
+  font-size: 12.5px;
+  white-space: normal;
+  text-align: left;
+  transition: border-color var(--tn-transition-fast), color var(--tn-transition-fast);
+}
+
+.themeChip:hover {
+  border-color: var(--tn-mint);
+  color: var(--tn-text);
+}
+
+/* ---- Opportunities, and portfolios, which share a card ---- */
+
+.oppGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.oppCard {
+  padding: 20px 22px;
+}
+
+/*
+ * The label leads the card and is deliberately quiet: it says what kind of thing
+ * this is — something changing, something being noticed — before the title says
+ * what it is about. Blue-grey, never mint or amber: this is a description, not a
+ * verdict.
+ */
+.oppLabel {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 7px;
+  background: #0d1b2a;
+  border: 1px solid #1e364d;
+  color: #7ea6c9;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.oppCard .cardTitle {
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.oppBody {
+  flex: 1;
+  display: block;
+  font-size: 13.5px;
+  color: var(--tn-text-soft);
+  margin-top: 8px;
+  line-height: 1.55;
+}
+
+.cardLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 16px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-blue);
+}
+
+/* ---- Popular with investors ---- */
+
+.popularCard {
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.popularRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 13px 18px;
+  text-align: left;
+  color: var(--tn-text);
+  transition: background var(--tn-transition-fast);
+}
+
+.popularRow + .popularRow {
+  border-top: 1px solid var(--tn-border-hairline);
+}
+
+.popularRow:hover {
+  background: #0b131e;
+}
+
+.rank {
+  width: 20px;
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--tn-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.popularName {
+  flex: 1;
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.kindChip {
+  font-size: 10.5px;
+}
+
+/* Which kind of attention, in a fixed column so the six read as one list. */
+.signal {
+  width: 180px;
+  flex-shrink: 0;
+  font-size: 12.5px;
+  color: var(--tn-text-muted);
+  text-align: right;
+}
+
+.rowChevron {
+  color: #4d6480;
+  flex-shrink: 0;
+}
+
+/* ---- Portfolios ---- */
+
+.bar {
+  display: flex;
+  gap: 3px;
+  margin-top: 16px;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar > span {
+  display: block;
+}
+
+.tone_mint {
+  background: var(--tn-mint);
+}
+
+.tone_blue {
+  background: var(--tn-blue);
+}
+
+.tone_purple {
+  background: var(--tn-purple);
+}
+
+.tone_cyan {
+  background: var(--tn-cyan);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 12px;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--tn-text-soft);
+}
+
+.swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.cardMeta {
+  display: block;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--tn-border-hairline);
+  font-size: 12px;
+  color: var(--tn-text-muted);
+}
+
+/* ---- Compare ideas ---- */
+
+.compareList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.compareRow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  text-align: left;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 16px 20px;
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-hover);
+}
+
+.compareRow:hover,
+.buildRow:hover {
+  border-color: var(--tn-mint);
+}
+
+.versus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.versusChip {
+  font-size: 12.5px;
+  padding: 7px 12px;
+  color: #e2ebf3;
+}
+
+.versusWord {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--tn-text-faint);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.compareBody {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--tn-text-muted);
+}
+
+/* Dashed, because it is the row that makes one rather than reads one. */
+.buildRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px dashed var(--tn-border-control);
+  border-radius: var(--tn-radius-card);
+  padding: 16px 20px;
+  color: var(--tn-text-secondary);
+  font-size: 13.5px;
+  font-weight: 700;
+  transition: border-color var(--tn-transition-hover), color var(--tn-transition-hover);
+}
+
+.buildRow:hover {
+  color: var(--tn-text);
+}
+
+/* ---- Voyager strip ---- */
+
+/*
+ * Last, and not first. Voyager augments this page — every section above it is
+ * useful without ever opening the assistant, which is the arrangement that keeps
+ * Ideas a place to read rather than a prompt box with cards around it.
+ */
+.voyagerSection {
+  margin-top: 40px;
+  margin-bottom: 8px;
+}
+
+.voyagerCard {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: #060d15;
+  border: 1px solid #16303a;
+  border-radius: var(--tn-radius-showcase);
+  padding: 22px 26px;
+}
+
+.robot {
+  flex-shrink: 0;
+  width: 84px;
+  height: 84px;
+  margin: -8px 0;
+}
+
+.voyagerText {
+  flex: 1;
+  min-width: 0;
+}
+
+.voyagerTitle {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.voyagerSub {
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--tn-text-soft);
+}
+
+.voyagerChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ---- Responsive ---- */
+
+@media (max-width: 1180px) {
+  .trendGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .themeCard {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .oppGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .themeCard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .robot {
+    width: 60px;
+    height: 60px;
+  }
+
+  /* The strip stacks: three chips beside a robot and two lines of text have
+     nowhere to go on a narrow screen. */
+  .voyagerCard {
+    flex-wrap: wrap;
+  }
+
+  .voyagerChips {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 680px) {
+  .h1 {
+    letter-spacing: -1.2px;
+  }
+
+  .trendGrid,
+  .themeCard {
+    grid-template-columns: 1fr;
+  }
+
+  /* The row keeps its rank and its name; the signal moves under them rather
+     than squeezing the name into two words per line. */
+  .compareRow,
+  .popularRow {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+  }
+
+  .signal {
+    width: auto;
+    text-align: left;
+  }
+}
