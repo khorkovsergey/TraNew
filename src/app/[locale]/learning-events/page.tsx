@@ -3,7 +3,6 @@ import { setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { EventSection } from '@/components/events/EventSection';
-import { EventsHubHeader } from '@/components/events/EventsHubHeader';
 import { summaries } from '@/lib/data/events';
 import { rankEvents } from '@/lib/events/recommend';
 import { NO_SIGNALS } from '@/lib/events/recommend';
@@ -49,7 +48,29 @@ export default async function LearningEventsPage({ params }: Props) {
 
   return (
     <div className={styles.wrap}>
-      <EventsHubHeader active="events" />
+      {/*
+        * Its own header, not the Events one.
+        *
+        * This page is the only place that really is both halves at once, so it
+        * says so. The Events header stopped describing learning when the tab
+        * strip came off, and borrowing it here would have put "Create an event"
+        * above a section about lessons.
+        */}
+      <header>
+        <Link className={styles.backHome} href="/">
+          ← Home
+        </Link>
+
+        <p className={styles.eyebrow}>LEARNING &amp; EVENTS</p>
+        <h1 className={styles.h1}>
+          Learn, connect and navigate the markets{' '}
+          <span className={styles.h1Accent}>with confidence</span>
+        </h1>
+        <p className={styles.lede}>
+          Build your knowledge with practical courses or join financial events hosted by TradingNew
+          and the community.
+        </p>
+      </header>
 
       <section className={styles.section}>
         <div className={styles.sectionHead}>

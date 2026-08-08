@@ -126,7 +126,7 @@ export default async function EventsPage({ params, searchParams }: Props) {
     <>
       <SpaceBackdrop tone={4} />
     <div className={styles.wrap}>
-      <EventsHubHeader active="events" />
+      <EventsHubHeader />
 
       <div className={styles.board}>
         <EventsBrowser

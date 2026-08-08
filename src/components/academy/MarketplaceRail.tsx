@@ -7,9 +7,7 @@ import styles from './Courses.module.css';
  * The Marketplace side navigation.
  *
  * Every destination is a route that already exists — the rail names the
- * marketplace's parts, it does not invent them. That is why "Tools and data"
- * points at the professional tools page: a rail entry that leads to a 404 is
- * worse than one that leads somewhere honest.
+ * marketplace's parts, it does not invent them.
  */
 
 const ITEMS: Array<{ label: string; href: StaticPathname; icon: IconName }> = [
@@ -18,7 +16,7 @@ const ITEMS: Array<{ label: string; href: StaticPathname; icon: IconName }> = [
   { label: 'Events near you', href: '/events', icon: 'calendar' },
   { label: 'Academy', href: '/marketplace/academy', icon: 'grad' },
   { label: 'Subscriptions', href: '/marketplace/subscriptions', icon: 'wallet' },
-  { label: 'Tools and data', href: '/tools', icon: 'bars' },
+  { label: 'Tools and data', href: '/marketplace/tools', icon: 'bars' },
 ];
 
 export function MarketplaceRail({ active }: { active: StaticPathname }) {

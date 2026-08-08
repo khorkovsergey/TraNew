@@ -64,18 +64,9 @@ export function EventsMap({
 
   return (
     <div className={styles.mapWrap}>
-      <div className={styles.mapList}>
-        {items.map((event) => (
-          <EventCard
-            key={event.id}
-            event={event}
-            variant="compact"
-            viewerTimeZone={viewerTimeZone}
-          />
-        ))}
-      </div>
-
       <div className={styles.mapCanvas} role="group" aria-label="Event locations">
+        <Contours />
+
         {placed.map((event) => {
           const times = formatEventTimes({
             startsAt: event.startsAt,
@@ -92,8 +83,8 @@ export function EventsMap({
               href={{ pathname: '/events/[slug]', params: { slug: event.slug } }}
               title={`${event.title} · ${times.dayLabel}`}
             >
-              <Dot />
-              {event.city ?? event.title}
+              <span className={styles.mapPinDot} aria-hidden="true" />
+              <span className={styles.mapPinLabel}>{event.city ?? event.title}</span>
             </Link>
           );
         })}
@@ -105,21 +96,47 @@ export function EventsMap({
           {online > 0 && ` ${online} online event${online === 1 ? '' : 's'} can be joined anywhere.`}
         </p>
       </div>
+
+      <div className={styles.mapList}>
+        {items.map((event) => (
+          <EventCard key={event.id} event={event} viewerTimeZone={viewerTimeZone} />
+        ))}
+      </div>
     </div>
   );
 }
 
-function Dot() {
+/*
+ * Contours, not coastlines.
+ *
+ * Deliberately abstract: a shape that looked like a real map would be read as
+ * one, and the pins are placed by relative position rather than by projection —
+ * the note under them says so.
+ */
+function Contours() {
   return (
-    <span
-      aria-hidden="true"
-      style={{
-        width: 8,
-        height: 8,
-        borderRadius: '50%',
-        background: 'var(--tn-purple)',
-        flexShrink: 0,
-      }}
-    />
+    <svg className={styles.mapLines} viewBox="0 0 1200 420" aria-hidden="true">
+      <path
+        d="M0 300 Q 200 260 380 290 T 760 270 T 1200 300"
+        fill="none"
+        stroke="var(--tn-border-card)"
+        strokeWidth={2}
+      />
+      <path
+        d="M0 180 Q 260 140 520 170 T 1200 150"
+        fill="none"
+        stroke="var(--tn-border-card)"
+        strokeWidth={2}
+      />
+      <circle
+        cx={340}
+        cy={205}
+        r={130}
+        fill="none"
+        stroke="var(--tn-border-hairline)"
+        strokeWidth={1.5}
+        strokeDasharray="4 8"
+      />
+    </svg>
   );
 }

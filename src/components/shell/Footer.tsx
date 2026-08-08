@@ -61,7 +61,8 @@ const COLUMNS: Array<{ title: string; links: FooterLink[] }> = [
     title: 'Services',
     links: [
       { label: 'Expert services', href: '/marketplace/experts' },
-      { label: 'Tools and data', href: '/tools' },
+      { label: 'Tools and data', href: '/marketplace/tools' },
+      { label: 'Chart Market', href: '/marketplace/tools/chart-market' },
       { label: 'Academy courses', href: '/marketplace/academy' },
       { label: 'Plans', href: '/marketplace/subscriptions' },
       { label: 'Marketplace', href: '/marketplace' },

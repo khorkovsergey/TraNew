@@ -81,18 +81,25 @@
   filter: brightness(1.08);
 }
 
+.plus {
+  font-size: 17px;
+  line-height: 1;
+}
+
 .primary:disabled {
   background: var(--tn-border-control);
   cursor: default;
 }
 
+/* Outline, not a second fill. Two solid buttons side by side make neither of
+   them the next step. */
 .secondary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--tn-surface);
-  border: 1px solid var(--tn-border-input);
-  border-radius: var(--tn-radius-pill);
+  background: none;
+  border: 1px solid var(--tn-border-control);
+  border-radius: 11px;
   padding: 12px 22px;
   font: inherit;
   font-size: 14px;
@@ -103,16 +110,20 @@
 }
 
 .secondary:hover {
-  border-color: var(--tn-purple);
+  border-color: var(--tn-border-hover);
 }
 
-/* ---- Learning / Events tabs ---- */
+/* ---- Tabs ---- */
 
 /*
- * Two tabs, marked by an underline rather than a filled pill.
+ * Marked by an underline rather than a filled pill.
  *
- * The pill read as a button and sat beside two real buttons, so the row had
- * four things that looked pressable and two that were a place you already are.
+ * The pill read as a button and sat beside real buttons, so the row had four
+ * things that looked pressable and two that were a place you already are.
+ *
+ * Used by My events. The hub's Learning|Events strip is gone: Learn has its own
+ * section in the navigation, and a tab that leaves the page you just picked is
+ * not a tab.
  */
 .hubTabs {
   display: flex;
@@ -147,12 +158,15 @@
 
 /* ---- Toolbar ---- */
 
+/*
+ * The browsing surface sits on the page, not inside a panel.
+ *
+ * It was a bordered card wrapping the toolbar, the search field, the filter
+ * panel and the results — a box around most of the page, which is a frame
+ * rather than a grouping. The cards below already carry the section's surface.
+ */
 .board {
-  margin-top: 28px;
-  background: var(--tn-surface);
-  border: 1px solid var(--tn-border-card);
-  border-radius: 22px;
-  padding: 22px;
+  margin-top: 26px;
 }
 
 .boardHead {
@@ -160,14 +174,14 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 }
 
 .boardTitle {
   margin: 0;
-  font-size: 19px;
+  font-size: 24px;
   font-weight: 800;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.5px;
   color: var(--tn-text);
 }
 
@@ -182,8 +196,9 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  max-width: 100%;
   background: var(--tn-surface-inner);
-  border: 1.5px solid #1e2a3a;
+  border: 1.5px solid var(--tn-border-control);
   border-radius: 10px;
   padding: 10px 16px;
   font: inherit;
@@ -216,6 +231,8 @@
   border-color: var(--tn-mint);
 }
 
+/* How many filters are on. Mint with dark ink — the same pairing every counted
+   state in the portal uses, and readable at 11px, which white on violet was not. */
 .controlCount {
   display: inline-flex;
   align-items: center;
@@ -224,46 +241,73 @@
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--tn-purple);
+  background: var(--tn-mint);
   font-size: 11px;
   font-weight: 800;
-  color: #fff;
+  color: var(--tn-cta-text);
 }
 
+/* Search and the view switch share one line: they are both "how am I looking at
+   this", and stacking them put two half-empty rows above the results. */
 .searchRow {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-top: 14px;
 }
 
 .search {
   flex: 1;
+  min-width: 260px;
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--tn-surface);
+  background: var(--tn-input-bg);
   border: 1px solid var(--tn-border-input);
-  border-radius: var(--tn-radius-pill);
-  padding: 0 18px;
+  border-radius: var(--tn-radius-search);
+  /* Room on the right for the submit button, which sits inside the field. */
+  padding: 4px 4px 4px 16px;
 }
 
 .search:focus-within {
-  border-color: var(--tn-purple);
+  border-color: var(--tn-mint);
 }
 
 .searchInput {
   flex: 1;
+  min-width: 0;
   border: 0;
   outline: none;
   background: transparent;
-  padding: 13px 0;
+  padding: 9px 0;
   font: inherit;
-  font-size: 14.5px;
+  /* 16px, not the 14px the mock shows: below 16 iOS zooms the page the moment
+     the field takes focus, and the first thing the layout does is jump. */
+  font-size: 16px;
   color: var(--tn-text);
 }
 
 .searchInput::placeholder {
-  color: var(--tn-text-muted);
+  color: var(--tn-text-faint);
+}
+
+.searchSubmit {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--tn-border-control);
+  border-radius: 9px;
+  padding: 9px 20px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+  cursor: pointer;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.searchSubmit:hover {
+  border-color: var(--tn-border-hover);
+  color: var(--tn-text);
 }
 
 /* Wraps. A <select> sizes itself to its widest option, so on a narrow screen the
@@ -273,11 +317,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 14px;
-}
-
-.control {
-  max-width: 100%;
 }
 
 /* ---- Active filter chips ---- */
@@ -290,29 +329,32 @@
   margin-top: 14px;
 }
 
+/* Mint outline, matching the controls that switched them on — a grey chip did
+   not read as "this is currently narrowing your results". */
 .activeChip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  background: var(--tn-chip-bg);
-  border: 0;
-  border-radius: var(--tn-radius-chip);
-  padding: 7px 8px 7px 12px;
+  gap: 8px;
+  background: var(--tn-mint-tint);
+  border: 1px solid var(--tn-mint-border);
+  border-radius: 9px;
+  padding: 7px 13px;
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--tn-text-nav);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--tn-mint);
   cursor: pointer;
+  transition: border-color var(--tn-transition-fast);
 }
 
 .activeChip:hover {
-  background: var(--tn-chip-bg);
+  border-color: var(--tn-mint);
 }
 
 .activeChipX {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
-  color: var(--tn-text-muted);
+  opacity: 0.8;
 }
 
 .clearAll {
@@ -322,33 +364,44 @@
   font: inherit;
   font-size: 12.5px;
   font-weight: 700;
-  color: var(--tn-blue);
+  color: var(--tn-text-secondary);
   cursor: pointer;
+  transition: color var(--tn-transition-fast);
+}
+
+.clearAll:hover {
+  color: var(--tn-text);
 }
 
 /* ---- Filter panel ---- */
 
 .panel {
-  margin-top: 16px;
-  border: 1px solid var(--tn-border-card);
-  border-radius: 18px;
-  padding: 20px;
-  background: var(--tn-bg);
+  margin-top: 14px;
+  border: 1px solid var(--tn-border-inner);
+  border-radius: 16px;
+  padding: 22px 26px;
+  background: var(--tn-surface-veil);
 }
 
+/* Four columns, so all eight groups are two rows and the panel never becomes a
+   scroll of its own. */
 .panelGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 22px 28px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px 28px;
 }
 
 .group {
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .groupTitle {
-  margin: 0 0 10px;
-  font-size: 12px;
+  margin: 0 0 9px;
+  padding: 0;
+  font-size: 11.5px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -362,14 +415,15 @@
 }
 
 .option {
-  background: var(--tn-surface);
-  border: 1px solid var(--tn-border-input);
-  border-radius: var(--tn-radius-chip);
-  padding: 8px 13px;
+  background: var(--tn-surface-inner);
+  border: 1.5px solid var(--tn-border-inner);
+  border-radius: 9px;
+  padding: 7px 13px;
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--tn-text-nav);
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background var(--tn-transition-fast),
@@ -378,22 +432,45 @@
 }
 
 .option:hover {
-  border-color: var(--tn-purple);
+  border-color: var(--tn-border-hover);
 }
 
+/*
+ * Selected: the same mint tint and border the toolbar controls take, rather than
+ * an inverted white slab. Sixteen inverted chips in one panel was the brightest
+ * thing on the page and read as the panel being selected, not the options.
+ */
 .optionOn {
-  background: var(--tn-text);
-  border-color: var(--tn-text);
+  background: var(--tn-mint-tint);
+  border-color: var(--tn-mint);
   color: #fff;
+}
+
+.optionOn:hover {
+  border-color: var(--tn-mint);
 }
 
 .panelFoot {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
   margin-top: 20px;
-  padding-top: 18px;
-  border-top: 1px solid var(--tn-border-card);
+  padding-top: 16px;
+  border-top: 1px solid var(--tn-border-hairline);
+}
+
+/* The panel's confirm button is smaller than the hero's Create button — it
+   dismisses a panel rather than starting something. */
+.panelFoot .primary {
+  padding: 11px 24px;
+  font-size: 13.5px;
+}
+
+.panelFoot .secondary {
+  padding: 10px 18px;
+  font-size: 13px;
+  color: var(--tn-text-nav);
 }
 
 /* ---- Sections and grid ---- */
@@ -433,18 +510,19 @@
  * three hundred. The result wrapped one word per line and pushed its badges
  * twelve pixels past the border.
  *
- * 300px is the width the card was designed at, so the full-width pages still
- * get their three columns and a narrow column gets one.
+ * 360px is the width the card was designed at — a 150px cover and a two-line
+ * title — so the full-width pages come out three across and a narrow column
+ * gets one, without either of them being told which.
  */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  gap: 16px;
 }
 
 /* Kept as a name for the pages that ask for it; the base grid now does this. */
 .gridWide {
-  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
 }
 
 /* ---- Card ---- */
@@ -453,21 +531,39 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  background: var(--tn-surface);
+  /* Veiled rather than solid: the section sits on a space image, and a flat
+     surface punched out of it reads as a hole. */
+  background: var(--tn-surface-veil);
   border: 1px solid var(--tn-border-card);
-  border-radius: 18px;
+  border-radius: 16px;
   overflow: hidden;
-  transition: box-shadow var(--tn-transition-fast);
+  transition:
+    border-color var(--tn-transition-fast),
+    box-shadow var(--tn-transition-fast);
 }
 
 .card:hover {
+  border-color: var(--tn-border-hover);
   box-shadow: var(--tn-shadow-card-hover);
 }
 
+/* Tall enough for a photograph to be a photograph. At 96px the cover was a
+   coloured strip and every card in a row looked the same. */
 .cardCover {
   position: relative;
-  height: 96px;
+  height: 150px;
   flex-shrink: 0;
+}
+
+/* A wash at the top of the cover, so a trust badge stays readable over a bright
+   photograph rather than only over the dark ones. */
+.cardCover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, var(--tn-overlay), transparent 58%);
+  pointer-events: none;
 }
 
 .cardCompact .cardCover {
@@ -486,16 +582,20 @@
   position: absolute;
   top: 12px;
   left: 12px;
+  /* Above the cover image, and never in the way of the taps meant for the card
+     underneath. */
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 7px;
+  pointer-events: none;
 }
 
 .cardBody {
   display: flex;
   flex-direction: column;
   flex: 1;
-  padding: 16px 18px 18px;
+  padding: 16px 18px;
 }
 
 .cardWhen {
@@ -509,18 +609,17 @@
 }
 
 .cardTime {
-  color: var(--tn-text-soft);
-  font-weight: 700;
+  color: var(--tn-text-nav);
 }
 
 .cardDot {
-  color: var(--tn-text-muted);
+  color: var(--tn-text-faint);
 }
 
 .cardTitle {
-  margin: 8px 0 0;
+  margin: 7px 0 0;
   font-size: 16.5px;
-  line-height: 1.3;
+  line-height: 1.35;
   font-weight: 800;
   letter-spacing: -0.3px;
 }
@@ -530,7 +629,7 @@
 }
 
 .cardLink:hover {
-  color: var(--tn-blue);
+  color: var(--tn-blue-hover);
 }
 
 /* The whole card is the target. Below the Save button (z-index 2) so that keeps
@@ -554,25 +653,30 @@
   content: none;
 }
 
+/* Takes the slack, so the footers of three cards in a row line up whatever
+   length their summaries are. */
 .cardSummary {
-  margin: 8px 0 0;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--tn-text-secondary);
+  flex: 1;
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tn-text-soft);
 }
 
 .cardChips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
+/* Cyan, and only here: it is the recommender talking about the reader, not a
+   property of the event. */
 .cardReason {
-  margin: 10px 0 0;
+  margin: 9px 0 0;
   font-size: 11.5px;
   line-height: 1.45;
-  color: var(--tn-text-muted);
+  color: var(--tn-cyan);
 }
 
 .cardFoot {
@@ -580,18 +684,18 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: auto;
-  padding-top: 14px;
-  border-top: 1px solid var(--tn-border-card);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tn-border-hairline);
 }
 
 .cardOrganizer {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--tn-text-nav);
 }
 
@@ -599,41 +703,47 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--tn-chip-bg);
+  border: 1px solid var(--tn-border-control);
   font-size: 10px;
   font-weight: 800;
   color: var(--tn-text-nav);
 }
 
 .cardAvailability {
-  font-size: 12px;
-  color: var(--tn-text-muted);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--tn-text-soft);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .cardStateOk {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 800;
   color: var(--tn-green);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .cardStateWait {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 800;
   color: var(--tn-amber-text);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .cardStateOff {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 800;
   color: var(--tn-red);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ---- Badges and chips ---- */
@@ -641,8 +751,8 @@
 .badge {
   display: inline-flex;
   align-items: center;
-  border-radius: var(--tn-radius-chip-sm);
-  padding: 5px 9px;
+  border-radius: 7px;
+  padding: 4px 10px;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -655,7 +765,7 @@
  * `badgeFor()` still decides which; this only says what each looks like.
  */
 .badgeOfficial {
-  background: rgba(46, 230, 168, 0.14);
+  background: var(--tn-mint-tint);
   color: var(--tn-mint);
 }
 
@@ -671,57 +781,82 @@
 
 .badgeExternal {
   background: var(--tn-chip-bg);
-  color: var(--tn-text-muted);
+  color: var(--tn-text-nav);
 }
 
+/*
+ * Paid placement, and it says so. Dark with a grey edge rather than the white
+ * plaque it was: on a photograph the white one was brighter than the trust
+ * badge beside it, so the advertisement outranked the thing that says who
+ * stands behind the event.
+ */
 .promoted {
   display: inline-flex;
   align-items: center;
-  border-radius: var(--tn-radius-chip-sm);
-  padding: 5px 10px;
-  background: rgba(255, 255, 255, 0.85);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--tn-text-muted);
+  border-radius: 7px;
+  padding: 4px 10px;
+  background: var(--tn-overlay);
+  border: 1px solid var(--tn-border-hover);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--tn-text-nav);
 }
 
+/* Neutral chips are outlined; the ones that carry a meaning are tinted. That
+   way a card's colour count matches how much of it is actually meaningful. */
 .chip {
   display: inline-flex;
   align-items: center;
-  border-radius: var(--tn-radius-chip-sm);
-  background: var(--tn-chip-bg);
-  padding: 5px 10px;
-  font-size: 11.5px;
-  font-weight: 600;
+  border-radius: 7px;
+  background: none;
+  border: 1px solid var(--tn-border-control);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
   color: var(--tn-text-nav);
   white-space: nowrap;
 }
 
 .chipFree {
   background: var(--tn-green-tint);
-  color: var(--tn-green);
+  border-color: transparent;
+  color: var(--tn-green-deep);
+  font-weight: 800;
 }
 
 /* A price is not a warning and not a saving — amber, so it is neither read as
    "free" nor as "careful". */
 .chipPaid {
   background: var(--tn-amber-tint);
+  border-color: transparent;
   color: var(--tn-amber-text);
+  font-weight: 800;
 }
 
+/*
+ * One tint per format, and the pairing is deliberate: online is the sky blue
+ * that means "wherever you are" across the portal, and in person is the mint
+ * that carries the section. They were the other way round, which put the
+ * colour of a remote thing on the events you have to travel to.
+ */
 .formatInPerson {
-  background: var(--tn-blue-tint);
-  color: var(--tn-blue);
+  background: var(--tn-mint-tint);
+  border-color: transparent;
+  color: var(--tn-green-deep);
 }
 
 .formatOnline {
-  background: var(--tn-green-tint);
-  color: var(--tn-green);
+  background: var(--tn-blue-tint);
+  border-color: transparent;
+  color: var(--tn-blue-hover);
 }
 
 .formatHybrid {
   background: var(--tn-purple-tint);
-  color: var(--tn-purple);
+  border-color: transparent;
+  color: var(--tn-purple-hover);
 }
 
 /* ---- Save control ---- */
@@ -737,14 +872,14 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid #1e2a3a;
+  border: 1px solid var(--tn-border-control);
   border-radius: 9px;
   /*
    * Dark, over the cover. A white square was the brightest thing on the card
    * and pulled the eye to a secondary action four times a row.
    */
-  background: rgba(4, 7, 12, 0.7);
-  color: var(--tn-text-secondary);
+  background: var(--tn-overlay);
+  color: var(--tn-text-nav);
   cursor: pointer;
   transition:
     background var(--tn-transition-fast),
@@ -761,8 +896,8 @@
   align-items: center;
   gap: 8px;
   background: var(--tn-surface);
-  border: 1px solid var(--tn-border-input);
-  border-radius: var(--tn-radius-pill);
+  border: 1px solid var(--tn-border-control);
+  border-radius: 11px;
   padding: 10px 18px;
   font: inherit;
   font-size: 13.5px;
@@ -777,7 +912,7 @@
 }
 
 .saveLabelled.saveOn {
-  border-color: var(--tn-orange-star);
+  border-color: var(--tn-mint-border);
 }
 
 /* ---- Skeletons ---- */
@@ -809,9 +944,11 @@
 /* ---- Empty and error states ---- */
 
 .empty {
-  border: 1px dashed var(--tn-border-input);
-  border-radius: 18px;
-  padding: 40px 28px;
+  margin-top: 12px;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: 16px;
+  padding: 44px 28px;
   text-align: center;
 }
 
@@ -867,16 +1004,105 @@
 .more {
   display: flex;
   justify-content: center;
-  margin-top: 26px;
+  margin-top: 20px;
 }
 
 .resultCount {
-  margin: 18px 0 0;
+  margin: 16px 0 12px;
   font-size: 13px;
-  color: var(--tn-text-muted);
+  color: var(--tn-text-soft);
 }
 
 /* ---- Calendar view ---- */
+
+/*
+ * A month grid, and the same events listed under it.
+ *
+ * The grid answers "when is this month busy"; a cell four lines tall cannot
+ * answer "what is it and can I go", and shrinking the answer to fit would drop
+ * the time, the venue and the link. So the grid is the shape of the month and
+ * the list below it is the month itself — both built from one set of results.
+ */
+.calMonth {
+  margin-top: 12px;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: 16px;
+  padding: 22px 26px;
+}
+
+.calMonthName {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.calWeekdays,
+.calGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calWeekdays {
+  margin-top: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tn-text-faint);
+  text-align: center;
+}
+
+.calGrid {
+  margin-top: 8px;
+}
+
+.calCell {
+  min-height: 54px;
+  border-radius: 9px;
+  padding: 6px 8px;
+  background: var(--tn-surface-inner);
+  border: 1px solid var(--tn-border-card);
+  color: var(--tn-text-nav);
+  overflow: hidden;
+}
+
+/* The days either side of the month keep their place in the grid without
+   claiming to be part of it. */
+.calCellOut {
+  background: none;
+  border-color: transparent;
+  color: transparent;
+}
+
+.calCellOn {
+  background: var(--tn-mint-tint);
+  border-color: var(--tn-mint-border);
+}
+
+.calCellNum {
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.calCellEvent {
+  display: block;
+  margin-top: 3px;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--tn-mint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calCellMore {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--tn-text-soft);
+}
 
 .calDay {
   margin-top: 22px;
@@ -899,18 +1125,23 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  background: var(--tn-surface);
+  background: var(--tn-surface-veil);
   border: 1px solid var(--tn-border-card);
   border-radius: 14px;
   padding: 12px 16px;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.calRow:hover {
+  border-color: var(--tn-border-hover);
 }
 
 .calTime {
   flex-shrink: 0;
   width: 116px;
   font-size: 12.5px;
-  font-weight: 700;
-  color: var(--tn-purple);
+  font-weight: 800;
+  color: var(--tn-mint);
 }
 
 .calTitle {
@@ -922,7 +1153,7 @@
 }
 
 .calTitle:hover {
-  color: var(--tn-blue);
+  color: var(--tn-blue-hover);
 }
 
 .calMeta {
@@ -933,23 +1164,34 @@
 
 /* ---- Map view ---- */
 
+/*
+ * The pane above, the events below.
+ *
+ * It was a 320px column of cards beside the pane, which gave the map two thirds
+ * of the width and the cards a third — the wrong way round for the half that
+ * has the times, the prices and the links in it.
+ */
 .mapWrap {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 18px;
-  margin-top: 20px;
+  margin-top: 12px;
 }
 
 .mapCanvas {
   position: relative;
-  min-height: 420px;
+  height: 420px;
   border: 1px solid var(--tn-border-card);
-  border-radius: 18px;
-  background:
-    repeating-linear-gradient(0deg, transparent 0 39px, var(--tn-border-hairline) 39px 40px),
-    repeating-linear-gradient(90deg, transparent 0 39px, var(--tn-border-hairline) 39px 40px),
-    var(--tn-chip-bg);
+  border-radius: 16px;
+  background: var(--tn-bg);
   overflow: hidden;
+}
+
+/* The contours underneath: an abstraction, not a map, and quiet enough that no
+   one mistakes it for one. */
+.mapLines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.5;
 }
 
 .mapNote {
@@ -957,9 +1199,9 @@
   left: 16px;
   bottom: 14px;
   right: 16px;
-  font-size: 11.5px;
+  font-size: 11px;
   line-height: 1.5;
-  color: var(--tn-text-muted);
+  color: var(--tn-text-faint);
 }
 
 .mapPin {
@@ -967,39 +1209,53 @@
   transform: translate(-50%, -100%);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: var(--tn-surface);
-  border: 1px solid var(--tn-border-input);
-  border-radius: var(--tn-radius-pill);
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 700;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 800;
   color: var(--tn-text);
-  box-shadow: var(--tn-shadow-card-hover);
   white-space: nowrap;
 }
 
-.mapPin:hover {
-  border-color: var(--tn-purple);
+.mapPinDot {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--tn-mint);
+  border: 2.5px solid var(--tn-cta-text);
+  box-shadow: var(--tn-mint-glow);
+}
+
+.mapPinLabel {
+  background: var(--tn-overlay);
+  border: 1px solid var(--tn-border-inner);
+  border-radius: 8px;
+  padding: 5px 10px;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.mapPin:hover .mapPinLabel {
+  border-color: var(--tn-mint-border);
 }
 
 .mapList {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 520px;
-  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  gap: 16px;
+  margin-top: 16px;
 }
 
 /* ---- Responsive ---- */
 
+@media (max-width: 1180px) {
+  .panelGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 1000px) {
   .grid {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .mapWrap {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -1008,8 +1264,41 @@
     grid-template-columns: 1fr;
   }
 
-  .board {
+  .panelGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+
+  .boardTitle {
+    font-size: 20px;
+  }
+
+  /* Every control keeps a 44px target: the row wraps rather than shrinking the
+     things a thumb has to hit. */
+  .control,
+  .option,
+  .activeChip,
+  .searchSubmit {
+    min-height: 44px;
+  }
+
+  /* Including Save, which sits on top of a card-sized link and has to be hit on
+     purpose rather than by accident. */
+  .saveIcon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .calMonth {
     padding: 16px;
+  }
+
+  .calCell {
+    min-height: 46px;
+    padding: 5px;
   }
 
   .calRow {
@@ -1115,7 +1404,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--tn-purple);
+  background: var(--tn-mint);
 }
 
 .factRow {
@@ -1164,7 +1453,7 @@
   width: 76px;
   font-size: 13px;
   font-weight: 700;
-  color: var(--tn-purple);
+  color: var(--tn-mint);
 }
 
 .agendaTitle {
@@ -1254,9 +1543,11 @@
   cursor: default;
 }
 
+/* Registering is the one leading action on an event page, so it takes the
+   section's own accent rather than Voyager's violet. */
 .ctaPrimary {
-  background: var(--tn-purple);
-  color: #fff;
+  background: var(--tn-cta);
+  color: var(--tn-cta-text);
 }
 
 .ctaDark {
@@ -1474,13 +1765,15 @@
   border-radius: 12px;
   padding: 11px 14px;
   font: inherit;
-  font-size: 14.5px;
+  /* 16px is the floor for a field: anything smaller and iOS zooms the page on
+     focus. */
+  font-size: 16px;
   color: var(--tn-text);
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--tn-purple);
+  border-color: var(--tn-mint);
 }
 
 .fieldHint {
@@ -1597,11 +1890,13 @@
 }
 
 .choice:hover {
-  border-color: var(--tn-purple);
+  border-color: var(--tn-border-hover);
 }
 
-.choiceOn {
-  border-color: var(--tn-purple);
+.choiceOn,
+.choiceOn:hover {
+  background: var(--tn-mint-tint);
+  border-color: var(--tn-mint);
 }
 
 .choiceTitle {

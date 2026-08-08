@@ -112,6 +112,24 @@ export const routing = defineRouting({
     '/marketplace/consultations/[id]': '/marketplace/consultations/[id]',
     '/marketplace/consultations/[id]/summary': '/marketplace/consultations/[id]/summary',
 
+    /*
+     * Tools & Data. The hub is a gateway to two products that exist and two
+     * that do not yet, and it says which is which on itself.
+     *
+     * Chart Market is one route rather than four. The catalogue, a product, the
+     * checkout and the confirmation are states of one screen held in the query
+     * string, so the back button walks the purchase backwards and a link to a
+     * script is a link to that script — which is what a person copies out of the
+     * address bar.
+     *
+     * `/professional-tools` was the placeholder that used to live at `/tools`.
+     * It redirects here (see middleware.ts); the old address should stop
+     * existing rather than keep working invisibly.
+     */
+    '/marketplace/tools': '/marketplace/tools',
+    '/marketplace/tools/chart-market': '/marketplace/tools/chart-market',
+    '/marketplace/tools/supercharts': '/marketplace/tools/supercharts',
+
     // Authentication
     '/sign-in': '/sign-in',
     '/sign-up': '/sign-up',
@@ -149,7 +167,6 @@ export const routing = defineRouting({
     '/trust': '/trust-center',
     '/how-we-explain': '/how-we-explain-markets',
     '/guidance': '/personal-guidance',
-    '/tools': '/professional-tools',
   },
 });
 

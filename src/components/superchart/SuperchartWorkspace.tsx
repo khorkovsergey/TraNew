@@ -37,6 +37,7 @@ import {
   serializeLayout,
   type StudyChoice,
 } from '@/lib/superchart/layouts/schema';
+import type { ChartPreset } from '@/lib/superchart/layouts/preset';
 import {
   canRedo,
   canUndo,
@@ -112,6 +113,16 @@ export type SuperchartWorkspaceProps = {
   symbol: string;
   companyName: string;
   exchange: string;
+  /**
+   * A starting point handed over by the Supercharts catalogue.
+   *
+   * Already validated on the server against the datafeed's symbols and the
+   * indicator registry — see `lib/superchart/layouts/preset.ts`. When one is
+   * present the stored layout is not restored: somebody who followed a link to
+   * "US Market Overview" asked for that workspace, and quietly replacing it with
+   * whatever they last had open is the chart ignoring the link they clicked.
+   */
+  preset?: ChartPreset | null;
 };
 
 /**
@@ -135,11 +146,12 @@ export function SuperchartWorkspace({
   symbol,
   companyName,
   exchange,
+  preset = null,
 }: SuperchartWorkspaceProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<CanvasChartEngine | null>(null);
 
-  const [interval, setInterval] = useState<ChartInterval>('1D');
+  const [interval, setInterval] = useState<ChartInterval>(preset?.interval ?? '1D');
   const [chartType, setChartType] = useState<ChartType>('candles');
   const [focus, setFocus] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
@@ -154,7 +166,7 @@ export function SuperchartWorkspace({
    * effect whenever the bars changed, which is a second copy of the truth and a
    * render cascade to keep it in step.
    */
-  const [studyChoices, setStudyChoices] = useState<StudyChoice[]>([]);
+  const [studyChoices, setStudyChoices] = useState<StudyChoice[]>(preset?.studies ?? []);
   const [history, setHistory] = useState<History>(EMPTY_HISTORY);
   const [panelTab, setPanelTab] = useState<'objects' | 'voyager'>('objects');
   /*
@@ -204,7 +216,7 @@ export function SuperchartWorkspace({
   const [bars, setBars] = useState<Bar[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [symbolId, setSymbolId] = useState(`NASDAQ:${symbol}`);
+  const [symbolId, setSymbolId] = useState(preset?.symbolId ?? `NASDAQ:${symbol}`);
 
   // One instance for the life of the component: the cache is the point, and a
   // new one per render would never hit.
@@ -796,6 +808,10 @@ export function SuperchartWorkspace({
    * later would undo whatever the person had since changed.
    */
   useEffect(() => {
+    // A preset is an explicit request for a particular workspace. Restoring over
+    // it would open the chart somebody last had rather than the one they clicked.
+    if (preset) return;
+
     try {
       const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
       if (!raw) return;
@@ -824,6 +840,7 @@ export function SuperchartWorkspace({
       /* Unreadable storage means starting fresh, which is the safe default. */
     }
     // Once, deliberately: this is a starting point, not a subscription.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // The toast clears itself; a confirmation that stays is a notification.
