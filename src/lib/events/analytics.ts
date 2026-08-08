@@ -87,11 +87,25 @@ export type AnalyticsEvent =
   | { name: 'voyager_chat_saved' }
   | { name: 'voyager_new_chat'; chatCount: number }
   /*
+   * The chat funnel, per Journey B. Shapes and counts only: the question, the
+   * answer and the subject stay out of here, because what somebody asks about
+   * their money is the thing this product promises not to sell.
+   */
+  | { name: 'voyager_question_sent'; contextKind: string; mode: string; turns: number }
+  | { name: 'voyager_tool_executed'; tool: string }
+  | { name: 'voyager_limit_hit'; authenticated: boolean }
+  | { name: 'voyager_auth_gate_shown'; askedInDialog: number }
+  | { name: 'voyager_restored_after_auth'; turns: number }
+  | { name: 'voyager_action_clicked'; action: string; authenticated: boolean }
+  /*
    * The expert-services funnel. Counts and ids only — a brief holds what
    * somebody is trying to do with their money, and none of that goes here.
    */
   | { name: 'voyager_message_sent'; turns: number }
-  | { name: 'expert_brief_saved'; services: string };
+  | { name: 'expert_brief_saved'; services: string }
+  /* The id of a public marketplace profile and the tier we ranked it at. Which
+     expert somebody picked is not private; what they wanted from them is. */
+  | { name: 'expert_selected'; expertId: string; tier: string };
 
 export interface AnalyticsSink {
   track(event: AnalyticsEvent): void;

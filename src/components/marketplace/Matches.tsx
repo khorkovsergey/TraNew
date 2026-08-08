@@ -3,277 +3,124 @@
 import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Icon } from '@/components/ui/Icon';
-import { EXPERTS, type CredentialStatus, type MatchBand } from '@/content/experts';
-import { pick } from '@/content/types';
+import { EXPERTS } from '@/content/experts';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
-import { useExpertFlow } from '@/lib/expertFlow';
+import { ExpertGrid } from './ExpertGrid';
+import { searchable } from './MatchResults';
 import {
   matchExperts,
   relaxations,
-  TIER_LABEL,
+  SERVICE_LABEL,
   type ExpertBrief,
-  type MatchTier,
 } from '@/lib/experts/brief';
 import styles from './Marketplace.module.css';
 
-const BAND_CLASS: Record<MatchBand, string> = {
-  best: styles.bandBest,
-  strong: styles.bandStrong,
-  suitable: styles.bandSuitable,
-};
-
-const BAND_CARD: Record<MatchBand, string> = {
-  best: styles.matchCardBest,
-  strong: styles.matchCardStrong,
-  suitable: '',
-};
-
-const CRED_CLASS: Record<CredentialStatus, string> = {
-  verified: styles.credVerified,
-  verification_pending: styles.credSelf,
-  self_declared: styles.credSelf,
-  not_applicable: styles.credNone,
-  demo: styles.credNone,
-};
-
-const BAND_KEY: Record<MatchBand, 'bandBest' | 'bandStrong' | 'bandSuitable'> = {
-  best: 'bandBest',
-  strong: 'bandStrong',
-  suitable: 'bandSuitable',
-};
-
-/** Service ids as the chips read them. The mockup shows the work, not the key. */
-const SERVICE_CHIP: Record<string, string> = {
-  strategy: 'Investment strategy',
-  review: 'Portfolio review',
-  finances: 'Financial planning',
-  tax: 'Tax and residency',
-};
-
-/** The brief-driven tiers, mapped onto the badge classes that already exist. */
-const TIER_CARD: Record<MatchTier, string> = {
-  best: styles.matchCardBest,
-  strong: styles.matchCardStrong,
-  relevant: '',
-};
-
-const TIER_BADGE: Record<MatchTier, string> = {
-  best: styles.bandBest,
-  strong: styles.bandStrong,
-  relevant: styles.bandSuitable,
-};
-
+/**
+ * The full catalogue — "view all experts" — and the same list filtered by a
+ * brief for anyone who arrives here with one.
+ *
+ * Two things it must not do. It must not invent a ranking: somebody browsing
+ * has asked for nothing, so no card claims to be a "best match" and the cards
+ * describe rather than recommend. And it must not silently ignore a brief that
+ * does exist — a bookmark opened after a conversation should show the same
+ * shortlist that conversation produced, with the constraints visible.
+ */
 export function Matches() {
   const t = useTranslations('marketplace');
   const locale = useLocale() as Locale;
-  const { state, update } = useExpertFlow();
 
   /*
    * The brief Voyager built, read once on arrival.
    *
    * From session storage rather than the URL: a brief holds what somebody is
-   * trying to do with their money, and §34 is explicit that it must not travel
-   * in a query string where it lands in history and server logs.
+   * trying to do with their money, and it must not travel in a query string
+   * where it lands in browser history and server logs.
    *
-   * Null means somebody came here directly — a bookmark, or the "browse all"
-   * link — and the full list is the right answer for them.
+   * Null means somebody came here directly — a bookmark, or "view all experts"
+   * — and the full list is the right answer for them.
    */
   const [brief, setBrief] = useState<ExpertBrief | null>(null);
 
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem('tn_expert_brief_v1');
+      const stored = raw ? (JSON.parse(raw) as ExpertBrief) : null;
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (raw) setBrief(JSON.parse(raw) as ExpertBrief);
+      if (stored?.goal) setBrief(stored);
     } catch {
       /* Unreadable storage means the unfiltered list, which still works. */
     }
   }, []);
 
-  /*
-   * Computed from the request, not read off the expert.
-   *
-   * `band` and `reasons` ship on the expert record, so every visitor saw the
-   * same "Best match" and the same three bullets whatever they had asked for.
-   * Those are properties of the expert; these are answers about this request.
-   */
-  /*
-   * Flattened for the matcher, which takes plain strings.
-   *
-   * The matcher lives in `lib` and knows nothing about `Localized` or about the
-   * marketplace's record shape — that is what lets it be tested without either.
-   */
-  const searchable = EXPERTS.map((expert) => ({
-    id: expert.id,
-    name: expert.name,
-    services: expert.services,
-    jurisdiction: pick(expert.jurisdiction, locale),
-    languages: expert.languages,
-  }));
-
-  const matches = brief ? matchExperts(searchable, brief) : null;
-  const shown = matches ? matches.map((match) => match.expert.id) : EXPERTS.map((e) => e.id);
-  const byId = new Map((matches ?? []).map((match) => [match.expert.id, match]));
-  const offers = brief ? relaxations(searchable, brief) : [];
-
-  const saved = state?.saved ?? [];
-
-  const toggleSave = (id: string) => {
-    update({
-      saved: saved.includes(id) ? saved.filter((item) => item !== id) : [...saved, id],
-    });
-  };
+  const pool = searchable(locale);
+  const matches = brief ? matchExperts(pool, brief) : null;
+  const byId = matches ? new Map(matches.map((match) => [match.expert.id, match])) : undefined;
+  const record = new Map(EXPERTS.map((expert) => [expert.id, expert]));
+  const shown = matches ? matches.flatMap((match) => record.get(match.expert.id) ?? []) : EXPERTS;
+  const offers = brief ? relaxations(pool, brief) : [];
 
   return (
     <>
       {brief && (
-        <div className={styles.briefStrip}>
+        <div className={styles.matchedRow}>
           {/*
-            * "Matched on", from the mockup — the chips are what the search used,
-            * not a restatement of the goal. The goal is a paragraph and does not
+            * "Matched on" — the chips are what the search used, not a
+            * restatement of the goal. The goal is a paragraph and does not
             * belong in a row of chips; what belongs there is the handful of
             * things somebody can see were applied.
             */}
           <span className={styles.matchedOn}>Matched on</span>
-          <div className={styles.briefChips}>
-            {[
-              ...brief.services.map((id) => SERVICE_CHIP[id] ?? id),
-              brief.country,
-              ...brief.languages,
-              brief.remoteAccepted ? 'Remote accepted' : null,
-            ]
-              .filter(Boolean)
-              .map((chip) => (
-                <span className={styles.briefChip} key={chip as string}>
-                  {chip}
-                </span>
-              ))}
-          </div>
-          <Link className={styles.editRequest} href="/marketplace/experts/intake">
-            Edit request
+          {[
+            ...brief.services.map((id) => SERVICE_LABEL[id] ?? id),
+            brief.country,
+            ...brief.languages,
+            brief.remoteAccepted ? 'Remote accepted' : null,
+          ]
+            .filter(Boolean)
+            .map((chip) => (
+              <span className={styles.briefChip} key={chip as string}>
+                {chip}
+              </span>
+            ))}
+          <Link className={styles.editRequest} href="/marketplace/experts">
+            <Icon name="sliders" size={13} /> Edit request
           </Link>
         </div>
       )}
 
       {matches?.length === 0 && (
-        /*
-         * Not "no experts found". Naming the constraint that emptied the list
-         * is the difference between a wall and a next step — and it is never
-         * relaxed silently, because somebody stated it on purpose.
-         */
-        <div className={styles.noMatches}>
+        <div className={styles.noMatchesCard}>
+          <span className={styles.noMatchesIcon}>
+            <Icon name="alert" size={23} strokeWidth={1.9} />
+          </span>
           <h2 className={styles.noMatchesHead}>We could not find an exact match yet</h2>
-          <p className={styles.briefNote}>
-            Your request is narrow enough that nobody on the marketplace meets all of it. You can
-            widen it here, or change the request itself.
+          <p className={styles.noMatchesText}>
+            Your request is narrow enough that nobody on the marketplace meets all of it. Widen it
+            here, or change the request itself.
           </p>
-          <ul className={styles.relaxList}>
+          <div className={styles.noMatchesActions}>
             {offers.map((offer) => (
-              <li key={offer}>{offer}</li>
+              <button
+                className={styles.widenButton}
+                key={offer.label}
+                onClick={() => setBrief({ ...brief!, ...offer.patch })}
+              >
+                {offer.label}
+              </button>
             ))}
-          </ul>
-          <Link className={styles.editRequest} href="/marketplace/experts/intake">
-            Edit request
-          </Link>
+            <Link className={styles.editRequest} href="/marketplace/experts">
+              Edit request
+            </Link>
+          </div>
         </div>
       )}
 
-      <div className={styles.matchList}>
-        {EXPERTS.filter((expert) => shown.includes(expert.id)).map((expert, index, list) => {
-          /*
-           * A heading before the first of each tier, as the mockup groups them.
-           * The list is already ordered by tier, so this reads the change
-           * rather than re-sorting — one ordering, in the matcher, and nothing
-           * here that can disagree with it.
-           */
-          const tier = byId.get(expert.id)?.tier;
-          const previous = index > 0 ? byId.get(list[index - 1].id)?.tier : undefined;
-          const heading = tier && tier !== previous ? TIER_LABEL[tier] : null;
+      <ExpertGrid experts={shown} matches={byId} catalogue />
 
-          return (
-            <div className={styles.tierGroup} key={`g-${expert.id}`}>
-              {heading && <h2 className={styles.tierHeading}>{heading}</h2>}
-          <article
-            className={`${styles.matchCard} ${
-              byId.get(expert.id) ? TIER_CARD[byId.get(expert.id)!.tier] : BAND_CARD[expert.band]
-            }`}
-            key={expert.id}
-          >
-            <div className={styles.matchHead}>
-              <div className={styles.identity}>
-                <div
-                  className={styles.avatar}
-                  style={{ background: expert.tile, color: expert.color }}
-                  aria-hidden="true"
-                >
-                  {expert.initials}
-                </div>
-                <div>
-                  <div className={styles.name}>{expert.name}</div>
-                  <div className={styles.provider}>{pick(expert.provider, locale)}</div>
-                </div>
-              </div>
-              <div className={styles.priceBlock}>
-                <div className={`${styles.price} tn-num`}>{expert.price}</div>
-                <div className={styles.priceMeta}>
-                  {pick(expert.duration, locale)} · ★ {expert.rating}
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.badges}>
-              <span className={`${styles.band} ${BAND_CLASS[expert.band]}`}>
-                {t(`matches.${BAND_KEY[expert.band]}`)}
-              </span>
-              <span className={`${styles.band} ${CRED_CLASS[expert.credential]}`}>
-                {t(`credential.${expert.credential}`)}
-              </span>
-              <span className={`${styles.band} ${styles.bandSuitable}`}>
-                {pick(expert.jurisdiction, locale)}
-              </span>
-              <span className={`${styles.band} ${styles.bandSuitable}`}>{expert.languages}</span>
-            </div>
-
-            <div className={styles.whyTitle}>{t('matches.why')}</div>
-            <div className={styles.reasons}>
-              {(byId.get(expert.id)?.reasons ?? expert.reasons.map((r) => pick(r, locale))).map(
-                (reason) => (
-                  <div className={styles.reason} key={reason}>
-                    <Icon name="check" size={15} strokeWidth={2.5} />
-                    {reason}
-                  </div>
-                )
-              )}
-            </div>
-
-            <div className={styles.matchActions}>
-              <Link
-                className={styles.primary}
-                href={{ pathname: '/marketplace/experts/[id]', params: { id: expert.id } }}
-                onClick={() => update({ expertId: expert.id })}
-              >
-                {t('matches.view')}
-              </Link>
-              <Link className={styles.ghost} href="/marketplace/experts/compare">
-                {t('matches.compare')}
-              </Link>
-              <button
-                className={`${styles.saveButton} ${
-                  saved.includes(expert.id) ? styles.saveButtonActive : ''
-                }`}
-                onClick={() => toggleSave(expert.id)}
-              >
-                {saved.includes(expert.id) ? t('matches.saved') : t('matches.save')}
-              </button>
-            </div>
-          </article>
-            </div>
-          );
-        })}
-      </div>
-
-      <p className={styles.disclaimer}>{t('matches.noPercentages')}</p>
+      <p className={styles.disclaimer}>
+        {brief ? t('matches.noPercentages') : t('matches.browseNote')}
+      </p>
     </>
   );
 }

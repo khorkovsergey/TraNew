@@ -28,7 +28,7 @@ export default async function ExpertsMatchesPage({ params }: Props) {
   const tScreens = await getTranslations('screens');
 
   return (
-    <div className={styles.wrap}>
+    <div className={`${styles.wrap} ${styles.wrapWide}`}>
       <Link className={styles.backHome} href="/marketplace/experts">
         ← {tScreens('experts.title')}
       </Link>

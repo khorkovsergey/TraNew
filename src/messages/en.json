@@ -316,41 +316,16 @@
       "otherTitle": "Something else",
       "otherText": "Describe your situation in your own words."
     },
-    "intake": {
-      "stepOf": "Question {step} of {total}",
-      "next": "Next",
-      "back": "Back",
-      "finish": "Create my brief",
-      "chooseOne": "Select an option to continue"
-    },
-    "brief": {
-      "title": "Your consultation brief",
-      "label": "AI structured",
-      "goal": "GOAL",
-      "situation": "CURRENT SITUATION",
-      "topics": "TOPICS TO COVER",
-      "preferred": "PREFERRED EXPERT",
-      "find": "Find experts",
-      "edit": "Edit brief",
-      "disclaimer": "AI helps structure your request so an expert can prepare. It does not provide the consultation itself.",
-      "goalValue": "{task} — {outcome}",
-      "situationValue": "Investing experience: {experience}. Based in {country}. Relevant amount: {amount}.",
-      "topic1": "What to do with the capital first",
-      "topic2": "How much risk fits the stated horizon",
-      "topic3": "Which instruments to compare, and on what criteria",
-      "preferredValue": "{language} · {format}"
-    },
     "matches": {
-      "sub": "Matched against your goal, jurisdiction, preferred language and consultation format.",
-      "bandBest": "Best match",
-      "bandStrong": "Strong match",
-      "bandSuitable": "Also suitable",
+      "sub": "Every expert on the marketplace. Nothing here is ranked — that needs a request to rank against.",
       "why": "Why this expert matches",
       "view": "View profile",
       "compare": "Compare",
       "save": "Save",
       "saved": "✓ Saved",
-      "noPercentages": "Bands, not percentages — a match score would imply a precision we do not have."
+      "noPercentages": "Bands, not percentages — a match score would imply a precision we do not have.",
+      "whatTheyDo": "What they work on",
+      "browseNote": "Browsing shows everybody, in no particular order. Describe what you need and the list gets ranked, with the reason on each card."
     },
     "credential": {
       "verified": "Verified credential",
@@ -710,15 +685,11 @@
     },
     "experts": {
       "title": "Expert Services",
-      "subtitle": "Start from the task you need help with — we'll structure the rest."
-    },
-    "expertsIntake": {
-      "title": "Tell Voyager what you need",
-      "subtitle": "A short conversation instead of a form. Your request takes shape beside it as you answer, and you can edit it before anyone sees it."
+      "subtitle": "Describe your goal, let Voyager prepare your brief, then choose the right specialist. You do not need to know which kind of expert you need."
     },
     "expertsMatches": {
-      "title": "Your best matches",
-      "subtitle": "Matched against your goal, jurisdiction, preferred language and consultation format."
+      "title": "All experts",
+      "subtitle": "Every specialist on the marketplace, with their credentials, jurisdiction and rates."
     },
     "expertsCompare": {
       "title": "Compare experts",

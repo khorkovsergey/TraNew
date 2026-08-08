@@ -107,6 +107,7 @@ try {
       'src/lib/start/path.ts',
       'src/lib/start/plan.ts',
       'src/lib/voyager/session.ts',
+      'src/lib/voyager/chat/transcript.ts',
       'src/lib/academy/summary.ts',
       'src/lib/explore/answers.ts',
       'src/content/wealth.ts',
@@ -242,6 +243,7 @@ try {
   const start = await load('path', 'start');
   const plan = await load('plan', 'start');
   const session = await load('session', 'voyager');
+  const transcript = await load('transcript', 'chat');
   const learn = await load('summary', 'academy');
   const answers = await load('answers', 'explore');
   const wealth = await load('wealth', 'content');
@@ -3754,7 +3756,7 @@ try {
     assert.ok(!early.includes('location'), 'asked where before asking what');
 
     const later = brief.missingFrom(briefOf({ goal: 'g', services: ['review'] }));
-    assert.deepEqual(later, ['location', 'language', 'engagement']);
+    assert.deepEqual(later, ['location', 'language', 'engagement', 'timeline']);
   });
 
   check('the stage is semantic, not a counter', () => {
@@ -3762,7 +3764,7 @@ try {
     assert.equal(brief.stageOf(briefOf({})), 'understanding');
     assert.equal(brief.stageOf(briefOf({ goal: 'g', services: ['review'] })), 'clarifying');
     assert.equal(
-      brief.stageOf(briefOf({ goal: 'g', services: ['review'], country: 'Cyprus', languages: ['English'], engagement: 'consultation' })),
+      brief.stageOf(briefOf({ goal: 'g', services: ['review'], country: 'Cyprus', languages: ['English'], engagement: 'consultation', urgency: 'weeks' })),
       'ready'
     );
     for (const stage of Object.keys(brief.STAGE_LABEL)) {
@@ -3809,7 +3811,9 @@ try {
       EXPERTS,
       briefOf({ goal: 'g', services: ['review'], country: 'Cyprus', languages: ['Greek'] })
     );
-    assert.ok(top.reasons.some((r) => /service/i.test(r)), top.reasons.join(' | '));
+    // Named, not counted: "takes on the services you asked for" is true of
+    // everybody on the shortlist and so distinguishes nobody.
+    assert.ok(top.reasons.some((r) => /portfolio review/i.test(r)), top.reasons.join(' | '));
     assert.ok(top.reasons.some((r) => /Cyprus/.test(r)), top.reasons.join(' | '));
     assert.ok(top.reasons.some((r) => /Greek/.test(r)), top.reasons.join(' | '));
   });
@@ -3839,7 +3843,9 @@ try {
 
     const offers = brief.relaxations(EXPERTS, impossible);
     assert.ok(offers.length > 0);
-    assert.ok(offers.some((o) => /language/i.test(o)), offers.join(' | '));
+    assert.ok(offers.some((o) => /language/i.test(o.label)), offers.map((o) => o.label).join(' | '));
+    // And each one carries the change it would make, so the button applies it.
+    assert.ok(offers.every((o) => o.patch && typeof o.patch === 'object'));
   });
 
   check('the next question follows the brief, not a list', () => {
@@ -3861,7 +3867,7 @@ try {
     // An interview that never stops is a form with better manners.
     const complete = briefOf({
       goal: 'g', services: ['tax'], country: 'Cyprus',
-      languages: ['English'], engagement: 'consultation',
+      languages: ['English'], engagement: 'consultation', urgency: 'weeks',
     });
     assert.equal(brief.nextQuestion(complete), null);
     assert.equal(brief.stageOf(complete), 'ready');
@@ -3870,8 +3876,8 @@ try {
   check('every question is a sentence, not a field label', () => {
     const seen = new Set();
     let current = briefOf({});
-    const fill = { goal: { goal: 'g' }, services: { services: ['tax'] }, location: { country: 'Cyprus' }, language: { languages: ['English'] }, engagement: { engagement: 'consultation' } };
-    for (let i = 0; i < 6; i += 1) {
+    const fill = { goal: { goal: 'g' }, services: { services: ['tax'] }, location: { country: 'Cyprus' }, language: { languages: ['English'] }, engagement: { engagement: 'consultation' }, timeline: { urgency: 'weeks' } };
+    for (let i = 0; i < 7; i += 1) {
       const question = brief.nextQuestion(current);
       if (!question) break;
       assert.ok(!seen.has(question.field), `asked ${question.field} twice`);
@@ -3880,7 +3886,7 @@ try {
       assert.ok(/\?/.test(question.ask), question.ask);
       current = { ...current, ...fill[question.field] };
     }
-    assert.equal(seen.size, 5);
+    assert.equal(seen.size, 6);
   });
 
   check('the closed questions offer their answers, the open ones do not', () => {
@@ -6033,6 +6039,199 @@ try {
   check('and a subject is stripped of anything that is not a plain name', () => {
     const parsed = session.parseContext('symbol:<img src=x onerror=alert(1)>');
     assert.ok(!/[<>=()]/.test(parsed.subject ?? ''), parsed.subject);
+  });
+
+  /* ================= Voyager: what the transcript is allowed to be ========== */
+
+  group('An answer only offers to act when there is an answer');
+
+  check('a settled answer offers the action row', () => {
+    assert.equal(
+      transcript.offersActions({ role: 'assistant', text: 'Here is the short version.' }),
+      true
+    );
+  });
+
+  check('an outage notice does not', () => {
+    /*
+     * "Add to watchlist" under "Voyager is temporarily unavailable" is an offer
+     * to act on an answer that does not exist.
+     */
+    assert.equal(
+      transcript.offersActions({ role: 'assistant', text: 'Could not reach it.', failed: true }),
+      false
+    );
+  });
+
+  check('nor does the limit notice, which is about the account', () => {
+    assert.equal(
+      transcript.offersActions({
+        role: 'assistant',
+        text: 'You are out of questions.',
+        notice: true,
+      }),
+      false
+    );
+  });
+
+  check('and a question never offers to act on itself', () => {
+    assert.equal(transcript.offersActions({ role: 'user', text: 'What is an ETF?' }), false);
+  });
+
+  group('What the model is told about the conversation so far');
+
+  const turns = [
+    { id: 'u1', role: 'user', text: 'What is an ETF?', at: '2026-08-06T09:00:00Z' },
+    { id: 'a1', role: 'assistant', text: 'A basket of holdings.', at: '2026-08-06T09:00:01Z' },
+    { id: 'u2', role: 'user', text: 'And the fees?', at: '2026-08-06T09:01:00Z' },
+    {
+      id: 'a2',
+      role: 'assistant',
+      text: 'Voyager is temporarily unavailable',
+      at: '2026-08-06T09:01:01Z',
+      failed: true,
+    },
+  ];
+
+  check('prior turns go in oldest first', () => {
+    const history = transcript.historyFor(turns);
+    assert.equal(history[0].text, 'What is an ETF?');
+    assert.equal(history[0].role, 'user');
+  });
+
+  check('an outage notice is not fed back as something Voyager said', () => {
+    /*
+     * It is not an answer about markets. Sending it teaches the next reply to
+     * talk about the outage instead of about the question.
+     */
+    const history = transcript.historyFor(turns);
+    assert.ok(!history.some((turn) => /temporarily unavailable/.test(turn.text)));
+    assert.equal(history.length, 3);
+  });
+
+  check('history is capped at the eight the API accepts', () => {
+    const many = Array.from({ length: 30 }, (_, index) => ({
+      id: `t${index}`,
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      text: `turn ${index}`,
+      at: '2026-08-06T09:00:00Z',
+    }));
+    assert.equal(transcript.historyFor(many).length, 8);
+    assert.equal(transcript.historyFor(many)[7].text, 'turn 29');
+  });
+
+  check('the guest gate counts questions, not bubbles', () => {
+    assert.equal(transcript.askedInDialog(turns), 2);
+  });
+
+  check('a retry finds the last question rather than the last thing on screen', () => {
+    assert.equal(transcript.lastQuestion(turns), 'And the fees?');
+    assert.equal(transcript.lastQuestion([]), null);
+  });
+
+  group('The page a question came from decides which sources exist');
+
+  check('every context kind maps to a screen the policy layer knows', () => {
+    /*
+     * The two vocabularies are deliberately different — one is what a link may
+     * carry, the other is what the server keys entitlements off. A kind with no
+     * mapping would silently become the generic screen and lose its data.
+     */
+    const kinds = [
+      'home',
+      'symbol',
+      'chart',
+      'comparison',
+      'article',
+      'event',
+      'portfolio',
+      'plan',
+      'explore',
+      'learn',
+    ];
+    for (const kind of kinds) {
+      assert.ok(transcript.screenFor(kind), kind);
+    }
+    assert.equal(transcript.screenFor('symbol'), 'symbol');
+    assert.equal(transcript.screenFor('learn'), 'academy');
+    assert.equal(transcript.screenFor(null), 'generic');
+  });
+
+  group('The counter a browser keeps is a display, not a permission');
+
+  check('a stored count reads back and is clamped', () => {
+    assert.deepEqual(transcript.parseAllowance({ used: 4, day: '2026-08-06' }), {
+      used: 4,
+      day: '2026-08-06',
+    });
+    // Writable by anything on the origin, so a hostile value cannot exceed the
+    // ceiling it is displayed against.
+    assert.equal(transcript.parseAllowance({ used: 9e9, day: '2026-08-06' }).used, 10);
+    assert.equal(transcript.parseAllowance({ used: -5, day: 'x' }).used, 0);
+    assert.deepEqual(transcript.parseAllowance('nonsense'), session.EMPTY_ALLOWANCE);
+  });
+
+  check('the server count replaces the browser optimism', () => {
+    const adopted = transcript.adoptServerCount(6, 10, new Date('2026-08-06T09:00:00Z'));
+    assert.deepEqual(adopted, { used: 6, day: '2026-08-06' });
+  });
+
+  check('and an unmetered plan has nothing to adopt', () => {
+    assert.equal(transcript.adoptServerCount(6, null, new Date('2026-08-06T09:00:00Z')), null);
+    assert.equal(transcript.adoptServerCount(undefined, 10, new Date('2026-08-06T09:00:00Z')), null);
+  });
+
+  check('the label says the day count, or that there is no ceiling', () => {
+    const at = new Date('2026-08-06T09:00:00Z');
+    assert.equal(
+      transcript.limitLabel({ used: 3, day: '2026-08-06' }, at, false),
+      'Free: 3 of 10 questions used today'
+    );
+    // Yesterday's nine is not today's nine.
+    assert.equal(
+      transcript.limitLabel({ used: 9, day: '2026-08-05' }, at, false),
+      'Free: 0 of 10 questions used today'
+    );
+    assert.equal(
+      transcript.limitLabel({ used: 3, day: '2026-08-06' }, at, true),
+      'Unlimited questions on your plan'
+    );
+  });
+
+  group('A mode changes what is asked, visibly');
+
+  check('Explain asks the plain question', () => {
+    assert.equal(transcript.framed('What is an ETF?', 'explain'), 'What is an ETF?');
+  });
+
+  check('the others say what kind of answer is wanted', () => {
+    for (const mode of ['guide', 'compare', 'simulate']) {
+      const asked = transcript.framed('bonds', mode);
+      assert.ok(asked.endsWith('bonds'), asked);
+      assert.ok(asked.length > 'bonds'.length, mode);
+    }
+  });
+
+  check('and an empty question stays empty whatever the mode', () => {
+    assert.equal(transcript.framed('   ', 'guide'), '');
+  });
+
+  group('Every action offered under an answer can be confirmed and undone');
+
+  check('a mutating action states where it lands and how to reverse it', () => {
+    for (const id of session.ANSWER_ACTIONS) {
+      const spec = session.VOYAGER_ACTIONS[id];
+      assert.ok(spec.about, id);
+      assert.ok(spec.done, id);
+      assert.ok(spec.where, id);
+      assert.ok(spec.undo, id);
+      assert.ok(spec.call, id);
+    }
+  });
+
+  check('the row leads with the one that keeps the answer', () => {
+    assert.equal(session.ANSWER_ACTIONS[0], 'research');
+    assert.equal(session.ANSWER_ACTIONS.length, Object.keys(session.VOYAGER_ACTIONS).length);
   });
 
   /* ============================ Superchart layouts ============================ */

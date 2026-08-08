@@ -50,6 +50,14 @@ export const routing = defineRouting({
     '/research': '/research',
     '/supercharts': '/supercharts',
     '/voyager': '/voyager',
+    /*
+     * The structured session, beside the dialogue rather than merged into it.
+     *
+     * Voyager is a conversation; this is a saved workspace that goes question →
+     * evidence → conclusion, with a canvas, an inspector and a change history.
+     * They were one page and the page could only be one of them at a time.
+     */
+    '/voyager/research': '/voyager/research',
     '/marketplace/subscriptions': '/marketplace/subscriptions',
     '/portfolio': '/portfolio',
 

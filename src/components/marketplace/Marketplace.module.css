@@ -65,21 +65,6 @@
   background: var(--tn-blue-hover);
 }
 
-.secondary {
-  background: transparent;
-  color: var(--tn-blue);
-  border: 1.5px solid var(--tn-blue);
-  border-radius: var(--tn-radius-pill);
-  padding: 12px 24px;
-  font-size: 15px;
-  font-weight: 700;
-  transition: background var(--tn-transition-fast);
-}
-
-.secondary:hover {
-  background: var(--tn-blue-tint);
-}
-
 .ghost {
   background: var(--tn-surface);
   border: 1px solid var(--tn-border-input);
@@ -143,32 +128,6 @@
   line-height: 1.55;
 }
 
-.otherCard {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: var(--tn-chip-bg);
-  border-radius: var(--tn-radius-chip);
-  padding: 18px 24px;
-  margin-top: 16px;
-  transition: background var(--tn-transition-fast);
-}
-
-.otherCard:hover {
-  background: var(--tn-blue-tint);
-}
-
-.otherTitle {
-  font-size: 14.5px;
-  font-weight: 800;
-}
-
-.otherText {
-  font-size: 13.5px;
-  color: var(--tn-text-muted);
-  margin-left: 10px;
-}
-
 .categoryIcon {
   width: 46px;
   height: 46px;
@@ -210,79 +169,6 @@
   color: var(--tn-text-secondary);
 }
 
-/* ---- Intake ---- */
-
-.progressRow {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 24px;
-}
-
-.progressTrack {
-  flex: 1;
-  height: 6px;
-  background: var(--tn-chip-bg);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.progressFill {
-  height: 6px;
-  background: var(--tn-blue);
-  border-radius: 3px;
-  transition: width var(--tn-transition-slow);
-}
-
-.progressLabel {
-  font-size: 12.5px;
-  color: var(--tn-text-muted);
-  white-space: nowrap;
-}
-
-.question {
-  font-size: 19px;
-  font-weight: 800;
-  margin-top: 24px;
-}
-
-.questionHint {
-  background: var(--tn-purple-tint-soft);
-  border-radius: 12px;
-  padding: 12px 16px;
-  margin-top: 10px;
-  font-size: 13px;
-  color: var(--tn-purple-deep);
-  line-height: 1.6;
-}
-
-.options {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.option {
-  text-align: left;
-  background: var(--tn-surface);
-  border: 1.5px solid var(--tn-border-control);
-  border-radius: var(--tn-radius-option);
-  padding: 13px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  transition: border-color var(--tn-transition-fast), background var(--tn-transition-fast);
-}
-
-.option:hover {
-  border-color: var(--tn-blue);
-}
-
-.optionSelected {
-  border-color: var(--tn-blue);
-  background: var(--tn-blue-tint);
-}
-
 /* ---- Brief ---- */
 
 .card {
@@ -293,20 +179,9 @@
   margin-top: 20px;
 }
 
-.cardHead {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .cardTitle {
   font-size: 16px;
   font-weight: 800;
-}
-
-.briefSection {
-  margin-top: 20px;
 }
 
 .briefKey {
@@ -323,18 +198,6 @@
   margin-top: 6px;
 }
 
-.bullets {
-  margin-top: 6px;
-}
-
-.bullet {
-  display: flex;
-  gap: 10px;
-  font-size: 14.5px;
-  color: var(--tn-text-nav);
-  line-height: 1.65;
-}
-
 .disclaimer {
   font-size: 12.5px;
   color: var(--tn-text-faint);
@@ -342,109 +205,11 @@
   margin-top: 18px;
 }
 
-/* ---- Matches ---- */
-
-.matchList {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  margin-top: 24px;
-}
-
-.matchCard {
-  background: var(--tn-surface);
-  border: 1.5px solid var(--tn-border-card);
-  border-radius: var(--tn-radius-card);
-  padding: 24px 26px;
-}
-
-.matchCardBest {
-  border-color: var(--tn-green);
-}
-
-.matchCardStrong {
-  border-color: var(--tn-blue);
-}
-
-.matchHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.identity {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-}
-
-.avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-
-.name {
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.provider {
-  font-size: 13px;
-  color: var(--tn-text-muted);
-  margin-top: 2px;
-}
-
-.priceBlock {
-  text-align: right;
-}
-
-.price {
-  font-size: 20px;
-  font-weight: 800;
-}
-
-.priceMeta {
-  font-size: 12.5px;
-  color: var(--tn-text-muted);
-  margin-top: 2px;
-}
-
-.badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
-}
-
 .band {
   font-size: 11.5px;
   font-weight: 700;
   border-radius: 10px;
   padding: 4px 11px;
-}
-
-.bandBest {
-  background: var(--tn-green-tint);
-  color: var(--tn-green);
-}
-
-.bandStrong {
-  background: var(--tn-blue-tint);
-  color: var(--tn-blue);
-}
-
-.bandSuitable {
-  background: var(--tn-chip-bg);
-  color: var(--tn-text-muted);
 }
 
 .credVerified {
@@ -462,19 +227,6 @@
   color: var(--tn-text-muted);
 }
 
-.whyTitle {
-  font-size: 13px;
-  font-weight: 800;
-  margin-top: 18px;
-}
-
-.reasons {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
-}
-
 .reason {
   display: flex;
   align-items: flex-start;
@@ -487,24 +239,6 @@
 .reason svg {
   flex-shrink: 0;
   margin-top: 3px;
-  color: var(--tn-green);
-}
-
-.matchActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 20px;
-  align-items: center;
-}
-
-.saveButton {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--tn-text-muted);
-}
-
-.saveButtonActive {
   color: var(--tn-green);
 }
 
@@ -999,68 +733,33 @@
 
 .consultation {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 460px;
+  gap: 18px;
   align-items: start;
+  margin-top: 22px;
 }
 
+/* The conversation is a panel, not a page region: it sits beside the brief it
+   is filling in, and both have to read as one surface being worked on. */
 .dialogue {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  min-height: 420px;
-}
-
-/* Semantic stages, not "question 3 of 12". */
-.stageRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.stageStep {
-  padding: 5px 11px;
   border: 1px solid var(--tn-border-card);
-  border-radius: var(--tn-radius-chip);
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--tn-text-faint);
+  border-radius: 18px;
+  background: var(--tn-surface-veil);
+  overflow: hidden;
 }
 
-.stageOn {
-  border-color: var(--tn-mint);
-  color: var(--tn-text);
-}
-
+/* A window rather than a growing page. The composer and the suggested answers
+   stay where somebody left them instead of walking down the screen as the
+   conversation gets longer. */
 .thread {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  flex: 1;
-}
-
-.voyagerSaid {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  margin: 0;
-  max-width: 46em;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--tn-text);
-}
-
-.youSaid {
-  align-self: flex-end;
-  margin: 0;
-  max-width: 34em;
-  padding: 9px 13px;
-  border: 1px solid var(--tn-border-card);
-  border-radius: 13px;
-  background: var(--tn-surface-inner);
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--tn-text);
+  gap: 14px;
+  height: 430px;
+  overflow-y: auto;
+  padding: 20px 22px;
 }
 
 .composer {
@@ -1108,22 +807,27 @@
 .briefPanel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px;
-  border: 1px solid var(--tn-border-card);
-  border-radius: 16px;
-  background: var(--tn-surface);
+  border: 1.5px solid var(--tn-border-card);
+  border-radius: 18px;
+  background: var(--tn-surface-veil);
   position: sticky;
   top: 90px;
+  transition: border-color var(--tn-transition-slow);
+}
+
+/* The panel changes state when it becomes searchable, because "the button is
+   enabled now" is easy to miss in a column somebody is not looking at. */
+.briefPanelReady {
+  border-color: var(--tn-mint-border);
+  box-shadow: var(--tn-mint-glow);
 }
 
 .briefHead {
   margin: 0;
-  font-size: 12px;
+  font-size: 18px;
   font-weight: 800;
-  letter-spacing: 0.9px;
-  text-transform: uppercase;
-  color: var(--tn-text-muted);
+  letter-spacing: -0.4px;
+  color: var(--tn-text);
 }
 
 .briefNote {
@@ -1131,29 +835,6 @@
   font-size: 12px;
   line-height: 1.55;
   color: var(--tn-text-muted);
-}
-
-.briefList {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.briefList dt {
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: var(--tn-text-faint);
-  margin-top: 8px;
-}
-
-.briefList dd {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--tn-text);
 }
 
 .briefCta {
@@ -1173,34 +854,6 @@
   background: var(--tn-chip-bg);
   color: var(--tn-text-faint);
   cursor: default;
-}
-
-/* One column below the fold-point: the brief follows the conversation. */
-@media (max-width: 900px) {
-  .consultation {
-    grid-template-columns: 1fr;
-  }
-
-  .briefPanel {
-    position: static;
-  }
-}
-
-/* ------------------------------------------- Brief-driven matching results */
-
-.briefStrip {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.briefChips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  flex: 1;
 }
 
 .briefChip {
@@ -1225,97 +878,11 @@
   border-color: var(--tn-mint);
 }
 
-/* Never "no experts found": a dead end with nothing to do next. */
-.noMatches {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
-  padding: 18px;
-  border: 1px solid var(--tn-border-card);
-  border-radius: 16px;
-  margin-bottom: 18px;
-}
-
 .noMatchesHead {
   margin: 0;
   font-size: 17px;
   font-weight: 800;
   color: var(--tn-text);
-}
-
-.relaxList {
-  margin: 4px 0;
-  padding-left: 18px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--tn-text-secondary);
-}
-
-/* ------------------------------------------------------ Editing the brief */
-
-.editFields {
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
-
-.editLabel {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: var(--tn-text-faint);
-}
-
-/* 16px floor: below it iOS zooms the page when the field takes focus. */
-.editInput,
-.editArea {
-  padding: 8px 10px;
-  border: 1px solid var(--tn-border-input);
-  border-radius: 10px;
-  background: var(--tn-surface-inner);
-  font: inherit;
-  font-size: 16px;
-  font-weight: 400;
-  letter-spacing: normal;
-  text-transform: none;
-  color: var(--tn-text);
-  resize: vertical;
-}
-
-.editInput:focus-visible,
-.editArea:focus-visible {
-  outline: 2px solid var(--tn-mint);
-  outline-offset: 1px;
-}
-
-.editGroup {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.editCheck {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: normal;
-  text-transform: none;
-  color: var(--tn-text);
-}
-
-.editActions {
-  display: flex;
-  gap: 8px;
 }
 
 /* The brief's actual content in the sharing preview — consent to a heading is
@@ -1331,24 +898,21 @@
 .briefTitleRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 17px 22px;
+  border-bottom: 1px solid var(--tn-border-hairline);
 }
 
-/* From the mockup. Green because it reports a state that is true, not an action. */
+/* Green because it reports a state that is true, not an action to take. */
 .autoSaved {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-left: auto;
-  padding: 3px 8px;
-  border-radius: var(--tn-radius-chip);
-  background: var(--tn-green-tint);
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--tn-green);
-}
-
-.briefSub {
-  margin: -4px 0 2px;
   font-size: 11.5px;
-  color: var(--tn-text-faint);
+  font-weight: 700;
+  color: var(--tn-green-deep);
 }
 
 .matchedOn {
@@ -1357,65 +921,6 @@
   letter-spacing: 0.9px;
   text-transform: uppercase;
   color: var(--tn-text-faint);
-}
-
-/* ------------------------------------------------------ The flow's stepper */
-
-.stepper {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  margin: 0 0 14px;
-  padding: 0;
-  list-style: none;
-}
-
-.step {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--tn-text-faint);
-}
-
-.stepNum {
-  display: grid;
-  place-items: center;
-  width: 21px;
-  height: 21px;
-  border: 1px solid var(--tn-border-card);
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.stepOn {
-  color: var(--tn-text);
-}
-
-.stepOn .stepNum {
-  border-color: var(--tn-mint);
-  color: var(--tn-mint);
-}
-
-/* A finished step looks finished, so this does not read as forms left to fill. */
-.stepDone {
-  color: var(--tn-text-secondary);
-}
-
-.stepDone .stepNum {
-  border-color: var(--tn-green);
-  color: var(--tn-green);
-}
-
-.askRow {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid var(--tn-border-card);
 }
 
 .askChip {
@@ -1441,18 +946,1208 @@
   gap: 7px;
 }
 
-.tierGroup {
-  display: contents;
+/* The pencil. Quiet until hovered — it is available on every line, and eight
+   bright affordances in a panel is a panel that looks like a form. */
+.pencil {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--tn-text-faint);
+  cursor: pointer;
 }
 
-/* The mockup groups the shortlist rather than only sorting it: "Best match"
-   above the ones that are, so the ordering is legible instead of implied. */
-.tierHeading {
-  grid-column: 1 / -1;
-  margin: 10px 0 2px;
-  font-size: 10.5px;
+.pencil:hover {
+  border-color: var(--tn-border-control);
+  color: var(--tn-text);
+}
+
+/* =================================================== The Expert Services screen */
+
+.servicesHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+/* ---- Where you are: three dots, not "step 3 of 12" ---- */
+
+.tracker {
+  display: flex;
+  align-items: flex-start;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trackerStep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  width: 106px;
+}
+
+.trackerDot {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid var(--tn-border-control);
+  border-radius: 50%;
+  background: var(--tn-surface-inner);
+  font-size: 13px;
   font-weight: 800;
-  letter-spacing: 1px;
-  text-transform: uppercase;
   color: var(--tn-text-faint);
+  flex-shrink: 0;
+}
+
+.trackerOn {
+  border-color: var(--tn-mint);
+  background: var(--tn-mint-tint);
+  color: var(--tn-mint);
+  box-shadow: var(--tn-mint-glow);
+}
+
+/* A finished step looks finished, so this does not read as forms left to fill. */
+.trackerDone {
+  border-color: transparent;
+  background: var(--tn-mint);
+  color: var(--tn-cta-text);
+}
+
+.trackerLabel {
+  width: 106px;
+  margin-top: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--tn-text-faint);
+}
+
+.trackerLabelOn {
+  color: var(--tn-text-nav);
+}
+
+.trackerLine {
+  position: absolute;
+  top: 14px;
+  left: calc(50% + 22px);
+  width: calc(100% - 44px);
+  height: 2px;
+  background: var(--tn-border-inner);
+}
+
+.trackerLineDone {
+  background: var(--tn-mint);
+}
+
+/* ---- The doors, above the conversation ---- */
+
+.categoryTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--tn-border-hairline);
+}
+
+.categoryTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 15px;
+  border: 1px solid var(--tn-border-inner);
+  border-radius: 11px;
+  background: var(--tn-surface-inner);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+  cursor: pointer;
+  transition: border-color var(--tn-transition-fast), color var(--tn-transition-fast);
+}
+
+.categoryTab:hover {
+  border-color: var(--tn-border-hover);
+  color: var(--tn-text);
+}
+
+.categoryTabOn {
+  border: 1.5px solid var(--tn-mint);
+  background: var(--tn-mint-tint);
+  color: var(--tn-text);
+}
+
+.categoryTick {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--tn-mint);
+  color: var(--tn-cta-text);
+}
+
+/* ---- The conversation itself ---- */
+
+.turnVoyager,
+.turnYou {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.turnYou {
+  justify-content: flex-end;
+}
+
+.bubbleVoyager,
+.bubbleYou {
+  max-width: 74%;
+  padding: 12px 15px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--tn-text);
+}
+
+.bubbleVoyager {
+  border: 1px solid var(--tn-border-hairline);
+  border-top-left-radius: 4px;
+  background: var(--tn-chip-bg);
+}
+
+.bubbleYou {
+  border: 1px solid var(--tn-blue-border);
+  border-top-right-radius: 4px;
+  background: var(--tn-blue-tint);
+}
+
+.turnTime {
+  padding-top: 11px;
+  font-size: 10.5px;
+  white-space: nowrap;
+  color: var(--tn-text-faint);
+  flex-shrink: 0;
+}
+
+/* Voyager thinking. Three dots and no text, because a sentence about waiting
+   is one more thing to read while waiting. */
+.typing {
+  display: flex;
+  gap: 5px;
+  padding: 15px 16px;
+  border: 1px solid var(--tn-border-hairline);
+  border-radius: 14px;
+  border-top-left-radius: 4px;
+  background: var(--tn-chip-bg);
+}
+
+.typing i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tn-cyan);
+  animation: tnblink 1.2s infinite;
+}
+
+.typing i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes tnblink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.composerBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 22px 16px;
+  border-top: 1px solid var(--tn-border-hairline);
+}
+
+/* Said where the conversation happens, not in a footnote: what Voyager is for
+   here is matching, and it is not the thing giving the advice. */
+.voyagerNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+.voyagerNote svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--tn-cyan);
+}
+
+/* ---- The brief ---- */
+
+.briefBadge {
+  padding: 4px 11px;
+  border: 1px solid var(--tn-blue-border);
+  border-radius: var(--tn-radius-chip-sm);
+  background: var(--tn-blue-tint);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tn-blue-hover);
+}
+
+.briefEmpty {
+  padding: 46px 22px;
+  text-align: center;
+}
+
+.briefEmptyIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--tn-border-inner);
+  border-radius: 14px;
+  background: var(--tn-chip-bg);
+  color: var(--tn-text-faint);
+}
+
+.briefEmptyHead {
+  margin-top: 14px;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--tn-text-nav);
+}
+
+.briefEmpty .briefNote {
+  max-width: 320px;
+  margin: 5px auto 0;
+  text-align: center;
+}
+
+.briefRows {
+  padding: 4px 22px;
+}
+
+.briefRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--tn-border-hairline);
+}
+
+.briefRow:last-child {
+  border-bottom: 0;
+}
+
+.briefRowIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--tn-text-muted);
+}
+
+.briefRowLabel {
+  width: 126px;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text-soft);
+}
+
+.briefRowValue {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--tn-text);
+}
+
+.briefRowChips {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.serviceChip {
+  padding: 3px 10px;
+  border: 1px solid var(--tn-mint-border);
+  border-radius: 7px;
+  background: var(--tn-mint-tint);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-green-deep);
+}
+
+/* 16px floor: below it iOS zooms the page when the field takes focus. */
+.briefRowInput {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 11px;
+  border: 1.5px solid var(--tn-border-focus);
+  border-radius: 8px;
+  background: var(--tn-surface-inner);
+  font: inherit;
+  font-size: 16px;
+  color: var(--tn-text);
+  outline: none;
+}
+
+.briefRowSave {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--tn-cta);
+  color: var(--tn-cta-text);
+  cursor: pointer;
+}
+
+.briefActions {
+  display: flex;
+  gap: 10px;
+  padding: 16px 22px 20px;
+}
+
+.briefEdit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  padding: 13px;
+  border: 1px solid var(--tn-border-control);
+  border-radius: 11px;
+  background: var(--tn-surface-inner);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+  cursor: pointer;
+}
+
+.briefEdit:hover {
+  border-color: var(--tn-border-hover);
+}
+
+.briefEdit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.briefActions .briefCta {
+  flex: 1.35;
+  margin-top: 0;
+}
+
+.briefCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+.briefPending {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--tn-border-control);
+  border-radius: 11px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--tn-text-muted);
+}
+
+.briefPanel .briefPending {
+  margin: 0 22px 20px;
+}
+
+/* ---- Between the brief and the shortlist ---- */
+
+.matching {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 56px 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid var(--tn-border-inner);
+  border-top-color: var(--tn-mint);
+  border-radius: 50%;
+  animation: tnspin 0.8s linear infinite;
+}
+
+@keyframes tnspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+
+  .typing i {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* =========================================================== The shortlist */
+
+.results {
+  margin-top: 32px;
+}
+
+.resultsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.resultsTitle {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: var(--tn-text);
+}
+
+.resultsTitle svg {
+  color: var(--tn-mint);
+}
+
+.resultsCount {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tn-text-soft);
+}
+
+.resultsActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.viewAll {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-cyan);
+}
+
+.matchedRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 13px;
+}
+
+/* The chips are what the search used, not a restatement of the goal — and the
+   ones that can empty a shortlist come off here, where somebody can see the
+   list refill. A requirement is never dropped silently. */
+.briefChipOptional {
+  border-color: var(--tn-amber-border);
+  background: var(--tn-amber-tint);
+  color: var(--tn-amber-text);
+}
+
+.chipRemove {
+  display: inline-grid;
+  place-items: center;
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  opacity: 0.75;
+  cursor: pointer;
+  vertical-align: -1px;
+}
+
+.chipRemove:hover {
+  opacity: 1;
+}
+
+.noMatchesCard {
+  margin-top: 16px;
+  padding: 30px 28px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 16px;
+  background: var(--tn-surface-veil);
+  text-align: center;
+}
+
+.noMatchesIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border: 1px solid var(--tn-amber-border);
+  border-radius: 14px;
+  background: var(--tn-amber-tint);
+  color: var(--tn-yellow);
+}
+
+.noMatchesCard .noMatchesHead {
+  margin-top: 13px;
+  font-size: 19px;
+}
+
+.noMatchesText {
+  max-width: 520px;
+  margin: 8px auto 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--tn-text-body);
+}
+
+.noMatchesActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.widenButton {
+  padding: 11px 20px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--tn-cta);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--tn-cta-text);
+  cursor: pointer;
+}
+
+.widenButton:hover {
+  filter: brightness(1.08);
+}
+
+/* ---- One expert ---- */
+
+.resultGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.resultCard {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 16px;
+  background: var(--tn-surface-veil);
+}
+
+.resultCardBest {
+  border: 1.5px solid var(--tn-mint-border);
+}
+
+.resultTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tierBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: var(--tn-radius-chip-sm);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tierBest {
+  background: var(--tn-mint-tint);
+  color: var(--tn-mint);
+}
+
+.tierStrong {
+  background: var(--tn-blue-tint);
+  color: var(--tn-blue-hover);
+}
+
+.tierRelevant {
+  background: var(--tn-chip-bg);
+  color: var(--tn-text-soft);
+}
+
+.resultPrice {
+  font-size: 11.5px;
+  color: var(--tn-text-soft);
+}
+
+.resultPrice b {
+  font-size: 15px;
+  color: var(--tn-text);
+}
+
+.resultIdentity {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 14px;
+}
+
+.resultAvatar {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.resultWho {
+  flex: 1;
+  min-width: 0;
+}
+
+.resultName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+/* The tick means a credential checked against a registry, and nothing else. */
+.verifiedTick {
+  display: inline-flex;
+  color: var(--tn-mint);
+}
+
+.resultRole {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--tn-text-soft);
+}
+
+.resultWhere {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--tn-text-nav);
+}
+
+.resultWhere svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--tn-text-muted);
+}
+
+.credNote {
+  margin-top: 10px;
+  padding: 4px 10px;
+  border-radius: var(--tn-radius-chip-sm);
+  background: var(--tn-amber-tint);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tn-amber-text);
+  align-self: flex-start;
+}
+
+.whyBox {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--tn-mint-border);
+  border-radius: 11px;
+  background: var(--tn-mint-tint);
+}
+
+.whyBoxTitle {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--tn-mint);
+}
+
+.whyBox .reason {
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--tn-text-nav);
+}
+
+.whyBox .reason svg {
+  margin-top: 2px;
+  color: var(--tn-mint);
+}
+
+/* `margin-top: auto` rather than a fixed gap: the cards in a row are as tall as
+   the longest one, and buttons that sit at five different heights read as five
+   unrelated cards rather than as a shortlist. */
+.resultMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 11.5px;
+  color: var(--tn-text-soft);
+}
+
+.resultMeta b {
+  color: var(--tn-text-nav);
+}
+
+.resultMeta svg {
+  color: var(--tn-green-deep);
+}
+
+.metaDot {
+  color: var(--tn-border-hover);
+}
+
+.resultActions {
+  display: flex;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.viewProfile {
+  flex: 1;
+  padding: 11px;
+  border: 1px solid var(--tn-border-control);
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--tn-text-nav);
+}
+
+.viewProfile:hover {
+  border-color: var(--tn-border-hover);
+  color: var(--tn-text);
+}
+
+.bookButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1.35;
+  padding: 11px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--tn-cta);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--tn-cta-text);
+  cursor: pointer;
+}
+
+.bookButton:hover {
+  filter: brightness(1.08);
+}
+
+.bookButtonOpen {
+  background: var(--tn-mint-tint);
+  color: var(--tn-mint);
+}
+
+/* Save and compare. Quieter than the two real actions above them, because
+   neither gets anybody a consultation — they are for a longer browse. */
+.cardMinorActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.minorAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--tn-border-inner);
+  border-radius: 9px;
+  background: transparent;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text-soft);
+  cursor: pointer;
+}
+
+.minorAction:hover {
+  border-color: var(--tn-border-hover);
+  color: var(--tn-text);
+}
+
+.minorActionOn {
+  border-color: var(--tn-mint-border);
+  background: var(--tn-mint-tint);
+  color: var(--tn-mint);
+}
+
+/* ---- Picking a time, without leaving the shortlist ---- */
+
+.bookPanel {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--tn-border-hairline);
+}
+
+.bookPanelHead {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--tn-text-soft);
+}
+
+.bookSlots {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.bookSlot {
+  padding: 9px;
+  border: 1px solid var(--tn-border-inner);
+  border-radius: 9px;
+  background: var(--tn-surface-inner);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+  cursor: pointer;
+}
+
+.bookSlot:hover {
+  border-color: var(--tn-mint-border);
+}
+
+.bookSlotOn {
+  border: 1.5px solid var(--tn-mint);
+  background: var(--tn-mint-tint);
+  color: var(--tn-text);
+}
+
+.shareRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 11px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-text-body);
+  cursor: pointer;
+}
+
+.shareRow input {
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--tn-mint);
+}
+
+.bookPanel .briefCta {
+  width: 100%;
+  margin-top: 11px;
+  padding: 11px;
+  font-size: 12.5px;
+}
+
+.bookNote {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--tn-text-faint);
+}
+
+/* ---- Voyager, after the shortlist exists ---- */
+
+.askBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding: 14px 18px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 14px;
+  background: var(--tn-surface-veil);
+}
+
+.askBarTitle {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.askAnswer {
+  margin: 10px 0 0;
+  padding: 14px 18px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 12px;
+  background: var(--tn-surface);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--tn-text-nav);
+}
+
+/* ======================================================== The expert profile */
+
+.profileHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin-top: 18px;
+}
+
+.profileAvatar {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  flex-shrink: 0;
+  border-radius: 20px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.profileWho {
+  flex: 1;
+  min-width: 0;
+}
+
+.profileNameRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.profileName {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--tn-text);
+}
+
+.credentialChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--tn-radius-chip-sm);
+  background: var(--tn-chip-bg);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--tn-text-muted);
+}
+
+.credentialChipOn {
+  background: var(--tn-mint-tint);
+  color: var(--tn-mint);
+}
+
+.profileRole {
+  margin-top: 3px;
+  font-size: 15px;
+  color: var(--tn-text-soft);
+}
+
+.profileFacts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--tn-text-nav);
+}
+
+.profileFacts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profileFacts svg {
+  color: var(--tn-text-muted);
+}
+
+.profileFacts span:first-child svg {
+  color: var(--tn-orange-star);
+}
+
+/* Not a badge on the expert: an answer about the request that surfaced them. */
+.whyRecommended {
+  padding: 20px 22px;
+  border: 1.5px solid var(--tn-mint-border);
+  border-radius: 16px;
+  background: var(--tn-surface-veil);
+}
+
+.whyRecommendedTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tn-mint);
+}
+
+.whyRecommendedGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px 20px;
+  margin-top: 12px;
+}
+
+.whyRecommendedGrid .reason svg {
+  color: var(--tn-mint);
+}
+
+.bookingRail {
+  padding: 20px 22px;
+  border: 1.5px solid var(--tn-mint-border);
+  border-radius: 16px;
+  background: var(--tn-surface-veil);
+  box-shadow: var(--tn-mint-glow);
+}
+
+.railPrice {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.railDuration {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--tn-text-soft);
+}
+
+.railNext {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--tn-green-deep);
+}
+
+.shareRowBoxed {
+  padding: 11px 13px;
+  border: 1px solid var(--tn-border-inner);
+  border-radius: 10px;
+  background: var(--tn-surface-inner);
+}
+
+.bookingRail .briefCta {
+  width: 100%;
+  margin-top: 14px;
+  padding: 14px;
+  font-size: 14.5px;
+}
+
+.railLink {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-cyan);
+}
+
+.assuranceCard {
+  display: flex;
+  gap: 11px;
+  margin-top: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: 16px;
+  background: var(--tn-surface-veil);
+}
+
+.assuranceCard svg {
+  flex-shrink: 0;
+  color: var(--tn-mint);
+}
+
+.assuranceCard p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--tn-text-soft);
+}
+
+/* One column below the fold-point: the brief follows the conversation. */
+@media (max-width: 1080px) {
+  .consultation {
+    grid-template-columns: 1fr;
+  }
+
+  .briefPanel {
+    position: static;
+  }
+
+  .tracker {
+    display: none;
+  }
 }

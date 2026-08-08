@@ -39,10 +39,34 @@ export const TIER_LIMITS: Record<VoyagerTier, string> = {
   private: 'Private AI: extended analysis, documents, portfolio',
 };
 
-/** Questions per day. Reaching it opens an upgrade card, never a wall. */
+/**
+ * Questions per day, by what the person is paying rather than by tier.
+ *
+ * Tier answers "what may Voyager see"; the quota answers "how often". They used
+ * to be the same axis and it produced a Premium subscriber capped at the same
+ * forty questions as a free account, because both resolve to `personal`. The
+ * plan sheet says free is ten a day and Premium is unlimited, so that is what
+ * this counts.
+ *
+ * `null` is unmetered. Reaching a number opens the Plans path, never a wall
+ * with nothing behind it.
+ */
+export const FREE_DAILY_QUESTIONS = 10;
+
+export function quotaFor(user: AuthedUser | null): number | null {
+  if (!user) return FREE_DAILY_QUESTIONS;
+  return hasPlan(user, 'premium') ? null : FREE_DAILY_QUESTIONS;
+}
+
+/**
+ * The old tier-keyed table, kept because the widget's copy still reads it.
+ *
+ * Every value now agrees with `quotaFor`: an anonymous visitor and a free
+ * account are the same ten, and the only unmetered tier is the paid one.
+ */
 export const TIER_QUOTA: Record<VoyagerTier, number | null> = {
-  basic: 3,
-  personal: 40,
+  basic: FREE_DAILY_QUESTIONS,
+  personal: FREE_DAILY_QUESTIONS,
   private: null,
 };
 

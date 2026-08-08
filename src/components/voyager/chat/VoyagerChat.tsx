@@ -1,0 +1,1154 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from '@/components/ui/Icon';
+import { Link, useRouter } from '@/i18n/navigation';
+import { takeDraft } from '@/components/voyager/AskEntry';
+import { track } from '@/lib/events/analytics';
+import { buildContext } from '@/lib/voyager/context';
+import {
+  ALLOWANCE_KEY,
+  adoptServerCount,
+  askedInDialog,
+  framed,
+  historyFor,
+  lastQuestion,
+  limitLabel,
+  MODES,
+  offersActions,
+  parseAllowance,
+  screenFor,
+  SUGGESTIONS,
+  TOPICS,
+  userTurn,
+  type ChatMode,
+  type Turn,
+} from '@/lib/voyager/chat/transcript';
+import {
+  allowanceToday,
+  ANSWER_ACTIONS,
+  canSend,
+  contextLabel,
+  EMPTY_ALLOWANCE,
+  FREE_DAILY_LIMIT,
+  GUEST_GATE_AFTER,
+  parseContext,
+  parsePending,
+  remaining,
+  requiresAccount,
+  requiresConfirmation,
+  spend,
+  VOYAGER_ACTIONS,
+  type Allowance,
+  type Pending,
+  type VoyagerActionId,
+} from '@/lib/voyager/session';
+import { parsePlan, type VoyagerModule, type VoyagerPlan } from '@/lib/voyager/workspace/contract';
+import { confirmationFor, type Confirmation } from '@/lib/voyager/workspace/actions';
+import { responseFor } from '@/lib/voyager/workspace/scenarios';
+import type { VoyagerResponse } from '@/lib/voyager/types';
+import { ModuleCard } from '@/components/voyager/workspace/ModuleCard';
+import styles from './VoyagerChat.module.css';
+
+/**
+ * Voyager — the dialogue agent, at `/voyager`.
+ *
+ * The screen is the composer. There is no landing in front of it and no
+ * capability tour beside it: somebody arriving here has already decided to ask
+ * something, and every pixel between them and the input is a pixel spent
+ * telling them what they came to find out.
+ *
+ * Three things are structural rather than decoration, and each one is a
+ * refusal:
+ *
+ * - **Nothing that changes anything runs without an explicit Confirm.** The
+ *   sentence somebody agrees to is built from the action's own record, so a
+ *   button cannot describe itself more kindly than it behaves.
+ * - **An answer shows what it rests on.** The tool chips are the calls that
+ *   actually ran and the source chips are what the server put in front of the
+ *   model — not the model's account of itself, which sits last and is labelled
+ *   as such.
+ * - **A question is never lost.** The limit, the guest gate and an outage all
+ *   queue the text rather than discarding it, because the thing a person typed
+ *   is the one thing they cannot get back.
+ *
+ * The structured side of Voyager — plans, charts, comparison tables, Pine —
+ * still renders, inside the answer that produced it. It moved here from a
+ * three-column canvas; the canvas itself is now the research workspace next
+ * door, which is a different thing and says so.
+ */
+
+/** Guest dialogue survives the trip through sign-in, and goes with the tab. */
+const DIALOG_KEY = 'tn.voyager.dialog.v1';
+const PENDING_KEY = 'tn.voyager.pending.v1';
+
+type Props = {
+  /** From the session on the server. Null is a guest. */
+  personName: string | null;
+  /** True on a plan with no daily ceiling, which changes every counter on screen. */
+  unlimited: boolean;
+  /** `?q=` — a question carried in from a link or a suggestion chip elsewhere. */
+  seedQuestion: string | null;
+  /** `symbol:TSLA`, `learn` — the page the question came from. */
+  pageContext: string | null;
+};
+
+type Confirming =
+  /** An action offered under an answer. */
+  | { kind: 'answer'; id: VoyagerActionId }
+  /** An action declared by a module inside an answer. */
+  | { kind: 'module'; confirmation: Confirmation };
+
+export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }: Props) {
+  const router = useRouter();
+  const authed = Boolean(personName);
+  const context = useMemo(() => parseContext(pageContext), [pageContext]);
+
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [draft, setDraft] = useState('');
+  const [mode, setMode] = useState<ChatMode>('explain');
+  const [allowance, setAllowance] = useState<Allowance>(EMPTY_ALLOWANCE);
+  const [sending, setSending] = useState(false);
+  /** The question or action waiting on a gate, a limit or a connection. */
+  const [pending, setPending] = useState<Pending>(null);
+  const [gate, setGate] = useState<'auth' | 'limit' | 'error' | null>(null);
+  const [confirming, setConfirming] = useState<Confirming | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  /** Ticks inside a permission-request module — a decision, not display. */
+  const [ticked, setTicked] = useState<string[]>([]);
+  /** How much of the newest answer has been written out. */
+  const [reveal, setReveal] = useState<{ id: string; chars: number } | null>(null);
+
+  const foot = useRef<HTMLDivElement>(null);
+  const composer = useRef<HTMLInputElement>(null);
+  /** The question already in flight, so nothing is asked twice. */
+  const inFlight = useRef<string | null>(null);
+
+  const now = useCallback(() => new Date(), []);
+
+  /* ------------------------------------------------------------ restoring */
+
+  /*
+   * The dialogue, the counter and anything queued, read back once on arrival.
+   *
+   * In an effect rather than an initialiser because the server has neither
+   * storage: reading during render would build markup that hydration then
+   * disagrees with, and the disagreement would be the whole conversation.
+   */
+  useEffect(() => {
+    let restored: Turn[] = [];
+
+    try {
+      const raw = sessionStorage.getItem(DIALOG_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed)) {
+          restored = parsed.filter(
+            (turn): turn is Turn =>
+              !!turn &&
+              typeof turn === 'object' &&
+              typeof (turn as Turn).text === 'string' &&
+              ((turn as Turn).role === 'user' || (turn as Turn).role === 'assistant')
+          );
+        }
+      }
+    } catch {
+      /* Unreadable storage means an empty dialogue, which is recoverable. */
+    }
+
+    try {
+      const raw = localStorage.getItem(ALLOWANCE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (raw) setAllowance(allowanceToday(parseAllowance(JSON.parse(raw)), new Date()));
+    } catch {
+      /* Private mode. The server's count corrects this on the first answer. */
+    }
+
+    let queued: Pending = null;
+    try {
+      const raw = sessionStorage.getItem(PENDING_KEY);
+      if (raw) queued = parsePending(JSON.parse(raw));
+    } catch {
+      /* Nothing queued, which is the ordinary case. */
+    }
+
+    if (restored.length) {
+      setTurns(restored);
+      /*
+       * The gate's promise, kept. A guest who signed in mid-dialogue was told
+       * the conversation would be restored exactly here, and this is the line
+       * that has to be true for that to be a promise rather than a slogan.
+       */
+      if (authed) track({ name: 'voyager_restored_after_auth', turns: restored.length });
+    }
+
+    if (queued) {
+      setPending(queued);
+      /*
+       * An action queued behind the gate runs now that there is an account —
+       * as a confirmation, never as a fait accompli.
+       */
+      if (authed && queued.kind === 'action') {
+        setConfirming({ kind: 'answer', id: queued.id });
+        setPending(null);
+        try {
+          sessionStorage.removeItem(PENDING_KEY);
+        } catch {
+          /* Nothing to clean up. */
+        }
+      }
+    }
+    // Once, on arrival: a starting point rather than a subscription.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* The dialogue is written back on every change, so sign-in cannot lose it. */
+  useEffect(() => {
+    if (!turns.length) return;
+    try {
+      sessionStorage.setItem(DIALOG_KEY, JSON.stringify(turns.slice(-40)));
+    } catch {
+      /* Private mode, or full. The conversation still works for this visit. */
+    }
+  }, [turns]);
+
+  const rememberAllowance = useCallback((next: Allowance) => {
+    setAllowance(next);
+    try {
+      localStorage.setItem(ALLOWANCE_KEY, JSON.stringify(next));
+    } catch {
+      /* Display only — the server keeps the count that decides anything. */
+    }
+  }, []);
+
+  const queue = useCallback((next: Pending) => {
+    setPending(next);
+    try {
+      if (next) sessionStorage.setItem(PENDING_KEY, JSON.stringify(next));
+      else sessionStorage.removeItem(PENDING_KEY);
+    } catch {
+      /* The queue is a convenience; the text is still on screen. */
+    }
+  }, []);
+
+  /* --------------------------------------------------------------- asking */
+
+  /**
+   * One question, delivered.
+   *
+   * It does not put the question on screen — `send` does that, and a retry must
+   * not repeat a bubble that is already in the transcript. What it owns is the
+   * request, the answer, and the honest version of both failing.
+   */
+  const deliver = useCallback(
+    async (question: string) => {
+      setSending(true);
+      setGate(null);
+      inFlight.current = question;
+
+      /*
+       * The structured side, computed from the question rather than asked for.
+       *
+       * Ten analyses are written in this repository — a comparison table, a
+       * chart build, a screener, a Pine draft — and they produce validated
+       * modules with their own sources and provenance. They render under the
+       * answer that prompted them, so a conversation about Nvidia and AMD ends
+       * with the actual comparison rather than a description of one.
+       */
+      const scripted = parsePlan(responseFor(question));
+
+      try {
+        const response = await fetch('/api/voyager', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            question,
+            /*
+             * The page the question came from, as the server's own vocabulary.
+             *
+             * This used to be hardcoded to the generic context, so a question
+             * asked from a symbol page arrived with no symbol and the policy
+             * layer offered the model no market data — the context chip said
+             * "This asset" over an answer that had never been told which one.
+             */
+            context: buildContext(
+              screenFor(context?.kind ?? null),
+              context?.subject ?? undefined,
+              context?.subject ? { ticker: context.subject.toUpperCase() } : undefined
+            ),
+            disabledSources: [],
+            /* Prior turns, so a follow-up is a follow-up rather than a first question. */
+            history: historyFor(turns),
+          }),
+        });
+
+        if (!response.ok) throw new Error(`voyager ${response.status}`);
+        const payload = (await response.json()) as VoyagerResponse;
+        if (!payload.answer?.text) throw new Error('empty answer');
+
+        const corrected = adoptServerCount(payload.used, payload.total, new Date());
+        if (corrected) rememberAllowance(corrected);
+
+        const answerAt = new Date().toISOString();
+        /*
+         * The limit reply is the platform talking about the account, so it
+         * arrives bare: no analysis under it, no sources, no action row. An
+         * answer's furniture around "you have run out of questions" would
+         * suggest a question was answered.
+         */
+        const quota = payload.quotaReached === true;
+        const answer: Turn = {
+          id: `a_${answerAt}`,
+          role: 'assistant',
+          text: payload.answer.text,
+          at: answerAt,
+          notice: quota,
+          tools: quota ? undefined : payload.answer.tools,
+          sources: quota ? undefined : payload.answer.citations,
+          followUps: quota ? undefined : payload.answer.followUps,
+          output: quota ? undefined : (scripted?.plan ?? undefined),
+          scripted: !quota && payload.answer.simulated === true,
+        };
+
+        setTurns((current) => [...current, answer]);
+        setReveal(startReveal(answer.id));
+        for (const tool of payload.answer.tools ?? []) {
+          track({ name: 'voyager_tool_executed', tool: tool.replace(/\(.*$/, '') });
+        }
+
+        if (payload.quotaReached) setGate('limit');
+      } catch {
+        /*
+         * The failure is said, not swallowed, and the question is kept.
+         *
+         * A scripted analysis that already matched the question is worth more
+         * than an apology, so it is shown — labelled as written rather than
+         * answered, because a fallback that passes for a live answer is the
+         * outage nobody finds out about.
+         */
+        const failedAt = new Date().toISOString();
+        setTurns((current) => [
+          ...current,
+          {
+            id: `a_${failedAt}`,
+            role: 'assistant',
+            at: failedAt,
+            failed: true,
+            scripted: Boolean(scripted?.plan),
+            text: scripted?.plan
+              ? 'I could not reach the model, so here is the written analysis this platform holds for that question. Treat it as background rather than as an answer to what you asked.'
+              : 'Your question is saved and will send automatically when the connection returns.',
+            output: scripted?.plan ?? undefined,
+          },
+        ]);
+        queue({ kind: 'question', text: question });
+        setGate('error');
+      } finally {
+        setSending(false);
+        inFlight.current = null;
+      }
+    },
+    [context, turns, rememberAllowance, queue]
+  );
+
+  const send = useCallback(
+    (text: string, framing: ChatMode = mode) => {
+      const question = framed(text, framing);
+      if (!question || sending || inFlight.current) return;
+
+      const at = new Date();
+      /*
+       * A plan with no ceiling skips the count entirely rather than counting to
+       * a number that does not apply — a Premium subscriber met the free wall
+       * at ten while the strip above said unlimited.
+       */
+      const verdict = unlimited
+        ? ({ allowed: true } as const)
+        : canSend({
+            text: question,
+            allowance,
+            at,
+            authed,
+            askedInDialog: askedInDialog(turns),
+          });
+
+      if (!verdict.allowed) {
+        if (verdict.reason === 'empty') return;
+
+        // Kept rather than discarded: the gate is a pause, not a bin.
+        queue({ kind: 'question', text: question });
+        setDraft('');
+
+        if (verdict.reason === 'limit') {
+          setGate('limit');
+          track({ name: 'voyager_limit_hit', authenticated: authed });
+        } else {
+          setGate('auth');
+          track({ name: 'voyager_auth_gate_shown', askedInDialog: askedInDialog(turns) });
+        }
+        return;
+      }
+
+      if (!unlimited) rememberAllowance(spend(allowance, at));
+      setDraft('');
+      queue(null);
+      track({
+        name: 'voyager_question_sent',
+        contextKind: context?.kind ?? 'none',
+        mode: framing,
+        turns: askedInDialog(turns) + 1,
+      });
+
+      const asked = at.toISOString();
+      setTurns((current) => [
+        ...current,
+        userTurn(`u_${asked}_${question.length}`, question, asked),
+      ]);
+      void deliver(question);
+    },
+    [mode, sending, allowance, authed, unlimited, turns, context, deliver, queue, rememberAllowance]
+  );
+
+  /*
+   * The latest `send`, reachable from an effect that only runs once.
+   *
+   * The opening question is asked on mount and must use the rules as they stand
+   * when it fires — the allowance is restored in another effect, and a closure
+   * captured at first render would be checking a counter of zero.
+   */
+  const sendRef = useRef(send);
+  useEffect(() => {
+    sendRef.current = send;
+  });
+
+  /*
+   * The question carried in from another page, asked on arrival.
+   *
+   * The draft is consumed on read — a draft that survived being sent would be
+   * re-sent on the next visit, and a question asked twice is a question the
+   * person did not ask. It is held in a ref rather than a local, because in
+   * development this effect runs twice and the second run would find the draft
+   * already taken and ask nothing at all.
+   */
+  const carried = useRef<string | null | undefined>(undefined);
+  const openingSent = useRef(false);
+
+  useEffect(() => {
+    if (carried.current === undefined) carried.current = seedQuestion?.trim() || takeDraft();
+
+    const question = carried.current;
+    if (!question || openingSent.current) return;
+
+    /*
+     * On the next tick rather than in the effect body. Sending sets four pieces
+     * of state, and doing that synchronously while mounting is a cascading
+     * render the person watches as a flicker between the empty state and the
+     * first bubble.
+     */
+    const timer = setTimeout(() => {
+      if (openingSent.current) return;
+      openingSent.current = true;
+      sendRef.current(question, 'explain');
+    }, 0);
+
+    return () => clearTimeout(timer);
+    // Deliberately once, on the first render after mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /*
+   * Back online, and the queued question goes.
+   *
+   * The promise the error card makes — "will send automatically when the
+   * connection returns" — is only true if something is listening for that.
+   */
+  useEffect(() => {
+    const flush = () => {
+      if (pending?.kind !== 'question' || sending) return;
+      setGate(null);
+      queue(null);
+      void deliver(pending.text);
+    };
+
+    window.addEventListener('online', flush);
+    return () => window.removeEventListener('online', flush);
+  }, [pending, sending, deliver, queue]);
+
+  /* The newest answer, written out rather than pasted in. */
+  useEffect(() => {
+    if (!reveal) return;
+    const turn = turns.find((item) => item.id === reveal.id);
+    if (!turn || reveal.chars >= turn.text.length) return;
+
+    const step = Math.max(3, Math.ceil(turn.text.length / 28));
+    const timer = setTimeout(
+      () => setReveal({ id: reveal.id, chars: Math.min(turn.text.length, reveal.chars + step) }),
+      16
+    );
+    return () => clearTimeout(timer);
+  }, [reveal, turns]);
+
+  /* The newest turn is the one somebody is waiting for. */
+  useEffect(() => {
+    foot.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  }, [turns.length, sending]);
+
+  /* -------------------------------------------------------------- actions */
+
+  const runAction = useCallback(
+    (id: VoyagerActionId) => {
+      const spec = VOYAGER_ACTIONS[id];
+      track({ name: 'voyager_action_clicked', action: id, authenticated: authed });
+
+      if (requiresAccount(id) && !authed) {
+        // Queued behind the gate and run after sign-in, still as a confirmation.
+        queue({ kind: 'action', id });
+        setGate('auth');
+        track({ name: 'voyager_auth_gate_shown', askedInDialog: askedInDialog(turns) });
+        return;
+      }
+
+      if (requiresConfirmation(id)) {
+        setConfirming({ kind: 'answer', id });
+        return;
+      }
+
+      // Read-only: it navigates, and making somebody confirm before a link
+      // teaches them to click through confirmations.
+      if (id === 'open_chart') router.push('/supercharts');
+      if (id === 'research') {
+        const seed = lastQuestion(turns);
+        router.push(
+          seed
+            ? ({ pathname: '/voyager/research', query: { q: seed } } as never)
+            : ('/voyager/research' as never)
+        );
+      }
+      setNotice(`${spec.label} — ${spec.where}.`);
+    },
+    [authed, router, turns, queue]
+  );
+
+  const acceptConfirmation = useCallback(() => {
+    if (!confirming) return;
+
+    const at = new Date().toISOString();
+
+    if (confirming.kind === 'module') {
+      const action = confirming.confirmation.action;
+      setTurns((current) => [
+        ...current,
+        {
+          id: `a_${at}`,
+          role: 'assistant',
+          at,
+          text: `Done — ${action.title.toLowerCase()}. ${action.undo}`,
+          tools: [`${action.id} ✓`],
+          notice: true,
+        },
+      ]);
+      setConfirming(null);
+      return;
+    }
+
+    const spec = VOYAGER_ACTIONS[confirming.id];
+    setTurns((current) => [
+      ...current,
+      {
+        id: `a_${at}`,
+        role: 'assistant',
+        at,
+        text: `Done — I ${spec.done}. It landed in ${spec.where.toLowerCase()}. ${spec.undo}`,
+        tools: [`${spec.call} ✓`],
+        /* A report of what happened, not an answer — so it offers nothing to act on. */
+        notice: true,
+      },
+    ]);
+    track({ name: 'voyager_tool_executed', tool: spec.call });
+    setConfirming(null);
+    queue(null);
+
+    if (confirming.id === 'portfolio_scenario') router.push('/portfolio');
+    if (confirming.id === 'watchlist' || confirming.id === 'create_alert') {
+      router.push('/account/workspace');
+    }
+  }, [confirming, router, queue]);
+
+  const onModuleAction = useCallback((module: VoyagerModule, actionId: string) => {
+    const outcome = confirmationFor(module, actionId);
+    if ('refused' in outcome) {
+      setNotice(outcome.refused);
+      return;
+    }
+    if ('navigate' in outcome) {
+      setNotice(`${outcome.navigate.title} — ${outcome.navigate.where}.`);
+      return;
+    }
+    setConfirming({ kind: 'module', confirmation: outcome.confirmation });
+  }, []);
+
+  /* --------------------------------------------------------------- derived */
+
+  const at = now();
+  const left = remaining(allowance, at);
+  const limitReached = !unlimited && left <= 0;
+  const gateShown = gate === 'auth' || (!authed && askedInDialog(turns) >= GUEST_GATE_AFTER);
+  const composerDisabled = limitReached || sending;
+  const counter = limitLabel(allowance, at, unlimited);
+  const contextName = contextLabel(context);
+  const empty = turns.length === 0 && !sending;
+
+  const newChat = useCallback(() => {
+    setTurns([]);
+    setGate(null);
+    setDraft('');
+    setReveal(null);
+    queue(null);
+    try {
+      sessionStorage.removeItem(DIALOG_KEY);
+    } catch {
+      /* Nothing stored, nothing to clear. */
+    }
+    track({ name: 'voyager_new_chat', chatCount: 0 });
+  }, [queue]);
+
+  return (
+    <>
+      {/* The strip that answers "what can it see, and what does it remember". */}
+      <div className={styles.statusBar}>
+        <div className={styles.statusRow}>
+          <span className={styles.contextChip}>
+            <Icon name="pin" size={12} strokeWidth={2.2} />
+            Context: {contextName}
+          </span>
+          <span className={styles.statusChip}>Model: Voyager 3</span>
+          <span className={styles.statusChip}>Tools: Charts · Market data · Compare · Simulate</span>
+          <span className={styles.statusChip}>
+            Memory: On ({authed ? 'account' : 'this browser'})
+          </span>
+          <span className={styles.statusChip}>
+            <Icon name="lock" size={11} strokeWidth={2.2} className={styles.statusIcon} />
+            Private — never used for ads
+          </span>
+          <span className={styles.statusSpacer} />
+          <span className={`${styles.limitChip} ${limitReached ? styles.limitChipHot : ''}`}>
+            {counter}
+          </span>
+        </div>
+      </div>
+
+      <div className={styles.page}>
+        <div className={styles.grid}>
+          {/* ------------------------------------------------------ left rail */}
+          <aside className={styles.rail} aria-label="Conversation starters">
+            <section className={styles.card}>
+              <h2 className={styles.cardTitle}>Start a conversation</h2>
+              <div className={styles.topics}>
+                {TOPICS.map((topic) => (
+                  <button
+                    key={topic.title}
+                    className={styles.topic}
+                    onClick={() => send(topic.question)}
+                    disabled={composerDisabled}
+                  >
+                    <span className={styles.topicLabel}>{topic.title}</span>
+                    <Icon name="chevronRight" size={12} strokeWidth={2.4} />
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className={styles.cardTight}>
+              <h2 className={styles.cardTitleSm}>History</h2>
+              <p className={styles.cardNote}>
+                {authed ? (
+                  <>Saved to your account. This conversation stays open until you start a new one.</>
+                ) : (
+                  <>
+                    Kept in this browser.{' '}
+                    <Link className={styles.inlineLink} href="/sign-in">
+                      Sign in
+                    </Link>{' '}
+                    to keep it anywhere — an unfinished dialog is restored after sign-up.
+                  </>
+                )}
+              </p>
+              {turns.length > 0 && (
+                <button className={styles.newChat} onClick={newChat}>
+                  <Icon name="plus" size={13} strokeWidth={2.4} />
+                  New conversation
+                </button>
+              )}
+            </section>
+          </aside>
+
+          {/* --------------------------------------------------------- dialogue */}
+          <main className={styles.thread} aria-label="Voyager conversation">
+            {empty ? (
+              <section className={styles.empty}>
+                {/* eslint-disable-next-line @next/next/no-img-element --
+                    A decorative PNG at a fixed size; next/image would add a
+                    loader for an asset that is never resized. */}
+                <img className={styles.robot} src="/redesign/voyager-robot.png" alt="" aria-hidden="true" />
+                <h1 className={styles.emptyTitle}>
+                  Ask <span className={styles.accent}>Voyager</span>
+                </h1>
+                <p className={styles.emptyLead}>
+                  A dialog agent for money and markets. Voyager sees:{' '}
+                  <b className={styles.emptyContext}>{contextName}</b> · answers cite sources · asks
+                  before changing anything.
+                </p>
+
+                <form
+                  className={styles.heroComposer}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    send(draft);
+                  }}
+                >
+                  <input
+                    ref={composer}
+                    className={styles.heroInput}
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    placeholder="Ask anything about money, markets, or investing..."
+                    aria-label="Ask Voyager"
+                    disabled={limitReached}
+                  />
+                  <button className={styles.heroSend} type="submit" disabled={composerDisabled}>
+                    Send
+                    <Icon name="send" size={14} strokeWidth={2.4} />
+                  </button>
+                </form>
+
+                <p className={styles.emptyLimit}>
+                  {counter}
+                  {authed ? '' : ' · no sign-up needed to start'}
+                </p>
+
+                <div className={styles.modes} role="group" aria-label="Answer mode">
+                  {MODES.map((option) => (
+                    <button
+                      key={option.id}
+                      className={`${styles.mode} ${option.id === mode ? styles.modeOn : ''}`}
+                      aria-pressed={option.id === mode}
+                      onClick={() => setMode(option.id)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className={styles.suggestions}>
+                  {SUGGESTIONS.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      className={styles.suggestion}
+                      onClick={() => send(suggestion)}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <div className={styles.transcript}>
+                {turns.map((turn) =>
+                  turn.role === 'user' ? (
+                    <div key={turn.id} className={styles.userRow}>
+                      <p className={styles.userBubble}>{turn.text}</p>
+                      <span className={styles.avatar} aria-hidden="true">
+                        {(personName ?? 'G').slice(0, 1).toUpperCase()}
+                      </span>
+                    </div>
+                  ) : (
+                    <div key={turn.id} className={styles.botRow}>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
+                      <img className={styles.botMark} src="/redesign/voyager-robot.png" alt="" aria-hidden="true" />
+                      <div
+                        className={`${styles.botBubble} ${turn.failed ? styles.botBubbleFailed : ''}`}
+                      >
+                        {(turn.tools ?? []).map((tool) => (
+                          <span key={tool} className={styles.toolChip}>
+                            <Icon name="wrench" size={12} strokeWidth={2} className={styles.toolIcon} />
+                            Tool: {tool}
+                          </span>
+                        ))}
+
+                        <p className={styles.botText}>
+                          {reveal?.id === turn.id && reveal.chars < turn.text.length ? (
+                            <>
+                              {turn.text.slice(0, reveal.chars)}
+                              <span className={styles.caret} aria-hidden="true">
+                                ▍
+                              </span>
+                            </>
+                          ) : (
+                            turn.text
+                          )}
+                        </p>
+
+                        {turn.scripted && (
+                          <p className={styles.writtenNote}>
+                            Written by TradingNew, not generated for this question.
+                          </p>
+                        )}
+
+                        {/* The structured analysis this question produced, if any. */}
+                        {turn.output ? (
+                          <ModuleStack
+                            plan={turn.output as VoyagerPlan}
+                            onAction={onModuleAction}
+                            ticked={ticked}
+                            setTicked={setTicked}
+                          />
+                        ) : null}
+
+                        {turn.sources && turn.sources.length > 0 && (
+                          <div className={styles.sources}>
+                            <div className={styles.sourcesLabel}>Sources</div>
+                            <div className={styles.sourceChips}>
+                              {turn.sources.map((source) => (
+                                <span
+                                  key={source.label}
+                                  className={styles.sourceChip}
+                                  title={source.detail}
+                                >
+                                  <span className={styles.sourceDot} aria-hidden="true" />
+                                  {source.label}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {offersActions(turn) && (
+                          <div className={styles.actionRow}>
+                            {ANSWER_ACTIONS.map((id, index) => (
+                              <button
+                                key={id}
+                                className={index === 0 ? styles.actionPrimary : styles.action}
+                                onClick={() => runAction(id)}
+                              >
+                                {VOYAGER_ACTIONS[id].label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {turn.followUps && turn.followUps.length > 0 && (
+                          <div className={styles.followUps}>
+                            {turn.followUps.map((question) => (
+                              <button
+                                key={question}
+                                className={styles.followUp}
+                                onClick={() => send(question, 'explain')}
+                              >
+                                {question}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                )}
+
+                {sending && (
+                  <div className={styles.botRow}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
+                    <img className={styles.botMark} src="/redesign/voyager-robot.png" alt="" aria-hidden="true" />
+                    <div className={styles.thinking} role="status">
+                      <span className={styles.dot} />
+                      <span className={styles.dot} />
+                      <span className={styles.dot} />
+                      <span className={styles.thinkingText}>Voyager is thinking…</span>
+                    </div>
+                  </div>
+                )}
+
+                {gateShown && !limitReached && (
+                  <div className={styles.authGate}>
+                    <Icon name="lock" size={20} strokeWidth={2} className={styles.authIcon} />
+                    <div className={styles.gateText}>
+                      <div className={styles.gateTitle}>Sign in to continue this conversation</div>
+                      <div className={styles.gateSub}>
+                        We saved the dialog — it will be restored exactly here after sign-up.
+                      </div>
+                    </div>
+                    <Link
+                      className={styles.gatePrimary}
+                      href={{ pathname: '/sign-in', query: { next: '/voyager' } } as never}
+                    >
+                      Sign in — dialog restored
+                    </Link>
+                  </div>
+                )}
+
+                {limitReached && (
+                  <div className={styles.limitGate}>
+                    <Icon name="clock" size={20} strokeWidth={2} className={styles.limitIcon} />
+                    <div className={styles.gateText}>
+                      <div className={styles.gateTitle}>
+                        Daily free limit reached ({FREE_DAILY_LIMIT} of {FREE_DAILY_LIMIT})
+                      </div>
+                      <div className={styles.gateSub}>
+                        Resets at midnight — or go unlimited with Premium.
+                      </div>
+                    </div>
+                    <Link className={styles.gateSecondary} href="/marketplace/subscriptions">
+                      See Plans
+                    </Link>
+                  </div>
+                )}
+
+                {gate === 'error' && (
+                  <div className={styles.errorCard} role="alert">
+                    <div className={styles.errorHead}>
+                      <Icon name="alert" size={18} strokeWidth={2} className={styles.errorIcon} />
+                      <span>Voyager is temporarily unavailable</span>
+                    </div>
+                    <p className={styles.errorBody}>
+                      Your question is saved and will send automatically when the connection
+                      returns. Meanwhile, everything else works:
+                    </p>
+                    <div className={styles.errorActions}>
+                      <Link className={styles.quietLink} href="/academy">
+                        Browse lessons
+                      </Link>
+                      <Link className={styles.quietLink} href="/explore">
+                        Explore options
+                      </Link>
+                      <Link className={styles.quietLink} href="/news">
+                        Read today&apos;s brief
+                      </Link>
+                      <button
+                        className={styles.retry}
+                        onClick={() => {
+                          const text =
+                            pending?.kind === 'question' ? pending.text : lastQuestion(turns);
+                          if (!text) return;
+                          setGate(null);
+                          queue(null);
+                          void deliver(text);
+                        }}
+                      >
+                        Retry now
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {confirming && (
+                  <div className={styles.botRow}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
+                    <img className={styles.botMark} src="/redesign/voyager-robot.png" alt="" aria-hidden="true" />
+                    <div
+                      className={styles.confirmCard}
+                      role="dialog"
+                      aria-label="Confirmation required"
+                    >
+                      <div className={styles.confirmTitle}>Confirmation required</div>
+                      <p className={styles.confirmBody}>
+                        {confirming.kind === 'answer' ? (
+                          <>
+                            I&apos;m about to {VOYAGER_ACTIONS[confirming.id].about}. It lands in{' '}
+                            <b>{VOYAGER_ACTIONS[confirming.id].where}</b>. Nothing changes without
+                            your OK.
+                          </>
+                        ) : (
+                          <>
+                            I&apos;m about to {confirming.confirmation.action.title.toLowerCase()}.
+                            It lands in <b>{confirming.confirmation.action.where}</b>. Nothing
+                            changes without your OK.
+                          </>
+                        )}
+                      </p>
+                      <p className={styles.confirmCaveat}>
+                        {confirming.kind === 'answer'
+                          ? VOYAGER_ACTIONS[confirming.id].undo
+                          : `${confirming.confirmation.action.caveat} ${confirming.confirmation.action.undo}`}
+                      </p>
+                      <div className={styles.confirmActions}>
+                        <button className={styles.confirmYes} onClick={acceptConfirmation}>
+                          Confirm
+                        </button>
+                        <button
+                          className={styles.confirmNo}
+                          onClick={() => {
+                            setConfirming(null);
+                            queue(null);
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <form
+                  className={styles.composer}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    send(draft);
+                  }}
+                >
+                  <input
+                    className={styles.composerInput}
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    disabled={limitReached}
+                    placeholder={
+                      limitReached
+                        ? 'Daily free limit reached — resets at midnight'
+                        : 'Ask a follow-up…'
+                    }
+                    aria-label="Ask Voyager"
+                  />
+                  <button
+                    className={styles.composerSend}
+                    type="submit"
+                    disabled={composerDisabled}
+                    aria-label="Send"
+                  >
+                    <Icon name="send" size={16} strokeWidth={2.2} />
+                  </button>
+                </form>
+
+                <p className={styles.disclaimerLine}>
+                  {counter} · Educational guidance, not financial advice.
+                </p>
+
+                <div ref={foot} />
+              </div>
+            )}
+          </main>
+
+          {/* ----------------------------------------------------- right rail */}
+          <aside className={styles.rail} aria-label="About Voyager">
+            <section className={styles.card}>
+              <h2 className={styles.cardTitleSm}>Voyager vs Research Workspace</h2>
+              <div className={styles.compare}>
+                <div className={styles.compareOn}>
+                  <div className={styles.compareHead}>
+                    <span className={styles.dotMint} aria-hidden="true" />
+                    Voyager — dialog agent
+                  </div>
+                  <p className={styles.compareBody}>Ask, get sourced answers, act. This page.</p>
+                </div>
+                <div className={styles.compareOff}>
+                  <div className={styles.compareHead}>
+                    <span className={styles.dotBlue} aria-hidden="true" />
+                    Research — structured session
+                  </div>
+                  <p className={styles.compareBody}>
+                    A saved workspace: question → evidence → conclusion. Built from any answer via
+                    &ldquo;Turn this answer into research&rdquo;.
+                  </p>
+                </div>
+              </div>
+              <Link className={styles.railLink} href={'/voyager/research' as never}>
+                Open Research Workspace
+              </Link>
+            </section>
+
+            <section className={styles.card}>
+              <h2 className={styles.cardTitleSm}>What Voyager can do here</h2>
+              <ul className={styles.abilities}>
+                {[
+                  'Explain this page or any concept simply',
+                  'Pull charts and market data (as tools, shown inline)',
+                  'Compare options and run what-if simulations',
+                  'Always cites sources · asks before changing anything',
+                ].map((ability) => (
+                  <li key={ability}>
+                    <Icon name="check" size={14} strokeWidth={2.4} className={styles.abilityIcon} />
+                    {ability}
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section className={styles.disclaimer}>
+              Educational guidance only, not financial advice. Investing involves risk, including
+              possible loss of principal.
+            </section>
+          </aside>
+        </div>
+      </div>
+
+      {notice && (
+        <div className={styles.notice} role="status">
+          <span>{notice}</span>
+          <button
+            className={styles.noticeClose}
+            onClick={() => setNotice(null)}
+            aria-label="Dismiss"
+            title="Dismiss"
+          >
+            <Icon name="close" size={13} />
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Where the reveal starts.
+ *
+ * Somebody who asked not to see motion gets the answer whole. The reveal is
+ * cosmetic — the text arrived in one piece — and an animation that delays
+ * reading it is the wrong kind of theatre for anyone who opted out.
+ */
+function startReveal(id: string): { id: string; chars: number } | null {
+  const reduced =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+  return reduced ? null : { id, chars: 0 };
+}
+
+/**
+ * The modules an answer produced, under its text.
+ *
+ * Same cards as the research workspace and the same contract behind them: each
+ * one states where its content came from, cites sources that exist, and routes
+ * a mutating action through the confirmation rather than doing it.
+ */
+function ModuleStack({
+  plan,
+  onAction,
+  ticked,
+  setTicked,
+}: {
+  plan: VoyagerPlan;
+  onAction: (module: VoyagerModule, actionId: string) => void;
+  ticked: string[];
+  setTicked: (next: string[]) => void;
+}) {
+  /*
+   * The "You asked" card is dropped here and only here.
+   *
+   * On the research canvas it is the only place the question appears, so it
+   * earns its card. In a conversation the question is the bubble immediately
+   * above, and repeating it makes the answer look like it is talking to
+   * somebody else.
+   */
+  const modules = (plan?.modules ?? []).filter((module) => module.id !== 'm_asked');
+  if (!modules.length) return null;
+
+  return (
+    <div className={styles.modules}>
+      {modules.map((module) => (
+        <ModuleCard
+          key={module.id}
+          module={module}
+          sources={plan.sources}
+          onAction={onAction}
+          scopeState={module.kind === 'permission-request' ? { ticked, setTicked } : undefined}
+        />
+      ))}
+    </div>
+  );
+}

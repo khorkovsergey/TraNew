@@ -292,6 +292,50 @@ function withAllowedActions(
   return { ...answer, actions, ...(study ? { study } : { study: undefined }) };
 }
 
+/**
+ * The hosts a web search actually returned, in the order they came back.
+ *
+ * Read off the response rather than off the model's prose: the sources line is
+ * written by the model and can be wrong, while these blocks are the record of
+ * what was fetched. Deduplicated by host, because five pages from one site is
+ * one source with five pages.
+ */
+function searchCitations(content: unknown[]): { label: string; detail?: string }[] {
+  const seen = new Set<string>();
+  const found: { label: string; detail?: string }[] = [];
+
+  for (const block of content) {
+    const entry = block as { type?: string; content?: unknown };
+    if (entry?.type !== 'web_search_tool_result' || !Array.isArray(entry.content)) continue;
+
+    for (const item of entry.content) {
+      const result = item as { url?: unknown; page_age?: unknown };
+      if (typeof result.url !== 'string') continue;
+
+      let host: string;
+      try {
+        host = new URL(result.url).hostname.replace(/^www\./, '');
+      } catch {
+        continue;
+      }
+
+      if (seen.has(host)) continue;
+      seen.add(host);
+      found.push({
+        label: host,
+        detail: typeof result.page_age === 'string' ? result.page_age : undefined,
+      });
+    }
+  }
+
+  return found;
+}
+
+/** How many searches ran, so the tool chip can say so rather than imply one. */
+function searchCount(content: unknown[]): number {
+  return content.filter((block) => (block as { type?: string }).type === 'server_tool_use').length;
+}
+
 export async function askVoyager(options: {
   question: string;
   context: VoyagerContext;
@@ -314,7 +358,16 @@ export async function askVoyager(options: {
    */
   if (wantsInvestmentAnalysis(question, context)) {
     const assessment = await runInvestmentAnalysis(question, context);
-    if (assessment) return withAllowedActions(assessment, allowed, context.screen === 'chart');
+    if (assessment) {
+      return withAllowedActions(
+        {
+          ...assessment,
+          tools: [`investment-analysis(${context.subject || 'this instrument'})`],
+        },
+        allowed,
+        context.screen === 'chart'
+      );
+    }
   }
 
   if (!client) {
@@ -404,7 +457,26 @@ export async function askVoyager(options: {
     }
 
     const coerced = coerce(JSON.parse(block.text), allowed, context.screen === 'chart');
-    return coerced ?? scripted();
+    if (!coerced) return scripted();
+
+    /*
+     * What ran, named from the response rather than from the intent.
+     *
+     * `searching` only says search was *offered*; a question the model answered
+     * without looking anything up must not show a search chip, or the chip
+     * stops meaning anything.
+     */
+    const searches = searchCount(response.content);
+    const tools = [
+      ...(searches > 0 ? [`web-search(${searches})`] : []),
+      ...(coerced.study ? [`study(${coerced.study.id})`] : []),
+    ];
+
+    return {
+      ...coerced,
+      ...(tools.length ? { tools } : {}),
+      ...(searches > 0 ? { citations: searchCitations(response.content) } : {}),
+    };
   } catch (error) {
     // Surfaced in the server log rather than to the person: the scripted answer
     // below is honest about being general, and an error toast is not more useful.

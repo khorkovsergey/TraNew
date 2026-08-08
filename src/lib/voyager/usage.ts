@@ -3,8 +3,6 @@ import { createHmac, randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { requestFingerprint } from '@/lib/session';
-import { TIER_QUOTA } from './policy';
-import type { VoyagerTier } from './types';
 
 /**
  * Daily question counting.
@@ -33,21 +31,28 @@ function today(): string {
 }
 
 export type UsageVerdict = {
-  /** Questions left today, or null when the tier is not metered. */
+  /** Questions left today, or null when the plan is not metered. */
   remaining: number | null;
   /** True once the person is past the limit — an upgrade card, not a wall. */
   quotaReached: boolean;
+  /** Questions spent today. The counter the composer shows before anyone asks. */
+  used: number;
+  /** The ceiling this verdict was measured against, or null when unmetered. */
+  total: number | null;
 };
 
 /**
  * Records one question and reports what is left. Counting happens before the model
  * runs, so a slow or failing answer cannot be retried for free in a loop.
+ *
+ * The quota arrives as a number rather than a tier: how often somebody may ask
+ * is a fact about what they pay, and the caller is the only place that knows
+ * both the session and the plan.
  */
 export async function consumeQuestion(
   userId: string | null,
-  tier: VoyagerTier
+  quota: number | null
 ): Promise<UsageVerdict> {
-  const quota = TIER_QUOTA[tier];
   const subject = await subjectKey(userId);
   const day = today();
 
@@ -63,19 +68,25 @@ export async function consumeQuestion(
     })
     .returning({ count: schema.voyagerUsage.count });
 
-  if (quota === null) return { remaining: null, quotaReached: false };
-
   const used = row?.count ?? 1;
-  return { remaining: Math.max(0, quota - used), quotaReached: used > quota };
+  if (quota === null) return { remaining: null, quotaReached: false, used, total: null };
+
+  return {
+    remaining: Math.max(0, quota - used),
+    quotaReached: used > quota,
+    used,
+    total: quota,
+  };
 }
 
 /** Reads the counter without spending a question — for rendering the limit line. */
 export async function peekUsage(
   userId: string | null,
-  tier: VoyagerTier
+  quota: number | null
 ): Promise<UsageVerdict> {
-  const quota = TIER_QUOTA[tier];
-  if (quota === null) return { remaining: null, quotaReached: false };
+  if (quota === null) {
+    return { remaining: null, quotaReached: false, used: 0, total: null };
+  }
 
   const subject = await subjectKey(userId);
   const [row] = await db
@@ -87,5 +98,10 @@ export async function peekUsage(
     .limit(1);
 
   const used = row?.count ?? 0;
-  return { remaining: Math.max(0, quota - used), quotaReached: used >= quota };
+  return {
+    remaining: Math.max(0, quota - used),
+    quotaReached: used >= quota,
+    used,
+    total: quota,
+  };
 }

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { EXPERTS } from '@/content/experts';
 import { isIndexable, listMarkets, type MarketSection } from '@/content/markets';
 import { getPathname } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';
@@ -33,6 +34,15 @@ const STATIC_PAGES: Array<{ href: Parameters<typeof getPathname>[0]['href']; pri
   { href: '/community', priority: 0.6 },
   { href: '/marketplace', priority: 0.5 },
   { href: '/marketplace/experts', priority: 0.5 },
+  /*
+   * The expert catalogue, but not the screens behind it.
+   *
+   * `/marketplace/experts` is a conversation with nothing to index until
+   * somebody has had it; the catalogue is the page that actually answers "who
+   * is on this marketplace". The intake, the matches-for-a-brief and the
+   * booking steps are states of one person's session, not pages.
+   */
+  { href: '/marketplace/experts/matches', priority: 0.5 },
   { href: '/marketplace/tools', priority: 0.6 },
   /*
    * The catalogue, not a product.
@@ -61,6 +71,25 @@ export default function sitemap(): MetadataRoute.Sitemap {
     lastModified,
     priority: page.priority,
   }));
+
+  /*
+   * Every expert profile. They are public pages about a real professional's
+   * credentials, which is exactly what somebody searches for by name — and a
+   * catalogue that is only reachable through a conversation is a catalogue no
+   * search engine ever sees.
+   */
+  for (const expert of EXPERTS) {
+    entries.push({
+      url:
+        SITE_URL +
+        getPathname({
+          href: { pathname: '/marketplace/experts/[id]', params: { id: expert.id } },
+          locale,
+        }),
+      lastModified,
+      priority: 0.4,
+    });
+  }
 
   for (const market of listMarkets()) {
     if (market.slug === 'global') {
