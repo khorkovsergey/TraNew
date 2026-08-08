@@ -1,10 +1,10 @@
 /*
  * Marketplace → Tools & Data.
  *
- * Three screens share this file because they share a shell: the same sub-rail,
- * the same card, the same illustrative preview. Splitting it per screen would
- * mean three definitions of a product card that drift apart on the second
- * change.
+ * Three screens share this file because they share a vocabulary: the same
+ * card, the same illustrative preview, the same empty state. Splitting it per
+ * screen would mean three definitions of a product card that drift apart on
+ * the second change.
  *
  * The mockups draw their surfaces as gradients. They are flat here — the
  * palette removed every decorative gradient on purpose, and four glowing cards
@@ -17,14 +17,15 @@
   padding: 28px var(--tn-page-pad) 64px;
 }
 
-/* The rail and the content beside it. */
-.shell {
-  display: grid;
-  grid-template-columns: 218px minmax(0, 1fr);
-  gap: 30px;
-  align-items: start;
-}
-
+/*
+ * No section rail.
+ *
+ * The three screens carried one down the left — Overview, Expert services,
+ * Tools & Data, and so on. It duplicated the Marketplace menu in the header
+ * while taking 218px from every screen under it, and on the hub it listed the
+ * two cards the page was already showing. The breadcrumb is the way back up;
+ * the header is the way sideways.
+ */
 .main {
   min-width: 0;
 }
@@ -55,77 +56,6 @@
 
 .breadcrumbHere {
   color: var(--tn-text);
-}
-
-/* ------------------------------------------------------------------ The rail */
-
-.rail {
-  position: sticky;
-  top: 88px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.railTitle {
-  padding: 0 12px 9px;
-  font-size: 11.5px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--tn-text-faint);
-}
-
-.railLink {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--tn-radius-chip);
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--tn-text-nav);
-  text-decoration: none;
-  transition: background var(--tn-transition-fast), color var(--tn-transition-fast);
-}
-
-.railLink:hover {
-  background: var(--tn-surface-inner);
-  color: var(--tn-text);
-}
-
-.railLink svg {
-  flex-shrink: 0;
-  color: var(--tn-icon);
-}
-
-/*
- * The active item. Border, tint and weight together — selection is never
- * colour alone, and on a rail the tick has no room, so the border does that job.
- */
-.railLinkOn {
-  border-color: var(--tn-mint-border);
-  background: var(--tn-mint-tint);
-  color: var(--tn-text);
-  font-weight: 800;
-}
-
-.railLinkOn svg {
-  color: var(--tn-mint);
-}
-
-.railDivider {
-  height: 1px;
-  margin: 14px 12px;
-  background: var(--tn-border-hairline);
-}
-
-.railNote {
-  margin: 6px 12px 0;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--tn-text-faint);
 }
 
 /* -------------------------------------------------------------- Page heading */
@@ -676,7 +606,22 @@ a.hubCard:hover {
   position: relative;
   display: block;
   height: 128px;
+  overflow: hidden;
   border-bottom: 1px solid var(--tn-border-card);
+}
+
+/*
+ * The preview fills the fixed-height tile.
+ *
+ * Without this the inner block has no height of its own, so the SVG's
+ * `height: 100%` resolves against `auto` and it falls back to the viewBox's
+ * aspect ratio instead — which is taller than 128px as soon as a column is
+ * wider than 300px, and the overflow paints straight over the title
+ * underneath. The card looked right only while the columns happened to be
+ * about 300px wide.
+ */
+.cardPreview .preview {
+  height: 100%;
 }
 
 .cardBody {
@@ -1685,28 +1630,15 @@ a.hubCard:hover {
 /* ------------------------------------------------------------------ Narrower */
 
 @media (max-width: 1080px) {
-  .shell,
   .catalogue,
   .detail,
   .voyagerStrip {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .rail,
   .filters,
   .buyColumn {
     position: static;
-  }
-
-  .rail {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .railTitle,
-  .railDivider,
-  .railNote {
-    display: none;
   }
 
   .grid {
