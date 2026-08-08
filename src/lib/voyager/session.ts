@@ -124,16 +124,96 @@ type ActionSpec = {
   mutates: boolean;
   /** Needs an account, so a guest is gated and the action queued. */
   needsAccount: boolean;
+  /**
+   * What the confirmation card says is about to happen, in the first person.
+   *
+   * Written here rather than at the call site so a button cannot describe
+   * itself more kindly than it behaves — the sentence somebody agrees to is
+   * built from the action, never from the label that offered it.
+   */
+  about: string;
+  /** The same act reported after the fact, so the reply is not written in the future tense. */
+  done: string;
+  /** Where the change lands, so nobody has to guess which part of the portal moved. */
+  where: string;
+  /** How to undo it, in words. Every mutating action has one or it is not here. */
+  undo: string;
+  /** The tool signature the answer shows once it has run. */
+  call: string;
 };
 
 export const VOYAGER_ACTIONS: Record<VoyagerActionId, ActionSpec> = {
-  research: { label: 'Turn this answer into research', mutates: false, needsAccount: false },
-  open_chart: { label: 'Open on chart', mutates: false, needsAccount: false },
-  watchlist: { label: 'Add to watchlist', mutates: true, needsAccount: true },
-  save_workspace: { label: 'Save to workspace', mutates: true, needsAccount: true },
-  portfolio_scenario: { label: 'Add to portfolio scenario', mutates: true, needsAccount: false },
-  create_alert: { label: 'Create alert', mutates: true, needsAccount: true },
+  research: {
+    label: 'Turn this answer into research',
+    mutates: false,
+    needsAccount: false,
+    about: 'open a research session seeded with this answer and its sources',
+    done: 'opened a research session seeded with this answer and its sources',
+    where: 'The research workspace',
+    undo: 'Nothing to undo — this only opens a session.',
+    call: 'research.open',
+  },
+  open_chart: {
+    label: 'Open on chart',
+    mutates: false,
+    needsAccount: false,
+    about: 'open this on the advanced chart',
+    done: 'opened this on the advanced chart',
+    where: 'Advanced Charts',
+    undo: 'Nothing to undo — this only navigates.',
+    call: 'chart.open',
+  },
+  watchlist: {
+    label: 'Add to watchlist',
+    mutates: true,
+    needsAccount: true,
+    about: 'add this to your watchlist',
+    done: 'added this to your watchlist',
+    where: 'Your workspace, under watchlists',
+    undo: 'Removing it from the list undoes this; nothing else changes.',
+    call: 'watchlist.add',
+  },
+  save_workspace: {
+    label: 'Save to workspace',
+    mutates: true,
+    needsAccount: true,
+    about: 'save this conversation to your workspace',
+    done: 'saved this conversation to your workspace',
+    where: 'Your saved workspaces',
+    undo: 'Deleting the saved copy removes it; what is on screen stays.',
+    call: 'workspace.save',
+  },
+  portfolio_scenario: {
+    label: 'Add to portfolio scenario',
+    mutates: true,
+    needsAccount: false,
+    about: 'add this to your practice portfolio as a virtual position',
+    done: 'added this to your practice portfolio as a virtual position',
+    where: 'Practice portfolio — simulated money only',
+    undo: 'You can remove the position in the simulator at any time.',
+    call: 'portfolio.add',
+  },
+  create_alert: {
+    label: 'Create alert',
+    mutates: true,
+    needsAccount: true,
+    about: 'draft an alert for this',
+    done: 'drafted an alert for this',
+    where: 'Your workspace, under alerts',
+    undo: 'Switching the alert off stops it immediately.',
+    call: 'alert.create',
+  },
 };
+
+/** The action row, in the order the design puts it: research first, then the rest. */
+export const ANSWER_ACTIONS: VoyagerActionId[] = [
+  'research',
+  'open_chart',
+  'watchlist',
+  'save_workspace',
+  'portfolio_scenario',
+  'create_alert',
+];
 
 /**
  * Whether this action must be confirmed before it runs.

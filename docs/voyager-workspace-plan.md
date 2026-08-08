@@ -4,6 +4,23 @@ The brief (38 sections) turns Voyager from an assistant into a product area. Its
 own §39 asks for an audit before any code. This is that audit, the plan it
 produced, and the three decisions that are not ours to make.
 
+> **Where this lives now.** The redesign handoff (`Voyager ReDes/`, Journey B)
+> splits the section in two, and the split is shipped:
+>
+> - **`/voyager` — the dialogue agent.** Chat-first, per `Voyager.dc.html`: a
+>   status strip, a composer as the first screen, sourced answers with tool
+>   chips and an action row. Rules in `lib/voyager/session.ts` and
+>   `lib/voyager/chat/transcript.ts`; UI in `components/voyager/chat/`; checked
+>   by `scripts/verify-voyager-chat.mjs`.
+> - **`/voyager/research` — the workspace this document describes.** The
+>   three-zone canvas, unchanged and still checked by
+>   `scripts/verify-voyager-workspace.mjs`. Everything below still applies to
+>   it.
+>
+> They were one page, and a page can only be one of them at a time — it was
+> always the wrong one for whoever had just opened it. "Turn this answer into
+> research" is the door between them.
+
 ## What already exists and is reused
 
 | Piece | State | Used for |

@@ -50,6 +50,14 @@ export const routing = defineRouting({
     '/research': '/research',
     '/supercharts': '/supercharts',
     '/voyager': '/voyager',
+    /*
+     * The structured session, beside the dialogue rather than merged into it.
+     *
+     * Voyager is a conversation; this is a saved workspace that goes question →
+     * evidence → conclusion, with a canvas, an inspector and a change history.
+     * They were one page and the page could only be one of them at a time.
+     */
+    '/voyager/research': '/voyager/research',
     '/marketplace/subscriptions': '/marketplace/subscriptions',
     '/portfolio': '/portfolio',
 
@@ -100,6 +108,15 @@ export const routing = defineRouting({
     '/marketplace/experts/[id]': '/marketplace/experts/[id]',
     '/marketplace/experts/[id]/sharing': '/marketplace/experts/[id]/sharing',
     '/marketplace/experts/[id]/booking': '/marketplace/experts/[id]/booking',
+    /*
+     * Academy — the paid course catalogue. It sits under Marketplace rather
+     * than under `/academy`, which is Learn and stays free: two things called
+     * Academy on one route would leave nobody able to say which one a link
+     * meant.
+     */
+    '/marketplace/academy': '/marketplace/academy',
+    '/marketplace/academy/my-learning': '/marketplace/academy/my-learning',
+    '/marketplace/academy/[slug]': '/marketplace/academy/[slug]',
     '/marketplace/consultations/[id]': '/marketplace/consultations/[id]',
     '/marketplace/consultations/[id]/summary': '/marketplace/consultations/[id]/summary',
 

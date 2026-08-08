@@ -793,13 +793,18 @@ export function VoyagerWorkspace({
                   </div>
                 )}
               </>
-            ) : asking ? null : (
+            ) : asking || !request ? null : (
               /*
                * Only reachable if the model neither answered nor failed, which
                * the effect does not allow — kept as the honest thing to say if
                * it ever happens rather than the old copy, which claimed the
                * scenario was unwritten and was shown for several seconds every
                * time the model was simply being asked.
+               *
+               * `!request` is the other half: with nothing asked there is
+               * nothing that failed to come back, and the bare workspace was
+               * greeting everybody with a refusal to a question they had not
+               * put.
                */
               <div className={styles.refusalCard} role="status">
                 <p>Nothing came back for that. Try asking again.</p>
@@ -1138,13 +1143,13 @@ export function VoyagerWorkspace({
                 <div className={styles.confirmActions}>
                   <Link
                     className={styles.primaryLink}
-                    href={{ pathname: '/sign-in', query: { next: '/voyager' } } as never}
+                    href={{ pathname: '/sign-in', query: { next: '/voyager/research' } } as never}
                   >
                     Sign in
                   </Link>
                   <Link
                     className={styles.topAction}
-                    href={{ pathname: '/sign-up', query: { next: '/voyager' } } as never}
+                    href={{ pathname: '/sign-up', query: { next: '/voyager/research' } } as never}
                   >
                     Create account
                   </Link>

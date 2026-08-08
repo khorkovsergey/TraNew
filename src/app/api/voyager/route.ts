@@ -4,6 +4,7 @@ import { getConsent } from '@/lib/consent';
 import { getSession, type AuthedUser, type PlanId } from '@/lib/session';
 import { askVoyager, isModelConfigured } from '@/lib/voyager/orchestrator';
 import {
+  quotaFor,
   sourcesFor,
   tierFor,
   TIER_LABEL,
@@ -41,6 +42,25 @@ const SCREENS: VoyagerScreen[] = [
 
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
+}
+
+/**
+ * One chip per source, whatever named it.
+ *
+ * The model's prose line often repeats what the policy layer already listed —
+ * "Current page" beside "Current page" reads as two pieces of evidence where
+ * there is one, which is the opposite of what a source list is for. The first
+ * mention wins, because it is the server's own record rather than the model's
+ * account of it.
+ */
+function dedupe(citations: { label: string; detail?: string }[]) {
+  const seen = new Set<string>();
+  return citations.filter((citation) => {
+    const key = citation.label.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 async function currentUser(): Promise<AuthedUser | null> {
@@ -81,7 +101,7 @@ export async function GET(request: NextRequest) {
     user,
     personalization
   );
-  const usage = await peekUsage(user?.id ?? null, tier);
+  const usage = await peekUsage(user?.id ?? null, quotaFor(user));
 
   return NextResponse.json({
     tier,
@@ -89,6 +109,9 @@ export async function GET(request: NextRequest) {
     limits: TIER_LIMITS[tier],
     sources,
     remaining: usage.remaining,
+    /* The counter the composer shows before anything is asked. */
+    used: usage.used,
+    total: usage.total,
     signedIn: Boolean(user),
     /** null until the person has answered the personalization question. */
     personalization: user ? personalization : null,
@@ -118,7 +141,7 @@ export async function POST(request: NextRequest) {
 
   // Counted before the model runs, so a slow or failing answer cannot be replayed
   // for free.
-  const usage = await consumeQuestion(user?.id ?? null, tier);
+  const usage = await consumeQuestion(user?.id ?? null, quotaFor(user));
 
   if (usage.quotaReached) {
     const response: VoyagerResponse = {
@@ -128,6 +151,9 @@ export async function POST(request: NextRequest) {
       },
       tier,
       remaining: 0,
+      used: usage.used,
+      total: usage.total,
+      quotaReached: true,
     };
     return NextResponse.json(response);
   }
@@ -168,13 +194,34 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  /*
+   * The chips under an answer, built from what this request was actually given.
+   *
+   * The model writes a prose `sources` line and it is kept, but it is the
+   * model's account of itself. These come from the policy layer — the sources
+   * the server put in front of it — and from the search results, which are a
+   * record rather than a claim. The prose line goes last, labelled as the
+   * model's own note.
+   */
+  const citations = dedupe([
+    ...active.map((source) => ({ label: source.label })),
+    ...(answer.citations ?? []),
+    ...(answer.sources && answer.sources !== 'General knowledge'
+      ? [{ label: answer.sources, detail: 'Stated by Voyager' }]
+      : []),
+  ]).slice(0, 6);
+
   const response: VoyagerResponse = {
     answer: {
       ...answer,
+      citations,
       upgrade: upgradeFor(tier, context, false, Boolean(user)),
     },
     tier,
     remaining: usage.remaining,
+    used: usage.used,
+    total: usage.total,
+    quotaReached: false,
   };
 
   return NextResponse.json(response);

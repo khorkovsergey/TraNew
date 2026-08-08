@@ -83,7 +83,16 @@ try {
 
   await entry.click();
   await page.waitForURL(/\/voyager/, { timeout: 10_000 });
-  check('one click reaches the workspace', page.url().includes('/voyager'));
+  check('one click reaches Voyager', page.url().includes('/voyager'));
+
+  /*
+   * The menu entry opens the dialogue, which is what somebody clicking
+   * "Voyager" is asking for. This file is about the research workspace beside
+   * it — the three-zone canvas — and the way in is the rail card on that page.
+   */
+  await page.getByRole('link', { name: 'Open Research Workspace' }).click();
+  await page.waitForURL(/\/voyager\/research/, { timeout: 10_000 });
+  check('and the rail card reaches the research workspace', page.url().includes('/voyager/research'));
 
   group('It opens as the workspace, with nothing asked yet');
 
@@ -94,6 +103,11 @@ try {
    */
   const bodyAtRest = await page.locator('body').innerText();
   check('no landing screen', !/What would you like to understand/.test(bodyAtRest));
+  check(
+    'and no refusal to a question nobody asked',
+    !/Nothing came back for that/.test(bodyAtRest),
+    bodyAtRest.slice(0, 120)
+  );
   check('the three columns are already there', (await page.locator('[class*="topBar"]').count()) === 1);
   check('the composer is in the conversation column', (await page.getByRole('textbox', { name: /Ask/ }).count()) > 0);
   // The history column arrives with the first conversation: one chat in it is
@@ -436,7 +450,7 @@ try {
     );
   });
   // Back into the workspace stage: the top bar only exists once a request does.
-  await page.goto(`${BASE}/en/voyager?q=${encodeURIComponent('Why has gold risen this quarter?')}`, {
+  await page.goto(`${BASE}/en/voyager/research?q=${encodeURIComponent('Why has gold risen this quarter?')}`, {
     waitUntil: 'networkidle',
   });
   await page.waitForTimeout(3400);
@@ -542,7 +556,7 @@ try {
 
   const failContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const failPage = await failContext.newPage();
-  await failPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await failPage.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
   await failPage.waitForTimeout(600);
 
   await failPage.getByRole('textbox', { name: /Ask/ }).first().fill('make this fail');
@@ -595,7 +609,7 @@ try {
 
   const a11yContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const a11yPage = await a11yContext.newPage();
-  await a11yPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await a11yPage.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
   await a11yPage.waitForTimeout(600);
   await a11yPage.getByRole('textbox', { name: /Ask/ }).first().fill('Build a Tesla chart with RSI and support levels');
   await a11yPage.keyboard.press('Enter');
@@ -641,7 +655,7 @@ try {
 
   const tabletContext = await browser.newContext({ viewport: { width: 1024, height: 900 } });
   const tabletPage = await tabletContext.newPage();
-  await tabletPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await tabletPage.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
   await tabletPage.waitForTimeout(600);
   await tabletPage.getByRole('textbox', { name: /Ask/ }).first().fill('What is happening in the US market today?');
   await tabletPage.keyboard.press('Enter');
@@ -671,7 +685,7 @@ try {
 
   const moneyContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const moneyPage = await moneyContext.newPage();
-  await moneyPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await moneyPage.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
   await moneyPage.waitForTimeout(600);
 
   // The signup offer went with the landing; the meter under the composer says
@@ -758,7 +772,7 @@ try {
    */
   const wealthContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const wealthPage = await wealthContext.newPage();
-  await wealthPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await wealthPage.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
   await wealthPage.waitForTimeout(600);
   await wealthPage.getByRole('textbox', { name: /Ask/ }).first().fill('What are the main risks in my portfolio?');
   await wealthPage.keyboard.press('Enter');
@@ -883,7 +897,7 @@ try {
   group('A model that cannot be reached says so');
 
   await page.route('**/api/voyager', (route) => route.abort());
-  await page.goto(`${BASE}/en/voyager?q=${encodeURIComponent('Tell me something')}`, {
+  await page.goto(`${BASE}/en/voyager/research?q=${encodeURIComponent('Tell me something')}`, {
     waitUntil: 'domcontentloaded',
   });
   await page.waitForTimeout(4000);
@@ -905,7 +919,7 @@ try {
   const phone = await browser.newContext({ ...devices['iPhone 13'] });
   const small = await phone.newPage();
 
-  await small.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await small.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
   await small.waitForTimeout(700);
 
   check('the composer is there', (await small.getByRole('textbox', { name: /Ask/ }).first().count()) > 0);

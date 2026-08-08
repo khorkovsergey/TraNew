@@ -87,6 +87,17 @@ export type AnalyticsEvent =
   | { name: 'voyager_chat_saved' }
   | { name: 'voyager_new_chat'; chatCount: number }
   /*
+   * The chat funnel, per Journey B. Shapes and counts only: the question, the
+   * answer and the subject stay out of here, because what somebody asks about
+   * their money is the thing this product promises not to sell.
+   */
+  | { name: 'voyager_question_sent'; contextKind: string; mode: string; turns: number }
+  | { name: 'voyager_tool_executed'; tool: string }
+  | { name: 'voyager_limit_hit'; authenticated: boolean }
+  | { name: 'voyager_auth_gate_shown'; askedInDialog: number }
+  | { name: 'voyager_restored_after_auth'; turns: number }
+  | { name: 'voyager_action_clicked'; action: string; authenticated: boolean }
+  /*
    * The expert-services funnel. Counts and ids only — a brief holds what
    * somebody is trying to do with their money, and none of that goes here.
    */

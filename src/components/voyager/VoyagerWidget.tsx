@@ -80,7 +80,8 @@ export function VoyagerWidget({ chartWorkspaceLive = false }: { chartWorkspaceLi
    * corner knowing less than the one filling the screen.
    */
   const onChartWorkspace =
-    (pathname?.endsWith('/voyager') ?? false) ||
+    /* Both Voyager surfaces — the dialogue and the research workspace. */
+    (pathname?.includes('/voyager') ?? false) ||
     (chartWorkspaceLive && (pathname?.endsWith('/supercharts') ?? false));
   const context = useVoyagerContext();
   const { applyStudy, requestPine } = useChartStudies();

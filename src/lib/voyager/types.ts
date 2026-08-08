@@ -129,6 +129,23 @@ export type VoyagerAnswer = {
   /** Set when the scripted layer answered because no model was configured. */
   simulated?: boolean;
   /**
+   * The tools that actually ran for this answer, as short call signatures —
+   * `web-search(3)`, `investment-analysis(TSLA)`, `study(rsi)`.
+   *
+   * Reported rather than decorative: the chat renders one chip per entry, and a
+   * chip claiming a tool ran when none did is the same lie as an invented
+   * source. An answer the model wrote from what it already knew carries none.
+   */
+  tools?: string[];
+  /**
+   * What the answer rests on, as chips rather than the one prose line.
+   *
+   * `sources` stays because the widget renders it and the model writes it; this
+   * is the structured form the chat shows — the context sources the request was
+   * actually given, plus any host a web search returned.
+   */
+  citations?: { label: string; detail?: string }[];
+  /**
    * A chart study to apply, on the chart screen only.
    *
    * The model chooses an id and numbers; it never writes the calculation or the
@@ -158,6 +175,11 @@ export type VoyagerRequest = {
 export type VoyagerResponse = {
   answer: VoyagerAnswer;
   tier: VoyagerTier;
-  /** Remaining questions today, or null when the tier is not metered. */
+  /** Remaining questions today, or null when the plan is not metered. */
   remaining: number | null;
+  /** Spent today, and the ceiling — the counter the chat shows, from the server. */
+  used: number;
+  total: number | null;
+  /** True when this reply is the limit notice rather than an answer. */
+  quotaReached: boolean;
 };
