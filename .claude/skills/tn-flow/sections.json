@@ -91,6 +91,16 @@
       ],
       "smoke": ["/en/markets", "/en/economy"]
     },
+    "shell": {
+      "branch": "feat/shell",
+      "port": 3409,
+      "$comment": "The frame every page renders inside — header, menus, drawer, footer. It was `shared` until two sections in a row rewrote it non-append-only; ownership is what stops the third from doing it blind. While this branch is open, a section that needs a menu entry asks for it here instead of appending to menu.ts.",
+      "owns": [
+        "src/components/shell/",
+        "scripts/verify-header.mjs"
+      ],
+      "smoke": ["/en", "/en/marketplace", "/en/ideas"]
+    },
     "explore": {
       "branch": "feat/explore",
       "port": 3408,
@@ -120,15 +130,13 @@
     }
   },
   "shared": {
-    "$comment": "Touched by every section. Append-only protocol — see SKILL.md. A change here is a conflict waiting to happen; keep it to the smallest possible addition at the end of your own block.",
+    "$comment": "Touched by every section. Append-only protocol — see SKILL.md. A change here is a conflict waiting to happen; keep it to the smallest possible addition at the end of your own block. The header and footer used to be on this list and are now owned by the `shell` section: a menu entry is requested there, not appended here, because the last two header changes were rewrites and would not have resolved by union.",
     "files": [
       "src/messages/en.json",
       "src/components/ui/Icon.tsx",
       "src/i18n/routing.ts",
       "src/app/sitemap.ts",
       "src/lib/events/analytics.ts",
-      "src/components/shell/Header.tsx",
-      "src/components/shell/Footer.tsx",
       "next.config.ts"
     ]
   },
