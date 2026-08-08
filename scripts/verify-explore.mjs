@@ -444,14 +444,23 @@ try {
   check('and it closes', (await page.locator('div[class*="panelMega"]').count()) === 0);
 
   /*
-   * The menu stopped linking anywhere, so the section it names is reached from
-   * the footer now. A section with no way in is a deleted feature wearing a
-   * route.
+   * The menu names a section it deliberately does not link to, so the way in
+   * has to exist somewhere else. It was the footer; the shell redesign reduced
+   * the footer to a brand line and the hub is reached from Home now.
+   *
+   * The place is allowed to move — what must not change is that there is one.
+   * A section with no way in is a deleted feature wearing a route, and that is
+   * what this checks, not which page happens to carry the link this month.
    */
-  const footer = await page
-    .locator('footer a[href]')
+  await page.goto(`${base}/en`, { waitUntil: 'networkidle' });
+  const fromHome = await page
+    .locator('a[href]')
     .evaluateAll((nodes) => nodes.map((node) => new URL(node.href).pathname));
-  check('and the footer still links the hub', footer.includes('/en/explore'), footer.join(' '));
+  check(
+    'and the hub is still reachable, now from Home',
+    fromHome.includes('/en/explore'),
+    fromHome.join(' '),
+  );
 } finally {
   await browser.close();
 }

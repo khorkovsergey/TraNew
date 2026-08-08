@@ -108,6 +108,8 @@
       "$comment": "The frame every page renders inside — header, menus, drawer, footer. It was `shared` until two sections in a row rewrote it non-append-only; ownership is what stops the third from doing it blind. While this branch is open, a section that needs a menu entry asks for it here instead of appending to menu.ts.",
       "owns": [
         "src/components/shell/",
+        "src/app/[locale]/ideas/",
+        "src/components/ideas/",
         "scripts/verify-header.mjs"
       ],
       "smoke": ["/en", "/en/marketplace", "/en/ideas"]
