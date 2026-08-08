@@ -77,7 +77,7 @@ export function MyLearning({ items, stats }: { items: LibraryItem[]; stats: Lear
   const shown = items.filter((item) => item.tab === tab);
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${styles.pageNarrow}`}>
       <div className={styles.breadcrumb}>
         <Link href="/marketplace" prefetch={false}>
           Marketplace

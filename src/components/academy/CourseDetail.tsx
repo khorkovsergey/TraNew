@@ -167,7 +167,7 @@ export function CourseDetail({ course, signedIn, enrolled, lessonsDone, saved }:
   };
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${styles.pageNarrow}`}>
       <div className={styles.breadcrumb}>
         <Link href="/marketplace" prefetch={false}>
           Marketplace

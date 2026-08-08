@@ -113,12 +113,27 @@ export function CourseCatalog({ enrolledSlugs }: { enrolledSlugs: string[] }) {
   const clearAll = () => setQuery(EMPTY_QUERY);
 
   return (
-    <div className={styles.main}>
+    <div className={styles.page}>
+      <div className={styles.breadcrumb}>
+        <Link href="/marketplace" prefetch={false}>
+          Marketplace
+        </Link>
+        <span className={styles.breadcrumbSep}>/</span>
+        <span className={styles.breadcrumbHere}>Academy</span>
+      </div>
+
       <section className={styles.hero}>
         <div>
           <h1 className={styles.h1}>Academy</h1>
           <p className={styles.lead}>
-            Paid trading and investing courses from TradingNew and from providers we have checked.
+            Paid trading and investing courses from TradingNew and from providers we have checked.{' '}
+            {/* The one line the section rail used to carry. Academy is the paid
+                half, and somebody who wanted the free one should not have to
+                find that out by buying. */}
+            <Link className={styles.leadLink} href="/academy" prefetch={false}>
+              Free explainers stay in Learn
+            </Link>
+            .
           </p>
 
           <div className={styles.trustRow}>

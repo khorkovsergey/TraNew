@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 import { CourseCatalog } from '@/components/academy/CourseCatalog';
-import { MarketplaceRail } from '@/components/academy/MarketplaceRail';
 import { SpaceBackdrop } from '@/components/shell/SpaceBackdrop';
-import styles from '@/components/academy/Courses.module.css';
 import type { Locale } from '@/i18n/routing';
 import { enrolledSlugs } from '@/lib/academy/enrolment';
 import { pageMetadata } from '@/lib/metadata';
@@ -43,10 +41,7 @@ export default async function AcademyMarketplacePage({ params }: Props) {
   return (
     <>
       <SpaceBackdrop tone={4} />
-      <div className={styles.shell}>
-        <MarketplaceRail active="/marketplace/academy" />
-        <CourseCatalog enrolledSlugs={[...owned]} />
-      </div>
+      <CourseCatalog enrolledSlugs={[...owned]} />
     </>
   );
 }

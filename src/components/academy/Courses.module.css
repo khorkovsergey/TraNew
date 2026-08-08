@@ -13,125 +13,25 @@
 
 /* ------------------------------------------------------------------ Layout */
 
-.shell {
-  display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
-  align-items: start;
-  min-height: 60vh;
-}
-
-.rail {
-  position: sticky;
-  top: var(--tn-header-h);
-  padding: 22px 16px;
-  border-right: 1px solid var(--tn-border-hairline);
-  box-sizing: border-box;
-}
-
-.railLabel {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  color: var(--tn-text-faint);
-  padding: 0 10px;
-}
-
-.railList {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-top: 12px;
-}
-
-.railItem {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 10px 12px;
-  border-radius: var(--tn-radius-chip);
-  border: 1px solid transparent;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--tn-text-nav);
-  transition: color var(--tn-transition-fast), background var(--tn-transition-fast);
-}
-
-.railItem svg {
-  color: var(--tn-icon);
-  flex-shrink: 0;
-}
-
-.railItem:hover {
-  background: var(--tn-surface-inner);
-  color: var(--tn-text);
-}
-
-.railItemActive {
-  background: var(--tn-mint-tint);
-  border-color: var(--tn-mint-border);
-  color: #fff;
-  font-weight: 800;
-}
-
-.railItemActive svg {
-  color: var(--tn-mint);
-}
-
-.railCard {
-  background: var(--tn-surface-veil);
-  border: 1px solid var(--tn-border-card);
-  border-radius: var(--tn-radius-card);
-  padding: 16px;
-  margin-top: 24px;
-}
-
-.railCardHead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-  font-weight: 800;
-}
-
-.railCardHead svg {
-  color: var(--tn-icon);
-}
-
-.railCardText {
-  font-size: 12px;
-  color: var(--tn-text-soft);
-  margin-top: 8px;
-  line-height: 1.55;
-}
-
-.railCardLink {
-  display: block;
-  text-align: center;
-  margin-top: 12px;
-  padding: 9px;
-  border-radius: var(--tn-radius-pill-sm);
-  border: 1px solid var(--tn-border-control);
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--tn-text-nav);
-  transition: border-color var(--tn-transition-fast), color var(--tn-transition-fast);
-}
-
-.railCardLink:hover {
-  border-color: var(--tn-border-hover);
-  color: var(--tn-text);
-}
-
-.main {
-  padding: 26px clamp(16px, 2.4vw, 36px) 56px;
-  min-width: 0;
-}
-
-/* A screen without the rail: a course page, and the library. */
+/*
+ * No section rail.
+ *
+ * These screens carried one down the left — Overview, Expert services, Academy,
+ * Subscriptions — which was the Marketplace menu a second time, 236px of it, on
+ * every screen in the section. The breadcrumb is the way back up and the header
+ * is the way sideways; both jobs were already done. The one thing the rail said
+ * that nothing else did — that the free lessons are in Learn — is now a line in
+ * the catalogue's own subtitle, where somebody reading the page will meet it.
+ */
 .page {
-  max-width: 1240px;
+  max-width: var(--tn-page-max);
   margin: 0 auto;
   padding: 26px var(--tn-page-pad) 56px;
+}
+
+/* The three screens that are read rather than browsed stay narrower. */
+.pageNarrow {
+  max-width: 1240px;
 }
 
 /* ---------------------------------------------------------------- Headings */
@@ -149,7 +49,16 @@
   font-size: 17px;
   color: var(--tn-text-secondary);
   line-height: 1.5;
-  max-width: 460px;
+  max-width: 520px;
+}
+
+.leadLink {
+  color: var(--tn-blue);
+  font-weight: 700;
+}
+
+.leadLink:hover {
+  color: var(--tn-blue-hover);
 }
 
 .h2 {
@@ -2043,22 +1952,6 @@
 /* --------------------------------------------------------------- Narrower */
 
 @media (max-width: 1100px) {
-  .shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .rail {
-    position: static;
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--tn-border-hairline);
-  }
-
-  .railList {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
   .hero,
   .detail,
   .catalogue {
