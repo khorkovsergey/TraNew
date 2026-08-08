@@ -53,7 +53,7 @@ const CATEGORIES: Array<{
   },
   {
     key: 'tools',
-    href: '/tools',
+    href: '/marketplace/tools',
     icon: 'bars',
     color: 'var(--tn-purple)',
     tile: 'var(--tn-purple-tint)',

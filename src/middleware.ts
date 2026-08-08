@@ -40,8 +40,27 @@ function stripLocale(pathname: string): string {
  */
 const CLASS_SLUGS = new Set(['stocks', 'etfs', 'bonds', 'cash', 'crypto', 'property']);
 
+/**
+ * The old Tools & Data placeholder.
+ *
+ * `/professional-tools` was a list of four links to screens that already had
+ * their own homes. Tools & Data is a real section now, and this is where it
+ * lives — permanent, for the same reason as the asset classes above: the
+ * address was in the Marketplace menu for months and should resolve rather than
+ * rot.
+ */
+const RETIRED = new Map([['/professional-tools', '/marketplace/tools']]);
+
 export default function middleware(request: NextRequest) {
   const path = stripLocale(request.nextUrl.pathname);
+
+  const moved = RETIRED.get(path.replace(/\/$/, '') || '/');
+  if (moved) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/${routing.defaultLocale}${moved}`;
+    url.search = '';
+    return NextResponse.redirect(url, 301);
+  }
 
   const toolMatch = /^\/tool\/([a-z-]+)\/?$/.exec(path);
   if (toolMatch && CLASS_SLUGS.has(toolMatch[1])) {

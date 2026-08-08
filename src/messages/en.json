@@ -123,7 +123,7 @@
       "expertServices": "Expert services",
       "expertServicesSub": "Book a consultation",
       "toolsData": "Tools and data",
-      "toolsDataSub": "Indicators, screeners, data feeds",
+      "toolsDataSub": "Chart Market, Supercharts and what is coming",
       "subscriptions": "Subscriptions",
       "subscriptionsSub": "Plans, Voyager AI tiers and limits",
       "academy": "Academy",
@@ -297,8 +297,8 @@
       "expertText": "Book a consultation with a professional whose credentials you can check.",
       "expertCta": "Browse experts",
       "toolsTitle": "Tools and Data",
-      "toolsText": "Indicators, screeners and data feeds built by the community and partners.",
-      "toolsCta": "Browse tools",
+      "toolsText": "Chart Market for Pine Script indicators and strategies, and Supercharts for ready-made chart workspaces.",
+      "toolsCta": "Open Tools & Data",
       "learningTitle": "Learning and Events",
       "learningText": "Structured programmes, live sessions and the TradingNew Academy.",
       "learningCta": "View programmes",
@@ -767,10 +767,6 @@
     "guidance": {
       "title": "Personal guidance",
       "subtitle": "Tools and insights tailored to your goals — never a recommendation to buy or sell."
-    },
-    "tools": {
-      "title": "Professional tools",
-      "subtitle": "Powerful charts, screeners and analysis in one place."
     },
     "globalMarkets": {
       "title": "Global Markets",
