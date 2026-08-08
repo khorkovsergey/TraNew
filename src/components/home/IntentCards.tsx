@@ -7,14 +7,12 @@ import { track } from '@/lib/events/analytics';
 import styles from './HomeV2.module.css';
 
 /**
- * "What brings you here today?"
+ * "What do you want to do?"
  *
- * A client component so the choice can be counted, and so each card can carry
- * its answer to the destination. The section asks what somebody came for and
- * then has to act on it: three of these used to open Explore on the same tab,
- * which made the question decorative.
- *
- * The id is a card, not a person — no goal, no amount, nothing about them.
+ * Six doors, each named by the thing somebody wants to do rather than by the
+ * kind of person who does it. A client component so the choice can be counted —
+ * and the id that is counted is a card, not a person: no goal, no amount,
+ * nothing about them.
  */
 export function IntentCards() {
   return (
@@ -29,12 +27,7 @@ export function IntentCards() {
 function IntentTile({ card }: { card: IntentCard }) {
   const body = (
     <>
-      <Icon
-        name={card.icon}
-        size={26}
-        strokeWidth={1.8}
-        className={styles[`accent_${card.accent}`]}
-      />
+      <Icon name={card.icon} size={26} strokeWidth={1.8} className={styles.iconMuted} />
       <div className={styles.intentTitle}>{card.title}</div>
       <div className={styles.intentBody}>{card.body}</div>
 
@@ -42,8 +35,8 @@ function IntentTile({ card }: { card: IntentCard }) {
         /*
          * Said on the card, before the click. A tile that looks like the five
          * beside it and silently hands somebody to another company is a small
-         * deception, and this one leads to the professional product the whole
-         * portal is a on-ramp to — worth arriving at deliberately.
+         * deception, and this one leads to the community the portal points at —
+         * worth arriving at deliberately.
          */
         <span className={styles.intentAway}>
           tradingview.com
@@ -59,7 +52,10 @@ function IntentTile({ card }: { card: IntentCard }) {
 
   const onClick = () => track({ name: 'intent_selected', intent: card.id });
 
-  if (card.external) {
+  // No internal route is what "this card leaves the product" means, and it is
+  // the check the type can narrow on — `external` is a string, and a string is
+  // never proof to the compiler that the other half of the union is gone.
+  if (card.href === undefined) {
     return (
       <a
         className={styles.intentCard}
@@ -79,7 +75,12 @@ function IntentTile({ card }: { card: IntentCard }) {
   return (
     <Link
       className={styles.intentCard}
-      href={{ pathname: card.href, params: card.params, query: card.query } as never}
+      href={card.href}
+      /*
+       * A grid of options is not a path anybody is about to take — they will
+       * follow at most one of these. Prefetching all six spends the network on
+       * the five that will not be opened.
+       */
       prefetch={false}
       onClick={onClick}
     >

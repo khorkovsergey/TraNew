@@ -1,17 +1,17 @@
 /*
  * The public home.
  *
- * Geometry follows the handoff. Two decisions worth naming:
+ * Geometry follows the handoff. Two things worth naming:
  *
- * The accent classes at the bottom exist so a card's colour is data rather than
- * markup — `accent: 'mint'` in the content file, one class here. Adding a card
- * never means writing a colour again, and a card can never quietly acquire a
- * seventh accent that means nothing.
+ * Colour is never written here twice. Direction is the only place green and red
+ * appear on this page, and they arrive through `.up` / `.down` on a wrapper, so
+ * a quote row and the sparkline beside it cannot disagree about which way the
+ * number went.
  *
- * The four-step path is a real <ol> with the connectors as pseudo-elements on
- * the list items. The prototype interleaved seven grid children — card, dash,
- * card, dash — which reads to a screen reader as seven things, three of which
- * are nothing.
+ * The card shell repeats — five sections use it — but it is spelled out per
+ * section rather than composed, because each one differs in padding or in
+ * direction and a shared base that every user overrides is harder to read than
+ * the four lines it saves.
  */
 
 .page {
@@ -38,13 +38,8 @@
   line-height: 1.1;
 }
 
-/* The one gradient headline on this screen. */
 .h1Accent {
-  background: var(--tn-accent-fill);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  color: var(--tn-accent-fill);
 }
 
 .heroSub {
@@ -98,7 +93,6 @@
 /* ---- Ask Voyager ---- */
 
 .askCard {
-  position: relative;
   border-radius: var(--tn-radius-showcase);
   border: 1px solid #16303a;
   background: #060d15;
@@ -106,19 +100,7 @@
   overflow: hidden;
 }
 
-.askGlow {
-  position: absolute;
-  top: -60px;
-  right: -40px;
-  width: 260px;
-  height: 260px;
-  border-radius: 50%;
-  background: none;
-  pointer-events: none;
-}
-
 .askBody {
-  position: relative;
   display: flex;
   gap: 24px;
   align-items: flex-start;
@@ -203,6 +185,18 @@
   filter: brightness(1.1);
 }
 
+/*
+ * The clarity line under an Ask Voyager box. It answers the four questions
+ * somebody hesitating has — what this does, what it costs, what the limit is,
+ * where the history goes — before they have to press anything to find out.
+ */
+.clarity {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--tn-text-faint);
+}
+
 .askTryLabel {
   margin-top: 14px;
   font-size: 13.5px;
@@ -220,7 +214,6 @@
 .askChip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
   padding: 8px 12px;
   border-radius: 9px;
   border: 1px solid var(--tn-border-input);
@@ -285,6 +278,28 @@
   color: var(--tn-blue-hover);
 }
 
+/*
+ * The eyebrow above every card in "Today in 3 minutes" and every row in the
+ * community column. Four cards with four different bodies read as one row
+ * because of this line and almost nothing else.
+ */
+/*
+ * Every decorative glyph on the page, in one colour. Icons here point at
+ * meaning that the text beside them already carries, so none of them is allowed
+ * to compete with the mint that marks an action.
+ */
+.iconMuted {
+  color: var(--tn-icon);
+}
+
+.eyebrow {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--tn-text-faint);
+}
+
 /* ---- Intent cards ---- */
 
 .intentGrid {
@@ -334,338 +349,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--tn-text-secondary);
+  color: var(--tn-icon);
+  transition: border-color var(--tn-transition-hover), color var(--tn-transition-hover);
 }
 
 .intentCard:hover .intentGo {
   border-color: var(--tn-mint-border);
   color: var(--tn-mint);
-}
-
-/* ---- Today in 3 minutes ---- */
-
-.todayGrid {
-  display: grid;
-  grid-template-columns: 1.25fr 1fr 1.1fr;
-  gap: 14px;
-  margin-top: 16px;
-}
-
-.todayCard {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  background: var(--tn-surface-veil);
-  border: 1px solid var(--tn-border-card);
-  border-radius: var(--tn-radius-card);
-  padding: 20px 22px;
-  min-width: 0;
-}
-
-.todayText {
-  flex: 1;
-  min-width: 0;
-}
-
-.todayHead {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.stepDot {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13.5px;
-  font-weight: 800;
-}
-
-.todayTitle {
-  font-size: 15.5px;
-  font-weight: 800;
-}
-
-.todayBody {
-  margin: 8px 0 0;
-  font-size: 13.5px;
-  color: var(--tn-text-soft);
-  line-height: 1.55;
-}
-
-.todayIcon {
-  flex-shrink: 0;
-  opacity: 0.85;
-}
-
-.todayQuote {
-  flex-shrink: 0;
-  text-align: right;
-}
-
-.spark {
-  width: 140px;
-  height: 44px;
-  display: block;
-}
-
-.quoteName {
-  font-size: 11.5px;
-  color: var(--tn-text-soft);
-  margin-top: 4px;
-}
-
-.quoteValue {
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.quoteChange {
-  font-size: 13.5px;
-  color: var(--tn-red);
-}
-
-.quoteNote {
-  font-size: 10.5px;
-  color: var(--tn-text-faint);
-  margin-top: 2px;
-}
-
-/* ---- Start with confidence ---- */
-
-.pathRow {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 28px;
-  margin-top: 16px;
-}
-
-.pathItem {
-  position: relative;
-  min-width: 0;
-}
-
-/* The dashed connector, drawn in the gap rather than as a grid child of its
-   own — see the note at the top of the file. */
-.pathLink {
-  position: absolute;
-  top: 50%;
-  right: 100%;
-  width: 28px;
-  border-top: 2px dashed #1d3a4a;
-}
-
-.pathCard {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  height: 100%;
-  background: var(--tn-surface-veil);
-  border: 1px solid var(--tn-border-card);
-  border-radius: var(--tn-radius-card);
-  padding: 20px 22px;
-  color: var(--tn-text);
-  transition: border-color var(--tn-transition-hover);
-}
-
-.pathCard:hover {
-  border-color: var(--tn-mint);
-}
-
-.pathStep {
-  width: 38px;
-  height: 38px;
-  flex-shrink: 0;
-  border-radius: var(--tn-radius-chip);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
-  font-weight: 800;
-  border: 1.5px solid;
-}
-
-.pathText {
-  flex: 1;
-  min-width: 0;
-}
-
-.pathTitle {
-  display: block;
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.pathBody {
-  display: block;
-  font-size: 13.5px;
-  color: var(--tn-text-soft);
-  line-height: 1.5;
-  margin-top: 4px;
-}
-
-/* ---- Trust bar ---- */
-
-.trustBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  gap: 18px;
-  flex-wrap: wrap;
-  background: var(--tn-surface-veil);
-  border: 1px solid var(--tn-border-card);
-  border-radius: var(--tn-radius-card);
-  padding: 18px 26px;
-  margin-bottom: 8px;
-}
-
-.trustItem {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 15px;
-  font-weight: 700;
-  color: #dbe6f0;
-}
-
-.tvMark {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  background: var(--tn-chip-bg);
-  border: 1px solid var(--tn-border-control);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 800;
-  color: #fff;
-}
-
-/* ---- Accents ----
- * One class per meaning, applied from the content file. */
-
-.accent_mint {
-  color: var(--tn-icon);
-}
-.accent_blue {
-  color: var(--tn-icon);
-}
-.accent_purple {
-  color: var(--tn-icon);
-}
-.accent_amber {
-  color: var(--tn-icon);
-}
-.accent_lime {
-  color: var(--tn-icon);
-}
-.accent_cyan {
-  color: var(--tn-icon);
-}
-
-.dot_mint {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-.dot_blue {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-.dot_purple {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-
-.step_mint {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-.step_blue {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-.step_purple {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-
-/* ---- Narrower screens ----
- * The handoff is desktop-only and says so; this is the reduction that keeps the
- * page usable below it, not the mobile design, which is its own pass. */
-
-@media (max-width: 1180px) {
-  .intentGrid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .todayGrid,
-  .pathRow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  /* With two per row the connector would point at the card above. */
-  .pathLink {
-    display: none;
-  }
-}
-
-@media (max-width: 900px) {
-  .hero {
-    grid-template-columns: 1fr;
-  }
-
-  .robot {
-    width: 160px;
-    margin: -12px -14px -12px 0;
-  }
-}
-
-@media (max-width: 680px) {
-  .intentGrid,
-  .todayGrid,
-  .pathRow {
-    grid-template-columns: 1fr;
-  }
-
-  .h1 {
-    letter-spacing: -1.2px;
-  }
-
-  .todayQuote {
-    display: none;
-  }
-
-  .askBody {
-    flex-direction: column-reverse;
-  }
-
-  .robot {
-    align-self: center;
-    margin: 0;
-  }
-}
-
-/*
- * The clarity line under an Ask Voyager box. It answers the four questions
- * somebody hesitating has — what this does, what it costs, what the limit is,
- * where the history goes — before they have to press anything to find out.
- */
-.clarity {
-  margin: 10px 0 0;
-  font-size: 11.5px;
-  line-height: 1.55;
-  color: var(--tn-text-faint);
 }
 
 /*
@@ -682,8 +372,468 @@
   font-size: 11px;
   font-weight: 700;
   color: var(--tn-text-muted);
+  transition: color var(--tn-transition-hover);
 }
 
 .intentCard:hover .intentAway {
   color: var(--tn-mint);
+}
+
+/* ---- Today in 3 minutes ---- */
+
+.todayGrid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1fr 0.85fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.todayCard {
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 18px 20px;
+  min-width: 0;
+}
+
+/* Card 1 — what moved. */
+
+.quoteRows {
+  margin-top: 8px;
+}
+
+.quoteRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 0;
+}
+
+.quoteName {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #dbe6f0;
+}
+
+.quoteSpark {
+  width: 64px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* Fixed widths, so three different numbers still line up on their last digit. */
+.quoteValue {
+  width: 86px;
+  text-align: right;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.quoteChange {
+  width: 60px;
+  text-align: right;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.quoteNote {
+  font-size: 10.5px;
+  color: var(--tn-text-faint);
+  margin-top: 8px;
+}
+
+/* Card 2 — what happened. */
+
+.summaryCard {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.summaryText {
+  flex: 1;
+  min-width: 0;
+}
+
+.summaryBody {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  color: var(--tn-text-soft);
+  line-height: 1.55;
+}
+
+.summaryIcon {
+  flex-shrink: 0;
+  opacity: 0.85;
+  color: var(--tn-icon);
+}
+
+/* Card 3 — what people are discussing. */
+
+.topicList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: flex-start;
+}
+
+.topicChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 11px;
+  border-radius: 7px;
+  background: var(--tn-chip-bg);
+  border: 1px solid #1b2836;
+  color: var(--tn-icon);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: border-color var(--tn-transition-hover), color var(--tn-transition-hover);
+}
+
+.topicChip:hover {
+  border-color: var(--tn-mint);
+  color: var(--tn-text);
+}
+
+/* Card 4 — Ask Voyager about today. The Voyager surface, so it reads as the
+   same object as the hero card rather than as a fourth summary. */
+
+.todayAsk {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-radius: var(--tn-radius-card);
+  border: 1px solid #16303a;
+  background: #060d15;
+  padding: 18px 20px;
+  color: var(--tn-text);
+  min-width: 0;
+  text-align: left;
+  transition: border-color var(--tn-transition-hover);
+}
+
+.todayAsk:hover {
+  border-color: var(--tn-mint);
+}
+
+.todayAskHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.todayAskCta {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-top: 12px;
+}
+
+/* ---- Ideas worth exploring · From the community ---- */
+
+.split {
+  margin-top: 40px;
+  display: grid;
+  grid-template-columns: 1.62fr 1fr;
+  gap: clamp(20px, 2.5vw, 36px);
+}
+
+.rowList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Ideas. Rows rather than a grid — the row shape is what makes it editorial. */
+
+.ideaRow {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 16px 18px;
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-hover);
+}
+
+.ideaRow:hover {
+  border-color: var(--tn-mint);
+}
+
+.ideaMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.ideaTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ticker {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 7px;
+  background: var(--tn-chip-bg);
+  border: 1px solid #1b2836;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #e2ebf3;
+  white-space: nowrap;
+}
+
+/*
+ * A stance, not an instruction. The colour says which way the author leans and
+ * stops there — it is the same green and red as the quotes above, and it means
+ * the same thing in both places.
+ */
+.ideaThesis {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.ideaFacts {
+  font-size: 11.5px;
+  color: var(--tn-text-faint);
+}
+
+.ideaHeadline {
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 10px;
+  line-height: 1.4;
+}
+
+.ideaAuthor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* Flat, per the token's own note — an author needs a name, not a photograph. */
+.monogram {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--tn-avatar);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #eaf7f2;
+}
+
+.authorName {
+  font-size: 12px;
+  color: var(--tn-text-muted);
+}
+
+.ideaSpark {
+  width: 96px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+/* Community. */
+
+.communityRow {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--tn-surface-veil);
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 16px 18px;
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-hover);
+}
+
+.communityRow:hover {
+  border-color: var(--tn-mint);
+}
+
+.glyphTile {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #0b1520;
+  border: 1px solid #172736;
+  color: #8ba7c2;
+}
+
+.communityText {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The row is an <a> of spans, so the eyebrow needs a box of its own. */
+.communityKind {
+  display: block;
+}
+
+.communityTitle {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 5px;
+  line-height: 1.4;
+}
+
+.communityMeta {
+  display: block;
+  font-size: 12px;
+  color: var(--tn-text-muted);
+  margin-top: 5px;
+}
+
+/* ---- Professional escalation ---- */
+
+.escalateSection {
+  margin-top: 40px;
+  margin-bottom: 8px;
+}
+
+/*
+ * The hover is neutral rather than mint on purpose: mint marks a TradingNew
+ * action, and this is a way out. An escalation path, not an advertisement — it
+ * has to be findable and it must not be the loudest thing on the page.
+ */
+.escalate {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  background: rgba(7, 14, 22, 0.6);
+  padding: 20px 26px;
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-hover);
+}
+
+.escalate:hover {
+  border-color: var(--tn-border-hover);
+}
+
+.escalateTile {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: var(--tn-chip-bg);
+  border: 1px solid #22303f;
+  color: #8ba7c2;
+}
+
+.escalateText {
+  flex: 1;
+  min-width: 0;
+}
+
+.escalateTitle {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.escalateBody {
+  display: block;
+  font-size: 13.5px;
+  color: var(--tn-text-muted);
+  margin-top: 5px;
+}
+
+.escalateCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--tn-text-secondary);
+}
+
+/* ---- Direction ----
+ * The only place green and red appear on this page. Set as `color` on the
+ * wrapper so the number and the line beside it are one decision. */
+
+.up {
+  color: var(--tn-green);
+}
+
+.down {
+  color: var(--tn-red);
+}
+
+/* ---- Narrower screens ---- */
+
+@media (max-width: 1180px) {
+  .intentGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .todayGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .robot {
+    width: 160px;
+    margin: -12px -14px -12px 0;
+  }
+
+  .split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .intentGrid,
+  .todayGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .h1 {
+    letter-spacing: -1.2px;
+  }
+
+  .askBody {
+    flex-direction: column-reverse;
+  }
+
+  .robot {
+    align-self: center;
+    margin: 0;
+  }
 }
