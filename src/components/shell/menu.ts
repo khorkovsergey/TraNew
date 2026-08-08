@@ -1,26 +1,25 @@
+import type { IconName } from '@/components/ui/Icon';
 import type { AppPathname } from '@/i18n/routing';
 import type { ExploreIconId } from './ExploreMenuIcons';
 
 /**
  * The header dropdowns.
  *
- * Four sections carry one: Start Investing, Explore, Learn and Marketplace. The
- * redesign shipped with only Marketplace, on the argument that a beginner should
- * be able to read the top of the page rather than navigate it; the sections
- * underneath then had to be reached through the page they belonged to. These
- * bring the shortcuts back without taking the destinations away — three of the
- * four open with the section itself, so the label is still a way in and not only
- * a way to a list.
+ * Four sections carry one: Explore, Ideas, Learn and Marketplace. Explore was
+ * the strongest of them and is now the reference — one row anatomy, an icon per
+ * line, a label and a description — and the other three were brought up to it
+ * rather than left as lists of links beside it. One component, four datasets;
+ * the difference between them is the shape of the panel, not the shape of a row.
  *
- * Explore is the exception and says so below: it announces a market data product
- * that is being built, so nothing in it clicks yet. The routes it used to hold
- * are all still linked from the footer.
+ * Explore is still the exception in what it promises: it announces a market data
+ * product that is being built, so nothing in it clicks yet. Everywhere else a row
+ * that looks clickable is clickable.
  *
- * Voyager is not among them. Its menu offered three entries that all opened
- * `/voyager` and a "Plans and limits" link pointing at the same page as
- * Marketplace's Subscriptions — a list of ways to reach one destination. The
- * label now simply goes there. Nothing was lost with it: Voyager settings live
- * in the account menu, and saved workspaces are on the workspace itself.
+ * `Start Investing` used to be here. Its menu named five ways into a
+ * questionnaire, which put a form on the same level as four sections of the
+ * product. `/start` is still the hero call to action on Home and the
+ * `Get started` button in the header; the practice portfolio and the beginner
+ * path are in Learn, where somebody looking for them would read first.
  *
  * Copy is literal rather than message keys. The portal is English-only by an
  * explicit decision, and every other file the redesign added carries its
@@ -35,18 +34,33 @@ export type MenuEntry = {
   /**
    * The glyph on the left of the row, from the Explore sprite.
    *
-   * Only Explore draws one. The other three menus are short lists of
-   * destinations where an icon per line would be decoration standing in a
-   * column; Explore is twenty rows that a reader scans rather than reads, and
-   * there the glyph is what makes a row findable a second time.
+   * Explore only. Its twenty glyphs are circles, rectangles and stacked strokes
+   * that `Icon` cannot hold — every icon there is a single `d` string on
+   * purpose — so they live in a sprite of their own.
    */
   icon?: ExploreIconId;
+  /**
+   * The same slot, filled from `Icon` instead.
+   *
+   * Two fields rather than one, because the two sets overlap by name: `search`
+   * and `calendar` exist in both, and a single field would have to guess which
+   * one a row meant.
+   */
+  glyph?: IconName;
 } & (
   | {
       kind: 'route';
       href: AppPathname;
       params?: Record<string, string>;
       query?: Record<string, string>;
+      /**
+       * The section of the destination page this row is about, as an anchor.
+       *
+       * Ideas is one page with six named parts, so its six rows would otherwise
+       * all be the same link — the failure Voyager's dropdown was deleted for.
+       * The hash makes each row land on the thing it names.
+       */
+      hash?: string;
     }
   | { kind: 'auth' }
   /**
@@ -68,7 +82,7 @@ export type MenuGroup = {
   items: MenuEntry[];
 };
 
-export type MenuKey = 'start' | 'explore' | 'learn' | 'marketplace';
+export type MenuKey = 'explore' | 'ideas' | 'learn' | 'marketplace';
 
 /**
  * An Explore row: named, described, illustrated, and going nowhere yet.
@@ -84,50 +98,15 @@ const soon = (
   icon: ExploreIconId
 ): MenuEntry => ({ kind: 'inert', soon: true, label, sub, icon });
 
-export const MENUS: Record<MenuKey, MenuGroup[]> = {
-  start: [
-    {
-      title: 'Find your footing',
-      items: [
-        {
-          label: 'Start Investing',
-          sub: 'Four questions and a starting path',
-          kind: 'route',
-          href: '/start',
-        },
-        {
-          label: 'Build my plan',
-          sub: 'The longer interview, and what it produces',
-          kind: 'route',
-          href: '/strategy',
-        },
-        {
-          label: 'My learning path',
-          sub: 'What to read, in the order it builds',
-          kind: 'route',
-          href: '/academy/path',
-        },
-      ],
-    },
-    {
-      title: 'If you already invest',
-      items: [
-        {
-          label: 'Practice portfolio',
-          sub: 'Try a decision with virtual money',
-          kind: 'route',
-          href: '/portfolio',
-        },
-        {
-          label: 'Compare the options',
-          sub: 'Every category, side by side',
-          kind: 'route',
-          href: '/explore/options',
-        },
-      ],
-    },
-  ],
+/** An Ideas row: one part of the landing page, named and pointed at. */
+const idea = (
+  label: string,
+  sub: string,
+  hash: string,
+  glyph: IconName
+): MenuEntry => ({ kind: 'route', href: '/ideas', hash, label, sub, glyph });
 
+export const MENUS: Record<MenuKey, MenuGroup[]> = {
   /*
    * Explore is a roadmap, not a set of shortcuts.
    *
@@ -137,10 +116,6 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
    * the order somebody actually asks them, and twenty answers none of which
    * exists yet. So none of them clicks. A row that navigates to a page which
    * cannot answer it spends the trust the row was meant to build.
-   *
-   * The three names are the ones the sections carried before Explore absorbed
-   * them, and the destinations they used to hold have not gone anywhere: every
-   * one of them is in the footer, which is what the footer is for.
    */
   explore: [
     {
@@ -183,14 +158,74 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
     },
   ],
 
+  /*
+   * Ideas: six ways into one page.
+   *
+   * The section answers "what should I look at?", and the two groups are the two
+   * halves of that — what is in front of you now, and what you do once something
+   * has caught your eye. Every row lands on the part of `/ideas` it names, so
+   * this is a menu of six destinations and not six links to the same one.
+   */
+  ideas: [
+    {
+      title: 'DISCOVER',
+      items: [
+        idea('Trending Ideas', 'What is gaining attention now', 'trending', 'trendUp'),
+        idea(
+          'Investment Themes',
+          'Explore markets through understandable themes',
+          'themes',
+          'layers'
+        ),
+        idea('Market Opportunities', 'Situations worth exploring', 'opportunities', 'target'),
+      ],
+    },
+    {
+      title: 'GO DEEPER',
+      items: [
+        idea(
+          'Popular With Investors',
+          'What investors are paying attention to',
+          'popular',
+          'users'
+        ),
+        idea('Explore Portfolios', 'See ideas combined into portfolios', 'portfolios', 'pie'),
+        idea('Compare Ideas', 'Compare themes, assets and approaches', 'compare', 'scale'),
+      ],
+    },
+  ],
+
   learn: [
     {
       title: 'Learn',
       items: [
-        { label: 'Learn', sub: 'Short lessons, in plain language', kind: 'route', href: '/academy' },
-        { label: 'Beginner path', sub: 'Five lessons that build on each other', kind: 'route', href: '/academy/path' },
-        { label: 'Where should I start?', sub: 'Two minutes of questions', kind: 'route', href: '/academy/setup' },
-        { label: 'My progress', kind: 'route', href: '/academy/dashboard' },
+        {
+          label: 'Learn',
+          sub: 'Short lessons, in plain language',
+          kind: 'route',
+          href: '/academy',
+          glyph: 'book',
+        },
+        {
+          label: 'Beginner path',
+          sub: 'Five lessons that build on each other',
+          kind: 'route',
+          href: '/academy/path',
+          glyph: 'compass',
+        },
+        {
+          label: 'Where should I start?',
+          sub: 'Two minutes of questions',
+          kind: 'route',
+          href: '/academy/setup',
+          glyph: 'help',
+        },
+        {
+          label: 'My progress',
+          kind: 'route',
+          href: '/academy/dashboard',
+          glyph: 'checkCircle',
+        },
       ],
     },
     {
@@ -201,6 +236,7 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
           sub: 'Virtual money, real prices',
           kind: 'route',
           href: '/portfolio',
+          glyph: 'wallet',
         },
         {
           label: 'First lesson',
@@ -208,6 +244,7 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
           kind: 'route',
           href: '/academy/lesson/[slug]',
           params: { slug: 'why-people-invest' },
+          glyph: 'play',
         },
       ],
     },
@@ -228,6 +265,7 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
           sub: 'Book a consultation',
           kind: 'route',
           href: '/marketplace/experts',
+          glyph: 'user',
         },
         /*
          * One entry per section, not one per screen.
@@ -244,34 +282,45 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
           sub: 'Chart Market, Supercharts and what is coming',
           kind: 'route',
           href: '/marketplace/tools',
+          glyph: 'sliders',
         },
         {
           label: 'Academy',
           sub: 'Paid courses from checked providers',
           kind: 'route',
           href: '/marketplace/academy',
+          glyph: 'grad',
         },
         {
           label: 'Events near you',
           sub: 'Meetups, webinars and conferences',
           kind: 'route',
           href: '/events',
+          glyph: 'calendar',
         },
         {
           label: 'Subscriptions',
           sub: 'Plans, Voyager tiers and limits',
           kind: 'route',
           href: '/marketplace/subscriptions',
+          glyph: 'star',
         },
         {
           label: 'Create an event',
           sub: 'Publish yours to the community',
           kind: 'route',
           href: '/events/create',
+          glyph: 'plus',
         },
         // There is no store, so there is nowhere for this to go. It used to
         // open the generic placeholder screen.
-        { label: 'Merchandise', sub: 'Physical goods and limited editions', kind: 'inert', soon: true },
+        {
+          label: 'Merchandise',
+          sub: 'Physical goods and limited editions',
+          kind: 'inert',
+          soon: true,
+          glyph: 'bookmark',
+        },
       ],
     },
   ],
