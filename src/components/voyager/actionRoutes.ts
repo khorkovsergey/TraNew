@@ -37,7 +37,12 @@ export function routeFor(
     case 'open_experts':
       return '/marketplace/experts';
     case 'open_experts_intake':
-      return '/marketplace/experts/intake';
+      /* The same screen as `open_experts`, because the intake stopped being a
+         page of its own: the conversation that structures a request now runs
+         on the Expert Services screen itself. The two actions stay distinct
+         because they are distinct offers — "find me somebody" and "help me say
+         what I need" — and the second may earn its own entry point again. */
+      return '/marketplace/experts';
     case 'open_strategy':
       return '/strategy';
     case 'open_explore':

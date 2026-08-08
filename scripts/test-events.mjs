@@ -3754,7 +3754,7 @@ try {
     assert.ok(!early.includes('location'), 'asked where before asking what');
 
     const later = brief.missingFrom(briefOf({ goal: 'g', services: ['review'] }));
-    assert.deepEqual(later, ['location', 'language', 'engagement']);
+    assert.deepEqual(later, ['location', 'language', 'engagement', 'timeline']);
   });
 
   check('the stage is semantic, not a counter', () => {
@@ -3762,7 +3762,7 @@ try {
     assert.equal(brief.stageOf(briefOf({})), 'understanding');
     assert.equal(brief.stageOf(briefOf({ goal: 'g', services: ['review'] })), 'clarifying');
     assert.equal(
-      brief.stageOf(briefOf({ goal: 'g', services: ['review'], country: 'Cyprus', languages: ['English'], engagement: 'consultation' })),
+      brief.stageOf(briefOf({ goal: 'g', services: ['review'], country: 'Cyprus', languages: ['English'], engagement: 'consultation', urgency: 'weeks' })),
       'ready'
     );
     for (const stage of Object.keys(brief.STAGE_LABEL)) {
@@ -3809,7 +3809,9 @@ try {
       EXPERTS,
       briefOf({ goal: 'g', services: ['review'], country: 'Cyprus', languages: ['Greek'] })
     );
-    assert.ok(top.reasons.some((r) => /service/i.test(r)), top.reasons.join(' | '));
+    // Named, not counted: "takes on the services you asked for" is true of
+    // everybody on the shortlist and so distinguishes nobody.
+    assert.ok(top.reasons.some((r) => /portfolio review/i.test(r)), top.reasons.join(' | '));
     assert.ok(top.reasons.some((r) => /Cyprus/.test(r)), top.reasons.join(' | '));
     assert.ok(top.reasons.some((r) => /Greek/.test(r)), top.reasons.join(' | '));
   });
@@ -3839,7 +3841,9 @@ try {
 
     const offers = brief.relaxations(EXPERTS, impossible);
     assert.ok(offers.length > 0);
-    assert.ok(offers.some((o) => /language/i.test(o)), offers.join(' | '));
+    assert.ok(offers.some((o) => /language/i.test(o.label)), offers.map((o) => o.label).join(' | '));
+    // And each one carries the change it would make, so the button applies it.
+    assert.ok(offers.every((o) => o.patch && typeof o.patch === 'object'));
   });
 
   check('the next question follows the brief, not a list', () => {
@@ -3861,7 +3865,7 @@ try {
     // An interview that never stops is a form with better manners.
     const complete = briefOf({
       goal: 'g', services: ['tax'], country: 'Cyprus',
-      languages: ['English'], engagement: 'consultation',
+      languages: ['English'], engagement: 'consultation', urgency: 'weeks',
     });
     assert.equal(brief.nextQuestion(complete), null);
     assert.equal(brief.stageOf(complete), 'ready');
@@ -3870,8 +3874,8 @@ try {
   check('every question is a sentence, not a field label', () => {
     const seen = new Set();
     let current = briefOf({});
-    const fill = { goal: { goal: 'g' }, services: { services: ['tax'] }, location: { country: 'Cyprus' }, language: { languages: ['English'] }, engagement: { engagement: 'consultation' } };
-    for (let i = 0; i < 6; i += 1) {
+    const fill = { goal: { goal: 'g' }, services: { services: ['tax'] }, location: { country: 'Cyprus' }, language: { languages: ['English'] }, engagement: { engagement: 'consultation' }, timeline: { urgency: 'weeks' } };
+    for (let i = 0; i < 7; i += 1) {
       const question = brief.nextQuestion(current);
       if (!question) break;
       assert.ok(!seen.has(question.field), `asked ${question.field} twice`);
@@ -3880,7 +3884,7 @@ try {
       assert.ok(/\?/.test(question.ask), question.ask);
       current = { ...current, ...fill[question.field] };
     }
-    assert.equal(seen.size, 5);
+    assert.equal(seen.size, 6);
   });
 
   check('the closed questions offer their answers, the open ones do not', () => {

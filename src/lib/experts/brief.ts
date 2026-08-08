@@ -39,6 +39,44 @@ export type ExpertBrief = {
   updatedAt?: string;
 };
 
+/**
+ * The four services, and the words for them.
+ *
+ * One map, because there were three: the landing page offered a "market" task
+ * nobody could be matched to, the conversation filed answers under "tax" which
+ * no expert provided, and the results chips spelled all four differently again.
+ * A service id that exists in one list and not another fails silently — the
+ * person gets an empty shortlist and no way to tell that the id was the reason.
+ */
+export const SERVICE_LABEL: Record<string, string> = {
+  strategy: 'Investment advisory',
+  review: 'Portfolio review',
+  finances: 'Wealth planning',
+  tax: 'Tax and legal',
+};
+
+/** The same four, as somebody would say them out loud when answering. */
+export const SERVICE_PHRASE: Record<string, string> = {
+  strategy: 'Building a strategy',
+  review: 'Reviewing what I hold',
+  finances: 'Planning my finances',
+  tax: 'Tax and residency',
+};
+
+export const ENGAGEMENT_LABEL: Record<Engagement, string> = {
+  consultation: 'One-off consultation',
+  project: 'A project with an end',
+  ongoing: 'Ongoing relationship',
+  unsure: 'Not decided yet',
+};
+
+export const URGENCY_LABEL: Record<Urgency, string> = {
+  asap: 'As soon as possible',
+  days: 'Within a few days',
+  weeks: 'Over the next few weeks',
+  flexible: 'No fixed deadline',
+};
+
 export const EMPTY_BRIEF: ExpertBrief = {
   title: '',
   goal: '',
@@ -71,6 +109,7 @@ export function missingFrom(brief: ExpertBrief): string[] {
     if (!brief.country) missing.push('location');
     if (brief.languages.length === 0) missing.push('language');
     if (!brief.engagement) missing.push('engagement');
+    if (!brief.urgency) missing.push('timeline');
   }
   return missing;
 }
@@ -104,6 +143,9 @@ export type ExpertLike = {
   /** Marketplace task ids this expert actually takes on. */
   services?: string[];
   jurisdiction?: string;
+  /** Where they sit. Matched as well as the jurisdiction — somebody who says
+      "Cyprus" means both, and only one of the two fields ever spells it. */
+  city?: string;
   languages?: string;
   remote?: boolean;
   currency?: string;
@@ -155,10 +197,16 @@ export function rank(expert: ExpertLike, brief: ExpertBrief): Match | null {
   const overlap = brief.services.filter((service) => offered.includes(service));
   if (overlap.length > 0) {
     score += overlap.length * 2;
-    reasons.push(`Takes on ${overlap.length === 1 ? 'the service' : 'the services'} you asked for`);
+    // Named, not counted. "Takes on the services you asked for" is true of
+    // everybody on the shortlist and so tells nobody anything; which service
+    // is what distinguishes the tax adviser from the portfolio one.
+    reasons.push(
+      `Takes on ${overlap.map((service) => (SERVICE_LABEL[service] ?? service).toLowerCase()).join(' and ')}`
+    );
   }
 
-  if (brief.country && expert.jurisdiction?.toLowerCase().includes(brief.country.toLowerCase())) {
+  const where = `${expert.jurisdiction ?? ''} ${expert.city ?? ''}`.toLowerCase();
+  if (brief.country && where.includes(brief.country.toLowerCase())) {
     score += 2;
     reasons.push(`Based in ${brief.country}`);
   } else if (brief.remoteAccepted) {
@@ -216,24 +264,29 @@ export function matchExperts(experts: ExpertLike[], brief: ExpertBrief): Match[]
  * is the difference between a wall and a next step — and the constraint is
  * never relaxed silently, because somebody stated it on purpose.
  */
-export function relaxations(experts: ExpertLike[], brief: ExpertBrief): string[] {
+export type Relaxation = {
+  label: string;
+  /** Applied to the brief on click, so the offer is the action rather than a
+      description of one somebody then has to perform themselves. */
+  patch: Partial<ExpertBrief>;
+};
+
+export function relaxations(experts: ExpertLike[], brief: ExpertBrief): Relaxation[] {
   if (matchExperts(experts, brief).length > 0) return [];
 
-  const offers: string[] = [];
-  const without = (patch: Partial<ExpertBrief>) =>
+  const offers: Relaxation[] = [];
+  const helps = (patch: Partial<ExpertBrief>) =>
     matchExperts(experts, { ...brief, ...patch }).length > 0;
 
-  if (brief.languages.length > 0 && without({ languages: [] })) {
-    offers.push('Include experts who do not list your language');
-  }
-  if (brief.country && without({ country: undefined })) {
-    offers.push('Look beyond your country');
-  }
-  if (!brief.remoteAccepted && without({ remoteAccepted: true })) {
-    offers.push('Include remote specialists');
-  }
-  if (brief.services.length > 1 && without({ services: brief.services.slice(0, 1) })) {
-    offers.push('Search for one service at a time');
+  const offer = (label: string, patch: Partial<ExpertBrief>) => {
+    if (helps(patch)) offers.push({ label, patch });
+  };
+
+  offer('Include other languages', { languages: [] });
+  offer('Look beyond your country', { country: undefined });
+  if (!brief.remoteAccepted) offer('Include remote specialists', { remoteAccepted: true });
+  if (brief.services.length > 1) {
+    offer('Search for one service at a time', { services: brief.services.slice(0, 1) });
   }
 
   return offers;
@@ -282,6 +335,11 @@ export function nextQuestion(brief: ExpertBrief): { field: string; ask: string }
         field: 'engagement',
         ask: 'Are you after a one-off consultation, a piece of work with an end, or someone ongoing?',
       };
+    case 'timeline':
+      return {
+        field: 'timeline',
+        ask: 'And when would you like this to happen? It decides who I can show you as actually available, not just suitable.',
+      };
     default:
       return null;
   }
@@ -301,15 +359,43 @@ export function nextQuestion(brief: ExpertBrief): { field: string; ask: string }
  * situation.
  */
 export const SUGGESTED: Record<string, string[]> = {
-  services: [
-    'Building a strategy',
-    'Reviewing what I hold',
-    'Planning my finances',
-    'Tax and residency',
-  ],
+  services: Object.values(SERVICE_PHRASE),
   language: ['English', 'Greek', 'Russian'],
   engagement: ['A one-off consultation', 'A project with an end', 'Someone ongoing'],
+  timeline: ['As soon as possible', 'Within a few days', 'Over the next few weeks', 'No rush'],
 };
 
+/**
+ * Which services an answer names, matched on the words rather than on our ids.
+ *
+ * Somebody typing "the tax side of it" is answering the services question, and
+ * filing that under nothing — which is what an id-only match did — means the
+ * question comes back and the person repeats themselves.
+ */
+export function servicesFromAnswer(said: string): string[] {
+  const lower = said.toLowerCase();
+  const words: Record<string, string[]> = {
+    strategy: ['strategy', 'advisory', 'advice', 'construct', 'allocate', 'invest'],
+    review: ['review', 'reviewing', 'hold', 'portfolio', 'second opinion', 'check'],
+    finances: ['finance', 'financial', 'wealth', 'plan my', 'planning', 'budget', 'retire'],
+    tax: ['tax', 'residency', 'legal', 'non-dom', 'domicile'],
+  };
+
+  return Object.keys(words).filter(
+    (id) => lower.includes(id) || words[id].some((word) => lower.includes(word))
+  );
+}
+
+/** The urgency an answer names, or undefined when it names none. */
+export function urgencyFromAnswer(said: string): Urgency | undefined {
+  const lower = said.toLowerCase();
+  if (/asap|as soon|urgent|immediately|right away/.test(lower)) return 'asap';
+  if (/day|this week|week\b/.test(lower) && !/weeks/.test(lower)) return 'days';
+  if (/weeks|month/.test(lower)) return 'weeks';
+  if (/no rush|flexible|whenever|no deadline|not urgent/.test(lower)) return 'flexible';
+  return undefined;
+}
+
 /** A short line for the brief panel before anything has been said. */
-export const EMPTY_BRIEF_NOTE = 'Voyager will build your request here as you talk.';
+export const EMPTY_BRIEF_NOTE =
+  'Answer a couple of questions and your goal, the specialist you need and your preferences appear here as a request you can send.';

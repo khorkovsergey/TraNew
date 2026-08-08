@@ -76,6 +76,12 @@ export function useExpertFlow() {
   const [state, setState] = useState<ExpertFlowState | null>(null);
 
   useEffect(() => {
+    /* eslint-disable-next-line react-hooks/set-state-in-effect --
+       session storage does not exist during the server render, so this state
+       cannot be produced any earlier than the first client effect. `null`
+       until then is deliberate: it is "not read yet", and a component that
+       renders the defaults instead would flash an empty booking over a real
+       one. */
     setState(load());
   }, []);
 

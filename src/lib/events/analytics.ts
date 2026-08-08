@@ -91,7 +91,10 @@ export type AnalyticsEvent =
    * somebody is trying to do with their money, and none of that goes here.
    */
   | { name: 'voyager_message_sent'; turns: number }
-  | { name: 'expert_brief_saved'; services: string };
+  | { name: 'expert_brief_saved'; services: string }
+  /* The id of a public marketplace profile and the tier we ranked it at. Which
+     expert somebody picked is not private; what they wanted from them is. */
+  | { name: 'expert_selected'; expertId: string; tier: string };
 
 export interface AnalyticsSink {
   track(event: AnalyticsEvent): void;

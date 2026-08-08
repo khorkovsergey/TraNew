@@ -3,6 +3,8 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { EXPERTS, expertById } from '@/content/experts';
 import { pick } from '@/content/types';
+import { Icon } from '@/components/ui/Icon';
+import { ProfileBooking, WhyRecommended } from '@/components/marketplace/ProfileSidebar';
 import { Link } from '@/i18n/navigation';
 import { routing, type Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
@@ -46,40 +48,58 @@ export default async function ExpertProfilePage({ params }: Props) {
 
       <div className={styles.breadcrumb}>{t('breadcrumb')}</div>
 
-      <div className={styles.matchHead} style={{ marginTop: 18 }}>
-        <div className={styles.identity}>
-          <div
-            className={styles.avatar}
-            style={{ background: expert.tile, color: expert.color, width: 64, height: 64 }}
-            aria-hidden="true"
-          >
-            {expert.initials}
-          </div>
-          <div>
-            <h1 className={styles.name} style={{ fontSize: 28 }}>
-              {expert.name}
-            </h1>
-            <div className={styles.provider}>{pick(expert.provider, locale)}</div>
-          </div>
+      <div className={styles.profileHead}>
+        <div
+          className={styles.profileAvatar}
+          style={{ background: expert.tile, color: expert.color }}
+          aria-hidden="true"
+        >
+          {expert.initials}
         </div>
-        <div className={styles.priceBlock}>
-          <div className={`${styles.price} tn-num`}>{expert.price}</div>
-          <div className={styles.priceMeta}>{pick(expert.duration, locale)}</div>
-          <Link
-            className={styles.primary}
-            style={{ display: 'inline-block', marginTop: 12 }}
-            href={{
-              pathname: '/marketplace/experts/[id]/sharing',
-              params: { id: expert.id },
-            }}
-          >
-            {t('profile.book')}
-          </Link>
+        <div className={styles.profileWho}>
+          <div className={styles.profileNameRow}>
+            <h1 className={styles.profileName}>{expert.name}</h1>
+            {/* The label is the honest one for this expert, not a decoration
+                every profile wears. Only a credential checked against a
+                regulator's registry gets the shield. */}
+            <span
+              className={`${styles.credentialChip} ${
+                expert.credential === 'verified' ? styles.credentialChipOn : ''
+              }`}
+            >
+              <Icon
+                name={expert.credential === 'verified' ? 'shieldCheck' : 'info'}
+                size={13}
+                strokeWidth={2.2}
+              />
+              {t(`credential.${expert.credential}`)}
+            </span>
+          </div>
+          <div className={styles.profileRole}>
+            {pick(expert.provider, locale)} · {pick(expert.jurisdiction, locale)} ·{' '}
+            {expert.years} years
+          </div>
+          <div className={styles.profileFacts}>
+            <span>
+              <Icon name="star" size={14} strokeWidth={2} />
+              <b className="tn-num">{expert.rating}</b> ({expert.consultations} sessions)
+            </span>
+            <span>
+              <Icon name="pin" size={14} strokeWidth={2} />
+              {pick(expert.city, locale)}
+            </span>
+            <span>
+              <Icon name="chat" size={14} strokeWidth={2} />
+              {expert.languages}
+            </span>
+          </div>
         </div>
       </div>
 
       <div className={styles.profileGrid}>
         <div className={styles.column}>
+          <WhyRecommended expert={expert} />
+
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>{t('profile.about')}</h2>
             <p className={styles.briefValue}>{pick(expert.about, locale)}</p>
@@ -120,6 +140,8 @@ export default async function ExpertProfilePage({ params }: Props) {
         </div>
 
         <div className={styles.column}>
+          <ProfileBooking expert={expert} />
+
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>{t('profile.credentials')}</h2>
             <div style={{ marginTop: 12 }}>

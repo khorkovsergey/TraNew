@@ -29,7 +29,7 @@ const RUSSIAN_SLUG_REDIRECTS: Array<[string, string]> = [
   ['/ru/akademiya/itog', '/en/academy/done'],
   ['/ru/akademiya', '/en/academy'],
   ['/ru/strategiya', '/en/strategy'],
-  ['/ru/marketplace/eksperty/anketa', '/en/marketplace/experts/intake'],
+  ['/ru/marketplace/eksperty/anketa', '/en/marketplace/experts'],
   ['/ru/marketplace/eksperty/podbor', '/en/marketplace/experts/matches'],
   ['/ru/marketplace/eksperty/sravnenie', '/en/marketplace/experts/compare'],
   ['/ru/marketplace/eksperty/:id/dostup-k-dannym', '/en/marketplace/experts/:id/sharing'],

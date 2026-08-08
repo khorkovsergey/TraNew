@@ -11,16 +11,12 @@ export type CredentialStatus =
   | 'not_applicable'
   | 'demo';
 
-/** Match quality is a band, never a percentage — a number would imply false precision. */
-export type MatchBand = 'best' | 'strong' | 'suitable';
-
 export type Expert = {
   id: string;
   initials: string;
   name: string;
   provider: Localized;
   credential: CredentialStatus;
-  band: MatchBand;
   /**
    * Marketplace task ids this expert actually takes on.
    *
@@ -31,6 +27,16 @@ export type Expert = {
    */
   services: string[];
   jurisdiction: Localized;
+  /**
+   * Where they actually sit, which is not the same question as which rules they
+   * are licensed under. The card shows the city because "Cyprus / EU" answers
+   * the regulator's question and not the "can I meet them" one.
+   */
+  city: Localized;
+  /** Years in the work. Stated on the profile, never used to rank. */
+  years: number;
+  /** Whether they take remote consultations at all. */
+  remote: boolean;
   languages: string;
   rating: string;
   consultations: number;
@@ -58,10 +64,12 @@ export const EXPERTS: Expert[] = [
       en: 'Regulated investment adviser',
     },
     credential: 'verified',
-    band: 'best',
     services: ['strategy', 'review'],
     jurisdiction: { en: 'Cyprus / EU' },
-    languages: 'EN · RU',
+    city: { en: 'Limassol, Cyprus' },
+    years: 12,
+    remote: true,
+    languages: 'English · Russian',
     rating: '4.9',
     consultations: 214,
     price: '€120',
@@ -158,10 +166,12 @@ export const EXPERTS: Expert[] = [
     name: 'Marcus Okafor',
     provider: { en: 'Financial planner' },
     credential: 'self_declared',
-    band: 'strong',
     services: ['finances', 'strategy'],
     jurisdiction: { en: 'United Kingdom' },
-    languages: 'EN · FR',
+    city: { en: 'London, United Kingdom' },
+    years: 9,
+    remote: true,
+    languages: 'English · French',
     rating: '4.8',
     consultations: 167,
     price: '€95',
@@ -260,10 +270,12 @@ export const EXPERTS: Expert[] = [
       en: 'TradingNew platform specialist',
     },
     credential: 'not_applicable',
-    band: 'suitable',
     services: ['review'],
     jurisdiction: { en: 'Sweden / EU' },
-    languages: 'EN · SV',
+    city: { en: 'Stockholm, Sweden' },
+    years: 6,
+    remote: true,
+    languages: 'English · Swedish',
     rating: '5.0',
     consultations: 98,
     price: '€40',
@@ -350,123 +362,258 @@ export const EXPERTS: Expert[] = [
       { en: 'Not a sponsored placement' },
     ],
   },
+
+  /*
+   * Tax and wealth planning had no provider at all.
+   *
+   * Two of the four doors on the discovery screen led to an empty shortlist
+   * every time, and an empty shortlist reads as a broken marketplace rather
+   * than as an honest "nobody here does that" — the person never learns which
+   * it was. These two cover the gap, and the tax adviser is deliberately not
+   * an investment adviser: bundling both into one profile would let a single
+   * booking imply advice the person is not licensed to give.
+   */
+  {
+    id: 'ep',
+    initials: 'EP',
+    name: 'Elena Papadopoulou',
+    provider: { en: 'Tax adviser and legal consultant' },
+    credential: 'verified',
+    services: ['tax'],
+    jurisdiction: { en: 'Cyprus / EU' },
+    city: { en: 'Nicosia, Cyprus' },
+    years: 14,
+    remote: true,
+    languages: 'English · Greek · Russian',
+    rating: '4.8',
+    consultations: 96,
+    price: '€110',
+    duration: { en: '60 min' },
+    availability: { en: 'Thu, 09:30' },
+    tile: 'var(--tn-orange-tint)',
+    color: 'var(--tn-orange)',
+    reasons: [
+      { en: 'Cyprus tax residency and non-dom status' },
+      { en: 'Works with people who have just relocated' },
+      { en: 'Coordinates with your investment adviser' },
+    ],
+    about: {
+      en: 'Licensed tax adviser working with individuals who have moved jurisdiction. Explains what your residency actually changes — reporting duties, treaty relief, and what the first tax year looks like in practice.',
+    },
+    suited: {
+      en: 'People who have relocated, or are about to, and need the tax picture settled before they restructure anything.',
+    },
+    expertise: [
+      { en: 'Tax residency' },
+      { en: 'Non-dom status' },
+      { en: 'Double taxation treaties' },
+      { en: 'Cross-border reporting' },
+      { en: 'Company structuring' },
+    ],
+    credentials: [
+      {
+        k: { en: 'Provider type' },
+        v: { en: 'Tax adviser and legal consultant' },
+      },
+      { k: { en: 'Regulator' }, v: { en: 'ICPAC' } },
+      { k: { en: 'Jurisdiction' }, v: { en: 'Cyprus / EU' } },
+      {
+        k: { en: 'Licence' },
+        v: { en: 'ICPAC 4471 · registry link' },
+      },
+      {
+        k: { en: 'Last verified' },
+        v: { en: 'Jun 30, 2026' },
+      },
+    ],
+    packages: [
+      {
+        id: 'intro',
+        label: { en: '30-minute residency question' },
+        price: '€55',
+      },
+      {
+        id: 'full',
+        label: { en: '60-minute consultation' },
+        price: '€110',
+      },
+      {
+        id: 'written',
+        label: { en: 'Written tax position note' },
+        price: '€180',
+      },
+    ],
+    reviews: [
+      {
+        rating: '5.0',
+        text: {
+          en: '“Explained the first tax year after moving without making it frightening.”',
+        },
+        meta: { en: 'Verified client · Jun 2026' },
+      },
+      {
+        rating: '4.7',
+        text: {
+          en: '“Told me plainly which parts she could not answer and who could.”',
+        },
+        meta: { en: 'Verified client · Apr 2026' },
+      },
+    ],
+    disclosures: [
+      { en: 'Tax and legal guidance only — not investment advice' },
+      { en: 'No commissions from any product or provider' },
+      { en: 'Not a sponsored placement' },
+      { en: 'Advises on Cypriot and EU law only' },
+    ],
+  },
+
+  {
+    id: 'ac',
+    initials: 'AC',
+    name: 'Andreas Christou',
+    provider: { en: 'Wealth planner and portfolio adviser' },
+    credential: 'verified',
+    services: ['finances', 'strategy', 'review'],
+    jurisdiction: { en: 'Cyprus / EU' },
+    city: { en: 'Limassol, Cyprus' },
+    years: 11,
+    remote: true,
+    languages: 'English · Greek',
+    rating: '4.9',
+    consultations: 143,
+    price: '€130',
+    duration: { en: '60 min' },
+    availability: { en: 'Wed, 11:00' },
+    tile: 'var(--tn-mint-tint)',
+    color: 'var(--tn-mint)',
+    reasons: [
+      { en: 'Long-horizon wealth plans, not product selection' },
+      { en: 'Regularly works with relocating investors' },
+      { en: 'Coordinates with a tax adviser where needed' },
+    ],
+    about: {
+      en: 'Builds long-horizon plans for households and relocating professionals: what the money is for, when it is needed, and the allocation that follows from those two answers. Sessions end in a written plan you keep.',
+    },
+    suited: {
+      en: 'People with a life change in progress — a move, a sale, an inheritance — who want the whole picture structured rather than one holding reviewed.',
+    },
+    expertise: [
+      { en: 'Wealth planning' },
+      { en: 'Portfolio structuring' },
+      { en: 'Relocating investors' },
+      { en: 'ETF portfolios' },
+      { en: 'Goal and horizon mapping' },
+    ],
+    credentials: [
+      {
+        k: { en: 'Provider type' },
+        v: { en: 'Regulated investment adviser' },
+      },
+      { k: { en: 'Regulator' }, v: { en: 'CySEC' } },
+      { k: { en: 'Jurisdiction' }, v: { en: 'Cyprus / EU' } },
+      {
+        k: { en: 'Licence' },
+        v: { en: 'CIF 189/12 · registry link' },
+      },
+      {
+        k: { en: 'Last verified' },
+        v: { en: 'Jul 2, 2026' },
+      },
+    ],
+    packages: [
+      {
+        id: 'intro',
+        label: { en: '30-minute introductory call' },
+        price: '€65',
+      },
+      {
+        id: 'full',
+        label: { en: '60-minute consultation' },
+        price: '€130',
+      },
+      {
+        id: 'written',
+        label: { en: 'Written wealth plan' },
+        price: '€210',
+      },
+    ],
+    reviews: [
+      {
+        rating: '5.0',
+        text: {
+          en: '“Read the brief before we met. We spent the hour on decisions, not background.”',
+        },
+        meta: { en: 'Verified client · Jul 2026' },
+      },
+      {
+        rating: '4.9',
+        text: {
+          en: '“Said outright which parts needed a tax adviser instead of guessing.”',
+        },
+        meta: { en: 'Verified client · May 2026' },
+      },
+    ],
+    disclosures: [
+      { en: 'No commissions from products discussed' },
+      { en: 'Not affiliated with any broker' },
+      { en: 'Not a sponsored placement' },
+      { en: 'Serves EU residents only' },
+    ],
+  },
 ];
 
-export const EXPERT_TASKS = [
-  {
-    id: 'strategy',
-    title: { en: 'Build my investment strategy' },
-    desc: {
-      en: 'For users who have capital but are unsure how to allocate it.',
-    },
-  },
+/**
+ * The doors on the discovery screen.
+ *
+ * Named after the specialism somebody is looking for rather than after the
+ * sentence they would say — the tabs sit above a conversation that asks for the
+ * sentence, so repeating it in the tab wastes the row. Each maps to exactly one
+ * service id, and the fifth deliberately maps to none: "not sure" is the honest
+ * answer for most people arriving here, and pretending it is a category would
+ * file them under a guess.
+ */
+export const EXPERT_CATEGORIES: Array<{
+  id: string;
+  /** The service id this door corresponds to. Null for "not sure". */
+  service: string | null;
+  title: Localized;
+  icon: 'pie' | 'trendUp' | 'scale' | 'shield' | 'help';
+  color: string;
+}> = [
   {
     id: 'review',
-    title: { en: 'Review my portfolio' },
-    desc: {
-      en: 'For users who already invest and want an independent professional perspective.',
-    },
+    service: 'review',
+    title: { en: 'Portfolio review' },
+    icon: 'pie',
+    color: 'var(--tn-mint)',
+  },
+  {
+    id: 'strategy',
+    service: 'strategy',
+    title: { en: 'Investment advisory' },
+    icon: 'trendUp',
+    color: 'var(--tn-blue)',
+  },
+  {
+    id: 'tax',
+    service: 'tax',
+    title: { en: 'Tax and legal' },
+    icon: 'scale',
+    color: 'var(--tn-orange-star)',
   },
   {
     id: 'finances',
-    title: { en: 'Plan my finances' },
-    desc: {
-      en: 'For budgeting, financial planning, debt, savings and long-term goals.',
-    },
+    service: 'finances',
+    title: { en: 'Wealth planning' },
+    icon: 'shield',
+    color: 'var(--tn-purple)',
   },
   {
-    id: 'market',
-    title: { en: 'Understand a market or asset' },
-    desc: {
-      en: 'For a focused consultation about an industry, market or asset class.',
-    },
-  },
-];
-
-export type IntakeQuestion = {
-  key: string;
-  question: Localized;
-  hint?: Localized;
-  options: Localized[];
-};
-
-export const INTAKE: IntakeQuestion[] = [
-  {
-    key: 'task',
-    question: { en: 'What would you like help with?' },
-    options: [
-      ...EXPERT_TASKS.map((task) => task.title),
-      { en: 'Something else' },
-    ],
-  },
-  {
-    key: 'outcome',
-    question: {
-      en: 'What outcome are you looking for?',
-    },
-    options: [
-      { en: 'A clear plan I can follow' },
-      { en: 'An independent second opinion' },
-      { en: 'Understanding my options' },
-      { en: 'Help with a specific question' },
-    ],
-  },
-  {
-    key: 'experience',
-    question: { en: 'Have you invested before?' },
-    options: [
-      { en: 'No, never' },
-      { en: 'A little' },
-      { en: 'Regularly' },
-    ],
-  },
-  {
-    key: 'country',
-    question: { en: 'Which country do you live in?' },
-    options: [
-      { en: 'Cyprus' },
-      { en: 'Germany' },
-      { en: 'United Kingdom' },
-      { en: 'Other EU' },
-    ],
-  },
-  {
-    key: 'language',
-    question: {
-      en: 'Which language would you prefer?',
-    },
-    options: [
-      { en: 'English' },
-      { en: 'Russian' },
-      { en: 'Both' },
-    ],
-  },
-  {
-    key: 'amount',
-    question: {
-      en: 'What approximate amount is relevant?',
-    },
-    hint: {
-      en: 'Capital range helps us find experts who normally work with situations similar to yours. You do not need to share an exact amount.',
-    },
-    options: [
-      { en: 'Under €10,000' },
-      { en: '€10,000 – €50,000' },
-      { en: '€50,000 – €250,000' },
-      { en: 'Over €250,000' },
-      { en: 'Prefer to skip' },
-    ],
-  },
-  {
-    key: 'format',
-    question: {
-      en: 'Would you like a video call, chat or written review?',
-    },
-    options: [
-      { en: 'Video call' },
-      { en: 'Chat' },
-      { en: 'Written review' },
-    ],
+    id: 'unsure',
+    service: null,
+    title: { en: 'Not sure where to start?' },
+    icon: 'help',
+    color: 'var(--tn-text-soft)',
   },
 ];
 

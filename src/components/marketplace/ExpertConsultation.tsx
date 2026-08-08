@@ -1,19 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Icon } from '@/components/ui/Icon';
+import { useEffect, useRef, useState } from 'react';
+import { useLocale } from 'next-intl';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { VoyagerMark } from '@/components/voyager/VoyagerMark';
-import { Matches } from './Matches';
+import { EXPERT_CATEGORIES } from '@/content/experts';
+import { pick } from '@/content/types';
+import type { Locale } from '@/i18n/routing';
+import { MatchResults } from './MatchResults';
 import { track } from '@/lib/events/analytics';
 import { saveExpertBriefAction } from '@/app/actions/expertBrief';
 import {
   EMPTY_BRIEF,
   EMPTY_BRIEF_NOTE,
+  ENGAGEMENT_LABEL,
   nextQuestion,
   readyToMatch,
-  STAGE_LABEL,
-  stageOf,
+  SERVICE_LABEL,
+  servicesFromAnswer,
   SUGGESTED,
+  urgencyFromAnswer,
+  URGENCY_LABEL,
   type ExpertBrief,
 } from '@/lib/experts/brief';
 import styles from './Marketplace.module.css';
@@ -35,39 +42,41 @@ import styles from './Marketplace.module.css';
  * specialist — the door was their guess about our taxonomy, not a requirement.
  */
 
-const SERVICE_LABEL: Record<string, string> = {
-  strategy: 'Building a strategy',
-  review: 'Reviewing what I hold',
-  finances: 'Planning my finances',
-  tax: 'Tax and residency',
-};
+/** `at` is an ISO stamp, empty on the opening line — see `time` below. */
+type Turn = { role: 'voyager' | 'you'; text: string; at: string };
 
-type Turn = { role: 'voyager' | 'you'; text: string };
+/** Where somebody is in the flow, as the three dots across the top show it. */
+const PHASES = [
+  ['Understanding', 'your goal'],
+  ['Preparing', 'your brief'],
+  ['Finding', 'experts'],
+] as const;
 
-/** The four steps the mockup shows across the top of this flow. */
-const STEPS = ['Describe', 'Your brief', 'Experts', 'Book'];
-
-/**
- * Where somebody is, with a tick behind them rather than a number.
- *
- * The mockup swaps the digit for a check once a step is done, which is the
- * detail that stops this reading as "4 of 4 forms to fill" — a finished step
- * should look finished.
- */
-function Stepper({ at }: { at: number }) {
+function Tracker({ at }: { at: number }) {
   return (
-    <ol className={styles.stepper}>
-      {STEPS.map((label, index) => {
-        const n = index + 1;
-        const done = n < at;
+    <ol className={styles.tracker}>
+      {PHASES.map(([first, second], index) => {
+        const done = index < at;
+        const current = index === at;
         return (
-          <li
-            key={label}
-            className={`${styles.step} ${n === at ? styles.stepOn : ''} ${done ? styles.stepDone : ''}`}
-            aria-current={n === at ? 'step' : undefined}
-          >
-            <span className={styles.stepNum}>{done ? '✓' : n}</span>
-            {label}
+          <li className={styles.trackerStep} key={first}>
+            <span
+              className={`${styles.trackerDot} ${done ? styles.trackerDone : ''} ${
+                current ? styles.trackerOn : ''
+              }`}
+            >
+              {done ? <Icon name="check" size={14} strokeWidth={3} /> : index + 1}
+            </span>
+            <span
+              className={`${styles.trackerLabel} ${done || current ? styles.trackerLabelOn : ''}`}
+            >
+              {first}
+              <br />
+              {second}
+            </span>
+            {index < PHASES.length - 1 && (
+              <span className={`${styles.trackerLine} ${done ? styles.trackerLineDone : ''}`} />
+            )}
           </li>
         );
       })}
@@ -75,30 +84,93 @@ function Stepper({ at }: { at: number }) {
   );
 }
 
-/** Questions worth asking about a shortlist, not about the marketplace. */
-const ASK_ABOUT = [
-  'Which of these also covers tax?',
-  'Who is available soonest?',
-  'What is the difference between them?',
-];
+/** The rows of the brief, in the order they are worth reading. */
+type Row = {
+  field: string;
+  label: string;
+  icon: IconName;
+  /** Rendered as chips rather than a sentence. */
+  chips?: string[];
+  value: string;
+};
 
-function opening(category: string | null): string {
-  const known = category && SERVICE_LABEL[category];
-  return known
-    ? `I see you are looking at ${SERVICE_LABEL[category!].toLowerCase()}. Tell me what you are actually trying to achieve — I will work out which specialist that needs, even if it turns out to be a different one.`
-    : 'I can help you find the right specialist. Tell me what you are trying to achieve, or what problem you are facing.';
+function rowsOf(brief: ExpertBrief): Row[] {
+  const rows: Row[] = [];
+  if (brief.goal) rows.push({ field: 'goal', label: 'Goal', icon: 'target', value: brief.goal });
+  if (brief.services.length > 0) {
+    rows.push({
+      field: 'services',
+      label: 'Requested services',
+      icon: 'users',
+      chips: brief.services.map((id) => SERVICE_LABEL[id] ?? id),
+      value: brief.services.map((id) => SERVICE_LABEL[id] ?? id).join(', '),
+    });
+  }
+  if (brief.country) {
+    rows.push({
+      field: 'country',
+      label: 'Location',
+      icon: 'pin',
+      value: `${brief.country}${brief.remoteAccepted ? ' · remote accepted' : ' · on-site only'}`,
+    });
+  }
+  if (brief.languages.length > 0) {
+    rows.push({
+      field: 'languages',
+      label: 'Language',
+      icon: 'chat',
+      value: brief.languages.join(', '),
+    });
+  }
+  if (brief.engagement) {
+    rows.push({
+      field: 'engagement',
+      label: 'Engagement',
+      icon: 'fileSearch',
+      value: ENGAGEMENT_LABEL[brief.engagement],
+    });
+  }
+  if (brief.urgency) {
+    rows.push({
+      field: 'urgency',
+      label: 'Timeline',
+      icon: 'clock',
+      value: URGENCY_LABEL[brief.urgency],
+    });
+  }
+  if (brief.notes) {
+    rows.push({ field: 'notes', label: 'Additional notes', icon: 'book', value: brief.notes });
+  }
+  return rows;
 }
 
-export function ExpertConsultation({ category }: { category: string | null }) {
+function opening(categoryId: string | null, locale: Locale): string {
+  const category = EXPERT_CATEGORIES.find((item) => item.id === categoryId);
+  return category && category.service
+    ? `I see you are looking at ${pick(category.title, locale).toLowerCase()}. Tell me what you are actually trying to achieve — I will work out which specialist that needs, even if it turns out to be a different one.`
+    : 'I can help you find the right specialist. Tell me what you are trying to achieve, or what problem you are facing — you do not need to know what kind of expert that is.';
+}
+
+export function ExpertConsultation({
+  category,
+  heading,
+}: {
+  category: string | null;
+  /** The page's own title block, so it can share a row with the tracker. */
+  heading?: React.ReactNode;
+}) {
+  const locale = useLocale() as Locale;
+
   /*
    * One screen with states, as the mockup has it, rather than a navigation.
    *
    * Sending somebody to another route to see the results loses the
-   * conversation that produced them — and the mockup keeps both, so "Edit
-   * request" is a step back rather than a page load. `/matches` stays a real
-   * route for anyone arriving with a bookmark.
+   * conversation that produced them — so "Edit request" is a step back rather
+   * than a page load. `/matches` stays a real route for anyone arriving with a
+   * bookmark or following "view all experts".
    */
-  const [showing, setShowing] = useState<'brief' | 'matches'>('brief');
+  const [phase, setPhase] = useState<'brief' | 'matching' | 'results'>('brief');
+  const [categoryId, setCategoryId] = useState<string | null>(category ?? 'unsure');
   const [brief, setBrief] = useState<ExpertBrief>({
     ...EMPTY_BRIEF,
     initialCategory: category ?? undefined,
@@ -112,44 +184,73 @@ export function ExpertConsultation({ category }: { category: string | null }) {
      * Voyager mentions the category in its opening line instead, and asks.
      */
   });
-  const [turns, setTurns] = useState<Turn[]>([{ role: 'voyager', text: opening(category) }]);
+  const [turns, setTurns] = useState<Turn[]>([
+    { role: 'voyager', text: opening(category ?? 'unsure', locale), at: '' },
+  ]);
+  const [typing, setTyping] = useState(false);
   const [draft, setDraft] = useState('');
-  const [editing, setEditing] = useState(false);
+  /**
+   * Which single line is being edited, and the text in it.
+   *
+   * Inline, with no separate editor page: a panel that turns into a form to
+   * correct one word is the questionnaire this replaced. The rest of the brief
+   * stays readable while one line changes — you are correcting a line against
+   * the request it belongs to.
+   */
+  const [editing, setEditing] = useState<string | null>(null);
+  const [rowDraft, setRowDraft] = useState('');
+  /* Times are rendered only after mount: the first turn exists during the
+     server render too, and a clock is the one thing guaranteed to differ. */
+  const [mounted, setMounted] = useState(false);
+  const threadRef = useRef<HTMLDivElement>(null);
 
   /*
    * A brief already in progress is picked up rather than started over.
    *
-   * "Edit request" on the results page comes back here, and it used to open a
-   * blank conversation — so changing one word meant answering everything again.
-   * §23 asks for the opposite: editing returns somebody to their request, not
-   * to the beginning of it.
+   * "Edit request" comes back here, and it used to open a blank conversation —
+   * so changing one word meant answering everything again. Editing returns
+   * somebody to their request, not to the beginning of it.
    */
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect --
+       session storage and the clock are both browser-only, so the state they
+       produce cannot exist until after the first render. */
+    setMounted(true);
     try {
       const raw = sessionStorage.getItem('tn_expert_brief_v1');
       if (!raw) return;
       const stored = JSON.parse(raw) as ExpertBrief;
       if (!stored?.goal) return;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBrief(stored);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTurns([
         {
           role: 'voyager',
           text: 'Here is the request we built. Change anything in it directly, or tell me what is wrong and I will adjust it.',
+          at: new Date().toISOString(),
         },
       ]);
     } catch {
       /* Unreadable storage means a fresh conversation, which still works. */
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
-  const stage = stageOf(brief);
+  /* The thread is a fixed-height window; a new message below the fold is a
+     message nobody sees. */
+  useEffect(() => {
+    const thread = threadRef.current;
+    if (thread) thread.scrollTop = thread.scrollHeight;
+  }, [turns, typing]);
+
   const question = nextQuestion(brief);
+  const ready = readyToMatch(brief);
+  const trackerAt = phase === 'results' || phase === 'matching' ? 2 : ready ? 1 : 0;
+
+  const say = (turn: Turn) => setTurns((current) => [...current, turn]);
 
   const send = (value?: string) => {
     const said = (value ?? draft).trim();
-    if (!said) return;
+    if (!said || typing) return;
     setDraft('');
 
     /*
@@ -164,17 +265,20 @@ export function ExpertConsultation({ category }: { category: string | null }) {
         next.goal = said;
         next.title = said.length > 60 ? `${said.slice(0, 57).trim()}…` : said;
         break;
-      case 'services':
-        next.services = Object.keys(SERVICE_LABEL).filter((id) =>
-          said.toLowerCase().includes(id) || said.toLowerCase().includes(SERVICE_LABEL[id].toLowerCase().split(' ')[0])
-        );
-        if (next.services.length === 0) next.services = brief.services;
+      case 'services': {
+        const found = servicesFromAnswer(said);
+        next.services = found.length > 0 ? found : brief.services;
         break;
+      }
       case 'location':
         next.country = said;
+        next.remoteAccepted = !/in person|on.?site|face to face/i.test(said);
         break;
       case 'language':
-        next.languages = said.split(/[,/]| and /).map((part) => part.trim()).filter(Boolean);
+        next.languages = said
+          .split(/[,/]| and /)
+          .map((part) => part.trim())
+          .filter(Boolean);
         break;
       case 'engagement':
         next.engagement = /ongoing/i.test(said)
@@ -183,36 +287,71 @@ export function ExpertConsultation({ category }: { category: string | null }) {
             ? 'project'
             : 'consultation';
         break;
+      case 'timeline':
+        next.urgency = urgencyFromAnswer(said) ?? 'flexible';
+        break;
       default:
         next.notes = [brief.notes, said].filter(Boolean).join('\n');
     }
 
     const asked = nextQuestion(next);
     setBrief(next);
-    setTurns((current) => [
-      ...current,
-      { role: 'you', text: said },
-      {
+    say({ role: 'you', text: said, at: new Date().toISOString() });
+    setTyping(true);
+    track({ name: 'voyager_message_sent', turns: turns.length + 1 });
+
+    /* A beat before the reply. Not decoration: an answer that appears in the
+       same frame as the question reads as a form validating, not as somebody
+       reading what you wrote. */
+    window.setTimeout(() => {
+      setTyping(false);
+      say({
         role: 'voyager',
         text:
           asked?.ask ??
-          'I have enough to prepare your request. Have a look at the brief — change anything that is not right, then I will find specialists for it.',
-      },
-    ]);
-    track({ name: 'voyager_message_sent', turns: turns.length + 1 });
+          'That is enough to search with. Have a look at the brief on the right — change anything that is not right, then I will find specialists for it.',
+        at: new Date().toISOString(),
+      });
+    }, 650);
+  };
+
+  /**
+   * Switching door mid-conversation.
+   *
+   * The mockup restarts on every tab. That is right for an empty conversation
+   * and wrong once somebody has typed their situation into it — losing a
+   * paragraph about your own money to a mis-click is not a category filter.
+   * So: restart while there is nothing to lose, otherwise carry on and say so.
+   */
+  const pickCategory = (id: string) => {
+    setCategoryId(id);
+    if (brief.goal) {
+      const label = pick(
+        EXPERT_CATEGORIES.find((item) => item.id === id)?.title ?? { en: 'that' },
+        locale
+      );
+      say({
+        role: 'voyager',
+        text: `Noted — ${label.toLowerCase()}. I have kept what you already told me; say what changes and I will update the brief.`,
+        at: new Date().toISOString(),
+      });
+      return;
+    }
+    setBrief({ ...EMPTY_BRIEF, initialCategory: id === 'unsure' ? undefined : id });
+    setTurns([{ role: 'voyager', text: opening(id, locale), at: new Date().toISOString() }]);
   };
 
   const findExperts = () => {
     track({ name: 'expert_brief_saved', services: brief.services.join(',') });
 
     /*
-     * Session storage first, always. It is what the next page reads, and it
-     * works for a guest — who has nowhere else to keep a brief.
+     * Session storage first, always. It is what the profile and the booking
+     * read, and it works for a guest — who has nowhere else to keep a brief.
      */
     try {
       sessionStorage.setItem('tn_expert_brief_v1', JSON.stringify(brief));
     } catch {
-      /* Private mode. The matches page falls back to an unfiltered list. */
+      /* Private mode. The matching still runs; nothing downstream reads it. */
     }
 
     /*
@@ -223,265 +362,303 @@ export function ExpertConsultation({ category }: { category: string | null }) {
      */
     void saveExpertBriefAction(brief).catch(() => null);
 
-    setShowing('matches');
+    setPhase('matching');
+    window.setTimeout(() => setPhase('results'), 900);
   };
 
-  if (showing === 'matches') {
-    return (
-      <>
-        <Stepper at={3} />
-        <button className={styles.editRequest} onClick={() => setShowing('brief')}>
-          ← Back to your brief
-        </button>
-        <Matches />
+  const startEdit = (row: Row) => {
+    setEditing(row.field);
+    setRowDraft(row.chips ? row.chips.join(', ') : row.value);
+  };
 
-        {/*
-          * Voyager stays reachable after the matching, as the mockup has it.
-          * The questions are about the shortlist on screen, which is the moment
-          * somebody actually has one — before it, "ask about these experts"
-          * refers to nothing.
-          */}
-        <section className={styles.askRow} aria-label="Ask Voyager about these experts">
-          <span className={styles.matchedOn}>Ask Voyager about these experts</span>
-          <div className={styles.briefChips}>
-            {ASK_ABOUT.map((question) => (
-              <button
-                key={question}
-                className={styles.askChip}
-                onClick={() => {
-                  setShowing('brief');
-                  setDraft(question);
-                }}
-              >
-                {question}
-              </button>
-            ))}
-          </div>
-        </section>
-      </>
-    );
-  }
+  const commitEdit = (row: Row) => {
+    const value = rowDraft.trim();
+    setEditing(null);
+    if (!value) return;
+
+    switch (row.field) {
+      case 'goal':
+        setBrief({ ...brief, goal: value });
+        break;
+      case 'services': {
+        // Typed back as labels, stored as ids — otherwise an edited row stops
+        // matching anybody and the panel gives no clue why.
+        const wanted = value.split(',').map((part) => part.trim().toLowerCase());
+        const ids = Object.keys(SERVICE_LABEL).filter((id) =>
+          wanted.some((word) => SERVICE_LABEL[id].toLowerCase().includes(word) || word === id)
+        );
+        setBrief({ ...brief, services: ids.length > 0 ? ids : brief.services });
+        break;
+      }
+      case 'country':
+        setBrief({ ...brief, country: value });
+        break;
+      case 'languages':
+        setBrief({
+          ...brief,
+          languages: value
+            .split(',')
+            .map((part) => part.trim())
+            .filter(Boolean),
+        });
+        break;
+      case 'notes':
+        setBrief({ ...brief, notes: value });
+        break;
+      default:
+        break;
+    }
+  };
+
+  const rows = rowsOf(brief);
+  /* Rendered only after mount. The opening turn exists during the server render
+     too, and a clock is the one thing guaranteed to differ between the two. */
+  const time = (at: string) =>
+    mounted && at
+      ? new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+      : '';
 
   return (
-    <div className={styles.consultation}>
-      <section className={styles.dialogue} aria-label="Consultation">
-        <Stepper at={stage === 'ready' ? 2 : 1} />
+    <>
+      <div className={styles.servicesHead}>
+        {heading}
+        <Tracker at={trackerAt} />
+      </div>
 
-        <div className={styles.stageRow}>
-          {(['understanding', 'clarifying', 'ready'] as const).map((step) => (
-            <span
-              key={step}
-              className={`${styles.stageStep} ${stage === step ? styles.stageOn : ''}`}
-              aria-current={stage === step ? 'step' : undefined}
-            >
-              {STAGE_LABEL[step]}
-            </span>
-          ))}
-        </div>
-
-        <div className={styles.thread}>
-          {turns.map((turn, index) => (
-            <p
-              key={index}
-              className={turn.role === 'you' ? styles.youSaid : styles.voyagerSaid}
-            >
-              {turn.role === 'voyager' && <VoyagerMark size={18} />}
-              <span>{turn.text}</span>
-            </p>
-          ))}
-        </div>
-
-        {/*
-          * The suggested answers, from the mockup's click-through. They exist
-          * because some of these are our vocabulary rather than the person's —
-          * nobody guesses that "review" is what this marketplace calls
-          * portfolio work. The text box stays; this removes a guessing game
-          * rather than a choice.
-          */}
-        {question && SUGGESTED[question.field] && (
-          <div className={styles.suggestRow}>
-            {SUGGESTED[question.field].map((option) => (
-              <button
-                key={option}
-                className={styles.askChip}
-                onClick={() => send(option)}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <form
-          className={styles.composer}
-          onSubmit={(event) => {
-            event.preventDefault();
-            send();
-          }}
-        >
-          <input
-            className={styles.composerInput}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Tell Voyager what you need"
-            aria-label="Tell Voyager what you need"
-          />
-          <button className={styles.composerSend} type="submit" disabled={!draft.trim()}>
-            <Icon name="arrowRight" size={16} />
-          </button>
-        </form>
-      </section>
-
-      <aside className={styles.briefPanel} aria-label="Your brief">
-        <div className={styles.briefTitleRow}>
-          <h2 className={styles.briefHead}>Your brief</h2>
-          {/* The mockup's badge. It only appears once there is something to
-              have saved, because a panel announcing it saved nothing is worse
-              than silent. */}
-          {brief.goal && <span className={styles.autoSaved}>Auto-saved</span>}
-        </div>
-        <p className={styles.briefSub}>Built live from our conversation</p>
-
-        {editing ? (
-          /*
-           * Editable fields, not another conversation.
-           *
-           * Somebody whose country was recorded wrong should be able to fix the
-           * word, and making them talk Voyager round to it is worse than the
-           * questionnaire this replaced — at least a form let you correct a
-           * field. §14 asks for this, and it is right.
-           */
-          <div className={styles.editFields}>
-            <label className={styles.editLabel}>
-              Goal
-              <textarea
-                className={styles.editArea}
-                value={brief.goal}
-                rows={3}
-                onChange={(event) => setBrief({ ...brief, goal: event.target.value })}
-              />
-            </label>
-
-            <fieldset className={styles.editGroup}>
-              <legend className={styles.editLabel}>Looking for</legend>
-              {Object.entries(SERVICE_LABEL).map(([id, label]) => (
-                <label className={styles.editCheck} key={id}>
-                  <input
-                    type="checkbox"
-                    checked={brief.services.includes(id)}
-                    onChange={(event) =>
-                      setBrief({
-                        ...brief,
-                        services: event.target.checked
-                          ? [...brief.services, id]
-                          : brief.services.filter((service) => service !== id),
-                      })
-                    }
-                  />
-                  {label}
-                </label>
-              ))}
-            </fieldset>
-
-            <label className={styles.editLabel}>
-              Country
-              <input
-                className={styles.editInput}
-                value={brief.country ?? ''}
-                onChange={(event) => setBrief({ ...brief, country: event.target.value || undefined })}
-              />
-            </label>
-
-            <label className={styles.editLabel}>
-              Language
-              <input
-                className={styles.editInput}
-                value={brief.languages.join(', ')}
-                onChange={(event) =>
-                  setBrief({
-                    ...brief,
-                    languages: event.target.value.split(',').map((v) => v.trim()).filter(Boolean),
-                  })
-                }
-              />
-            </label>
-
-            <label className={styles.editCheck}>
-              <input
-                type="checkbox"
-                checked={brief.remoteAccepted}
-                onChange={(event) => setBrief({ ...brief, remoteAccepted: event.target.checked })}
-              />
-              Remote specialists are fine
-            </label>
-
-            <div className={styles.editActions}>
-              <button className={styles.briefCta} onClick={() => setEditing(false)}>
-                Save changes
-              </button>
+      {phase === 'brief' && (
+        <div className={styles.consultation}>
+          <section className={styles.dialogue} aria-label="Consultation with Voyager">
+            <div className={styles.categoryTabs} role="group" aria-label="What you need help with">
+              {EXPERT_CATEGORIES.map((item) => {
+                const on = categoryId === item.id;
+                return (
+                  <button
+                    className={`${styles.categoryTab} ${on ? styles.categoryTabOn : ''}`}
+                    key={item.id}
+                    onClick={() => pickCategory(item.id)}
+                    aria-pressed={on}
+                  >
+                    <Icon
+                      name={item.icon}
+                      size={17}
+                      strokeWidth={1.9}
+                      style={{ color: on ? item.color : 'var(--tn-text-muted)' }}
+                    />
+                    {pick(item.title, locale)}
+                    {on && (
+                      <span className={styles.categoryTick}>
+                        <Icon name="check" size={11} strokeWidth={3.4} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-          </div>
-        ) : !brief.goal ? (
-          <p className={styles.briefNote}>{EMPTY_BRIEF_NOTE}</p>
-        ) : (
-          <dl className={styles.briefList}>
-            <dt>Goal</dt>
-            <dd>{brief.goal}</dd>
 
-            {brief.services.length > 0 && (
-              <>
-                <dt>Looking for</dt>
-                <dd>{brief.services.map((id) => SERVICE_LABEL[id] ?? id).join(' · ')}</dd>
-              </>
-            )}
-            {brief.country && (
-              <>
-                <dt>Location</dt>
-                <dd>
-                  {brief.country}
-                  {brief.remoteAccepted && ' · remote accepted'}
-                </dd>
-              </>
-            )}
-            {brief.languages.length > 0 && (
-              <>
-                <dt>Language</dt>
-                <dd>{brief.languages.join(', ')}</dd>
-              </>
-            )}
-            {brief.engagement && (
-              <>
-                <dt>Engagement</dt>
-                <dd>{brief.engagement}</dd>
-              </>
-            )}
-          </dl>
-        )}
+            <div className={styles.thread} ref={threadRef}>
+              {turns.map((turn, index) => (
+                <div
+                  className={turn.role === 'you' ? styles.turnYou : styles.turnVoyager}
+                  key={index}
+                >
+                  {turn.role === 'voyager' && <VoyagerMark size={30} />}
+                  <span
+                    className={turn.role === 'you' ? styles.bubbleYou : styles.bubbleVoyager}
+                  >
+                    {turn.text}
+                  </span>
+                  <span className={styles.turnTime}>{time(turn.at)}</span>
+                </div>
+              ))}
+              {typing && (
+                <div className={styles.turnVoyager}>
+                  <VoyagerMark size={30} />
+                  <span className={styles.typing} aria-label="Voyager is typing">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                </div>
+              )}
+            </div>
 
-        {/*
-          * Available as soon as there is something to search with, not only
-          * when every field is filled. The remaining questions refine a
-          * shortlist; waiting for them is the questionnaire's mistake.
-          */}
-        {brief.goal && !editing && (
-          <button className={styles.editRequest} onClick={() => setEditing(true)}>
-            Edit brief
-          </button>
-        )}
+            <div className={styles.composerBlock}>
+              {/*
+                * The suggested answers, from the mockup's click-through. They
+                * exist because some of these are our vocabulary rather than the
+                * person's — nobody guesses that "review" is what this
+                * marketplace calls portfolio work. The text box stays; this
+                * removes a guessing game rather than a choice.
+                */}
+              {!typing && question && SUGGESTED[question.field] && (
+                <div className={styles.suggestRow}>
+                  {SUGGESTED[question.field].map((option) => (
+                    <button className={styles.askChip} key={option} onClick={() => send(option)}>
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-        <button
-          className={styles.briefCta}
-          onClick={findExperts}
-          disabled={!readyToMatch(brief) || editing}
-        >
-          Save &amp; find experts
-        </button>
-        {!readyToMatch(brief) && brief.goal && (
-          <p className={styles.briefNote}>
-            A couple more answers and your brief is ready to search with.
-          </p>
-        )}
-      </aside>
-    </div>
+              <form
+                className={styles.composer}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  send();
+                }}
+              >
+                <input
+                  className={styles.composerInput}
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder="Type a message to Voyager…"
+                  aria-label="Message Voyager"
+                />
+                <button className={styles.composerSend} type="submit" disabled={!draft.trim()}>
+                  <Icon name="send" size={16} strokeWidth={2.2} />
+                </button>
+              </form>
+
+              <p className={styles.voyagerNote}>
+                <Icon name="sparkle" size={13} strokeWidth={2} />
+                Voyager clarifies your goal and matches you with experts whose credentials you can
+                check. It never gives professional advice itself.
+              </p>
+            </div>
+          </section>
+
+          <aside
+            className={`${styles.briefPanel} ${ready ? styles.briefPanelReady : ''}`}
+            aria-label="Your brief"
+          >
+            <div className={styles.briefTitleRow}>
+              <h2 className={styles.briefHead}>Your brief</h2>
+              <span className={styles.briefBadge}>Built live from our conversation</span>
+              {/* Only once there is something to have saved: a panel announcing
+                  it saved nothing is worse than a silent one. */}
+              {brief.goal && (
+                <span className={styles.autoSaved}>
+                  <Icon name="check" size={12} strokeWidth={3} /> Auto-saved
+                </span>
+              )}
+            </div>
+
+            {rows.length === 0 ? (
+              <div className={styles.briefEmpty}>
+                <span className={styles.briefEmptyIcon}>
+                  <Icon name="fileSearch" size={24} strokeWidth={1.7} />
+                </span>
+                <div className={styles.briefEmptyHead}>Voyager will build your request here</div>
+                <p className={styles.briefNote}>{EMPTY_BRIEF_NOTE}</p>
+              </div>
+            ) : (
+              <div className={styles.briefRows}>
+                {rows.map((row) => (
+                  <div className={styles.briefRow} key={row.field}>
+                    <Icon
+                      className={styles.briefRowIcon}
+                      name={row.icon}
+                      size={16}
+                      strokeWidth={1.9}
+                    />
+                    <span className={styles.briefRowLabel}>{row.label}</span>
+
+                    {editing === row.field ? (
+                      <>
+                        <input
+                          className={styles.briefRowInput}
+                          value={rowDraft}
+                          autoFocus
+                          aria-label={`Edit ${row.label}`}
+                          onChange={(event) => setRowDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') commitEdit(row);
+                            if (event.key === 'Escape') setEditing(null);
+                          }}
+                        />
+                        <button
+                          className={styles.briefRowSave}
+                          onClick={() => commitEdit(row)}
+                          aria-label={`Save ${row.label}`}
+                        >
+                          <Icon name="check" size={14} strokeWidth={3} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {row.chips ? (
+                          <span className={styles.briefRowChips}>
+                            {row.chips.map((chip) => (
+                              <span className={styles.serviceChip} key={chip}>
+                                {chip}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className={styles.briefRowValue}>{row.value}</span>
+                        )}
+                        {/* Every line is editable, including the ones Voyager
+                            inferred — an inference nobody can correct is a
+                            decision made on somebody's behalf. */}
+                        <button
+                          className={styles.pencil}
+                          onClick={() => startEdit(row)}
+                          aria-label={`Edit ${row.label}`}
+                        >
+                          <Icon name="sliders" size={13} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/*
+              * Available as soon as there is something to search with, not only
+              * when every field is filled. The remaining questions refine a
+              * shortlist; waiting for them is the questionnaire's mistake.
+              */}
+            {ready ? (
+              <div className={styles.briefActions}>
+                <button
+                  className={styles.briefEdit}
+                  onClick={() => rows[0] && startEdit(rows[0])}
+                  disabled={editing !== null}
+                >
+                  <Icon name="sliders" size={14} /> Edit brief
+                </button>
+                <button
+                  className={styles.briefCta}
+                  onClick={findExperts}
+                  disabled={editing !== null}
+                >
+                  <Icon name="search" size={15} strokeWidth={2.4} /> Save and find experts
+                </button>
+              </div>
+            ) : (
+              <p className={styles.briefPending}>
+                A couple more answers and your brief is ready to search with.
+              </p>
+            )}
+          </aside>
+        </div>
+      )}
+
+      {phase === 'matching' && (
+        <div className={styles.matching}>
+          <span className={styles.spinner} />
+          Finding experts for your request…
+        </div>
+      )}
+
+      {phase === 'results' && (
+        <MatchResults
+          brief={brief}
+          onBriefChange={setBrief}
+          onEditRequest={() => setPhase('brief')}
+        />
+      )}
+    </>
   );
 }
