@@ -233,6 +233,16 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
           kind: 'route',
           href: '/marketplace/experts',
         },
+        /*
+         * One entry per section, not one per screen.
+         *
+         * Chart Market and Supercharts were listed here beside Tools & Data,
+         * and My Learning beside Academy. Both pairs put a section and its own
+         * inside on the same level, which reads as four products rather than
+         * two — and the first thing either section shows is the way to the
+         * screens that were listed. A menu that names what is behind a door as
+         * well as the door is a longer menu, not a shorter path.
+         */
         {
           label: 'Tools and data',
           sub: 'Chart Market, Supercharts and what is coming',
@@ -240,28 +250,10 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
           href: '/marketplace/tools',
         },
         {
-          label: 'Chart Market',
-          sub: 'Pine Script indicators and strategies',
-          kind: 'route',
-          href: '/marketplace/tools/chart-market',
-        },
-        {
-          label: 'Supercharts',
-          sub: 'Ready-made chart workspaces',
-          kind: 'route',
-          href: '/marketplace/tools/supercharts',
-        },
-        {
           label: 'Academy',
           sub: 'Paid courses from checked providers',
           kind: 'route',
           href: '/marketplace/academy',
-        },
-        {
-          label: 'My Learning',
-          sub: 'Courses you are enrolled in',
-          kind: 'route',
-          href: '/marketplace/academy/my-learning',
         },
         {
           label: 'Events near you',
