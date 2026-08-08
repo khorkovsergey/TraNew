@@ -91,6 +91,18 @@
       ],
       "smoke": ["/en/markets", "/en/economy"]
     },
+    "explore": {
+      "branch": "feat/explore",
+      "port": 3408,
+      "owns": [
+        "src/app/[locale]/explore/",
+        "src/components/explore/",
+        "src/content/explore.ts",
+        "src/lib/explore/",
+        "scripts/verify-explore.mjs"
+      ],
+      "smoke": ["/en/explore", "/en/explore/options", "/en/explore/stocks"]
+    },
     "account": {
       "branch": "feat/account",
       "port": 3407,
