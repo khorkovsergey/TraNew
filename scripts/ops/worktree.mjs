@@ -6,7 +6,7 @@ import {
   mkdirSync,
   readFileSync,
   rmdirSync,
-  symlinkSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -24,14 +24,21 @@ import { fileURLToPath } from 'node:url';
  * same object store, which is the isolation the sessions were assuming they
  * already had.
  *
- * What this script does beyond `git worktree add` is the three things that make
- * a Next.js worktree actually runnable: node_modules is junctioned rather than
- * reinstalled (a second install is 400MB and a slower `npm ci` for no benefit),
- * `.env.local` is copied because it is gitignored and a fresh worktree has
- * none, and the two URL variables in it are rewritten to the section's own
- * port — better-auth answers 403 to a POST from an origin it does not trust, so
- * a copied 3210 in a tree served on 3401 breaks sign-in in a way that looks
- * like a bug in the section.
+ * What this script does beyond `git worktree add` is the two things that make a
+ * Next.js worktree actually runnable: dependencies are installed for real, and
+ * `.env.local` is copied — it is gitignored, so a fresh worktree has none — with
+ * its two URL variables rewritten to the section's own port. better-auth
+ * answers 403 to a POST from an origin it does not trust, so a copied 3210 in a
+ * tree served on 3401 breaks sign-in in a way that looks like a bug in the
+ * section.
+ *
+ * Dependencies used to be a junction to the integration tree's node_modules,
+ * which was faster and wrong: Turbopack refuses a symlink that leaves the
+ * project root — "Symlink [project]/node_modules is invalid, it points out of
+ * the filesystem root" — so both `next build` and `next dev` died, and the
+ * workaround was `--webpack`, a different bundler from the one Railway ships
+ * with. A section cannot verify its own build against a bundler production does
+ * not use. 400MB and half a minute per worktree buys that back.
  *
  *   node scripts/ops/worktree.mjs new voyager
  *   node scripts/ops/worktree.mjs list
@@ -96,49 +103,54 @@ function seedEnv(target, port) {
   console.log(`  .env.local  — copied, origins rewritten to :${port}`);
 }
 
-/* A junction, not a copy and not a symlink: it needs no elevation on Windows
-   and Node resolves through it normally. The cost is that every worktree shares
-   one installed dependency set, which is why package.json is orchestrator-only
-   in the registry — a branch that changes a dependency changes it for all. */
-function linkModules(target) {
-  const source = join(REPO, 'node_modules');
-  const destination = join(target, 'node_modules');
-  if (existsSync(destination)) return;
-  if (!existsSync(source)) {
-    console.log('  node_modules — none in the integration tree; run `npm ci` there first');
-    return;
-  }
+/* A real install, from the same lockfile. `ci` rather than `install` so a
+   worktree can never drift to a different dependency tree than the one main
+   builds against — and so `package.json` stays orchestrator-only in practice
+   and not just in the registry. */
+function installModules(target) {
+  dropModules(target);
+  console.log('  node_modules — installing from the lockfile (npm ci)…');
   try {
-    symlinkSync(source, destination, 'junction');
-    console.log('  node_modules — junctioned to the integration tree');
+    /* `shell` on Windows: npm is a .cmd, and since Node 20.12 execFile refuses
+       to spawn one directly — it fails with EINVAL, which reads like npm broke
+       rather than like the call did. */
+    execFileSync('npm', ['ci', '--no-audit', '--no-fund'], {
+      cwd: target,
+      stdio: ['ignore', 'ignore', 'inherit'],
+      shell: process.platform === 'win32',
+    });
+    console.log('  node_modules — installed');
   } catch (error) {
-    console.log(`  node_modules — could not junction (${error.code}); run \`npm ci\` in the worktree`);
+    console.log(`  node_modules — \`npm ci\` failed (${error.message.split('\n')[0]})`);
+    console.log('                 run it by hand in the worktree before starting');
   }
 }
 
-/* `git worktree remove` walks the tree deleting as it goes, reaches the
-   junction and fails with "Invalid argument" — it will not delete a reparse
-   point. So the link goes first, by hand and never recursively: the target of
-   this junction is the integration tree's node_modules, and a recursive delete
-   that followed it would take every worktree's dependencies with it. */
-function unlinkModules(target) {
-  const link = join(target, 'node_modules');
+/* Worktrees made before dependencies were installed for real still hold a
+   junction, and `git worktree remove` will not delete a reparse point: it walks
+   into it, deletes the integration tree's dependencies on the way, and then
+   fails on the link itself. So a link is unlinked, never recursed into; a real
+   directory is deleted outright, which is also faster than letting git walk
+   400MB of it. */
+function dropModules(target) {
+  const path = join(target, 'node_modules');
   let stat;
   try {
-    stat = lstatSync(link);
+    stat = lstatSync(path);
   } catch {
     return;
   }
-  if (!stat.isSymbolicLink()) {
-    console.log('  node_modules — a real directory here, not a link; left alone');
+  if (stat.isSymbolicLink()) {
+    try {
+      unlinkSync(path);
+    } catch {
+      rmdirSync(path);
+    }
+    console.log('  node_modules — junction removed (it was made by an older version of this script)');
     return;
   }
-  try {
-    unlinkSync(link);
-  } catch {
-    rmdirSync(link);
-  }
-  console.log('  node_modules — link removed');
+  rmSync(path, { recursive: true, force: true });
+  console.log('  node_modules — removed');
 }
 
 function create(name) {
@@ -168,12 +180,14 @@ function create(name) {
   const added = tryGit(add);
   if (!added.ok) die(`git worktree add failed:\n  ${added.out}`);
 
-  linkModules(target.path);
+  installModules(target.path);
   seedEnv(target.path, target.port);
 
   console.log(`\n  ${name} is ready.\n`);
   console.log(`    cd ${target.path}`);
   console.log(`    npm run dev -- -p ${target.port}`);
+  console.log(`\n  Turbopack, the same bundler Railway builds with — so \`npm run build\` here means`);
+  console.log(`  something. \`next dev --webpack\` is no longer needed and no longer proves anything.`);
   console.log(`\n  This worktree owns, and only owns:`);
   for (const owned of target.owns) console.log(`    ${owned}`);
   console.log(`\n  Smoke routes the orchestrator will check after deploy:`);
@@ -232,8 +246,22 @@ function remove(name) {
     );
   }
 
-  unlinkModules(target.path);
-  git(['worktree', 'remove', target.path]);
+  dropModules(target.path);
+  /* `git worktree remove` deletes what git knows about and then rmdirs, so a
+     leftover `.next` or `.env.local` stops it with "Directory not empty". The
+     dirty check above already refused if anything untracked survived, so by
+     here the only things left are ignored build artefacts — which is exactly
+     what `clean -xdf` is for. */
+  tryGit(['-C', target.path, 'clean', '-xdfq']);
+
+  /* A `remove` that failed halfway deregisters the worktree and leaves the
+     directory, so the next attempt is told it is "not a working tree" and the
+     directory outlives every retry. Finish the job either way. */
+  const removed = tryGit(['worktree', 'remove', target.path]);
+  if (!removed.ok) {
+    rmSync(target.path, { recursive: true, force: true });
+    git(['worktree', 'prune']);
+  }
   console.log(`\n  Removed ${target.path}. The branch ${target.branch} still exists.\n`);
 }
 

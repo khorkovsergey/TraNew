@@ -98,6 +98,18 @@ Both must be clean. `npm run lint` is red on `main` already (see
 `lintBaseline`) — read its output, confirm nothing new is yours, and say so in
 the handoff rather than pretending it passed.
 
+Once before handing off, also:
+
+```
+npm run build
+```
+
+The worktree installs its own dependencies, so this is Turbopack — the same
+bundler Railway builds with — and a green build here means the deploy will
+build. `next dev --webpack` was a workaround for a junctioned `node_modules`
+and is no longer needed; it also proves nothing about the deploy, and the
+webpack build has a separate failure of its own on `main`.
+
 Commit in the repository's voice: a sentence that says what changed and why,
 present tense, no ticket numbers, and the trailer the CLI adds. Small commits,
 often. A branch that holds a day of work in one commit cannot be partially
@@ -124,12 +136,19 @@ Railway.
 node scripts/ops/worktree.mjs rm <section>
 ```
 
-**Never `git worktree remove` by hand.** `node_modules` in a worktree is a
-junction to the integration tree's, and git's recursive delete walks straight
-through it: it deletes the real dependencies, fails on the junction itself, and
-leaves the shared tree broken for every other session. The script unlinks
-first, which is the whole reason it exists. If it has already happened, `npm
-install` in `tradingnew-portal` puts back what was removed.
+**Never `git worktree remove` by hand.** It stops on the first thing it did not
+put there — a `.next`, an `.env.local` — with "Directory not empty", and a
+half-finished remove deregisters the worktree while leaving the directory, so
+every retry is then told it is "not a working tree". The script clears the
+ignored artefacts first and finishes the job either way.
+
+Worktrees made before 8 August 2026 hold a **junction** to the integration
+tree's `node_modules` instead of their own install. Git's recursive delete walks
+straight through a junction and deletes the real dependencies on its way, which
+breaks every other session at once. The script unlinks before removing; if it
+has already happened, `npm install` in `tradingnew-portal` puts back what was
+taken. To convert an old worktree in place, delete the junction (do not use a
+recursive delete on it) and run `npm ci`.
 
 ## Orchestrator
 
