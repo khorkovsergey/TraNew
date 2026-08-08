@@ -91,6 +91,17 @@
       ],
       "smoke": ["/en/markets", "/en/economy"]
     },
+    "home": {
+      "branch": "feat/home",
+      "port": 3410,
+      "$comment": "The public home only. It renders inside the shell and imports SpaceBackdrop from it — that file belongs to `shell`, so a home redesign that needs the backdrop changed asks for it rather than reaching in.",
+      "owns": [
+        "src/app/[locale]/page.tsx",
+        "src/components/home/",
+        "src/content/homeV2.ts"
+      ],
+      "smoke": ["/en", "/"]
+    },
     "shell": {
       "branch": "feat/shell",
       "port": 3409,
