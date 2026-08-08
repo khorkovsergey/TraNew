@@ -380,6 +380,20 @@ try {
     drawer ? `${Math.round(drawer.width)}×${Math.round(drawer.height)} at y=${Math.round(drawer.y)}` : 'no panel'
   );
   check('with a way out of it', (await page.locator('button[aria-label="Close menu"]').count()) === 1);
+  await closeMenu();
+
+  /*
+   * The descriptions are hidden at 1024 and come back at 640, and the two rules
+   * are one specificity step apart: the tablet one is written against
+   * `.panelMega` and still matches at 390px, so the phone rule has to be at
+   * least as specific or Explore reads as twenty bare labels here.
+   */
+  await openMenu('Explore');
+  check(
+    'and its rows keep their descriptions',
+    await page.locator('[class*="menuItemSub"]').first().isVisible()
+  );
+  await closeMenu();
 
   await page.goto(`${base}/en/ideas`, { waitUntil: 'networkidle' });
   const ideasOverflow = await page.evaluate(

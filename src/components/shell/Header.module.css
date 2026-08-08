@@ -618,12 +618,21 @@
     padding-top: 0;
   }
 
-  .groupHead {
+  /*
+   * `.panel` on every one of these, and it is not decoration.
+   *
+   * The tablet block above is written as `.panelMega .x`, and it still matches
+   * at 390px. A bare `.menuItemSub` here loses to it on specificity rather than
+   * on order, and the descriptions this rule exists to bring back stayed hidden
+   * on Explore. One class in front puts the two on equal terms, and then the
+   * later block — this one — wins.
+   */
+  .panel .groupHead {
     margin-bottom: 8px;
     padding: 16px 6px 8px;
   }
 
-  .groupItems {
+  .panel .groupItems {
     gap: 0;
   }
 
@@ -638,7 +647,7 @@
    * Separators instead of gaps, and 11px of padding around a 30px glyph: 52px of
    * row, which is a target a thumb can hit.
    */
-  .menuItemWide {
+  .panel .menuItemWide {
     align-items: center;
     gap: 12px;
     padding: 11px 6px;
@@ -646,18 +655,18 @@
     border-bottom: 1px solid #0c1520;
   }
 
-  .menuIcon {
+  .panel .menuIcon {
     width: 30px;
     height: 30px;
     border-radius: 9px;
   }
 
-  .menuIcon svg {
+  .panel .menuIcon svg {
     width: 16px;
     height: 16px;
   }
 
-  .menuItemLabel {
+  .panel .menuItemLabel {
     flex-wrap: nowrap;
     justify-content: space-between;
     font-size: 14px;
@@ -665,7 +674,7 @@
 
   /* The descriptions come back — a phone reader has one column and the room for
      them, which the tablet's two do not. */
-  .menuItemSub {
+  .panel .menuItemSub {
     display: block;
     font-size: 11.5px;
   }
