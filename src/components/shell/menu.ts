@@ -1,4 +1,5 @@
 import type { AppPathname } from '@/i18n/routing';
+import type { ExploreIconId } from './ExploreMenuIcons';
 
 /**
  * The header dropdowns.
@@ -7,9 +8,13 @@ import type { AppPathname } from '@/i18n/routing';
  * redesign shipped with only Marketplace, on the argument that a beginner should
  * be able to read the top of the page rather than navigate it; the sections
  * underneath then had to be reached through the page they belonged to. These
- * bring the shortcuts back without taking the destinations away — every menu
- * opens with the section itself, so the label is still a way in and not only a
- * way to a list.
+ * bring the shortcuts back without taking the destinations away — three of the
+ * four open with the section itself, so the label is still a way in and not only
+ * a way to a list.
+ *
+ * Explore is the exception and says so below: it announces a market data product
+ * that is being built, so nothing in it clicks yet. The routes it used to hold
+ * are all still linked from the footer.
  *
  * Voyager is not among them. Its menu offered three entries that all opened
  * `/voyager` and a "Plans and limits" link pointing at the same page as
@@ -27,6 +32,15 @@ export type MenuEntry = {
   sub?: string;
   /** Carries the "Soon" badge. */
   soon?: boolean;
+  /**
+   * The glyph on the left of the row, from the Explore sprite.
+   *
+   * Only Explore draws one. The other three menus are short lists of
+   * destinations where an icon per line would be decoration standing in a
+   * column; Explore is twenty rows that a reader scans rather than reads, and
+   * there the glyph is what makes a row findable a second time.
+   */
+  icon?: ExploreIconId;
 } & (
   | {
       kind: 'route';
@@ -45,35 +59,30 @@ export type MenuEntry = {
 
 export type MenuGroup = {
   title: string;
+  /**
+   * The question the group answers, set beside its title. Three columns of
+   * financial nouns are hard to tell apart at a glance; "What is happening?"
+   * beside MARKET says which column to read without adding a row to it.
+   */
+  hint?: string;
   items: MenuEntry[];
 };
 
 export type MenuKey = 'start' | 'explore' | 'learn' | 'marketplace';
 
-const tool = (
-  slug: string
-): { kind: 'route'; href: AppPathname; params: Record<string, string>; soon: true } => ({
-  kind: 'route',
-  href: '/tool/[slug]',
-  params: { slug },
-  soon: true,
-});
-
-const symbol = (
-  ticker: string
-): { kind: 'route'; href: AppPathname; params: Record<string, string> } => ({
-  kind: 'route',
-  href: '/symbols/[ticker]',
-  params: { ticker },
-});
-
-const klass = (
-  key: string
-): { kind: 'route'; href: AppPathname; params: Record<string, string> } => ({
-  kind: 'route',
-  href: '/explore/[class]',
-  params: { class: key },
-});
+/**
+ * An Explore row: named, described, illustrated, and going nowhere yet.
+ *
+ * All twenty are built through this rather than written out, because the one
+ * thing that must not vary between them is the part that matters — a row that
+ * quietly gained an `href` would be the single clickable line in a panel where
+ * nothing else clicks, and nobody would notice until it 404s.
+ */
+const soon = (
+  label: string,
+  sub: string,
+  icon: ExploreIconId
+): MenuEntry => ({ kind: 'inert', soon: true, label, sub, icon });
 
 export const MENUS: Record<MenuKey, MenuGroup[]> = {
   start: [
@@ -119,70 +128,57 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
     },
   ],
 
+  /*
+   * Explore is a roadmap, not a set of shortcuts.
+   *
+   * It held five groups of working links — investment types, and the three
+   * sections that used to be top-level headings, plus an advanced layer. What it
+   * describes now is the market data product being built: three questions, in
+   * the order somebody actually asks them, and twenty answers none of which
+   * exists yet. So none of them clicks. A row that navigates to a page which
+   * cannot answer it spends the trust the row was meant to build.
+   *
+   * The three names are the ones the sections carried before Explore absorbed
+   * them, and the destinations they used to hold have not gone anywhere: every
+   * one of them is in the footer, which is what the footer is for.
+   */
   explore: [
     {
-      title: 'Investment types',
+      title: 'MARKET',
+      hint: 'What is happening?',
       items: [
-        { label: 'Stocks', ...klass('stocks') },
-        { label: 'ETFs', ...klass('etfs') },
-        { label: 'Bonds', ...klass('bonds') },
-        { label: 'Cash & deposits', ...klass('cash') },
-        { label: 'Crypto', ...klass('crypto') },
-        { label: 'Property', ...klass('property') },
-        { label: 'See all options', kind: 'route', href: '/explore/options' },
-      ],
-    },
-    /*
-     * Market, Symbols and Economy are named groups here on purpose. They were
-     * three top-level sections before the redesign folded them into Explore,
-     * and somebody who knew where they used to be should find them by that name
-     * rather than by guessing which tab absorbed them.
-     */
-    {
-      title: 'Market',
-      items: [
-        {
-          label: 'Today in markets',
-          sub: 'What moved, and whether it matters',
-          kind: 'route',
-          href: '/markets/global',
-        },
-        { label: 'Market news', sub: 'Headlines with the reason under them', kind: 'route', href: '/news' },
-        { label: 'Market Views', sub: 'Opinion, labelled as opinion', kind: 'route', href: '/ideas' },
+        soon('Market overview', 'See what is moving today', 'overview'),
+        soon('Stocks', 'Global equity markets', 'stocks'),
+        soon('ETFs', 'Funds across markets and themes', 'etfs'),
+        soon('Indices', 'Major global benchmarks', 'indices'),
+        soon('Crypto', 'Digital asset markets', 'crypto'),
+        soon('Forex', 'Global currencies', 'forex'),
+        soon('Futures & Commodities', 'Energy, metals, agriculture', 'futures'),
+        soon('Bonds', 'Government and corporate debt', 'bonds'),
       ],
     },
     {
-      title: 'Symbols',
+      title: 'SYMBOLS',
+      hint: 'What is this asset?',
       items: [
-        { label: 'Research an asset', sub: 'Ask about one in particular', kind: 'route', href: '/research' },
-        { label: 'Tesla', ...symbol('TSLA') },
-        { label: 'S&P 500', ...symbol('SPX') },
-        { label: 'NVIDIA', ...symbol('NVDA') },
-        { label: 'Bitcoin', ...symbol('BTC') },
-        { label: 'Gold', ...symbol('GOLD') },
+        soon('Search an asset', 'Stocks, ETFs, crypto and more', 'search'),
+        soon('Stock screener', 'Find stocks by fundamentals and performance', 'filter'),
+        soon('ETF screener', 'Compare funds and strategies', 'filter'),
+        soon('Crypto screener', 'Explore digital assets', 'filterCrypto'),
+        soon('Bond screener', 'Compare yields and maturities', 'filterDoc'),
+        soon('Popular symbols', 'What investors are looking at', 'popular'),
       ],
     },
     {
-      title: 'Economy',
+      title: 'ECONOMY',
+      hint: 'Why is it happening?',
       items: [
-        {
-          label: 'Economy & your money',
-          sub: 'Rates, inflation, and what they do to a plan',
-          kind: 'route',
-          href: '/economy',
-        },
-        { label: 'Countries', kind: 'route', href: '/economy', query: { tab: 'countries' } },
-        { label: 'Indicators', kind: 'route', href: '/economy', query: { tab: 'indicators' } },
-        { label: 'Calendar', kind: 'route', href: '/economy', query: { tab: 'calendar' } },
-      ],
-    },
-    {
-      title: 'Advanced',
-      items: [
-        { label: 'Advanced charts', sub: 'The professional workspace', kind: 'route', href: '/supercharts' },
-        { label: 'Find investments', ...tool('screeners') },
-        { label: 'Brokers', kind: 'route', href: '/brokers' },
-        { label: 'How we explain markets', kind: 'route', href: '/how-we-explain' },
+        soon('World economy', 'The global macro picture', 'world'),
+        soon('Countries', 'Explore economies by country', 'flag'),
+        soon('Economic indicators', 'Inflation, rates, GDP and more', 'indicators'),
+        soon('Economic calendar', 'Events that can move markets', 'calendar'),
+        soon('Macro maps', 'Compare economies visually', 'map'),
+        soon('Yield curves', 'Interest rates across maturities', 'yield'),
       ],
     },
   ],

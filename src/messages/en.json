@@ -44,7 +44,8 @@
     "openApp": "Get started",
     "openMenu": "Open {menu} menu",
     "search": "Search",
-    "saved": "Saved"
+    "saved": "Saved",
+    "closeMenu": "Close menu"
   },
   "menu": {
     "market": {
