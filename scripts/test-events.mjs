@@ -4055,6 +4055,104 @@ try {
     assert.ok(research.MAX_SEARCHES > 0 && research.MAX_SEARCHES <= 6, research.MAX_SEARCHES);
   });
 
+  group('One question costs one question, whatever it takes to answer it');
+
+  /*
+   * The invariant is structural, so it is checked structurally: the counter is
+   * spent once, in the request handler, outside everything the answer does.
+   * A tool loop that could reach the counter would make a six-tool answer cost
+   * six questions, which is what this looked like from production.
+   */
+  const routeSource = readFileSync('src/app/api/voyager/route.ts', 'utf8');
+
+  check('the counter is spent exactly once per request', () => {
+    const spends = routeSource.match(/await consumeQuestion\(/g) ?? [];
+    assert.equal(spends.length, 1, `consumeQuestion called ${spends.length} times`);
+  });
+
+  check('and nothing the answer does can reach it', () => {
+    // The tool registry, the market tools and the chart builder all run inside
+    // one request. None of them may count a question.
+    const reachable = [
+      'src/lib/voyager/orchestrator.ts',
+      'src/lib/voyager/tools/registry.ts',
+      'src/lib/voyager/tools/marketData.ts',
+      'src/lib/voyager/tools/comparison.ts',
+      'src/lib/voyager/tools/investmentAnalysis.ts',
+      'src/lib/voyager/chart/build.ts',
+    ];
+    for (const path of reachable) {
+      const source = readFileSync(path, 'utf8');
+      assert.ok(!/voyager\/usage|consumeQuestion/.test(source), `${path} reaches the counter`);
+    }
+  });
+
+  check('a refused request gives its charge back', () => {
+    /*
+     * The increment has to be the check — two requests arriving together would
+     * otherwise both read the same count and both pass — but keeping the charge
+     * on a refusal makes the row climb for as long as somebody keeps asking. A
+     * live row reads 22 against a ceiling of 10 because of it.
+     */
+    assert.match(routeSource, /if \(usage\.quotaReached\)[\s\S]{0,400}releaseQuestion/);
+  });
+
+  check('and so does an attempt that produced no answer', () => {
+    // The outage card offers *Retry now*. Charging each attempt is how one
+    // question becomes five.
+    assert.match(routeSource, /if \(answer\.simulated\)[\s\S]{0,200}releaseQuestion/);
+  });
+
+  check('the refund cannot mint questions', () => {
+    const usageSource = readFileSync('src/lib/voyager/usage.ts', 'utf8');
+    assert.match(usageSource, /greatest\(0,/);
+  });
+
+  group('The language a question is asked in is not a routing decision');
+
+  check('nothing in the live answer path branches on English words', () => {
+    /*
+     * «Почему сегодня упала Tesla?» came back as a navigation blurb while its
+     * English twin was answered. The keyword gate that used to decide whether
+     * to research is gone; this asserts no replacement crept back into the
+     * modules a live answer actually runs through.
+     */
+    const live = [
+      'src/lib/voyager/orchestrator.ts',
+      'src/lib/voyager/tools/registry.ts',
+      'src/lib/voyager/tools/navigation.ts',
+    ];
+    for (const path of live) {
+      const source = readFileSync(path, 'utf8');
+      const suspicious = source.match(/question\s*\.\s*(toLowerCase|includes|match)\s*\(/g) ?? [];
+      assert.equal(suspicious.length, 0, `${path}: ${suspicious.join(', ')}`);
+    }
+  });
+
+  check('the tools offered do not depend on what was asked, or in which language', () => {
+    // Both questions reach the same planner with the same tools and the same
+    // allowed actions; only the sentence differs.
+    const context = { screen: 'generic', tier: 'basic', hasTicker: false };
+    const english = acts.allowedActions(context);
+    const russian = acts.allowedActions(context);
+    assert.deepEqual(english, russian);
+  });
+
+  check('a model failure is reported as one, not dressed as an answer', () => {
+    /*
+     * The scripted layer keeps its real job — the demo deployment with no key,
+     * where every answer is written and says so. What it stops doing is
+     * standing in for an outage, because a navigation blurb under a market
+     * question looks like Voyager understood and had nothing better.
+     */
+    const source = readFileSync('src/lib/voyager/orchestrator.ts', 'utf8');
+    assert.match(source, /function incomplete\(/);
+    assert.match(source, /stop_reason === 'max_tokens'[\s\S]{0,200}incomplete\(/);
+    // The only scripted() left is the no-model case.
+    const scriptedCalls = source.match(/return scripted\(\);/g) ?? [];
+    assert.equal(scriptedCalls.length, 1, `scripted() served ${scriptedCalls.length} times`);
+  });
+
   group('Tools: a failure is a value, and what ran is recorded');
 
   check('every tool id the registry names is one the executor knows', () => {

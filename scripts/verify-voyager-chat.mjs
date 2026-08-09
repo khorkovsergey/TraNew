@@ -54,7 +54,7 @@ async function reset(page) {
  * The live path is not abandoned: the screen-acceptance probes below are GET
  * requests, which the API answers without spending anything.
  */
-async function stubAnswer(page, answer) {
+async function stubAnswer(page, answer, usage = { used: 1, remaining: 9 }) {
   await page.route('**/api/voyager', async (route) => {
     if (route.request().method() !== 'POST') return route.fallback();
     await route.fulfill({
@@ -63,8 +63,10 @@ async function stubAnswer(page, answer) {
       body: JSON.stringify({
         answer,
         tier: 'basic',
-        remaining: 7,
-        used: 3,
+        /* Fixed rather than counted: what this asserts is that the browser
+           shows the number the server sent, not one it accumulated itself. */
+        remaining: usage.remaining,
+        used: usage.used,
         total: 10,
         quotaReached: false,
       }),
@@ -244,6 +246,93 @@ try {
     !actionIds.some((id) => ['watchlist', 'save_workspace', 'portfolio_scenario', 'research'].includes(id ?? '')),
     actionIds.join(' · ')
   );
+
+  group('One submit is one request, however many tools answer it');
+
+  /*
+   * From production: one question with several internal tool calls moved the
+   * visible counter by five. The counter is spent once per request, in the
+   * route handler, outside the tool loop — so the only way it moves by five is
+   * five requests. This is the client half of that invariant, measured rather
+   * than argued: every POST is intercepted, so nothing reaches the server and
+   * nothing touches the usage row.
+   */
+  let posts = 0;
+  await page.unroute('**/api/voyager');
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/api/voyager')) posts += 1;
+  });
+
+  await stubAnswer(page, {
+    contentType: 'AI analysis',
+    text: 'Tesla fell with the rest of the growth names in that session.',
+    bullets: [],
+    sources: 'Twelve Data',
+    confidence: 'medium',
+    actions: [],
+    followUps: [],
+    citations: [{ label: 'Market data & news' }],
+    // A six-tool answer, which is what the reported question ran.
+    tools: [
+      'web-search(2)',
+      'resolve-asset(Tesla)',
+      'quote(TSLA)',
+      'history(TSLA 1D)',
+      'chart(line)',
+    ],
+  });
+
+  await page.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => {
+    sessionStorage.clear();
+    localStorage.removeItem('tn.voyager.allowance.v1');
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(700);
+
+  posts = 0;
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Why did Tesla fall today?');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(3000);
+
+  check('one intentional question sends exactly one request', posts === 1, `${posts} POSTs`);
+  check(
+    'and the counter moves by one, not by the number of tools',
+    /Free: 1 of 10/.test(await page.locator('[class*="limitChip"]').innerText()),
+    await page.locator('[class*="limitChip"]').innerText()
+  );
+  check(
+    'even though the answer reports five tools',
+    (await page.locator('[class*="toolChip"]').count()) === 5,
+    `${await page.locator('[class*="toolChip"]').count()} chips`
+  );
+
+  group('A question in another language takes the same path');
+
+  /*
+   * The reported defect: the Russian question came back as this platform's
+   * navigation blurb. The planner, its tools and its sources are identical
+   * whatever the question was written in — what changed is that a model failure
+   * is now reported as a failure instead of being dressed as an answer.
+   */
+  posts = 0;
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(700);
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Почему сегодня упала Tesla?');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(3000);
+
+  const russian = await page.locator('body').innerText();
+  check('the question survives as the person typed it', russian.includes('Почему сегодня упала Tesla?'));
+  check('it is one request, like its English twin', posts === 1, `${posts} POSTs`);
+  check(
+    'and it is answered rather than handed a navigation blurb',
+    !/tell me your goal/i.test(russian),
+    russian.slice(0, 200)
+  );
+
+  await page.unroute('**/api/voyager');
 
   group('The chart says exactly what it drew');
 
