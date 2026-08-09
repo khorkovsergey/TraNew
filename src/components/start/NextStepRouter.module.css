@@ -1,0 +1,688 @@
+/*
+ * "Find my next step".
+ *
+ * One question on screen at a time, in a column narrower than the rest of the
+ * portal — the flow is a decision, and a decision does not want a 1480px canvas
+ * with somewhere else to look.
+ *
+ * Selection is the only state here that carries meaning, so it is the only one
+ * that gets mint, and it never relies on the colour alone: border, tint, glow
+ * and a tick, because the tick is the one that survives a colour-blind reader,
+ * a failed stylesheet and a screenshot in greyscale.
+ */
+
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 28px var(--tn-page-pad) 72px;
+}
+
+/* ---- Progress ---- */
+
+/*
+ * Three markers, no bar and no percentage. A clarifying question lives inside
+ * step 2 and must never add a fourth: "you are 66% of the way through" is a
+ * promise about length that the flow deliberately does not make.
+ */
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 22px;
+  margin: 0 0 30px;
+  padding: 0;
+  list-style: none;
+}
+
+.railItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text-faint);
+}
+
+.railNumber {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--tn-border-card);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.rail_current {
+  color: var(--tn-text);
+}
+
+.rail_current .railNumber {
+  border-color: var(--tn-mint-border);
+  color: var(--tn-mint);
+}
+
+.rail_done {
+  color: var(--tn-text-muted);
+}
+
+.rail_done .railNumber {
+  border-color: var(--tn-mint-border);
+  background: var(--tn-mint-tint);
+  color: var(--tn-mint);
+}
+
+/* ---- Question head ---- */
+
+.screen {
+  animation: rise 0.34s ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.head {
+  margin-bottom: 26px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  margin-bottom: 4px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--tn-text-muted);
+  transition: color var(--tn-transition-fast);
+}
+
+.back:hover {
+  color: var(--tn-text);
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--tn-text-faint);
+}
+
+.h1 {
+  margin: 12px 0 0;
+  font-size: clamp(30px, 3.6vw, 46px);
+  font-weight: 800;
+  letter-spacing: -1.4px;
+  line-height: 1.12;
+}
+
+.sub {
+  margin: 14px 0 0;
+  max-width: 660px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--tn-text-secondary);
+}
+
+/*
+ * The way past the questions, offered before the first one is answered.
+ *
+ * Somebody who does not want to categorise themselves should not have to do it
+ * once in order to say so.
+ */
+.escape {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tn-blue);
+  transition: color var(--tn-transition-fast);
+}
+
+.escape:hover {
+  color: var(--tn-blue-hover);
+}
+
+/* ---- Answer cards ---- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  min-height: 44px;
+  padding: 20px 20px 16px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  background: var(--tn-surface-veil);
+  color: var(--tn-text);
+  text-align: left;
+  transition:
+    border-color var(--tn-transition-hover),
+    background var(--tn-transition-hover),
+    box-shadow var(--tn-transition-hover),
+    transform var(--tn-transition-fast);
+}
+
+.card:hover {
+  border-color: var(--tn-border-hover);
+  background: var(--tn-surface-inner);
+}
+
+.card:active {
+  transform: translateY(1px);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--tn-mint);
+  outline-offset: 3px;
+}
+
+.cardOn {
+  border-color: var(--tn-mint);
+  background: var(--tn-mint-tint);
+  box-shadow: var(--tn-mint-glow);
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardIcon {
+  color: var(--tn-icon);
+  transition: color var(--tn-transition-hover);
+}
+
+.cardOn .cardIcon {
+  color: var(--tn-mint);
+}
+
+.tick {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--tn-border-card);
+  color: var(--tn-cta-text);
+}
+
+.tickOn {
+  border-color: var(--tn-mint);
+  background: var(--tn-mint);
+}
+
+.cardTitle {
+  display: block;
+  margin-top: 14px;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.cardDesc {
+  display: block;
+  flex: 1;
+  margin-top: 7px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+.cardGo {
+  align-self: flex-end;
+  margin-top: 14px;
+  color: var(--tn-text-faint);
+  transition: color var(--tn-transition-hover);
+}
+
+.card:hover .cardGo {
+  color: var(--tn-text-muted);
+}
+
+.cardOn .cardGo {
+  color: var(--tn-mint);
+}
+
+/* ---- Free text ---- */
+
+.freeCard {
+  max-width: 720px;
+  padding: 26px 28px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-showcase);
+  background: var(--tn-surface);
+}
+
+.freeLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text-soft);
+}
+
+/*
+ * 16px, and never less. Below that iOS zooms the page when the field takes
+ * focus, and the first thing this box would do on a phone is throw the layout
+ * sideways.
+ */
+.freeInput {
+  width: 100%;
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--tn-border-input);
+  border-radius: var(--tn-radius-option);
+  background: var(--tn-input-bg);
+  color: var(--tn-text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.55;
+  resize: vertical;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.freeInput:focus {
+  outline: none;
+  border-color: var(--tn-mint-border);
+}
+
+.freeInput::placeholder {
+  color: var(--tn-text-faint);
+}
+
+.examplesLabel {
+  margin-top: 18px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--tn-text-faint);
+}
+
+.examples {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.example {
+  padding: 10px 13px;
+  border: 1px solid var(--tn-border-hairline);
+  border-radius: var(--tn-radius-chip);
+  background: var(--tn-chip-bg);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+.freeNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--tn-text-faint);
+}
+
+/* ---- Loading ---- */
+
+/*
+ * 700 ms, and it is a transition rather than a computation. Nothing is being
+ * fetched — the result was decided the moment the last card was pressed — so
+ * this exists to make the change of screen deliberate, and it disappears
+ * entirely under reduced motion.
+ */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 280px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--tn-text-secondary);
+}
+
+.loadingDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--tn-mint);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ---- Result ---- */
+
+.resultCard {
+  padding: 30px 32px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-showcase);
+  background: var(--tn-surface);
+}
+
+.resultHead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.resultIcon {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid var(--tn-mint-border);
+  background: var(--tn-mint-tint);
+  color: var(--tn-mint);
+}
+
+.resultTitle {
+  margin: 0;
+  font-size: clamp(26px, 3vw, 38px);
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1.15;
+}
+
+.resultReason {
+  margin: 20px 0 0;
+  max-width: 680px;
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--tn-text-body);
+}
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-top: 24px;
+  padding: 14px 26px;
+  border-radius: var(--tn-radius-option);
+  background: var(--tn-cta);
+  color: var(--tn-cta-text);
+  font-size: 15px;
+  font-weight: 800;
+  transition: filter var(--tn-transition-hover);
+}
+
+.primary:hover {
+  filter: brightness(1.08);
+}
+
+.primary:disabled {
+  opacity: 0.45;
+  filter: none;
+  cursor: not-allowed;
+}
+
+.primary:focus-visible {
+  outline: 2px solid var(--tn-mint);
+  outline-offset: 3px;
+}
+
+.helper {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--tn-text-faint);
+}
+
+.textLink {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tn-blue);
+}
+
+.textLink:hover {
+  color: var(--tn-blue-hover);
+}
+
+/* ---- The Wealth Hub gate ---- */
+
+.gate {
+  margin-top: 24px;
+  padding: 22px 24px;
+  border: 1px solid var(--tn-border-inner);
+  border-radius: var(--tn-radius-card);
+  background: var(--tn-surface-inner);
+}
+
+.gateChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border-radius: var(--tn-radius-pill-sm);
+  border: 1px solid var(--tn-border-card);
+  background: var(--tn-chip-bg);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text-soft);
+}
+
+.gateBody {
+  margin: 14px 0 0;
+  max-width: 620px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--tn-text-secondary);
+}
+
+.gateActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.gateActions .primary {
+  margin-top: 18px;
+}
+
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 18px;
+  padding: 13px 22px;
+  border-radius: var(--tn-radius-option);
+  border: 1px solid var(--tn-border-control);
+  background: transparent;
+  color: var(--tn-text-secondary);
+  font-size: 14.5px;
+  font-weight: 700;
+  transition:
+    border-color var(--tn-transition-hover),
+    color var(--tn-transition-hover);
+}
+
+.ghost:hover {
+  border-color: var(--tn-border-hover);
+  color: var(--tn-text);
+}
+
+/* ---- You may also find useful ---- */
+
+.alsoHead {
+  margin: 34px 0 14px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--tn-text-faint);
+}
+
+.alsoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.alsoCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-height: 44px;
+  padding: 18px 20px;
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  background: var(--tn-surface-veil);
+  color: var(--tn-text);
+  transition: border-color var(--tn-transition-hover);
+}
+
+.alsoCard:hover {
+  border-color: var(--tn-border-hover);
+}
+
+.alsoIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--tn-icon);
+}
+
+.alsoText {
+  flex: 1;
+  min-width: 0;
+}
+
+.alsoTitle {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.alsoDesc {
+  display: block;
+  margin-top: 5px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+.alsoArrow {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--tn-text-faint);
+}
+
+/* ---- Change my answers · Start over ---- */
+
+.resultActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.resultActions .ghost {
+  margin-top: 0;
+}
+
+.textButton {
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tn-text-muted);
+  transition: color var(--tn-transition-fast);
+}
+
+.textButton:hover {
+  color: var(--tn-text);
+}
+
+/* ---- Narrower screens ---- */
+
+@media (max-width: 1080px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding-bottom: calc(48px + env(safe-area-inset-bottom));
+  }
+
+  .grid,
+  .alsoGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 16px 16px 14px;
+  }
+
+  /* Numbers only — three labels do not fit a phone without wrapping into a
+     paragraph that reads as content rather than as progress. */
+  .railLabel {
+    display: none;
+  }
+
+  .resultCard,
+  .freeCard {
+    padding: 22px 20px;
+  }
+
+  .resultHead {
+    gap: 12px;
+  }
+
+  .resultIcon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .primary {
+    width: 100%;
+    justify-content: center;
+  }
+}

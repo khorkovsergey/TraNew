@@ -40,15 +40,13 @@ export type IntentCard = { id: string; icon: IconName; title: string; body: stri
  * no pro, no "new investor". Beginner-friendly is not beginner-only, and a
  * person who has to pick a label for themselves before they can press anything
  * has been asked the wrong question.
+ *
+ * Markets is deliberately not among them. The hero directly above this section
+ * already carries "Explore markets" as its second CTA, and a door repeated two
+ * hundred pixels below itself does not read as twice as open — it reads as a
+ * grid where one of the options is the button somebody has just declined.
  */
 export const INTENT_CARDS: IntentCard[] = [
-  {
-    id: 'markets',
-    icon: 'bars',
-    title: 'Explore markets',
-    body: 'Stocks, ETFs, crypto and the economy.',
-    href: '/explore',
-  },
   {
     id: 'ideas',
     icon: 'bulb',

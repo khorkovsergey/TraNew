@@ -70,25 +70,6 @@
   border-radius: 16px;
 }
 
-.resumeHead {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.resumeIcon {
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--tn-mint-tint);
-  border: 1px solid var(--tn-mint-border);
-  color: var(--tn-mint);
-}
-
 .resumeTitle {
   font-size: 17px;
   font-weight: 800;
@@ -99,30 +80,6 @@
   font-size: 13.5px;
   line-height: 1.55;
   color: var(--tn-text-soft);
-}
-
-.resumeCount {
-  margin-left: auto;
-  flex-shrink: 0;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--tn-text-secondary);
-  white-space: nowrap;
-}
-
-.progressTrack {
-  height: 7px;
-  border-radius: 4px;
-  background: var(--tn-border-hairline);
-  margin-top: 16px;
-  overflow: hidden;
-}
-
-.progressFill {
-  height: 100%;
-  border-radius: 4px;
-  background: var(--tn-progress);
-  transition: width var(--tn-transition-slow);
 }
 
 /* The one level-1 action on this screen. */
