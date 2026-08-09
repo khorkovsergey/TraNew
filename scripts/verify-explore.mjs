@@ -346,8 +346,19 @@ try {
     'Bond screener',
     'Popular symbols',
   ];
-  /* The rows that are meant to be links, and where each one goes. */
-  const LIVE = { 'Market overview': '/en/markets/global' };
+  /*
+   * Where a ready row goes, when it is ready.
+   *
+   * Not a list of which rows must be links — that number changes every time a
+   * screen ships, and a suite that has to be edited on each one is a suite that
+   * gets edited without being read. The rule below is derived from the panel
+   * instead: a row is a link if and only if it carries a Live or New chip. This
+   * map only says that *if* one of these is a link, it goes here.
+   */
+  const DESTINATIONS = {
+    'Market overview': '/en/markets/global',
+    'Compare assets': '/en/markets/compare',
+  };
   const ECONOMY = [
     'World economy',
     'Countries',
@@ -411,7 +422,6 @@ try {
   group('Every row is named, and only the ready ones are a way anywhere');
 
   const EXPECTED = [...MARKET, ...SYMBOLS, ...ECONOMY];
-  const liveNames = Object.keys(LIVE);
 
   /* Every row, whichever element it is: the ready ones are `<a>`. */
   const rows = panel().locator('[class*="menuItemWide"]');
@@ -436,17 +446,30 @@ try {
         label: node.innerText.split('\n')[0].trim(),
       }))
     );
+  const chipCount = await panel()
+    .locator('[class*="menuItemLabel"] > [class*="chipLive"]')
+    .count();
+
   check(
-    'exactly the ready rows are links',
-    links.length === liveNames.length,
-    links.map((link) => `${link.label} → ${link.href}`).join(', ') || '(none)'
+    'exactly the chipped rows are links',
+    links.length === chipCount,
+    `${links.length} links, ${chipCount} chipped — ${
+      links.map((link) => `${link.label} → ${link.href}`).join(', ') || '(none)'
+    }`
   );
-  for (const [label, href] of Object.entries(LIVE)) {
-    const link = links.find((entry) => entry.label.startsWith(label));
-    check(`"${label}" goes to ${href}`, link?.href === href, link?.href ?? 'not a link');
+  check('and at least one row is ready', chipCount > 0, `${chipCount}`);
+
+  // Not "these must be links" — "if this one is, it goes here".
+  for (const link of links) {
+    const expected = DESTINATIONS[link.label];
+    check(
+      `"${link.label}" goes where it says`,
+      expected ? link.href === expected : false,
+      expected ? `${link.href} (want ${expected})` : `${link.label} is a link nobody declared`
+    );
   }
 
-  const inert = EXPECTED.length - liveNames.length;
+  const inert = EXPECTED.length - chipCount;
   check(
     'and every other row is announced as disabled',
     (await panel().locator('div[class*="menuItemWide"][aria-disabled="true"]').count()) === inert,
@@ -493,9 +516,9 @@ try {
 
   const chips = panel().locator('[class*="menuItemLabel"] > [class*="chipLive"]');
   check(
-    'and one on every row that is',
-    (await chips.count()) === liveNames.length,
-    (await chips.allInnerTexts()).join(', ') || '(none)'
+    'and the rest of the rows account for themselves',
+    (await badges.count()) + (await chips.count()) === EXPECTED.length,
+    `${await badges.count()} badged + ${await chips.count()} chipped of ${EXPECTED.length}`
   );
   /*
    * The two are exclusive. A row that both warns and navigates spends the click
