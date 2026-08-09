@@ -694,27 +694,57 @@ try {
   check('the rest of the portal is still navigable', stillWorks >= 5, `${stillWorks} nav items`);
   await offline.close();
 
-  group('State 7 — the daily limit');
+  group('State 7 — the daily limit, however we learned about it');
 
-  const spent = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  await spent.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
-  await spent.evaluate(() => {
-    const day = new Date().toISOString().slice(0, 10);
-    localStorage.setItem('tn.voyager.allowance.v1', JSON.stringify({ used: 10, day }));
-    sessionStorage.setItem(
-      'tn.voyager.dialog.v1',
-      JSON.stringify([
-        { id: 'u1', role: 'user', text: 'What is an ETF?', at: new Date().toISOString() },
-        { id: 'a1', role: 'assistant', text: 'A basket of holdings.', at: new Date().toISOString() },
-      ])
-    );
+  /*
+   * One quota state, three ways in.
+   *
+   * The banner used to live only inside the transcript, so somebody who arrived
+   * already spent got a disabled composer and no explanation — the full state
+   * was reachable only by hitting the limit in the current session, which is
+   * the case that needed it least.
+   *
+   * Driven by the bootstrap read rather than by a seeded browser counter, and
+   * waited for by state rather than by a sleep: the old test seeded
+   * localStorage and raced the server, so it passed or failed on timing. The
+   * browser no longer keeps a count at all — the server is the only authority —
+   * which is what makes this deterministic.
+   */
+  const atLimit = await browser.newContext();
+  const spent = await atLimit.newPage();
+
+  await spent.route('**/api/voyager?*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        tier: 'basic',
+        tierLabel: 'Voyager Basic',
+        limits: 'Basic',
+        sources: [],
+        remaining: 0,
+        used: 10,
+        total: 10,
+        signedIn: false,
+        personalization: null,
+        modelConfigured: true,
+      }),
+    });
   });
-  await spent.reload({ waitUntil: 'domcontentloaded' });
-  await spent.waitForTimeout(800);
+
+  await spent.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
 
   const limitCard = spent.locator('[class*="limitGate"]');
-  check('the limit is stated as a banner', await limitCard.isVisible());
-  check('with the reset and the way past it', /Resets at midnight/.test(await limitCard.innerText()));
+  await limitCard.waitFor({ state: 'visible', timeout: 10_000 });
+
+  check('a visitor who arrives already spent sees the banner', await limitCard.isVisible());
+  const limitText = await limitCard.innerText();
+  check('with the real figures', /10 of 10/.test(limitText), limitText);
+  check(
+    'a reset the counter actually keeps to',
+    /Resets at 00:00 UTC/.test(limitText),
+    limitText
+  );
   check('and a route to Plans', (await limitCard.getByRole('link', { name: 'See Plans' }).count()) === 1);
 
   const composer = spent.getByRole('textbox', { name: 'Ask Voyager' });
@@ -727,7 +757,59 @@ try {
     'the strip badge turns amber',
     (await spent.locator('[class*="limitChipHot"]').count()) === 1
   );
-  await spent.close();
+  check(
+    'and the counter quotes the server',
+    /Free: 10 of 10/.test(await spent.locator('[class*="limitChip"]').innerText())
+  );
+  await atLimit.close();
+
+  group('The last question reaches the same state as arriving spent');
+
+  /*
+   * The other route in: nine spent, one asked, and the answer carries the tenth.
+   * Same banner, same wording, same CTA — one implementation, so there is
+   * nothing to keep in step.
+   */
+  const lastOne = await browser.newContext();
+  const lastPage = await lastOne.newPage();
+
+  await stubAnswer(
+    lastPage,
+    {
+      contentType: 'AI explanation',
+      text: 'An ETF is a basket of holdings you can buy as one line.',
+      bullets: [],
+      sources: 'General knowledge',
+      confidence: 'high',
+      actions: [],
+      followUps: [],
+      citations: [],
+    },
+    { used: 10, remaining: 0, before: 9 }
+  );
+
+  await lastPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await lastPage.waitForFunction(
+    () => /Free: 9 of 10/.test(document.querySelector('[class*="limitChip"]')?.textContent ?? ''),
+    undefined,
+    { timeout: 10_000 }
+  );
+  check('nine spent leaves the composer open', !(await lastPage.getByRole('textbox', { name: 'Ask Voyager' }).isDisabled()));
+
+  await lastPage.getByRole('textbox', { name: 'Ask Voyager' }).fill('What is an ETF?');
+  await lastPage.keyboard.press('Enter');
+
+  const lastCard = lastPage.locator('[class*="limitGate"]');
+  await lastCard.waitFor({ state: 'visible', timeout: 10_000 });
+
+  check('the tenth answer closes the composer', await lastCard.isVisible());
+  check(
+    'with the same banner as arriving spent',
+    /Resets at 00:00 UTC/.test(await lastCard.innerText()) &&
+      /10 of 10/.test(await lastCard.innerText()),
+    await lastCard.innerText()
+  );
+  await lastOne.close();
 
   group('It fits the window it is in');
 
