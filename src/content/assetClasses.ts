@@ -22,26 +22,57 @@ export type AssetAccent = 'green' | 'blue' | 'purple' | 'amber' | 'orange' | 'ro
 
 export type AssetClassKey = 'stocks' | 'etfs' | 'bonds' | 'cash' | 'crypto' | 'property';
 
-/** The six axes. Order is meaningful — it is the order they are read in. */
+/**
+ * The six axes that are rated. Order is meaningful — it is the order they are
+ * read in.
+ *
+ * "Minimum amount" used to be one of them and is text now: a dot scale claiming
+ * that one share is a lower number than any amount was comparing two things
+ * that are not on the same line. Complexity took the sixth slot instead, which
+ * is the axis somebody choosing between property and a fund actually needs.
+ */
 export const COMPARE_AXES = [
   'Risk',
   'Growth potential',
   'Stability',
   'Ease of selling',
   'Costs',
-  'Minimum amount',
+  'Complexity',
 ] as const;
 
 export type CompareAxis = (typeof COMPARE_AXES)[number];
 
-/** Eight steps. Enough to rank six things, too few to imply a measurement. */
-export const DOT_SCALE = 8;
+/** Five steps. Enough to rank six things, too few to imply a measurement. */
+export const DOT_SCALE = 5;
 
-export type Rating = {
-  /** The word, which carries the value on its own. */
-  value: string;
-  /** 1–8. The dots repeat the word; they never say anything it does not. */
-  level: number;
+/** 1–5, in order. The word carries the value; the dots only repeat it. */
+export const SCALE_WORDS = ['Very low', 'Low', 'Medium', 'High', 'Very high'] as const;
+
+/**
+ * The axes where more is worse.
+ *
+ * On these three a high rating is a warning rather than a score, so the dots
+ * turn amber at 4 instead of staying mint. Everywhere else the colour is the
+ * class's own accent and means nothing but "this many".
+ */
+export const CAUTION_AXES: readonly CompareAxis[] = ['Risk', 'Costs', 'Complexity'];
+
+/** The word for a level. Derived, never stored — the two cannot disagree. */
+export function ratingWord(level: number): string {
+  return SCALE_WORDS[Math.min(Math.max(level, 1), DOT_SCALE) - 1];
+}
+
+/** The four tiles above the prose. Labels live in the UI, values here. */
+export type AssetFacts = {
+  risk: string;
+  horizon: string;
+  liquidity: string;
+  entry: string;
+};
+
+export type StartingPoint = {
+  title: string;
+  sub: string;
 };
 
 export type AssetClass = {
@@ -68,7 +99,24 @@ export type AssetClass = {
   longRisks: string;
   longSuit: string;
 
-  ratings: Record<CompareAxis, Rating>;
+  /** The four tiles: risk, horizon, liquidity, entry size. */
+  facts: AssetFacts;
+  /** Three things worth knowing that the prose above does not say. */
+  goodToKnow: string[];
+  /** The one mistake people actually make with this category. */
+  watchOut: string;
+  /** How people usually begin. Examples, and labelled as examples. */
+  starts: StartingPoint[];
+  /** The lesson this category leads to, by title. */
+  lesson: string;
+  /** How this category is named when pointing at the live market. */
+  marketLabel: string;
+
+  ratings: Record<CompareAxis, number>;
+  /** What it takes to start, in words rather than on a scale. */
+  minimum: string;
+  /** What the category is usually held for. */
+  useCase: string;
   /** The two classes worth putting beside it. */
   alternatives: AssetClassKey[];
   /** What people ask about it. Answered by the Voyager library. */
@@ -96,14 +144,45 @@ export const ASSET_CLASSES: AssetClass[] = [
       'One company can lose most of its value and not recover. That is not a rare event and no amount of research reliably prevents it, because the causes are often outside the business entirely. Holding a handful of stocks means a bad outcome in one of them shows up in your total; holding one means it decides your total.',
     longSuit:
       'People who will read about a business before buying it, who can leave the money alone for years, and for whom a 40% fall in one holding would be disappointing rather than damaging. For most people starting out, a fund is the same exposure without the concentration.',
-    ratings: {
-      Risk: { value: 'High', level: 6 },
-      'Growth potential': { value: 'High', level: 7 },
-      Stability: { value: 'Low', level: 2 },
-      'Ease of selling': { value: 'High', level: 7 },
-      Costs: { value: 'Low per trade', level: 2 },
-      'Minimum amount': { value: 'One share', level: 2 },
+    facts: {
+      risk: 'Higher',
+      horizon: '5+ years',
+      liquidity: 'High',
+      entry: 'One share',
     },
+    goodToKnow: [
+      'Returns are not smooth: a single company can fall sharply even in a rising market.',
+      'Owning 20 companies behaves very differently from owning two — spread matters more than picking.',
+      'Dividends are optional for the company and can be cut at any time.',
+    ],
+    watchOut:
+      'Concentration is the most common mistake. A portfolio built from a handful of familiar names carries far more single-company risk than most people assume.',
+    starts: [
+      {
+        title: 'Start with a broad index fund',
+        sub: 'Own hundreds of companies at once instead of choosing between them.',
+      },
+      {
+        title: 'Add individual names slowly',
+        sub: 'Keep single positions small while you learn how they behave.',
+      },
+      {
+        title: 'Set a schedule, not a moment',
+        sub: 'Investing monthly removes the pressure to time an entry.',
+      },
+    ],
+    lesson: 'How shares actually make money',
+    marketLabel: 'stocks',
+    ratings: {
+      Risk: 4,
+      'Growth potential': 5,
+      Stability: 2,
+      'Ease of selling': 5,
+      Costs: 2,
+      Complexity: 3,
+    },
+    minimum: 'Price of one share',
+    useCase: 'Long-term growth',
     alternatives: ['etfs', 'bonds'],
     questions: [
       'Are single stocks risky for beginners?',
@@ -131,15 +210,46 @@ export const ASSET_CLASSES: AssetClass[] = [
       'It spreads company risk, not market risk. When the whole market falls, a fund that holds the whole market falls with it — diversification narrows what can happen to you, it does not remove the bad end. The fee is charged every year whether the fund rose or fell. And "ETF" describes a wrapper, not a level of risk: a fund holding one country’s smallest companies is not a safe investment because it is a fund.',
     longSuit:
       'Almost anyone starting out, and plenty of people who are not. It is the default answer for money that can be left alone for years and that you would rather not have to think about weekly.',
-    ratings: {
-      Risk: { value: 'Medium', level: 4 },
-      'Growth potential': { value: 'Medium to high', level: 5 },
-      Stability: { value: 'Medium', level: 4 },
-      'Ease of selling': { value: 'High', level: 7 },
-      Costs: { value: 'Very low, annual', level: 2 },
-      'Minimum amount': { value: 'One unit', level: 2 },
+    facts: {
+      risk: 'Medium',
+      horizon: '3–10 years',
+      liquidity: 'High',
+      entry: 'One unit',
     },
-    alternatives: ['bonds', 'cash'],
+    goodToKnow: [
+      'The index a fund tracks matters more than the fund’s brand name.',
+      'Costs compound: a 0.20% fee is roughly double a 0.09% one over decades.',
+      'Two “diversified” ETFs can hold largely the same top ten companies.',
+    ],
+    watchOut:
+      'Broad does not mean safe. A world equity ETF still falls in a global sell-off — diversification spreads company risk, not market risk.',
+    starts: [
+      {
+        title: 'One world equity fund',
+        sub: 'The simplest single-fund core many people begin with.',
+      },
+      {
+        title: 'Core plus a theme',
+        sub: 'A broad fund as the base, a small satellite for conviction.',
+      },
+      {
+        title: 'Check overlap before adding',
+        sub: 'See what a second fund actually adds to the first.',
+      },
+    ],
+    lesson: 'How index funds work',
+    marketLabel: 'ETFs',
+    ratings: {
+      Risk: 3,
+      'Growth potential': 4,
+      Stability: 3,
+      'Ease of selling': 5,
+      Costs: 1,
+      Complexity: 2,
+    },
+    minimum: 'Price of one unit',
+    useCase: 'Diversified core',
+    alternatives: ['stocks', 'bonds'],
     questions: [
       'What is the difference between an ETF and a stock?',
       'Are ETFs suitable for beginners?',
@@ -166,14 +276,45 @@ export const ASSET_CLASSES: AssetClass[] = [
       'Two things break the schedule. If interest rates rise, the price of a bond you already hold falls — you can hold it to maturity and still get your money, but selling early may lose some. And the borrower can fail to pay: a government bond and a struggling company’s bond are the same instrument only in name.',
     longSuit:
       'People who want a return without watching a number move much, and anyone whose horizon is short enough that a sharp fall would force them to sell at the wrong time.',
-    ratings: {
-      Risk: { value: 'Low to medium', level: 3 },
-      'Growth potential': { value: 'Low to medium', level: 3 },
-      Stability: { value: 'High', level: 6 },
-      'Ease of selling': { value: 'Medium to high', level: 5 },
-      Costs: { value: 'Low', level: 3 },
-      'Minimum amount': { value: 'Higher, direct', level: 5 },
+    facts: {
+      risk: 'Lower',
+      horizon: '1–10 years',
+      liquidity: 'Medium',
+      entry: 'Fund or €1,000+',
     },
+    goodToKnow: [
+      'When interest rates rise, existing bond prices fall — longer bonds fall further.',
+      'Government and corporate bonds carry very different credit risk.',
+      'A bond fund never “matures” the way a single bond does.',
+    ],
+    watchOut:
+      'Bonds are not automatically the safe part of a portfolio. Long-duration funds can lose double digits in a fast rate cycle.',
+    starts: [
+      {
+        title: 'Short-duration government bonds',
+        sub: 'Least sensitive to rate moves while you learn the mechanics.',
+      },
+      {
+        title: 'A broad aggregate bond fund',
+        sub: 'Government and corporate exposure in one holding.',
+      },
+      {
+        title: 'Match maturity to the goal',
+        sub: 'Money needed in three years should not sit in 20-year duration.',
+      },
+    ],
+    lesson: 'Why bond prices move opposite to yields',
+    marketLabel: 'bonds',
+    ratings: {
+      Risk: 2,
+      'Growth potential': 2,
+      Stability: 4,
+      'Ease of selling': 3,
+      Costs: 2,
+      Complexity: 3,
+    },
+    minimum: 'Fund unit or €1,000+',
+    useCase: 'Income and ballast',
     alternatives: ['etfs', 'cash'],
     questions: [
       'How does a bond actually pay interest?',
@@ -201,14 +342,45 @@ export const ASSET_CLASSES: AssetClass[] = [
       'Inflation. Cash cannot fall in value and can still leave you worse off, quietly, over a long enough period — at 3% a year it buys roughly a quarter less after ten years. That is a real cost and it appears on no statement. A headline rate can also be cut the month after you open the account.',
     longSuit:
       'Everyone, for part of their money. An emergency fund, and any goal close enough that a 20% fall would change what you can do.',
-    ratings: {
-      Risk: { value: 'Very low', level: 1 },
-      'Growth potential': { value: 'Very low', level: 1 },
-      Stability: { value: 'Very high', level: 8 },
-      'Ease of selling': { value: 'Immediate', level: 8 },
-      Costs: { value: 'None', level: 1 },
-      'Minimum amount': { value: 'Any', level: 1 },
+    facts: {
+      risk: 'Lowest',
+      horizon: '0–2 years',
+      liquidity: 'Immediate',
+      entry: 'Any amount',
     },
+    goodToKnow: [
+      'Inflation is the real risk: 3% inflation against a 2% rate is a quiet annual loss.',
+      'Deposit protection limits are per bank, per person — worth checking above them.',
+      'Money-market funds are not deposits, even though they behave similarly.',
+    ],
+    watchOut:
+      'Holding a large cash balance “until things calm down” is the most expensive form of waiting in most historical periods.',
+    starts: [
+      {
+        title: 'Build the buffer first',
+        sub: 'Three to six months of expenses before anything is invested.',
+      },
+      {
+        title: 'Separate the buffer from the plan',
+        sub: 'Different accounts stop one goal from eating the other.',
+      },
+      {
+        title: 'Compare the real rate',
+        sub: 'Rate minus inflation is the number that matters.',
+      },
+    ],
+    lesson: 'What inflation does to savings',
+    marketLabel: 'rates',
+    ratings: {
+      Risk: 1,
+      'Growth potential': 1,
+      Stability: 5,
+      'Ease of selling': 5,
+      Costs: 1,
+      Complexity: 1,
+    },
+    minimum: 'Any amount',
+    useCase: 'Buffer and short goals',
     alternatives: ['bonds', 'etfs'],
     questions: [
       'How much cash should I keep aside?',
@@ -236,15 +408,46 @@ export const ASSET_CLASSES: AssetClass[] = [
       'Falls of 70% or more have happened repeatedly and taken years to recover, when they recovered. There is no earnings figure to anchor a valuation to, custody mistakes are permanent, and a platform failing has cost people everything they held on it. Nothing here is protected by a deposit guarantee.',
     longSuit:
       'People who can lose the entire amount without it changing anything they had planned — and only after a reserve and the rest of a plan already exist.',
-    ratings: {
-      Risk: { value: 'Very high', level: 8 },
-      'Growth potential': { value: 'Very high', level: 8 },
-      Stability: { value: 'Very low', level: 1 },
-      'Ease of selling': { value: 'High', level: 7 },
-      Costs: { value: 'Varies widely', level: 5 },
-      'Minimum amount': { value: 'Any', level: 1 },
+    facts: {
+      risk: 'Highest',
+      horizon: 'Undefined',
+      liquidity: 'High, uneven',
+      entry: 'Any amount',
     },
-    alternatives: ['stocks', 'cash'],
+    goodToKnow: [
+      'Drawdowns of 50–70% have happened repeatedly, including in the largest assets.',
+      'Custody is a real decision: exchange, wallet or regulated product each behave differently.',
+      'Regulation and tax treatment vary sharply by country.',
+    ],
+    watchOut:
+      'Position sizing matters more here than in any other option. Most damage comes from an allocation that was never survivable at a −60% move.',
+    starts: [
+      {
+        title: 'Size it as a satellite',
+        sub: 'A small share of a portfolio, decided before you buy.',
+      },
+      {
+        title: 'Majors before anything else',
+        sub: 'Liquidity and history differ enormously below the top assets.',
+      },
+      {
+        title: 'Understand custody first',
+        sub: 'Know exactly who holds the asset and what happens if they fail.',
+      },
+    ],
+    lesson: 'What actually backs a crypto asset',
+    marketLabel: 'crypto',
+    ratings: {
+      Risk: 5,
+      'Growth potential': 5,
+      Stability: 1,
+      'Ease of selling': 4,
+      Costs: 3,
+      Complexity: 4,
+    },
+    minimum: 'Any amount',
+    useCase: 'Small satellite',
+    alternatives: ['stocks', 'etfs'],
     questions: [
       'Is crypto too risky for someone starting out?',
       'What is Bitcoin, in plain terms?',
@@ -271,14 +474,45 @@ export const ASSET_CLASSES: AssetClass[] = [
       'Direct property is hard to sell quickly and expensive to enter and exit — the costs of buying and selling can take years of rent to recover. Markets move in long cycles rather than daily wiggles, which hides risk rather than removing it. And a single building is a single, undiversified holding in one street.',
     longSuit:
       'Long horizons and people who will not need the money back at short notice. A REIT gives most of the exposure without the illiquidity, at the cost of a price that moves daily like a share.',
-    ratings: {
-      Risk: { value: 'Medium to high', level: 5 },
-      'Growth potential': { value: 'Medium', level: 5 },
-      Stability: { value: 'Medium', level: 4 },
-      'Ease of selling': { value: 'Low, direct', level: 2 },
-      Costs: { value: 'High to enter', level: 7 },
-      'Minimum amount': { value: 'Large, direct', level: 8 },
+    facts: {
+      risk: 'Medium',
+      horizon: '10+ years',
+      liquidity: 'Low (direct)',
+      entry: 'Large or fund',
     },
+    goodToKnow: [
+      'Direct property is a business: maintenance, vacancy, tenants and paperwork are part of the return.',
+      'Leverage cuts both ways — a mortgage amplifies gains and losses alike.',
+      'Listed real-estate funds trade like shares and move with rates, not with your street.',
+    ],
+    watchOut:
+      'Illiquidity is the defining constraint. Selling takes months, and costs on entry and exit are far higher than for listed assets.',
+    starts: [
+      {
+        title: 'Listed real estate first',
+        sub: 'Exposure without a mortgage or a tenant.',
+      },
+      {
+        title: 'Model the full cost',
+        sub: 'Taxes, fees, vacancy and maintenance before the headline yield.',
+      },
+      {
+        title: 'Treat your home separately',
+        sub: 'A place to live is not the same asset as an investment.',
+      },
+    ],
+    lesson: 'Direct property vs REITs',
+    marketLabel: 'real estate',
+    ratings: {
+      Risk: 3,
+      'Growth potential': 3,
+      Stability: 3,
+      'Ease of selling': 1,
+      Costs: 5,
+      Complexity: 5,
+    },
+    minimum: 'Deposit or fund unit',
+    useCase: 'Long-horizon asset',
     alternatives: ['etfs', 'bonds'],
     questions: [
       'What is a REIT?',
@@ -304,6 +538,42 @@ export function comparisonSet(key: AssetClassKey): AssetClass[] {
   const selected = assetClass(key);
   if (!selected) return ASSET_CLASSES.slice(0, 3);
   return [selected, ...selected.alternatives.map((alt) => assetClass(alt)!)];
+}
+
+/**
+ * The pairs offered as chips beside a comparison.
+ *
+ * The first is the class's own two alternatives, so the chip row opens on the
+ * comparison the page was already showing. The rest are other pairs, in the
+ * order the classes are declared, and the selected class is never among them —
+ * it is always the first column.
+ */
+export function rivalPairs(key: AssetClassKey, limit = 4): AssetClassKey[][] {
+  const others = ASSET_CLASS_KEYS.filter((entry) => entry !== key);
+  const pairs: AssetClassKey[][] = [];
+
+  for (let i = 0; i < others.length; i += 1) {
+    for (let j = i + 1; j < others.length; j += 1) pairs.push([others[i], others[j]]);
+  }
+
+  const preferred = assetClass(key)?.alternatives ?? others.slice(0, 2);
+  const seen = new Set<string>();
+  const out: AssetClassKey[][] = [];
+
+  for (const pair of [preferred, ...pairs]) {
+    const id = [...pair].sort().join(',');
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(pair);
+    if (out.length === limit) break;
+  }
+
+  return out;
+}
+
+/** How a pair of chips reads: "ETFs + Bonds". */
+export function pairLabel(pair: AssetClassKey[]): string {
+  return pair.map((entry) => assetClass(entry)?.name ?? entry).join(' + ');
 }
 
 /** How this class is described in a sentence: "an ETF works", "stocks work". */
