@@ -115,6 +115,8 @@ try {
       'src/lib/voyager/tools/assets.ts',
       'src/lib/voyager/tools/range.ts',
       'src/lib/voyager/tools/metrics.ts',
+      'src/lib/voyager/tools/tradingView.ts',
+      'src/lib/voyager/tools/pine.ts',
       'src/lib/voyager/chart/spec.ts',
       'src/lib/voyager/chat/transcript.ts',
       'src/lib/academy/summary.ts',
@@ -260,6 +262,8 @@ try {
   const ranges = await load('range', 'tools');
   const metrics = await load('metrics', 'tools');
   const chart = await load('spec', 'chart');
+  const tv = await load('tradingView', 'tools');
+  const voyagerPine = await load('pine', 'tools');
   const pageContext = await load('context', 'voyager');
   const transcript = await load('transcript', 'chat');
   const learn = await load('summary', 'academy');
@@ -4745,6 +4749,184 @@ try {
     assert.equal(chart.clampChartSpec({ kind: 'renko', series: [] }), null);
     assert.equal(chart.clampChartSpec({ kind: 'line', series: [] }), null);
     assert.equal(chart.clampChartSpec({ kind: 'line', series: [{ label: 'no symbol' }] }), null);
+  });
+
+  group('What needs TradingView is written down, not left to a prompt');
+
+  check('every feature says where it can be done, and why when it is not here', () => {
+    for (const id of tv.CHART_FEATURE_IDS) {
+      const support = tv.CHART_FEATURES[id];
+      assert.ok(['voyager', 'tradingview'].includes(support.where), id);
+      if (support.where === 'tradingview') {
+        assert.ok(support.reason && support.reason.length > 20, `${id} has no reason`);
+      }
+    }
+  });
+
+  check('a reason is a property of the product, not a roadmap', () => {
+    /*
+     * "Not yet supported" invites somebody to wait for something nobody has
+     * promised. Every refusal here says what to do now instead.
+     */
+    for (const id of tv.CHART_FEATURE_IDS) {
+      const reason = tv.CHART_FEATURES[id].reason ?? '';
+      assert.ok(!/not yet|coming soon|in a future|for now/i.test(reason), `${id}: ${reason}`);
+    }
+  });
+
+  check('the professional chart types are all handoffs', () => {
+    for (const id of [
+      'renko',
+      'kagi',
+      'point_and_figure',
+      'range_bars',
+      'tpo_profile',
+      'session_volume_profile',
+      'multi_pane_layout',
+      'bar_replay',
+      'strategy_backtest',
+      'pine_execution',
+    ]) {
+      assert.equal(tv.needsHandoff(id), true, id);
+    }
+  });
+
+  check('and what this surface really draws is not', () => {
+    for (const id of ['line', 'area', 'candles', 'moving_average', 'bollinger_bands', 'drawdown']) {
+      assert.equal(tv.needsHandoff(id), false, id);
+    }
+  });
+
+  check('the pane studies are handoffs, and say why', () => {
+    // Registered as a superchart dependency: an oscillator needs its own pane
+    // and its own scale, which the engine does not paint.
+    for (const id of ['rsi', 'macd', 'volume_pane']) {
+      assert.equal(tv.needsHandoff(id), true, id);
+      assert.match(tv.CHART_FEATURES[id].reason, /own pane|own scale/i);
+    }
+  });
+
+  group('The destination is built here, never written by a model');
+
+  check('a chart handoff carries the symbol and the timeframe', () => {
+    const handoff = tv.chartHandoff({
+      symbol: 'TSLA',
+      exchange: 'NASDAQ',
+      interval: '1D',
+      features: ['renko'],
+    });
+    assert.ok(handoff.url.startsWith('https://www.tradingview.com/chart/'));
+    assert.match(handoff.url, /symbol=NASDAQ%3ATSLA/);
+    assert.match(handoff.url, /interval=D/);
+    assert.deepEqual(
+      handoff.carried.map((item) => item.label),
+      ['Symbol', 'Timeframe']
+    );
+  });
+
+  check('and never claims to carry what the URL has no field for', () => {
+    /*
+     * The chart URL takes a symbol and an interval. It does not take a study, a
+     * drawing or a date range — so those are things to set on arrival, not
+     * things that travelled.
+     */
+    const handoff = tv.chartHandoff({ symbol: 'TSLA', interval: '1D', features: ['rsi', 'renko'] });
+    const carried = handoff.carried.map((item) => item.label.toLowerCase()).join(' ');
+    assert.ok(!/rsi|renko|range|study/.test(carried), carried);
+    assert.ok(handoff.manual.some((item) => /rsi/i.test(item)));
+    assert.ok(handoff.manual.some((item) => /date range/i.test(item)));
+  });
+
+  check('a symbol that is not a symbol produces no destination at all', () => {
+    // This string ends up in a URL somebody will click.
+    for (const symbol of ['this chart', '../../evil', 'javascript:alert(1)', '']) {
+      assert.equal(tv.chartHandoff({ symbol }), null, symbol);
+    }
+  });
+
+  check('and the host is never anything but TradingView', () => {
+    const chart = tv.chartHandoff({ symbol: 'TSLA' });
+    const pine = tv.pineHandoff({ hasCode: true });
+    for (const url of [chart.url, pine.url]) {
+      assert.equal(new URL(url).origin, 'https://www.tradingview.com', url);
+    }
+  });
+
+  check('the Pine editor carries nothing, and says the paste is the step', () => {
+    // There is no field for a script in that URL, and no version of this where
+    // it arrives with the code already in it.
+    const handoff = tv.pineHandoff({ hasCode: true });
+    assert.equal(handoff.carried.length, 0);
+    assert.ok(handoff.manual.some((item) => /copy it from here|paste/i.test(item)));
+  });
+
+  group('Pine is written and checked here, and never run');
+
+  check('a built-in study yields the exact Pine the chart draws', () => {
+    const made = voyagerPine.pineTemplate('sma', { fast: 50, slow: 200 });
+    assert.equal(made.ok, true);
+    assert.equal(made.data.provenance, 'template');
+    assert.match(made.data.source, /ta\.sma\(close, fastLen\)/);
+    assert.match(made.data.source, /input\.int\(50/);
+    assert.match(made.data.source, /input\.int\(200/);
+  });
+
+  check('out-of-range parameters are pulled in before they reach the code', () => {
+    const made = voyagerPine.pineTemplate('rsi', { length: 9999 });
+    assert.equal(made.ok, true);
+    assert.match(made.data.source, new RegExp(`input\\.int\\(${studies.STUDIES.rsi.params.length.max}`));
+  });
+
+  check('a study nobody has is refused with the list of the ones that exist', () => {
+    const made = voyagerPine.pineTemplate('supertrend', {});
+    assert.equal(made.ok, false);
+    assert.equal(made.code, 'not_found');
+    assert.match(made.message, /sma/);
+  });
+
+  check('every artefact carries the permanent limit, attached by code', () => {
+    const artefacts = [
+      voyagerPine.pineTemplate('macd', {}).data,
+      voyagerPine.pineReview('//@version=6\nindicator("x")\nplot(close)').data,
+      voyagerPine.pineFromModel('EMA crossover', '//@version=6\nindicator("x")\nplot(ta.ema(close, 20))'),
+    ];
+    for (const artefact of artefacts) {
+      assert.match(artefact.notExecuted, /cannot run it/i);
+      assert.match(artefact.notExecuted, /TradingView/);
+    }
+  });
+
+  check('and nothing ever claims it was run, verified or backtested', () => {
+    /*
+     * Asserted against the artefacts rather than trusted to a review: somebody
+     * who believes a script was checked against live data is somebody who will
+     * trade on an unchecked one.
+     */
+    const artefacts = [
+      voyagerPine.pineTemplate('sma', {}),
+      voyagerPine.pineReview('//@version=6\nindicator("x")\nplot(close)'),
+    ];
+    for (const result of artefacts) {
+      const text = `${result.summary} ${result.data.status}`;
+      for (const claim of voyagerPine.FORBIDDEN_PINE_CLAIMS) {
+        // "not executed" is the one legitimate use of the word.
+        const bare = new RegExp(`(?<!not )(?<!never )${claim}`, 'i');
+        assert.ok(!bare.test(text), `${claim} in: ${text}`);
+      }
+    }
+  });
+
+  check('a review reports what the linter found and nothing more', () => {
+    const broken = voyagerPine.pineReview('indicator("no version line")\nplot(close)');
+    assert.equal(broken.ok, true);
+    assert.ok(broken.data.findings.length > 0);
+    assert.match(broken.data.status, /syntax and known built-ins only/);
+    assert.match(broken.data.status, /not compiled and not run/);
+  });
+
+  check('empty source is refused rather than reviewed', () => {
+    assert.equal(voyagerPine.pineReview('   ').ok, false);
+    assert.equal(voyagerPine.pineFromModel('x', ''), null);
   });
 
   group('A follow-up edits the chart instead of starting again');

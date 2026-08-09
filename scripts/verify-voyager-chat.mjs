@@ -406,6 +406,75 @@ try {
 
   await page.unroute('**/api/voyager');
 
+  group('Pine is on screen with its caveat, and the handoff is a real destination');
+
+  await page.unroute('**/api/voyager');
+  await stubAnswer(page, {
+    contentType: 'AI structured',
+    text: 'Here is an EMA crossover with volume confirmation, and where to run it.',
+    bullets: [],
+    sources: 'Written for this question',
+    confidence: 'medium',
+    actions: [],
+    followUps: [],
+    citations: [],
+    tools: ['pine(template sma)', 'tradingview-handoff(pine)'],
+    code: {
+      language: 'pine',
+      title: 'EMA crossover',
+      source: '//@version=6\nindicator("EMA crossover", overlay = true)\nfast = ta.ema(close, 20)\nplot(fast)',
+      provenance: 'model-written',
+      notExecuted:
+        'I can write and explain Pine Script, but I cannot run it. Executing it needs TradingView’s own engine, which is not something this platform reimplements — so treat anything I write as a draft to review and test on a chart yourself, not as a script that has already been checked against live data.',
+      findings: [],
+      status: 'No errors found — checked for syntax and known built-ins only; not compiled and not run.',
+    },
+    handoff: {
+      kind: 'pine',
+      url: 'https://www.tradingview.com/pine-editor/',
+      carried: [],
+      manual: ['The script itself — copy it from here and paste it into the editor.'],
+      because: [
+        'Running Pine needs TradingView’s own engine. Voyager writes and explains Pine; it cannot execute it, here or anywhere.',
+      ],
+    },
+  });
+
+  await page.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(600);
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Write a Pine indicator for an EMA crossover');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(2500);
+
+  const pineBody = await page.locator('body').innerText();
+  check('the code is shown as code', (await page.locator('pre code').count()) >= 1);
+  check('with a copy button', (await page.getByRole('button', { name: 'Copy' }).count()) === 1);
+  check(
+    'and the permanent limit is stated, not implied',
+    /cannot run it/i.test(pineBody) && /TradingView’s own engine/i.test(pineBody)
+  );
+  check(
+    'nothing claims it was backtested or verified',
+    !/\bbacktested\b/i.test(pineBody) && !/verified against live data/i.test(pineBody.replace(/not .{0,20}verified against live data/gi, ''))
+  );
+  check(
+    'the linter says exactly what it checked',
+    /syntax and known built-ins only/i.test(pineBody)
+  );
+
+  const handoffLink = page.locator('a[href^="https://www.tradingview.com"]').first();
+  check('the handoff is a real link', (await handoffLink.count()) === 1);
+  check('to TradingView and nowhere else', (await handoffLink.getAttribute('href'))?.startsWith('https://www.tradingview.com/'));
+  check('opening in its own tab, safely', (await handoffLink.getAttribute('rel'))?.includes('noopener'));
+  check(
+    'and it says the paste is the step rather than pretending the code travelled',
+    /copy it from here/i.test(pineBody)
+  );
+
+  await page.unroute('**/api/voyager');
+
   group('State 8 — a guest is gated, and the action is kept');
 
   /*

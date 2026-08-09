@@ -39,7 +39,9 @@ export {
 
 import type { VoyagerAction } from './actions';
 import type { VoyagerChartSpec } from './chart/spec';
+import type { PineArtifact } from './tools/pine';
 import type { Bar as ChartBar } from './tools/range';
+import type { TradingViewHandoff } from './tools/tradingView';
 import type { VoyagerScreen } from './screens';
 
 /**
@@ -156,6 +158,23 @@ export type VoyagerAnswer = {
     spec: VoyagerChartSpec;
     series: { assetId: string; bars: ChartBar[]; normalized?: (number | null)[] }[];
   };
+  /**
+   * Pine, as an artefact rather than as prose in the answer.
+   *
+   * It carries its own provenance and its own never-executed sentence, both
+   * attached by code. An answer that had to remember to say "this has not been
+   * backtested" is an answer that will forget on a busy day.
+   */
+  code?: PineArtifact;
+  /**
+   * Where this request goes when it is bigger than this surface.
+   *
+   * Built by `tools/tradingView.ts` from an allowlisted host and validated
+   * parts — the model picks a feature, never a URL. `carried` is what the link
+   * genuinely encodes and `manual` is what has to be set on arrival, so an
+   * answer cannot claim the studies travelled with it.
+   */
+  handoff?: TradingViewHandoff;
 };
 
 export type VoyagerRequest = {

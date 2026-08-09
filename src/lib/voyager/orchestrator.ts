@@ -20,8 +20,10 @@ import {
   type VoyagerToolResult,
 } from './tools/types';
 import { chartFromComparison, chartFromHistory } from './chart/build';
+import { pineFromModel, type PineArtifact } from './tools/pine';
 import type { ComparisonResult } from './tools/comparison';
 import type { HistoryResult } from './tools/marketData';
+import type { TradingViewHandoff } from './tools/tradingView';
 import {
   type VoyagerAction,
   type VoyagerActionId,
@@ -402,6 +404,8 @@ export async function askVoyager(options: {
   let investment: InvestmentSummary | undefined;
   let lastHistory: HistoryResult | undefined;
   let lastComparison: ComparisonResult | undefined;
+  let code: PineArtifact | undefined;
+  let handoff: TradingViewHandoff | undefined;
 
   try {
     /*
@@ -418,11 +422,19 @@ export async function askVoyager(options: {
       const response = await client.messages.create({
         model: MODEL,
         /*
-         * Headroom, because this model thinks by default and `max_tokens`
-         * bounds the thinking and the reply together. Eight thousand was
-         * comfortable for a single-shot answer and is not for one that has read
-         * several tool results first — and the reply it truncates is JSON, so
-         * the failure arrives as a parse error rather than as a short answer.
+         * A ceiling, not a target.
+         *
+         * This model thinks by default and `max_tokens` bounds the thinking and
+         * the reply together, so eight thousand — comfortable for a single-shot
+         * answer — is not comfortable for one that has read several tool
+         * results first. The reply it truncates is JSON, so the failure arrives
+         * as a parse error rather than as a short answer.
+         *
+         * Nothing here asks for longer answers. How much is written is set by
+         * the answer rules ("two or three sentences", at most four bullets) and
+         * by `effort`, both unchanged; raising the ceiling costs nothing when
+         * the reply does not reach it, because output is billed by what is
+         * generated rather than by what was allowed.
          */
         max_tokens: 16000,
         ...(tools.length ? { tools } : {}),
@@ -511,6 +523,18 @@ export async function askVoyager(options: {
           if (call.trace.id === 'compare_assets' && call.result.ok) {
             lastComparison = call.result.data as ComparisonResult;
           }
+          /*
+           * Both travel as themselves. The Pine artefact carries its own
+           * provenance and its own never-executed sentence, and the handoff
+           * carries a destination this code built — neither is something the
+           * answer should be paraphrasing.
+           */
+          if (call.trace.id === 'pine_script' && call.result.ok) {
+            code = call.result.data as PineArtifact;
+          }
+          if (call.trace.id === 'tradingview_handoff' && call.result.ok) {
+            handoff = call.result.data as TradingViewHandoff;
+          }
         }
         continue;
       }
@@ -574,6 +598,15 @@ export async function askVoyager(options: {
           ? chartFromHistory(lastHistory, requestedChart(block.text))
           : null;
 
+      /*
+       * Pine the model wrote, if it wrote any and no deterministic template
+       * already answered. The template wins: it comes from the registry that
+       * also draws the line, so it is the same calculation rather than a
+       * description of one. Either way `pineFromModel` attaches the label, the
+       * lint and the never-executed sentence — the answer never gets to.
+       */
+      const written = code ?? pineFromModel(requestedCode(block.text)?.title, requestedCode(block.text)?.source);
+
       const chips = [
         ...(searches > 0 ? [`web-search(${searches})`] : []),
         ...traceChips(trace),
@@ -585,6 +618,8 @@ export async function askVoyager(options: {
         ...coerced,
         ...(investment ? { investment } : {}),
         ...(chart ? { chart } : {}),
+        ...(written ? { code: written } : {}),
+        ...(handoff ? { handoff } : {}),
         ...(chips.length ? { tools: chips } : {}),
         ...(trace.length ? { trace } : {}),
         ...(citations.length ? { citations: dedupeCitations(citations) } : {}),
@@ -652,6 +687,16 @@ function requestedChart(text: string): { kind?: unknown; studies?: unknown } | u
   try {
     const parsed = JSON.parse(text) as { chart?: { kind?: unknown; studies?: unknown } };
     return parsed.chart;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Pine the model wrote for a free-form request, before it becomes an artefact. */
+function requestedCode(text: string): { title?: unknown; source?: unknown } | undefined {
+  try {
+    const parsed = JSON.parse(text) as { code?: { title?: unknown; source?: unknown } };
+    return parsed.code;
   } catch {
     return undefined;
   }

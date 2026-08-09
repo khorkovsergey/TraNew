@@ -6,6 +6,15 @@ import { findDestinations, NAV_TOPICS } from './navigation';
 import { INVESTMENT_SCREENS, runInvestmentAnalysis } from './investmentAnalysis';
 import { compareAssets } from './comparison';
 import { getHistoryFor, getQuoteFor, MAX_COMPARE_ASSETS, resolveVerified } from './marketData';
+import { pineReview, pineTemplate } from './pine';
+import {
+  CHART_FEATURE_IDS,
+  chartHandoff,
+  isChartFeature,
+  pineHandoff,
+  type TradingViewHandoff,
+} from './tradingView';
+import { STUDY_IDS } from '@/lib/studies/registry';
 import {
   argString,
   callKey,
@@ -244,7 +253,119 @@ export const VOYAGER_TOOLS: Record<VoyagerToolId, VoyagerToolDefinition> = {
       return `compare(${list.slice(0, MAX_COMPARE_ASSETS).join(',').slice(0, 40) || '?'})`;
     },
   },
+
+  tradingview_handoff: {
+    id: 'tradingview_handoff',
+    description:
+      'Hand a request to TradingView and get the destination back. Call it when somebody wants ' +
+      'something these charts do not do — Renko, Kagi, Point & Figure, range bars, volume or TPO ' +
+      'profiles, RSI or MACD panes, multi-pane layouts, drawing workflows, bar replay, a strategy ' +
+      'backtest, or running Pine. This is a feature, not a failure: say plainly what this surface ' +
+      'does and that the professional chart does the rest. It returns the destination, what the ' +
+      'link actually carries and what has to be set on arrival — state those, and never invent a ' +
+      'URL or claim state travelled that this did not list as carried.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: {
+          type: 'string',
+          enum: ['chart', 'pine'],
+          description: 'chart for a charting request, pine for the script editor.',
+        },
+        symbol: { type: 'string', description: 'Ticker, for a chart handoff.' },
+        exchange: { type: 'string', description: 'Exchange, when it is known.' },
+        interval: { type: 'string', enum: ['1D', '1W', '1M'] },
+        features: {
+          type: 'array',
+          items: { type: 'string', enum: CHART_FEATURE_IDS as unknown as string[] },
+          description: 'What was asked for that this surface does not do.',
+        },
+      },
+      required: ['kind'],
+      additionalProperties: false,
+    },
+    mutates: false,
+    requiresAccount: false,
+    requiresConfirmation: false,
+    available: () => true,
+    execute: async (input, context) => {
+      if (input.kind === 'pine') {
+        const handoff = pineHandoff({ hasCode: input.hasCode !== false });
+        return { ok: true, data: handoff, summary: summariseHandoff(handoff) };
+      }
+
+      const symbol = argString(input.symbol, 16) ?? context.subject;
+      const features = (Array.isArray(input.features) ? input.features : []).filter(isChartFeature);
+      const handoff = chartHandoff({
+        symbol,
+        exchange: argString(input.exchange, 12) ?? undefined,
+        interval: argString(input.interval, 4) ?? undefined,
+        features,
+      });
+
+      if (!handoff) {
+        return toolFailure(
+          'bad_arguments',
+          'I need an instrument before I can open the professional chart on it.',
+          true
+        );
+      }
+
+      return { ok: true, data: handoff, summary: summariseHandoff(handoff) };
+    },
+    call: (input) => `tradingview-handoff(${argString(input.kind, 8) ?? 'chart'})`,
+  },
+
+  pine_script: {
+    id: 'pine_script',
+    description:
+      'Pine Script, written or checked here and never run. Use mode "template" for the exact Pine ' +
+      'behind a study this platform draws — it comes from the same registry that computes the ' +
+      'line, so the code and the chart are one calculation. Use mode "review" to check Pine ' +
+      'somebody supplied: it reports syntax and known built-ins only. Whatever comes back has not ' +
+      'been compiled, executed, backtested or checked against live data, and you must not say or ' +
+      'imply otherwise. If somebody asks to run or backtest a script, say that this platform ' +
+      'cannot and hand off to TradingView.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', enum: ['template', 'review'] },
+        study: {
+          type: 'string',
+          enum: STUDY_IDS,
+          description: 'Which built-in study, for mode "template".',
+        },
+        source: { type: 'string', description: 'The script to check, for mode "review".' },
+      },
+      required: ['mode'],
+      additionalProperties: false,
+    },
+    mutates: false,
+    requiresAccount: false,
+    requiresConfirmation: false,
+    available: () => true,
+    execute: async (input) =>
+      input.mode === 'review' ? pineReview(input.source) : pineTemplate(input.study, input.params),
+    call: (input) =>
+      `pine(${argString(input.mode, 10) ?? 'template'}${
+        input.study ? ` ${argString(input.study, 10)}` : ''
+      })`,
+  },
 };
+
+/** The handoff as one line for the planner: destination, what travels, what does not. */
+function summariseHandoff(handoff: TradingViewHandoff): string {
+  return [
+    `TradingView ${handoff.kind} handoff prepared.`,
+    handoff.carried.length
+      ? `Carries: ${handoff.carried.map((item) => `${item.label} ${item.value}`).join(', ')}.`
+      : 'Carries nothing — the editor URL has no fields.',
+    handoff.manual.length ? `Set on arrival: ${handoff.manual.join('; ')}.` : '',
+    handoff.because.length ? `Because: ${handoff.because.join(' ')}` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
 
 /** The tools this request may use, in the shape the Messages API takes. */
 export function toolSpecsFor(context: VoyagerToolContext) {

@@ -513,6 +513,156 @@
   color: var(--tn-text-nav);
 }
 
+/* ------------------------------------------------------------ Pine & handoff */
+
+.pine {
+  margin-top: 12px;
+  border-radius: var(--tn-radius-option);
+  border: 1px solid var(--tn-border-inner);
+  background: var(--tn-surface-inner);
+  overflow: hidden;
+}
+
+.pineHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--tn-border-hairline);
+}
+
+.pineTitle {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.pineProvenance {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--tn-text-muted);
+}
+
+.pineCopy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--tn-radius-chip-sm);
+  border: 1px solid var(--tn-border-control);
+  background: none;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+  cursor: pointer;
+  transition: border-color var(--tn-transition-hover);
+}
+
+.pineCopy:hover {
+  border-color: var(--tn-border-hover);
+}
+
+/* Above the code, deliberately: a caveat below the fold is one nobody read
+   before pasting the script into a chart. */
+.pineWarning {
+  margin: 0;
+  padding: 10px 13px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--tn-amber-text);
+  background: var(--tn-amber-tint);
+  border-bottom: 1px solid var(--tn-border-hairline);
+}
+
+.pineSource {
+  margin: 0;
+  padding: 13px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--tn-text-nav);
+}
+
+.pineStatus {
+  margin: 0;
+  padding: 9px 13px;
+  border-top: 1px solid var(--tn-border-hairline);
+  font-size: 11px;
+  color: var(--tn-text-muted);
+}
+
+.pineFindings {
+  margin: 0;
+  padding: 0 13px 12px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--tn-red);
+}
+
+.handoff {
+  margin-top: 12px;
+  padding: 13px;
+  border-radius: var(--tn-radius-option);
+  border: 1px solid var(--tn-border-inner);
+  background: var(--tn-surface-inner);
+}
+
+.handoffTitle {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.handoffWhy {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--tn-text-soft);
+}
+
+.handoffCarried {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+}
+
+.handoffManual {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+.handoffCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 8px 14px;
+  border-radius: var(--tn-radius-chip-sm);
+  border: 1px solid var(--tn-border-control);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+  text-decoration: none;
+  transition: border-color var(--tn-transition-hover);
+}
+
+.handoffCta:hover {
+  border-color: var(--tn-border-hover);
+}
+
 /* The contextual upgrade card, when the policy layer decided there is one. */
 .upgrade {
   margin-top: 12px;

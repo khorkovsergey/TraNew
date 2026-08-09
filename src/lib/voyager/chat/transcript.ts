@@ -78,6 +78,10 @@ export type Turn = {
    * from. `unknown` for the same reason `output` is: the renderer is the gate.
    */
   chart?: unknown;
+  /** Assistant only — a Pine artefact, with its own provenance and caveat. */
+  code?: unknown;
+  /** Assistant only — a TradingView destination this application built. */
+  handoff?: unknown;
   /** Assistant only — the contextual upgrade card the policy layer decided on. */
   upgrade?: { text: string; cta: string; intent: 'sign_up' | 'unlock_private' };
   /**
