@@ -115,6 +115,7 @@ try {
       'src/lib/voyager/tools/assets.ts',
       'src/lib/voyager/tools/range.ts',
       'src/lib/voyager/tools/metrics.ts',
+      'src/lib/voyager/quota.ts',
       'src/lib/voyager/pages.ts',
       'src/lib/voyager/portal.ts',
       'src/lib/voyager/chart/engine.ts',
@@ -266,6 +267,7 @@ try {
   const metrics = await load('metrics', 'tools');
   const chart = await load('spec', 'chart');
   const tv = await load('tradingView', 'tools');
+  const quota = await load('quota', 'voyager');
   const pages = await load('pages', 'voyager');
   const portalKnowledge = await load('portal', 'voyager');
   const engine = await load('engine', 'chart');
@@ -4065,6 +4067,101 @@ try {
     assert.ok(research.MAX_SEARCHES > 0 && research.MAX_SEARCHES <= 6, research.MAX_SEARCHES);
   });
 
+
+  group('One question moves the counter by one, whatever ran inside it');
+
+  check('a question that was answered costs exactly one', () => {
+    /*
+     * The invariant the production smoke appeared to break. It did not: the
+     * route charges once, outside the tool loop, and this is that decision on
+     * its own.
+     */
+    const result = quota.quotaDelta({ before: 3, quota: 10, answered: true });
+    assert.equal(result.charged, true);
+    assert.equal(result.after, 4);
+  });
+
+  check('and it costs the same whether nothing ran or six tools did', () => {
+    // The number of tools is not an input, and cannot become one: there is
+    // nowhere in this signature to put it.
+    for (let before = 0; before < 10; before += 1) {
+      const result = quota.quotaDelta({ before, quota: 10, answered: true });
+      assert.equal(result.after - before, 1, `before=${before}`);
+    }
+  });
+
+  check('a refused request leaves the counter where it was', () => {
+    // The increment is the check, so a refusal has already been charged when it
+    // is discovered. Keeping that charge is what made a live row read 22 of 10.
+    const atCeiling = quota.quotaDelta({ before: 10, quota: 10, answered: true });
+    assert.equal(atCeiling.charged, false);
+    assert.equal(atCeiling.after, 10);
+
+    const past = quota.quotaDelta({ before: 22, quota: 10, answered: true });
+    assert.equal(past.after, 22, 'a row past the ceiling must stop climbing');
+  });
+
+  check('the last question inside the allowance is still allowed', () => {
+    const ninth = quota.quotaDelta({ before: 9, quota: 10, answered: true });
+    assert.equal(ninth.charged, true);
+    assert.equal(ninth.after, 10);
+  });
+
+  check('an attempt that produced no answer is not charged', () => {
+    // The outage card offers *Retry now*; charging each attempt is how one
+    // question becomes five.
+    const failed = quota.quotaDelta({ before: 3, quota: 10, answered: false });
+    assert.equal(failed.charged, false);
+    assert.equal(failed.after, 3);
+  });
+
+  check('an unmetered plan is not counted at all', () => {
+    const premium = quota.quotaDelta({ before: 40, quota: null, answered: true });
+    assert.equal(premium.charged, false);
+    assert.equal(premium.after, 40);
+  });
+
+  check('the route calls this rule rather than restating it', () => {
+    /*
+     * A specification kept beside an implementation is one that drifts, and
+     * this one guards a number people are charged against.
+     */
+    const source = readFileSync('src/app/api/voyager/route.ts', 'utf8');
+    assert.match(source, /quotaDelta\(\{/);
+    assert.match(source, /if \(!decision\.charged\)[\s\S]{0,120}releaseQuestion/);
+  });
+
+  group('The counter is not drawn before the server has said what it is');
+
+  check('an unknown count says so instead of showing zero', () => {
+    /*
+     * The defect behind the reported quota jump. A fresh browser on an address
+     * that had already spent nine questions rendered "Free: 0 of 10", then
+     * corrected to 9 on the first answer — which reads exactly like one
+     * question costing nine.
+     */
+    const at = new Date('2026-08-09T12:00:00Z');
+    const unknown = transcript.limitLabel(session.EMPTY_ALLOWANCE, at, false, false);
+    assert.match(unknown, /Free: — of 10/);
+    assert.ok(!/0 of 10/.test(unknown), unknown);
+  });
+
+  check('and shows the server figure once it has one', () => {
+    const at = new Date('2026-08-09T12:00:00Z');
+    const known = transcript.limitLabel({ used: 9, day: '2026-08-09' }, at, false, true);
+    assert.match(known, /Free: 9 of 10/);
+  });
+
+  check('an unmetered plan never shows a count either way', () => {
+    const at = new Date('2026-08-09T12:00:00Z');
+    for (const known of [true, false]) {
+      assert.match(
+        transcript.limitLabel(session.EMPTY_ALLOWANCE, at, true, known),
+        /Unlimited questions/
+      );
+    }
+  });
+
   group('One question costs one question, whatever it takes to answer it');
 
   /*
@@ -4109,8 +4206,10 @@ try {
 
   check('and so does an attempt that produced no answer', () => {
     // The outage card offers *Retry now*. Charging each attempt is how one
-    // question becomes five.
-    assert.match(routeSource, /if \(answer\.simulated\)[\s\S]{0,200}releaseQuestion/);
+    // question becomes five. The route asks `quotaDelta` whether the request
+    // bought anything and refunds when it did not.
+    assert.match(routeSource, /answered: answer\.simulated !== true/);
+    assert.match(routeSource, /if \(!decision\.charged\)[\s\S]{0,120}releaseQuestion/);
   });
 
   check('the refund cannot mint questions', () => {
