@@ -2,77 +2,129 @@
   min-width: 0;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-  gap: 12px;
+/* The table has a floor width; below it this scrolls rather than the page. */
+.scroll {
+  overflow-x: auto;
 }
 
-.column {
-  background: var(--tn-surface-inner);
-  border: 1px solid var(--tn-border-inner);
-  border-radius: 13px;
-  padding: 16px 16px 14px;
-  min-width: 0;
+.table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
 
-.head {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.name {
-  font-size: 15.5px;
-  font-weight: 800;
-  color: var(--tn-text);
-}
-
-a.name:hover {
-  color: var(--tn-mint);
-}
-
-.axes {
-  margin: 0;
-}
-
-.axis {
-  margin-top: 11px;
-}
-
-.axisLine {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--tn-text-soft);
-}
-
-.axisLabel {
-  min-width: 0;
-}
-
-.axisValue {
-  margin: 0;
-  color: var(--tn-text-nav);
-  font-weight: 700;
-  text-align: right;
+/* Present for a screen reader, off screen for everybody else: the same
+   sentence is rendered visibly beside the chips that build the comparison. */
+.caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
+.corner,
+.rowHead {
+  width: 30%;
+  text-align: left;
+  font-weight: 600;
+  vertical-align: top;
+}
+
+.corner {
+  padding: 10px 12px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}
+
+.rowHead {
+  padding: 14px 12px;
+  border-top: 1px solid var(--tn-border-inner);
+  font-size: 13.5px;
+  color: var(--tn-text-soft);
+}
+
+.colHead {
+  padding: 10px 12px 12px;
+  text-align: center;
+  vertical-align: bottom;
+}
+
+.colName {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--tn-text);
+}
+
+.colName a:hover {
+  color: var(--tn-mint);
+}
+
+/* The class being read about. It is always first, and it is the only one
+   coloured — a comparison in which every column is emphasised has no subject. */
+.colHeadOn .colName,
+.colHeadOn .colName a {
+  color: var(--tn-mint);
+}
+
+.colTagline {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--tn-text-muted);
+}
+
+.cell {
+  padding: 14px 12px;
+  border-top: 1px solid var(--tn-border-inner);
+  text-align: center;
+  vertical-align: top;
+}
+
 .dots {
-  display: flex;
-  gap: 3px;
-  margin-top: 5px;
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
 }
 
 .dot {
-  flex: 1;
-  height: 5px;
-  border-radius: 3px;
-  background: #1b2836;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--tn-border-control);
+}
+
+.dotOn {
+  background: var(--tn-mint);
+}
+
+/* Risk, Costs and Complexity at 4 or 5. More is worse on these three only. */
+.dotWarn {
+  background: var(--tn-amber-text);
+}
+
+.scaleWord {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--tn-text-muted);
+}
+
+.cellText {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tn-text-nav);
 }
 
 .note {
@@ -90,46 +142,18 @@ a.name:hover {
   color: var(--tn-blue);
 }
 
-.accent_green {
-  color: var(--tn-icon);
-}
-.accent_blue {
-  color: var(--tn-icon);
-}
-.accent_purple {
-  color: var(--tn-icon);
-}
-.accent_amber {
-  color: var(--tn-icon);
-}
-.accent_orange {
-  color: var(--tn-icon);
-}
-.accent_rose {
-  color: var(--tn-icon);
-}
-
-.dotOn_green {
-  background: var(--tn-text-faint);
-}
-.dotOn_blue {
-  background: var(--tn-text-faint);
-}
-.dotOn_purple {
-  background: var(--tn-text-faint);
-}
-.dotOn_amber {
-  background: var(--tn-text-faint);
-}
-.dotOn_orange {
-  background: var(--tn-text-faint);
-}
-.dotOn_rose {
-  background: var(--tn-text-faint);
-}
-
 @media (max-width: 760px) {
-  .grid {
-    grid-template-columns: 1fr;
+  .table {
+    min-width: 460px;
+    font-size: 12.5px;
+  }
+
+  .corner,
+  .rowHead {
+    width: 34%;
+  }
+
+  .colTagline {
+    display: none;
   }
 }

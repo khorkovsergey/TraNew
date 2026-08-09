@@ -62,27 +62,52 @@ try {
     (await page.locator('[role="radio"][aria-checked="true"]').innerText()).includes('Stocks')
   );
 
-  group('Every tab moves all three columns');
+  group('Every tab moves the whole page with it');
 
   for (const label of ['Stocks', 'ETFs', 'Bonds', 'Cash & Deposits', 'Crypto', 'Property']) {
     await page.locator('[role="radio"]', { hasText: label }).first().click();
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(250);
 
-    const understand = await page.locator('section', { hasText: 'Understand this option' }).first().innerText();
-    const compare = await page.locator('section', { hasText: 'Compare options' }).first().innerText();
-    const ask = await page.locator('section', { hasText: 'Ask Voyager about this option' }).first().innerText();
+    const explain = await page.locator('#main h2').first().innerText();
+    const compare = await page.locator('#compare').innerText();
+    const leads = await page.locator('section', { hasText: 'Where this leads' }).last().innerText();
+    const ask = await page.locator('section', { hasText: 'Ask Voyager about' }).last().innerText();
 
     /*
-     * The stem rather than the label: the Ask column speaks in sentences and
-     * uses the singular subject — "I can explain how a bond works" — so looking
-     * for the plural heading there tests the grammar, not the wiring.
+     * The stem rather than the label: Voyager speaks in sentences and uses the
+     * singular subject — "I can explain how a bond works" — so looking for the
+     * plural heading there tests the grammar, not the wiring.
      */
     const stem = label.split(' ')[0].replace(/s$/, '').toLowerCase();
     const mentions = (text) => text.toLowerCase().includes(stem);
     check(
-      `${label}: all three columns follow the tab`,
-      mentions(understand) && mentions(compare) && mentions(ask),
-      `understand:${mentions(understand)} compare:${mentions(compare)} ask:${mentions(ask)}`
+      `${label}: explanation, comparison, next steps and Voyager all follow the tab`,
+      mentions(explain) && mentions(compare) && mentions(leads) && mentions(ask),
+      `explain:${mentions(explain)} compare:${mentions(compare)} leads:${mentions(leads)} ask:${mentions(ask)}`
+    );
+  }
+
+  group('Each option is explained, not just named');
+
+  for (const label of ['Stocks', 'Bonds', 'Crypto']) {
+    await page.locator('[role="radio"]', { hasText: label }).first().click();
+    await page.waitForTimeout(250);
+
+    /* Lower-cased: these headings are upper-cased in CSS, and `innerText`
+       reports what is rendered rather than what is in the markup. */
+    const detail = (await page.locator('#main section').first().innerText()).toLowerCase();
+    const missing = [
+      'risk',
+      'typical horizon',
+      'liquidity',
+      'entry size',
+      'good to know',
+      'watch out for',
+    ].filter((heading) => !detail.includes(heading));
+    check(
+      `${label}: the four facts, what to know, and what to watch`,
+      missing.length === 0,
+      `missing: ${missing.join(', ')}`
     );
   }
 
@@ -132,21 +157,57 @@ try {
     (redirect.headers()['location'] ?? '').includes('/en/explore/etfs')
   );
 
-  group('Compare in detail carries the comparison');
+  /*
+   * ---- The comparison ----
+   *
+   * It used to leave for `/research`, which is the instrument-research
+   * workspace: a search box, a chart and a canned "Direct answer". Somebody
+   * still deciding whether they wanted bonds or a fund at all was handed a
+   * screen built for choosing between two tickers. It stays on this page now,
+   * and the first thing checked is that it did not go anywhere.
+   */
+  group('Compare investment types stays on the page');
 
   await page.goto(`${base}/en/explore`, { waitUntil: 'networkidle' });
   await page.locator('[role="radio"]', { hasText: 'Bonds' }).first().click();
-  await page.waitForTimeout(200);
-  await page.locator('a', { hasText: 'Compare in detail' }).first().click();
-  await page.waitForURL(/\/research/, { timeout: 8000 });
+  await page.waitForTimeout(250);
+  await page.locator('a', { hasText: 'Compare investment types' }).first().click();
   await page.waitForTimeout(400);
 
-  const comparison = await page.locator('#main').innerText();
-  check('it is a comparison, not the canned answer', !/Direct answer/i.test(comparison));
+  check(
+    'it did not leave for the research workspace',
+    new URL(page.url()).pathname === '/en/explore',
+    page.url()
+  );
+
+  const comparison = await page.locator('#compare').innerText();
   check('the class you were reading about is in it', /Bonds/.test(comparison));
   check('so are its two alternatives', /ETFs/.test(comparison) && /Cash/.test(comparison));
-  check('all six measures are shown', /Ease of selling/.test(comparison) && /Minimum amount/.test(comparison));
-  check('and each column offers its own page', /Understand Bonds/.test(comparison));
+  check(
+    'all six criteria are shown',
+    /Ease of selling/.test(comparison) && /Complexity/.test(comparison)
+  );
+  /* The two that are answers rather than positions on a scale. */
+  check(
+    'and the two that are not scales',
+    /Minimum amount/.test(comparison) && /Typical use case/.test(comparison)
+  );
+  check(
+    'each column offers its own page',
+    (await page.locator('#compare a[href^="/en/explore/"]').count()) >= 3
+  );
+  check(
+    'and it is labelled as education, not advice',
+    /not investment advice/i.test(comparison)
+  );
+
+  // The same comparison, arrived at from elsewhere: the class travels in `tab`.
+  await page.goto(`${base}/en/explore?tab=crypto#compare`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(300);
+  check(
+    'an arriving compare link opens on the class it names',
+    (await page.locator('[role="radio"][aria-checked="true"]').innerText()).includes('Crypto')
+  );
 
   group('Every "Try asking" question is answered');
 
@@ -184,20 +245,68 @@ try {
       (await page.locator('a', { hasText: 'Compare' }).count()) >= 6
   );
 
-  group('Explore more is a block, not a row of tabs');
+  /*
+   * ---- What this page is ----
+   *
+   * It is education, and the redesign's whole point is that it says so before
+   * anything else. It used to open under "Explore your options" with four
+   * market tiles and a percentage on each — a page that answers "what is an
+   * ETF" was also reporting what the market did this morning, which made it
+   * the wrong answer to both questions.
+   */
+  group('The page says what it is, and it is not markets');
 
   await page.goto(`${base}/en/explore`, { waitUntil: 'networkidle' });
-  const more = page.locator('section', { hasText: 'Explore more' }).last();
-  check('the section exists', (await more.count()) > 0);
-  check('Economy is in it', (await more.innerText()).includes('Economy'));
 
-  // The tab row and this block must not look like the same control.
-  const tabBox = await page.locator('[role="radio"]').first().boundingBox();
-  const cardBox = await more.locator('a').first().boundingBox();
+  const head = await page.locator('#main').innerText();
+  check('it is announced as Learn', /\blearn\b/i.test(head.slice(0, 200)), head.slice(0, 60));
   check(
-    'and it does not look like a tab',
-    cardBox && tabBox && Math.abs(cardBox.height - tabBox.height) > 20,
-    `tab ${tabBox?.height} vs card ${cardBox?.height}`
+    'and states that it carries no live prices',
+    /no live prices/i.test(head),
+    head.slice(0, 120).replace(/\s+/g, ' ')
+  );
+  check('the heading is Investment options', (await page.locator('#main h1').innerText()) === 'Investment options');
+
+  /*
+   * A quoted change — a sign, a decimal and a per cent — is a price. The prose
+   * on this page talks in percentages ("a 0.20% fee", "falls of 50–70%") and
+   * that is not the same claim, so the pattern is deliberately narrow.
+   */
+  const quoted = head.match(/[+−-]\d+\.\d+\s*%/g) ?? [];
+  check('and there is not a quoted price on it', quoted.length === 0, quoted.join(' '));
+
+  check(
+    'somebody who wanted live markets is told where they are',
+    (await page.locator('#main a[href="/en/markets/global"]').count()) > 0
+  );
+
+  group('Where this leads, and what it does not promise');
+
+  const leadsCard = page.locator('section', { hasText: 'Where this leads' }).last();
+  const leadHrefs = await leadsCard
+    .locator('a')
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')));
+  check('three ways on from here', leadHrefs.length === 3, leadHrefs.join(' '));
+  check('the comparison is one of them, on this page', leadHrefs.includes('#compare'));
+  check(
+    'and the other two are real routes',
+    leadHrefs.filter((href) => href?.startsWith('/en/')).length === 2,
+    leadHrefs.join(' ')
+  );
+
+  /*
+   * Starting points are examples and the card says so. They used to be cards
+   * with an "Understand" button each, which made six product shapes look like
+   * six screens the portal had built.
+   */
+  const startsCard = page.locator('section', { hasText: 'Popular starting points' }).last();
+  check(
+    'starting points are examples, not destinations',
+    (await startsCard.locator('a').count()) === 0
+  );
+  check(
+    'and they are labelled as examples',
+    /not recommendations/i.test(await startsCard.innerText())
   );
   /*
    * ---- The header menu ----
@@ -444,23 +553,45 @@ try {
   check('and it closes', (await page.locator('div[class*="panelMega"]').count()) === 0);
 
   /*
-   * The menu names a section it deliberately does not link to, so the way in
-   * has to exist somewhere else. It was the footer; the shell redesign reduced
-   * the footer to a brand line and the hub is reached from Home now.
+   * ---- The way in ----
    *
-   * The place is allowed to move — what must not change is that there is one.
-   * A section with no way in is a deleted feature wearing a route, and that is
-   * what this checks, not which page happens to carry the link this month.
+   * The menu names this section and deliberately does not link to it, so the
+   * way in has to exist somewhere else. It was the footer; the shell redesign
+   * reduced the footer to a brand line and it moved to Home.
+   *
+   * It is moving again. The Investment options redesign gives Home's "Explore
+   * markets" button to Market Overview at `/markets/global`, because that
+   * button says markets and this page is education — and this page becomes
+   * something reached *from* live markets rather than instead of them.
+   *
+   * So the door is not asserted to be on Home. What must not change is that
+   * there is one somewhere: a section with no way in is a deleted feature
+   * wearing a route. The known doors are listed and at least one must be open,
+   * which stays true before that hand-over, after it, and during it.
    */
-  await page.goto(`${base}/en`, { waitUntil: 'networkidle' });
-  const fromHome = await page
-    .locator('a[href]')
-    .evaluateAll((nodes) => nodes.map((node) => new URL(node.href).pathname));
+  group('The section has a way in');
+
+  const DOORS = [
+    { path: '/en', name: 'Home' },
+    { path: '/en/markets/global', name: 'Global markets' },
+    { path: '/en/explore/options', name: 'the catalogue' },
+  ];
+
+  const open = [];
+  for (const door of DOORS) {
+    await page.goto(`${base}${door.path}`, { waitUntil: 'networkidle' });
+    const hrefs = await page
+      .locator('a[href]')
+      .evaluateAll((nodes) => nodes.map((node) => new URL(node.href).pathname));
+    if (hrefs.includes('/en/explore')) open.push(door.name);
+  }
+
   check(
-    'and the hub is still reachable, now from Home',
-    fromHome.includes('/en/explore'),
-    fromHome.join(' '),
+    'at least one page still leads here',
+    open.length > 0,
+    `open: ${open.join(', ') || 'none'}`
   );
+  console.log(`       reached from: ${open.join(', ') || 'nowhere'}`);
 } finally {
   await browser.close();
 }
