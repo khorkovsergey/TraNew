@@ -115,6 +115,7 @@ try {
       'src/lib/voyager/tools/assets.ts',
       'src/lib/voyager/tools/range.ts',
       'src/lib/voyager/tools/metrics.ts',
+      'src/lib/voyager/chart/spec.ts',
       'src/lib/voyager/chat/transcript.ts',
       'src/lib/academy/summary.ts',
       'src/lib/explore/answers.ts',
@@ -258,6 +259,7 @@ try {
   const assets = await load('assets', 'tools');
   const ranges = await load('range', 'tools');
   const metrics = await load('metrics', 'tools');
+  const chart = await load('spec', 'chart');
   const pageContext = await load('context', 'voyager');
   const transcript = await load('transcript', 'chat');
   const learn = await load('summary', 'academy');
@@ -4520,6 +4522,176 @@ try {
     assert.equal(one[0], 100);
     assert.equal(two[0], 100);
     assert.deepEqual(one, two);
+  });
+
+  group('A chart cannot promise what the canvas will not draw');
+
+  const specOf = (patch = {}) =>
+    chart.clampChartSpec({
+      kind: 'line',
+      series: [{ assetId: 'stock:TSLA', symbol: 'TSLA', label: 'Tesla, Inc.', field: 'close' }],
+      range: { start: '2026-01-01', end: '2026-08-09' },
+      interval: '1D',
+      studies: [],
+      sourceMeta: {
+        provider: 'Twelve Data',
+        firstObservation: '2026-01-02',
+        lastObservation: '2026-08-07',
+        delayed: true,
+        derivedFromDaily: false,
+      },
+      ...patch,
+    });
+
+  check('what is renderable comes from the registry, not from a list here', () => {
+    /*
+     * `placement: 'overlay'` is the studies that share the price pane, which is
+     * what the canvas paints. A study gaining or losing a pane in the registry
+     * changes this set without anybody remembering to update it.
+     */
+    for (const id of chart.RENDERABLE_STUDIES) {
+      assert.equal(studies.STUDIES[id].placement, 'overlay', id);
+    }
+    assert.ok(chart.RENDERABLE_STUDIES.includes('sma'));
+    assert.ok(!chart.RENDERABLE_STUDIES.includes('rsi'));
+  });
+
+  check('a study that needs its own pane is refused with a reason', () => {
+    /*
+     * The defect this whole file exists for: a module described "RSI and three
+     * detected levels" while the renderer drew plain candles. The engine skips
+     * anything whose pane is not `main` — Supercharts' own workspace included —
+     * so RSI is refused here rather than claimed and silently dropped.
+     */
+    const spec = specOf({ studies: [{ id: 'rsi', params: { length: 14 } }, { id: 'sma' }] });
+    assert.equal(spec.studies.length, 1);
+    assert.equal(spec.studies[0].id, 'sma');
+    assert.equal(spec.refused.length, 1);
+    assert.equal(spec.refused[0].study, 'rsi');
+    assert.match(chart.refusalNotes(spec)[0], /own pane/i);
+  });
+
+  check('and the caption cannot mention it, because it is not in the spec', () => {
+    // The mechanism, not the discipline: the caption is generated from the
+    // clamped spec, so there is nowhere for a refused study's name to come from.
+    const spec = specOf({ studies: [{ id: 'macd' }, { id: 'rsi' }] });
+    const caption = chart.describeChart(spec);
+    assert.ok(!/rsi/i.test(caption), caption);
+    assert.ok(!/macd/i.test(caption), caption);
+  });
+
+  check('a study that is drawn is named in the caption with its real parameters', () => {
+    const spec = specOf({ studies: [{ id: 'sma', params: { fast: 50, slow: 200 } }] });
+    assert.match(chart.describeChart(spec), /MA 50\/200/);
+    assert.equal(chart.refusalNotes(spec).length, 0);
+  });
+
+  check('out-of-range study numbers are pulled in rather than drawn blank', () => {
+    // A 4,000-period average on a 200-bar series is an empty line that the
+    // caption would still announce.
+    const spec = specOf({ studies: [{ id: 'sma', params: { fast: 9999, slow: -5 } }] });
+    assert.equal(spec.studies[0].params.fast, studies.STUDIES.sma.params.fast.max);
+    assert.equal(spec.studies[0].params.slow, studies.STUDIES.sma.params.slow.min);
+  });
+
+  check('several instruments cannot be candles, so the kind is corrected', () => {
+    // Five candlestick bodies on one pane is five overlapping bodies, and the
+    // engine only has bars for one series anyway.
+    const spec = specOf({
+      kind: 'candles',
+      series: [
+        { assetId: 'a', symbol: 'AAPL', label: 'Apple', field: 'normalized' },
+        { assetId: 'b', symbol: 'MSFT', label: 'Microsoft', field: 'normalized' },
+      ],
+    });
+    assert.equal(spec.kind, 'performance');
+    assert.equal(spec.normalization.enabled, true);
+    assert.equal(spec.normalization.base, 100);
+    assert.match(chart.describeChart(spec), /rebased to 100/);
+  });
+
+  check('a study on a comparison is refused rather than drawn across all of it', () => {
+    const spec = specOf({
+      kind: 'performance',
+      series: [
+        { assetId: 'a', symbol: 'AAPL', label: 'Apple', field: 'normalized' },
+        { assetId: 'b', symbol: 'MSFT', label: 'Microsoft', field: 'normalized' },
+      ],
+      studies: [{ id: 'sma' }],
+    });
+    assert.equal(spec.studies.length, 0);
+    assert.equal(spec.refused.length, 1);
+  });
+
+  check('the caption says the dates it has, not the ones it was asked for', () => {
+    const caption = chart.describeChart(specOf());
+    assert.match(caption, /2026-01-02 to 2026-08-07/);
+    assert.ok(!caption.includes('2026-01-01'), caption);
+  });
+
+  check('delayed and folded-from-daily are always said out loud', () => {
+    const spec = specOf({ interval: '1W', sourceMeta: {
+      provider: 'Twelve Data',
+      firstObservation: '2026-01-05',
+      lastObservation: '2026-08-03',
+      delayed: true,
+      derivedFromDaily: true,
+    } });
+    const caption = chart.describeChart(spec);
+    assert.match(caption, /folded from daily/);
+    assert.match(caption, /delayed/);
+  });
+
+  check('rubbish is no chart rather than an empty one', () => {
+    assert.equal(chart.clampChartSpec(null), null);
+    assert.equal(chart.clampChartSpec({ kind: 'renko', series: [] }), null);
+    assert.equal(chart.clampChartSpec({ kind: 'line', series: [] }), null);
+    assert.equal(chart.clampChartSpec({ kind: 'line', series: [{ label: 'no symbol' }] }), null);
+  });
+
+  group('A follow-up edits the chart instead of starting again');
+
+  check('"show it as candles" keeps the instrument and the period', () => {
+    const before = specOf({ studies: [{ id: 'sma' }] });
+    const after = chart.applyChartEdit(before, { kind: 'chart_kind', value: 'candles' });
+
+    assert.equal(after.kind, 'candles');
+    assert.equal(after.series[0].symbol, 'TSLA');
+    assert.deepEqual(after.range, before.range);
+    assert.deepEqual(after.studies, before.studies);
+  });
+
+  check('an edit cannot smuggle in what the original could not contain', () => {
+    // Asking for RSI third is refused exactly as asking for it first was.
+    const after = chart.applyChartEdit(specOf(), {
+      kind: 'add_study',
+      study: { id: 'rsi', params: { length: 14 } },
+    });
+    assert.equal(after.studies.length, 0);
+    assert.equal(after.refused.length, 1);
+    assert.ok(!/rsi/i.test(chart.describeChart(after)));
+  });
+
+  check('removing a study takes its apology with it', () => {
+    const withStudy = chart.applyChartEdit(specOf(), {
+      kind: 'add_study',
+      study: { id: 'sma', params: { fast: 20, slow: 50 } },
+    });
+    assert.equal(withStudy.studies.length, 1);
+
+    const without = chart.applyChartEdit(withStudy, { kind: 'remove_study', study: 'sma' });
+    assert.equal(without.studies.length, 0);
+    assert.ok(!/MA 20\/50/.test(chart.describeChart(without)));
+  });
+
+  check('changing the period keeps everything else', () => {
+    const after = chart.applyChartEdit(specOf(), {
+      kind: 'range',
+      start: '2021-01-01',
+      end: '2026-01-01',
+    });
+    assert.equal(after.range.start, '2021-01-01');
+    assert.equal(after.series[0].symbol, 'TSLA');
   });
 
   check('correlation needs both alignment and enough of a period', () => {

@@ -38,6 +38,8 @@ export {
 } from './actions';
 
 import type { VoyagerAction } from './actions';
+import type { VoyagerChartSpec } from './chart/spec';
+import type { Bar as ChartBar } from './tools/range';
 import type { VoyagerScreen } from './screens';
 
 /**
@@ -141,6 +143,19 @@ export type VoyagerAnswer = {
    * about one.
    */
   investment?: InvestmentSummary;
+  /**
+   * A chart, and the specification it was drawn from.
+   *
+   * The two travel together because the caption under the picture and the
+   * sentence in the answer are generated from that same specification — which
+   * is what stops a paragraph describing an indicator the canvas never drew.
+   * Everything unrenderable was removed from it before it got here, and what
+   * was removed is listed on it so the answer can say so.
+   */
+  chart?: {
+    spec: VoyagerChartSpec;
+    series: { assetId: string; bars: ChartBar[]; normalized?: (number | null)[] }[];
+  };
 };
 
 export type VoyagerRequest = {

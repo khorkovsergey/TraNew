@@ -50,6 +50,8 @@ import { runVoyagerAction } from '@/app/actions/voyagerActions';
 import type { InvestmentSummary } from '@/lib/investment/summary';
 import type { VoyagerResponse } from '@/lib/voyager/types';
 import { InvestmentAssessmentCard } from '@/components/voyager/InvestmentAssessment';
+import { VoyagerChart } from '@/components/voyager/chart/VoyagerChart';
+import type { ChartPayload } from '@/lib/voyager/chart/build';
 import { ModuleCard } from '@/components/voyager/workspace/ModuleCard';
 import styles from './VoyagerChat.module.css';
 
@@ -345,6 +347,7 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
           bullets: quota ? undefined : payload.answer.bullets,
           actions: quota ? undefined : payload.answer.actions,
           investment: quota ? undefined : payload.answer.investment,
+          chart: quota ? undefined : payload.answer.chart,
           upgrade: quota ? undefined : payload.answer.upgrade,
           ticker: quota ? undefined : (voyagerContext.facts?.ticker ?? undefined),
           scripted: !quota && payload.answer.simulated === true,
@@ -904,6 +907,22 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
                             ))}
                           </ul>
                         )}
+
+                        {/* The chart, drawn by the Supercharts engine from the same
+                            specification the caption and this answer were written
+                            from. Nothing here can describe a study the canvas did
+                            not draw, because the caption is generated from the spec
+                            after everything unrenderable was removed from it. */}
+                        {turn.chart ? (
+                          <VoyagerChart
+                            spec={(turn.chart as ChartPayload).spec}
+                            series={(turn.chart as ChartPayload).series}
+                            onRetry={() => {
+                              const text = lastQuestion(turns);
+                              if (text) void deliver(text);
+                            }}
+                          />
+                        ) : null}
 
                         {/* The deterministic assessment, when a question asked for one.
                             Every figure in it was computed and is traceable to a dated

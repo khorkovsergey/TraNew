@@ -73,6 +73,11 @@ export type Turn = {
    * conversation, not the shape of an assessment, and the renderer is the gate.
    */
   investment?: unknown;
+  /**
+   * Assistant only — the chart this answer drew, with the spec it was drawn
+   * from. `unknown` for the same reason `output` is: the renderer is the gate.
+   */
+  chart?: unknown;
   /** Assistant only — the contextual upgrade card the policy layer decided on. */
   upgrade?: { text: string; cta: string; intent: 'sign_up' | 'unlock_private' };
   /**

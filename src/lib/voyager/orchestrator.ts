@@ -19,6 +19,9 @@ import {
   type ToolTraceEntry,
   type VoyagerToolResult,
 } from './tools/types';
+import { chartFromComparison, chartFromHistory } from './chart/build';
+import type { ComparisonResult } from './tools/comparison';
+import type { HistoryResult } from './tools/marketData';
 import {
   type VoyagerAction,
   type VoyagerActionId,
@@ -389,6 +392,8 @@ export async function askVoyager(options: {
   const citations: { label: string; detail?: string }[] = [];
   let searches = 0;
   let investment: InvestmentSummary | undefined;
+  let lastHistory: HistoryResult | undefined;
+  let lastComparison: ComparisonResult | undefined;
 
   try {
     /*
@@ -479,6 +484,18 @@ export async function askVoyager(options: {
           if (call.trace.id === 'investment_analysis' && call.result.ok) {
             investment = call.result.data as InvestmentSummary;
           }
+          /*
+           * The last market result is kept so a chart can be drawn from it.
+           * Kept rather than drawn now: the model has not yet said which view
+           * it wants, and a chart built before that choice would be a second
+           * chart to reconcile with the one that ends up on screen.
+           */
+          if (call.trace.id === 'get_history' && call.result.ok) {
+            lastHistory = call.result.data as HistoryResult;
+          }
+          if (call.trace.id === 'compare_assets' && call.result.ok) {
+            lastComparison = call.result.data as ComparisonResult;
+          }
         }
         continue;
       }
@@ -505,15 +522,29 @@ export async function askVoyager(options: {
        * question the model answered without looking anything up shows no search
        * chip, or the chip stops meaning anything.
        */
+      /*
+       * The chart, built from the data that was fetched and the view the model
+       * asked for — in that order, and never the other way round. A comparison
+       * outranks a single history because somebody who asked for both wanted
+       * the comparison; the single fetch was a step towards it.
+       */
+      const chart = lastComparison
+        ? chartFromComparison(lastComparison)
+        : lastHistory
+          ? chartFromHistory(lastHistory, requestedChart(block.text))
+          : null;
+
       const chips = [
         ...(searches > 0 ? [`web-search(${searches})`] : []),
         ...traceChips(trace),
+        ...(chart ? [`chart(${chart.spec.kind})`] : []),
         ...(coerced.study ? [`study(${coerced.study.id})`] : []),
       ];
 
       return {
         ...coerced,
         ...(investment ? { investment } : {}),
+        ...(chart ? { chart } : {}),
         ...(chips.length ? { tools: chips } : {}),
         ...(trace.length ? { trace } : {}),
         ...(citations.length ? { citations: dedupeCitations(citations) } : {}),
@@ -528,6 +559,23 @@ export async function askVoyager(options: {
     // below is honest about being general, and an error toast is not more useful.
     console.error('[voyager] model call failed, falling back to scripted answer', error);
     return scripted();
+  }
+}
+
+/**
+ * The chart view the answer asked for, if it asked for one.
+ *
+ * Read back out of the JSON rather than off `coerce`, because `coerce` is the
+ * answer contract and a chart is a request about data the contract knows
+ * nothing about. Unparseable is not an error: no view stated means the builder
+ * picks the sensible default for the period.
+ */
+function requestedChart(text: string): { kind?: unknown; studies?: unknown } | undefined {
+  try {
+    const parsed = JSON.parse(text) as { chart?: { kind?: unknown; studies?: unknown } };
+    return parsed.chart;
+  } catch {
+    return undefined;
   }
 }
 
