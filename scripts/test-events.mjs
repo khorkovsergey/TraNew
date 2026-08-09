@@ -112,6 +112,9 @@ try {
       'src/lib/voyager/context.ts',
       'src/lib/voyager/tools/types.ts',
       'src/lib/voyager/tools/navigation.ts',
+      'src/lib/voyager/tools/assets.ts',
+      'src/lib/voyager/tools/range.ts',
+      'src/lib/voyager/tools/metrics.ts',
       'src/lib/voyager/chat/transcript.ts',
       'src/lib/academy/summary.ts',
       'src/lib/explore/answers.ts',
@@ -252,6 +255,9 @@ try {
   const acts = await load('actions', 'voyager');
   const toolTypes = await load('types', 'tools');
   const nav = await load('navigation', 'tools');
+  const assets = await load('assets', 'tools');
+  const ranges = await load('range', 'tools');
+  const metrics = await load('metrics', 'tools');
   const pageContext = await load('context', 'voyager');
   const transcript = await load('transcript', 'chat');
   const learn = await load('summary', 'academy');
@@ -4149,6 +4155,382 @@ try {
       assert.equal(found.ok, true, topic);
       assert.ok(found.data.destinations.length > 0, topic);
     }
+  });
+
+  /* ============ Voyager: which instrument, over which period ============== */
+
+  group('An instrument is resolved, never guessed');
+
+  check('a ticker and a name reach the same instrument', () => {
+    for (const query of ['TSLA', 'tsla', 'Tesla', 'тесла', 'chart Tesla for me']) {
+      const found = assets.resolveAsset(query);
+      assert.equal(found.status, 'exact', query);
+      assert.equal(found.asset.symbol, 'TSLA', query);
+    }
+  });
+
+  check('a name is matched whole, never inside another word', () => {
+    /*
+     * The old dictionary matched substrings, so "metallurgy" contained "meta"
+     * and "a metaphor for risk" charted Meta Platforms.
+     */
+    assert.notEqual(assets.resolveAsset('what is a metaphor for risk').status, 'exact');
+    assert.notEqual(assets.resolveAsset('metallurgy stocks').status, 'exact');
+  });
+
+  check('a word that means two instruments asks instead of choosing', () => {
+    // Gold is an ETF holding bullion and a spot rate. They do not move
+    // identically, and picking one silently is how somebody reads the wrong one.
+    const found = assets.resolveAsset('gold');
+    assert.equal(found.status, 'ambiguous');
+    assert.ok(found.alternatives.length >= 2);
+    assert.match(assets.clarification(found.alternatives), /which did you mean/i);
+    assert.equal(assets.resolveAsset('золото').status, 'ambiguous');
+  });
+
+  check('an unknown ticker is held for verification, not accepted', () => {
+    /*
+     * "Chart ABC" must not chart something. It is ticker-shaped, so it goes to
+     * the provider; if no quote comes back it does not exist here.
+     */
+    const found = assets.resolveAsset('ABC');
+    assert.equal(found.status, 'unverified');
+    assert.equal(found.symbol, 'ABC');
+  });
+
+  check('and a sentence that names nothing resolves to nothing', () => {
+    for (const query of ['how do I start investing', '', null, 42]) {
+      assert.equal(assets.resolveAsset(query).status, 'unknown', JSON.stringify(query));
+    }
+  });
+
+  group('A period is a period, not "about 260 bars"');
+
+  const TODAY = '2026-08-09';
+
+  check('the defaults are the ones somebody means by leaving them out', () => {
+    const both = ranges.normalizeRange({}, TODAY);
+    assert.equal(both.ok, true);
+    assert.equal(both.range.end, TODAY);
+    assert.equal(both.range.start, '2025-08-09');
+  });
+
+  check('an end date in the future is pulled back, not refused', () => {
+    // "Through the end of the year", asked in August, has an obvious right answer.
+    const clamped = ranges.normalizeRange({ start: '2026-01-01', end: '2026-12-31' }, TODAY);
+    assert.equal(clamped.ok, true);
+    assert.equal(clamped.range.end, TODAY);
+  });
+
+  check('a backwards or unparseable period is refused by name', () => {
+    assert.equal(ranges.normalizeRange({ start: '2026-06-01', end: '2026-01-01' }, TODAY).problem, 'reversed');
+    assert.equal(ranges.normalizeRange({ start: '2027-01-01' }, TODAY).problem, 'future');
+    assert.equal(ranges.normalizeRange({ start: 'last January' }, TODAY).problem, 'bad_dates');
+    assert.equal(ranges.normalizeRange({ start: '2026-13-45' }, TODAY).problem, 'bad_dates');
+  });
+
+  check('the request reaches back to the start date, and no further', () => {
+    /*
+     * The provider returns the most recent N daily bars, so a period beginning
+     * in January 2024 costs the walk back to January 2024 — the old code asked
+     * for 260 whatever was wanted, which is why a two-year request drew one year.
+     */
+    const short = ranges.outputsizeFor({ start: '2026-08-04', end: TODAY }, TODAY);
+    const long = ranges.outputsizeFor({ start: '2024-01-01', end: '2025-06-30' }, TODAY);
+    assert.ok(long > short, `${long} vs ${short}`);
+    // Roughly five sevenths of the calendar, plus an edge buffer.
+    assert.ok(long > 600 && long < 800, long);
+  });
+
+  check('a five-day period still fetches enough to come back at all', () => {
+    // The market client returns nothing below thirty bars, so a short period
+    // cannot ask for five. It asks for a floor and is trimmed afterwards.
+    const size = ranges.outputsizeFor({ start: '2026-08-04', end: TODAY }, TODAY);
+    assert.ok(size >= ranges.PROVIDER_MIN_BARS * 2, size);
+  });
+
+  check('and a request older than the provider is capped rather than refused', () => {
+    const ancient = ranges.outputsizeFor({ start: '1970-01-01', end: TODAY }, TODAY);
+    assert.equal(ancient, ranges.MAX_OUTPUTSIZE);
+  });
+
+  /* A deterministic daily series: one bar per weekday, close walking upward. */
+  const unixDay = (iso) => Date.parse(`${iso}T00:00:00Z`) / 1000;
+  function weekdays(from, count) {
+    const out = [];
+    let cursor = Date.parse(`${from}T00:00:00Z`);
+    while (out.length < count) {
+      const date = new Date(cursor);
+      const weekday = date.getUTCDay();
+      if (weekday !== 0 && weekday !== 6) out.push(date.toISOString().slice(0, 10));
+      cursor += 86_400_000;
+    }
+    return out;
+  }
+  function fixtureBars(from, count, startClose = 100, step = 1) {
+    return weekdays(from, count).map((date, index) => {
+      const close = startClose + index * step;
+      return {
+        time: unixDay(date),
+        open: close - step / 2,
+        high: close + 1,
+        low: close - 1,
+        close,
+        volume: 1000 + index,
+      };
+    });
+  }
+
+  check('only the bars inside the period survive the trim', () => {
+    const bars = fixtureBars('2026-06-01', 40);
+    const kept = ranges.trimToRange(bars, { start: '2026-06-15', end: '2026-06-19' });
+    assert.equal(kept.length, 5);
+    assert.equal(ranges.isoOf(kept[0].time), '2026-06-15');
+    assert.equal(ranges.isoOf(kept[4].time), '2026-06-19');
+  });
+
+  group('Weekly and monthly bars are folded from daily ones');
+
+  check('a week is first open, highest high, lowest low, last close, summed volume', () => {
+    // Monday 1 June 2026 through Friday the 5th.
+    const week = ranges.trimToRange(fixtureBars('2026-06-01', 20), {
+      start: '2026-06-01',
+      end: '2026-06-05',
+    });
+    const [folded] = ranges.resample(week, '1W');
+
+    assert.equal(ranges.isoOf(folded.time), '2026-06-01');
+    assert.equal(folded.open, week[0].open);
+    assert.equal(folded.close, week[4].close);
+    assert.equal(folded.high, Math.max(...week.map((bar) => bar.high)));
+    assert.equal(folded.low, Math.min(...week.map((bar) => bar.low)));
+    assert.equal(folded.volume, week.reduce((total, bar) => total + bar.volume, 0));
+  });
+
+  check('a week is labelled by its Monday however the series starts', () => {
+    /*
+     * Two runs over the same data must label the bar identically, or a chart
+     * redrawn after a holiday moves every weekly point by a day.
+     */
+    const fromWednesday = ranges.trimToRange(fixtureBars('2026-06-01', 20), {
+      start: '2026-06-03',
+      end: '2026-06-05',
+    });
+    assert.equal(ranges.isoOf(ranges.resample(fromWednesday, '1W')[0].time), '2026-06-01');
+  });
+
+  check('a month folds by calendar month, and a partial one is kept', () => {
+    const bars = ranges.trimToRange(fixtureBars('2026-06-01', 60), {
+      start: '2026-06-01',
+      end: '2026-07-10',
+    });
+    const months = ranges.resample(bars, '1M');
+    assert.equal(months.length, 2);
+    assert.equal(ranges.isoOf(months[0].time), '2026-06-01');
+    assert.equal(ranges.isoOf(months[1].time), '2026-07-01');
+    // Dropping the part-month would move the end date away from the one asked for.
+    assert.equal(months[1].close, bars[bars.length - 1].close);
+  });
+
+  check('a daily request is not resampled at all', () => {
+    const bars = fixtureBars('2026-06-01', 10);
+    assert.equal(ranges.resample(bars, '1D'), bars);
+  });
+
+  group('Coverage says which dates it actually has');
+
+  check('a period starting on a weekend is not called truncated', () => {
+    // 2026-06-06 is a Saturday; the first bar is the Monday, and that is
+    // ordinary rather than a failure to reach back.
+    const bars = ranges.trimToRange(fixtureBars('2026-06-01', 30), {
+      start: '2026-06-06',
+      end: '2026-06-19',
+    });
+    const coverage = ranges.coverageOf(bars, { start: '2026-06-06', end: '2026-06-19' }, '1D', {
+      reachedProviderCap: false,
+    });
+    assert.equal(coverage.truncated, false);
+    assert.equal(coverage.firstObservation, '2026-06-08');
+    assert.match(ranges.describeCoverage(coverage), /first trading day on or after/);
+  });
+
+  check('but running out of provider history is', () => {
+    const bars = fixtureBars('2020-01-01', 30);
+    const coverage = ranges.coverageOf(bars, { start: '1995-01-01', end: '2020-02-15' }, '1D', {
+      reachedProviderCap: true,
+    });
+    assert.equal(coverage.truncated, true);
+    assert.match(ranges.describeCoverage(coverage), /does not reach 1995-01-01/);
+  });
+
+  check('an empty period says so rather than reporting nothing', () => {
+    const coverage = ranges.coverageOf([], { start: '2026-06-01', end: '2026-06-05' }, '1D', {
+      reachedProviderCap: false,
+    });
+    assert.equal(coverage.firstObservation, null);
+    assert.match(ranges.describeCoverage(coverage), /no observations/);
+  });
+
+  check('a derived interval always admits it was derived', () => {
+    const coverage = ranges.coverageOf(fixtureBars('2026-06-01', 8), { start: '2026-06-01', end: '2026-07-01' }, '1W', {
+      reachedProviderCap: false,
+    });
+    assert.equal(coverage.derivedFromDaily, true);
+    assert.match(ranges.describeCoverage(coverage), /folded from daily/);
+  });
+
+  group('The arithmetic is arithmetic, and refuses when it would mislead');
+
+  check('return and change are computed from first and last close', () => {
+    const bars = fixtureBars('2026-01-01', 60, 100, 1);
+    const measured = metrics.seriesMetrics(bars, '1D');
+    assert.equal(measured.observations, 60);
+    assert.equal(measured.first.close, 100);
+    assert.equal(measured.last.close, 159);
+    assert.equal(measured.change, 59);
+    assert.equal(measured.changePercent, 59);
+  });
+
+  check('the high and low carry the day they happened', () => {
+    const bars = fixtureBars('2026-01-01', 30, 100, 1);
+    bars[7].high = 999;
+    bars[12].low = 1;
+    const measured = metrics.seriesMetrics(bars, '1D');
+    assert.equal(measured.periodHigh.value, 999);
+    assert.equal(measured.periodHigh.date, ranges.isoOf(bars[7].time));
+    assert.equal(measured.periodLow.value, 1);
+    assert.equal(measured.periodLow.date, ranges.isoOf(bars[12].time));
+  });
+
+  check('a drawdown is measured peak to trough on closes', () => {
+    // 100 → 200 → 150: a third off the peak, and never mind that it started at 100.
+    const bars = [100, 200, 150].map((close, index) => ({
+      time: unixDay(`2026-01-0${index + 1}`),
+      open: close,
+      high: close,
+      low: close,
+      close,
+    }));
+    assert.equal(metrics.maxDrawdown(bars), -25);
+  });
+
+  check('a series that only rises has no drawdown', () => {
+    assert.equal(metrics.maxDrawdown(fixtureBars('2026-01-01', 20, 100, 1)), 0);
+  });
+
+  check('volatility is refused when there is not enough of it to measure', () => {
+    /*
+     * Twelve daily closes annualised is a fortnight of noise wearing a yearly
+     * headline. Null with a stated reason beats a number somebody would quote.
+     */
+    const short = metrics.seriesMetrics(fixtureBars('2026-01-01', 10), '1D');
+    assert.equal(short.annualisedVolatility, null);
+    assert.ok(short.caveats.some((note) => /volatility needs at least/.test(note)));
+
+    const long = metrics.seriesMetrics(fixtureBars('2026-01-01', 120), '1D');
+    assert.equal(typeof long.annualisedVolatility, 'number');
+  });
+
+  check('a flat series has zero volatility rather than none', () => {
+    const flat = Array.from({ length: 40 }, (_, index) => ({
+      time: unixDay('2026-01-01') + index * 86_400,
+      open: 50,
+      high: 50,
+      low: 50,
+      close: 50,
+    }));
+    assert.equal(metrics.annualisedVolatility(flat, '1D'), 0);
+  });
+
+  check('CAGR is not quoted for a period under a year', () => {
+    // A four-month gain annualises to a number that will be read as a forecast.
+    const months = metrics.seriesMetrics(fixtureBars('2026-01-01', 80), '1D');
+    assert.equal(months.cagr, null);
+    assert.ok(months.caveats.some((note) => /under a year/.test(note)));
+
+    const years = metrics.seriesMetrics(fixtureBars('2023-01-02', 520), '1D');
+    assert.equal(typeof years.cagr, 'number');
+  });
+
+  check('a doubling over two years is about 41% a year', () => {
+    const bars = [
+      { time: unixDay('2024-01-02'), open: 100, high: 100, low: 100, close: 100 },
+      { time: unixDay('2026-01-02'), open: 200, high: 200, low: 200, close: 200 },
+    ];
+    const rate = metrics.cagr(bars);
+    assert.ok(Math.abs(rate - 41.4) < 0.5, rate);
+  });
+
+  check('missing volume is said rather than counted as zero', () => {
+    const bars = fixtureBars('2026-01-01', 40).map((bar, index) =>
+      index % 2 === 0 ? { ...bar, volume: undefined } : bar
+    );
+    const measured = metrics.seriesMetrics(bars, '1D');
+    assert.ok(measured.averageVolume > 0);
+    assert.ok(measured.caveats.some((note) => /volume is missing on 20 of 40/.test(note)));
+
+    const none = metrics.seriesMetrics(
+      fixtureBars('2026-01-01', 40).map((bar) => ({ ...bar, volume: undefined })),
+      '1D'
+    );
+    assert.equal(none.averageVolume, null);
+  });
+
+  check('one observation is a price, not a period', () => {
+    assert.equal(metrics.seriesMetrics(fixtureBars('2026-01-01', 1), '1D'), null);
+    assert.equal(metrics.seriesMetrics([], '1D'), null);
+  });
+
+  group('A comparison is aligned by date, never by index');
+
+  check('only the trading days every instrument has are compared', () => {
+    /*
+     * Instruments do not share a holiday calendar. Pairing the nth bar of one
+     * with the nth of another drifts a day at a time, and every figure
+     * downstream inherits the drift with nothing on screen to show it.
+     */
+    const a = fixtureBars('2026-06-01', 10);
+    const b = fixtureBars('2026-06-01', 10).filter((_, index) => index !== 3);
+    const shared = metrics.commonDates([a, b]);
+
+    assert.equal(shared.length, 9);
+    assert.ok(!shared.includes(ranges.isoOf(a[3].time)));
+
+    const alignedA = metrics.alignTo(a, shared);
+    const alignedB = metrics.alignTo(b, shared);
+    assert.equal(alignedA.length, alignedB.length);
+    for (let index = 0; index < shared.length; index += 1) {
+      assert.equal(ranges.isoOf(alignedA[index].time), ranges.isoOf(alignedB[index].time));
+    }
+  });
+
+  check('series that never overlap share nothing', () => {
+    const older = fixtureBars('2020-01-01', 10);
+    const newer = fixtureBars('2026-01-01', 10);
+    assert.equal(metrics.commonDates([older, newer]).length, 0);
+  });
+
+  check('normalising rebases to 100 so different price levels can be read together', () => {
+    // A $400 share and a $40 share plotted raw are a chart of the first one.
+    const expensive = fixtureBars('2026-01-01', 5, 400, 40);
+    const cheap = fixtureBars('2026-01-01', 5, 40, 4);
+    const one = metrics.normalise(expensive);
+    const two = metrics.normalise(cheap);
+
+    assert.equal(one[0], 100);
+    assert.equal(two[0], 100);
+    assert.deepEqual(one, two);
+  });
+
+  check('correlation needs both alignment and enough of a period', () => {
+    const a = fixtureBars('2026-01-01', 40, 100, 1);
+    const b = fixtureBars('2026-01-01', 40, 200, 2);
+    assert.ok(Math.abs(metrics.correlation(a, b) - 1) < 0.05);
+
+    // Different lengths mean they were not aligned, and a single number would
+    // hide that.
+    assert.equal(metrics.correlation(a, b.slice(0, 30)), null);
+    assert.equal(metrics.correlation(a.slice(0, 5), b.slice(0, 5)), null);
   });
 
   group('Pine is written, never run');

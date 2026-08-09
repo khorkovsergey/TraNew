@@ -24,11 +24,21 @@
  * Import-free, so the unit harness compiles it alone.
  */
 
-export type VoyagerToolId = 'portal_navigation' | 'investment_analysis';
+export type VoyagerToolId =
+  | 'portal_navigation'
+  | 'investment_analysis'
+  | 'resolve_asset'
+  | 'get_quote'
+  | 'get_history'
+  | 'compare_assets';
 
 export const VOYAGER_TOOL_IDS: VoyagerToolId[] = [
   'portal_navigation',
   'investment_analysis',
+  'resolve_asset',
+  'get_quote',
+  'get_history',
+  'compare_assets',
 ];
 
 export function isVoyagerToolId(value: unknown): value is VoyagerToolId {

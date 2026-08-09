@@ -4,6 +4,8 @@ import type { VoyagerScreen } from '../screens';
 import type { VoyagerTier } from '../types';
 import { findDestinations, NAV_TOPICS } from './navigation';
 import { INVESTMENT_SCREENS, runInvestmentAnalysis } from './investmentAnalysis';
+import { compareAssets } from './comparison';
+import { getHistoryFor, getQuoteFor, MAX_COMPARE_ASSETS, resolveVerified } from './marketData';
 import {
   argString,
   callKey,
@@ -122,6 +124,125 @@ export const VOYAGER_TOOLS: Record<VoyagerToolId, VoyagerToolDefinition> = {
     execute: async (input, context) => runInvestmentAnalysis(input, context),
     call: (input, context) =>
       `investment-analysis(${argString(input.symbol, 16) ?? (context.subject || 'this instrument')})`,
+  },
+
+  resolve_asset: {
+    id: 'resolve_asset',
+    description:
+      'Turn a name or ticker into the instrument it means, verified against the market data ' +
+      'provider when this portal does not already know it. Call it before any other market tool ' +
+      'when you are not certain which instrument is meant, and never assume a ticker yourself — ' +
+      'if this returns a clarification, ask it rather than picking one.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'What the person called it — "Tesla", "TSLA", "биткоин", "the S&P".',
+        },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    mutates: false,
+    requiresAccount: false,
+    requiresConfirmation: false,
+    available: () => true,
+    execute: async (input) => resolveVerified(input.query),
+    call: (input) => `resolve-asset(${argString(input.query, 24) ?? '?'})`,
+  },
+
+  get_quote: {
+    id: 'get_quote',
+    description:
+      'The current price of one instrument, delayed, from the market data provider. Use it ' +
+      'whenever the answer turns on what something is trading at. Never state a price this did ' +
+      'not return, and never round or adjust the one it did.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'The instrument, by name or ticker.' },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    mutates: false,
+    requiresAccount: false,
+    requiresConfirmation: false,
+    available: () => true,
+    execute: async (input) => getQuoteFor(input),
+    call: (input) => `quote(${argString(input.query, 16) ?? '?'})`,
+  },
+
+  get_history: {
+    id: 'get_history',
+    description:
+      'Price history for one instrument over a period you specify, with the metrics computed ' +
+      'from it: return, high, low, max drawdown, annualised volatility, CAGR and average volume. ' +
+      'Source data is daily; 1W and 1M are folded from it and there is no intraday. Use this ' +
+      'rather than reasoning about prices yourself — every figure it returns was computed, and ' +
+      'a figure it did not return is one you do not have. It reports the dates it actually ' +
+      'covered, which differ from the ones you asked for because markets are shut some days.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'The instrument, by name or ticker.' },
+        start: {
+          type: 'string',
+          description: 'First day of the period, YYYY-MM-DD. Defaults to a year before the end.',
+        },
+        end: {
+          type: 'string',
+          description: 'Last day of the period, YYYY-MM-DD. Defaults to today.',
+        },
+        interval: { type: 'string', enum: ['1D', '1W', '1M'] },
+      },
+      required: ['query', 'start', 'end', 'interval'],
+      additionalProperties: false,
+    },
+    mutates: false,
+    requiresAccount: false,
+    requiresConfirmation: false,
+    available: () => true,
+    execute: async (input) => getHistoryFor(input),
+    call: (input) =>
+      `history(${argString(input.query, 16) ?? '?'} ${argString(input.interval, 4) ?? '1D'})`,
+  },
+
+  compare_assets: {
+    id: 'compare_assets',
+    description:
+      'Compare two to five instruments over a period. Aligns them to the trading days they all ' +
+      'share, rebases each to 100 at the first of those days, and computes return, volatility, ' +
+      'max drawdown and pairwise correlation. Use it for any "which did better" question — ' +
+      'normalised performance is what that question means, because raw prices on different ' +
+      'scales cannot be read against each other.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        queries: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Two to five instruments, by name or ticker.',
+        },
+        start: { type: 'string', description: 'First day, YYYY-MM-DD.' },
+        end: { type: 'string', description: 'Last day, YYYY-MM-DD.' },
+        interval: { type: 'string', enum: ['1D', '1W', '1M'] },
+      },
+      required: ['queries', 'start', 'end', 'interval'],
+      additionalProperties: false,
+    },
+    mutates: false,
+    requiresAccount: false,
+    requiresConfirmation: false,
+    available: () => true,
+    execute: async (input) => compareAssets(input),
+    call: (input) => {
+      const list = Array.isArray(input.queries)
+        ? input.queries.filter((item): item is string => typeof item === 'string')
+        : [];
+      return `compare(${list.slice(0, MAX_COMPARE_ASSETS).join(',').slice(0, 40) || '?'})`;
+    },
   },
 };
 
