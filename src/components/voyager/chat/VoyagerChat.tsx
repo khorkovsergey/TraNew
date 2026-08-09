@@ -7,7 +7,6 @@ import { takeDraft } from '@/components/voyager/AskEntry';
 import { track } from '@/lib/events/analytics';
 import { buildContext } from '@/lib/voyager/context';
 import {
-  ALLOWANCE_KEY,
   adoptServerCount,
   askedInDialog,
   framed,
@@ -16,7 +15,6 @@ import {
   limitLabel,
   MODES,
   offersActions,
-  parseAllowance,
   screenFor,
   SUGGESTIONS,
   TOPICS,
@@ -90,6 +88,15 @@ import styles from './VoyagerChat.module.css';
 const DIALOG_KEY = 'tn.voyager.dialog.v1';
 const PENDING_KEY = 'tn.voyager.pending.v1';
 
+/**
+ * What a disabled composer says, in both places there is one.
+ *
+ * UTC because that is the day the counter rolls on — the count is keyed by the
+ * date off an ISO timestamp, so "midnight" was true in one timezone and a small
+ * lie in every other.
+ */
+const LIMIT_PLACEHOLDER = 'Daily free limit reached — resets at 00:00 UTC';
+
 type Props = {
   /** From the session on the server. Null is a guest. */
   personName: string | null;
@@ -157,6 +164,14 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
    * the difference between not knowing and claiming.
    */
   const [usageKnown, setUsageKnown] = useState(false);
+  /**
+   * The ceiling the server measured against, rather than this file's constant.
+   *
+   * They agree today. They are still two different facts — one is a product
+   * decision the server owns, the other is a number compiled into a browser
+   * bundle — and the banner quotes the server's.
+   */
+  const [quotaTotal, setQuotaTotal] = useState(FREE_DAILY_LIMIT);
   const [notice, setNotice] = useState<string | null>(null);
   /** Ticks inside a permission-request module — a decision, not display. */
   const [ticked, setTicked] = useState<string[]>([]);
@@ -210,20 +225,18 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
     }
 
     /*
-     * The browser's copy is a head start, not an answer.
+     * The browser no longer keeps a copy of the count.
      *
-     * It is read so the number has something to show the instant the server
-     * replies, but `usageKnown` stays false until it does — the count lives on
-     * the server against a subject this browser cannot see, and anything here
-     * is at best this device's share of it.
+     * It used to, and the two were independent truths that had to be kept in
+     * step: a stored figure and a server figure, arriving in either order,
+     * either of which could be the one on screen. Reconciling them was a race
+     * nobody could win — a test could seed one and the bootstrap would land on
+     * top of it, or not, depending on the network.
+     *
+     * The count is per visitor and lives on the server against a subject this
+     * browser cannot compute. So the server is the only authority, and the
+     * optimistic increment below is a courtesy that its next reply corrects.
      */
-    try {
-      const raw = localStorage.getItem(ALLOWANCE_KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (raw) setAllowance(allowanceToday(parseAllowance(JSON.parse(raw)), new Date()));
-    } catch {
-      /* Private mode. The server's count is what decides anything anyway. */
-    }
 
     let queued: Pending = null;
     try {
@@ -234,6 +247,10 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
     }
 
     if (restored.length) {
+      /* Restoring a conversation out of storage on arrival is precisely the
+         "synchronise with an external system" case; the disable moved here when
+         the allowance stopped being read from storage beside it. */
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTurns(restored);
       /*
        * The gate's promise, kept. A guest who signed in mid-dialogue was told
@@ -311,6 +328,7 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
         if (usageSettled.current) return;
 
         usageSettled.current = true;
+        if (typeof data.total === 'number') setQuotaTotal(data.total);
         setAllowance(adoptServerCount(data.used, data.total, new Date()) ?? EMPTY_ALLOWANCE);
         setUsageKnown(true);
       })
@@ -337,13 +355,15 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
     }
   }, [turns]);
 
+  /*
+   * In memory for this page, and nowhere else.
+   *
+   * Persisting it made a second copy of a number the server owns, and a second
+   * copy of an authoritative number is a number that disagrees with itself
+   * eventually.
+   */
   const rememberAllowance = useCallback((next: Allowance) => {
     setAllowance(next);
-    try {
-      localStorage.setItem(ALLOWANCE_KEY, JSON.stringify(next));
-    } catch {
-      /* Display only — the server keeps the count that decides anything. */
-    }
   }, []);
 
   const queue = useCallback((next: Pending) => {
@@ -398,6 +418,7 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
 
         const corrected = adoptServerCount(payload.used, payload.total, new Date());
         if (corrected) rememberAllowance(corrected);
+        if (typeof payload.total === 'number') setQuotaTotal(payload.total);
         /*
          * An answer carries the server's own figure, counted after this
          * question. It outranks the bootstrap read whichever arrives first,
@@ -795,6 +816,8 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
    * attempt.
    */
   const limitReached = !unlimited && usageKnown && left <= 0;
+  /** What the banner quotes — the server's figures, not this file's constant. */
+  const usedToday = Math.min(allowanceToday(allowance, at).used, quotaTotal);
   const gateShown = gate === 'auth' || (!authed && askedInDialog(turns) >= GUEST_GATE_AFTER);
   const composerDisabled = limitReached || sending;
   const counter = limitLabel(allowance, at, unlimited, usageKnown);
@@ -914,7 +937,14 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
                     className={styles.heroInput}
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
-                    placeholder="Ask anything about money, markets, or investing..."
+                    /* Same sentence as the composer in a conversation: a
+                       disabled input that still invites a question is the one
+                       part of the limit state that reads as a bug. */
+                    placeholder={
+                      limitReached
+                        ? LIMIT_PLACEHOLDER
+                        : 'Ask anything about money, markets, or investing...'
+                    }
                     aria-label="Ask Voyager"
                     disabled={limitReached}
                   />
@@ -928,6 +958,17 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
                   {counter}
                   {authed ? '' : ' · no sign-up needed to start'}
                 </p>
+
+                {/*
+                  * The same banner the transcript shows, on the same condition.
+                  *
+                  * It used to live only in the transcript branch, so somebody
+                  * who arrived already at their limit got a disabled composer
+                  * and no explanation — the state was reachable only by hitting
+                  * the limit in the current session, which is the one case that
+                  * needed it least.
+                  */}
+                {limitReached && <LimitGate used={usedToday} total={quotaTotal} />}
 
                 <div className={styles.modes} role="group" aria-label="Answer mode">
                   {MODES.map((option) => (
@@ -1170,22 +1211,7 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
                   </div>
                 )}
 
-                {limitReached && (
-                  <div className={styles.limitGate}>
-                    <Icon name="clock" size={20} strokeWidth={2} className={styles.limitIcon} />
-                    <div className={styles.gateText}>
-                      <div className={styles.gateTitle}>
-                        Daily free limit reached ({FREE_DAILY_LIMIT} of {FREE_DAILY_LIMIT})
-                      </div>
-                      <div className={styles.gateSub}>
-                        Resets at midnight — or go unlimited with Premium.
-                      </div>
-                    </div>
-                    <Link className={styles.gateSecondary} href="/marketplace/subscriptions">
-                      See Plans
-                    </Link>
-                  </div>
-                )}
+                {limitReached && <LimitGate used={usedToday} total={quotaTotal} />}
 
                 {gate === 'error' && (
                   <div className={styles.errorCard} role="alert">
@@ -1289,11 +1315,7 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
                     disabled={limitReached}
-                    placeholder={
-                      limitReached
-                        ? 'Daily free limit reached — resets at midnight'
-                        : 'Ask a follow-up…'
-                    }
+                    placeholder={limitReached ? LIMIT_PLACEHOLDER : 'Ask a follow-up…'}
                     aria-label="Ask Voyager"
                   />
                   <button
@@ -1382,6 +1404,36 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * The daily limit, said once.
+ *
+ * One component and one condition, rendered wherever the screen happens to be:
+ * before a conversation starts and inside one. There were two states before —
+ * a full banner in the transcript and a disabled composer with no explanation
+ * on the opening screen — so how much somebody was told depended on whether
+ * they had asked anything yet in this browser, which is exactly backwards.
+ *
+ * The reset is stated in UTC because that is the day the counter actually
+ * rolls on: `dayOf` takes the date off an ISO timestamp. "Midnight" was true
+ * for one timezone and a small lie everywhere else.
+ */
+function LimitGate({ used, total }: { used: number; total: number }) {
+  return (
+    <div className={styles.limitGate}>
+      <Icon name="clock" size={20} strokeWidth={2} className={styles.limitIcon} />
+      <div className={styles.gateText}>
+        <div className={styles.gateTitle}>
+          Daily free limit reached ({used} of {total})
+        </div>
+        <div className={styles.gateSub}>Resets at 00:00 UTC — or go unlimited with Premium.</div>
+      </div>
+      <Link className={styles.gateSecondary} href="/marketplace/subscriptions">
+        See Plans
+      </Link>
+    </div>
   );
 }
 
