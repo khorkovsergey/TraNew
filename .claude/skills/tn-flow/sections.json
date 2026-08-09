@@ -95,6 +95,21 @@
       ],
       "smoke": ["/en/markets/global", "/en/market", "/en/economy"]
     },
+    "start": {
+      "branch": "feat/start",
+      "port": 3411,
+      "$comment": "\"Find my next step\" and the guest workspace it feeds. Unowned until 2026-08-09, which is why the plan funnel and its replacement were both built by whoever happened to be nearby. `actions/startPlan.ts` and `lib/start/plan.ts` are still here although the router no longer writes a plan: the account screens read the ones already saved, so removing them is an `account` decision, not this section's.",
+      "owns": [
+        "src/app/[locale]/start/",
+        "src/app/[locale]/workspace/",
+        "src/components/start/",
+        "src/lib/start/",
+        "src/content/nextStep.ts",
+        "src/app/actions/startPlan.ts",
+        "scripts/verify-start.mjs"
+      ],
+      "smoke": ["/en/start", "/en/start/plan", "/en/workspace"]
+    },
     "home": {
       "branch": "feat/home",
       "port": 3410,
