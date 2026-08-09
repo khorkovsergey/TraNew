@@ -200,10 +200,33 @@ try {
     check(`Explore names ${name} as a group`, exploreGroups.includes(name), exploreGroups.join(' | '));
   }
 
-  // Announced, not routed — and never dimmed: a greyed-out roadmap announces
-  // nothing.
+  /*
+   * Announced, not routed — and never dimmed: a greyed-out roadmap announces
+   * nothing.
+   *
+   * "Not routed" is no longer all of them. Market overview and Compare assets
+   * are built, so they are links and carry a Live or New chip instead of the
+   * Coming soon badge. The rule the count is written against is that pairing,
+   * not the number twenty: a row clicks if and only if it is chipped, and it is
+   * never both chipped and badged.
+   */
+  const rows = await page.locator('[class*="menuItemWide"]').count();
+  const chipped = await page.locator('[class*="menuItemLabel"] > [class*="chipLive"]').count();
+  const inertRows = await page.locator('div[class*="menuItemInert"]').count();
+
+  check(
+    'its rows do not click unless they are ready',
+    inertRows === rows - chipped,
+    `${rows} rows, ${chipped} ready, ${inertRows} inert`
+  );
+  check(
+    'and no row both warns and navigates',
+    (await page
+      .locator('[class*="menuItemLabel"]:has([class*="soon"]):has([class*="chipLive"])')
+      .count()) === 0
+  );
+
   const inert = page.locator('div[class*="menuItemInert"]').first();
-  check('its rows do not click', (await page.locator('div[class*="menuItemInert"]').count()) === 20);
   check(
     'and are not dimmed for it',
     (await inert.evaluate((node) => getComputedStyle(node).opacity)) === '1'

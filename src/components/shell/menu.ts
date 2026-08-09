@@ -163,17 +163,22 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
       items: [
         soon('Search an asset', 'Stocks, ETFs, crypto and more', 'search'),
         /*
-         * Named here before it is built, deliberately.
+         * The second screen the Explore redesign introduces, and the rule it
+         * enforces is that no major screen is missing from this menu.
          *
-         * Compare assets is one of the two screens the Explore redesign
-         * introduces, and the rule it enforces is that no major screen is
-         * missing from this menu. Its route is `/markets/compare` and the
-         * markets section has not built it yet, so the row stays inert and
-         * keeps the `Coming soon` badge: a `New` chip on a link that 404s is
-         * worse than an honest promise. When that route ships, this becomes a
-         * `route` row with `chip: 'new'` and nothing else about it changes.
+         * It carried `Coming soon` for exactly as long as `/markets/compare`
+         * did not exist. The markets section has built it, so the row is a link
+         * and the chip says `New` — which is what that chip means here, and why
+         * it was not used a day earlier.
          */
-        soon('Compare assets', 'Put 2–4 instruments side by side', 'compare'),
+        {
+          kind: 'route',
+          href: '/markets/compare',
+          chip: 'new',
+          label: 'Compare assets',
+          sub: 'Put 2–4 instruments side by side',
+          icon: 'compare',
+        },
         soon('Stock screener', 'Find stocks by fundamentals and performance', 'filter'),
         soon('ETF screener', 'Compare funds and strategies', 'filter'),
         soon('Crypto screener', 'Explore digital assets', 'filterCrypto'),
