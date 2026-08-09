@@ -13,6 +13,7 @@ import {
 } from '@/lib/voyager/policy';
 import { quotaAnswer } from '@/lib/voyager/scenarios';
 import { consumeQuestion, peekUsage, releaseQuestion } from '@/lib/voyager/usage';
+import { clampFacts } from '@/lib/voyager/pages';
 import { isVoyagerScreen } from '@/lib/voyager/screens';
 import type { VoyagerRequest, VoyagerResponse } from '@/lib/voyager/types';
 
@@ -125,10 +126,25 @@ export async function POST(request: NextRequest) {
   if (!question) return badRequest('A question is required.');
   if (question.length > 2000) return badRequest('That question is too long.');
 
-  const context = body.context;
-  if (!context || !isVoyagerScreen(context.screen)) {
+  const rawContext = body.context;
+  if (!rawContext || !isVoyagerScreen(rawContext.screen)) {
     return badRequest('A valid page context is required.');
   }
+
+  /*
+   * The facts a page may state, and nothing else.
+   *
+   * `facts` was an open map, so anything that could reach this route could put
+   * whatever it liked in front of the model. Each screen names its own keys in
+   * the capability registry and the rest are dropped here, on the server, where
+   * the client cannot argue with it. What Voyager is allowed to see stays
+   * reviewable, which is the promise the structured context package exists to
+   * keep.
+   */
+  const context = {
+    ...rawContext,
+    facts: clampFacts(rawContext.screen, rawContext.facts),
+  };
 
   const user = await currentUser();
   const tier = tierFor(user);

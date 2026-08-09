@@ -32,7 +32,9 @@ export type VoyagerToolId =
   | 'get_history'
   | 'compare_assets'
   | 'tradingview_handoff'
-  | 'pine_script';
+  | 'pine_script'
+  | 'page_capabilities'
+  | 'portal_knowledge';
 
 export const VOYAGER_TOOL_IDS: VoyagerToolId[] = [
   'portal_navigation',
@@ -43,6 +45,8 @@ export const VOYAGER_TOOL_IDS: VoyagerToolId[] = [
   'compare_assets',
   'tradingview_handoff',
   'pine_script',
+  'page_capabilities',
+  'portal_knowledge',
 ];
 
 export function isVoyagerToolId(value: unknown): value is VoyagerToolId {

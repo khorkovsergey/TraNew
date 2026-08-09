@@ -15,6 +15,14 @@ import {
   type TradingViewHandoff,
 } from './tradingView';
 import { STUDY_IDS } from '@/lib/studies/registry';
+import { describePage } from '../pages';
+import {
+  describeSections,
+  PORTAL_SECTION_IDS,
+  portalSection,
+  portalSections,
+} from '../portal';
+import { headerMenuRows } from '../portalMenu';
 import {
   argString,
   callKey,
@@ -253,6 +261,79 @@ export const VOYAGER_TOOLS: Record<VoyagerToolId, VoyagerToolDefinition> = {
       return `compare(${list.slice(0, MAX_COMPARE_ASSETS).join(',').slice(0, 40) || '?'})`;
     },
   },
+
+  page_capabilities: {
+    id: 'page_capabilities',
+    description:
+      'What the screen the person is on actually is, what can be done from it and what it knows ' +
+      'about its subject. Call it for "what can I do here?" and before assuming what is on screen — ' +
+      'the answer should be about this page, not a tour of the portal.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    mutates: false,
+    requiresAccount: false,
+    requiresConfirmation: false,
+    available: () => true,
+    execute: async (_input, context) => {
+      const page = describePage(context.screen, context.subject);
+      return {
+        ok: true,
+        data: page,
+        summary:
+          `This is the ${page.screen} screen — ${page.purpose} Subject: ${page.subject}. ` +
+          `It can state: ${page.knows.length ? page.knows.join(', ') : 'nothing beyond the screen name'}. ` +
+          `Openings offered here: ${page.canDo.join('; ')}.`,
+      };
+    },
+    call: (_input, context) => `page-capabilities(${context.screen})`,
+    },
+
+  portal_knowledge: {
+    id: 'portal_knowledge',
+    description:
+      'What TradingNew contains: sections, what each is for, whether it is built, and how to open ' +
+      'it. Call it for any question about this product — where courses are, where to find an ' +
+      'expert, how two sections differ, whether something exists. Never answer those from memory: ' +
+      'this portal changes, and a section marked coming soon must never be offered as somewhere to ' +
+      'go today.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        section: {
+          type: 'string',
+          enum: PORTAL_SECTION_IDS,
+          description: 'One section, when the question is about a specific one.',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    mutates: false,
+    requiresAccount: false,
+    requiresConfirmation: false,
+    available: () => true,
+    execute: async (input) => {
+      const menu = headerMenuRows();
+    const one = portalSection(input.section, menu);
+      if (input.section && !one) {
+        return toolFailure('not_found', 'There is no section here by that name.', true);
+      }
+
+      const sections = one ? [one] : portalSections(menu);
+      return {
+        ok: true,
+        data: { sections },
+        summary: `${describeSections(sections)}${
+          one?.notToBeConfusedWith ? `\nDistinction: ${one.notToBeConfusedWith}` : ''
+        }`,
+      };
+    },
+    call: (input) => `portal-knowledge(${argString(input.section, 24) ?? 'all'})`,
+    },
 
   tradingview_handoff: {
     id: 'tradingview_handoff',

@@ -115,6 +115,9 @@ try {
       'src/lib/voyager/tools/assets.ts',
       'src/lib/voyager/tools/range.ts',
       'src/lib/voyager/tools/metrics.ts',
+      'src/lib/voyager/pages.ts',
+      'src/lib/voyager/portal.ts',
+      'src/lib/voyager/chart/engine.ts',
       'src/lib/voyager/tools/tradingView.ts',
       'src/lib/voyager/tools/pine.ts',
       'src/lib/voyager/chart/spec.ts',
@@ -263,6 +266,9 @@ try {
   const metrics = await load('metrics', 'tools');
   const chart = await load('spec', 'chart');
   const tv = await load('tradingView', 'tools');
+  const pages = await load('pages', 'voyager');
+  const portalKnowledge = await load('portal', 'voyager');
+  const engine = await load('engine', 'chart');
   const voyagerPine = await load('pine', 'tools');
   const pageContext = await load('context', 'voyager');
   const transcript = await load('transcript', 'chat');
@@ -4749,6 +4755,203 @@ try {
     assert.equal(chart.clampChartSpec({ kind: 'renko', series: [] }), null);
     assert.equal(chart.clampChartSpec({ kind: 'line', series: [] }), null);
     assert.equal(chart.clampChartSpec({ kind: 'line', series: [{ label: 'no symbol' }] }), null);
+  });
+
+  group('Every screen says what it is, and what it may know');
+
+  check('the registry covers every screen, with nothing left blank', () => {
+    for (const screen of screens.VOYAGER_SCREENS) {
+      const page = pages.PAGE_CAPABILITIES[screen];
+      assert.equal(page.screen, screen);
+      assert.ok(page.subject, screen);
+      assert.ok(page.purpose && page.purpose.length > 15, screen);
+      assert.ok(page.quick.length >= 3, screen);
+    }
+  });
+
+  check('the actions a screen offers are actions the registry describes', () => {
+    for (const screen of screens.VOYAGER_SCREENS) {
+      for (const action of pages.PAGE_CAPABILITIES[screen].actions) {
+        assert.equal(acts.isVoyagerActionId(action), true, `${screen}: ${action}`);
+      }
+    }
+  });
+
+  check('and the tools it names are tools the executor knows', () => {
+    for (const screen of screens.VOYAGER_SCREENS) {
+      for (const tool of pages.PAGE_CAPABILITIES[screen].tools) {
+        assert.equal(toolTypes.isVoyagerToolId(tool), true, `${screen}: ${tool}`);
+      }
+    }
+  });
+
+  check('a page may only state the facts its screen declares', () => {
+    /*
+     * `facts` was an open map, so anything that could reach the route could put
+     * whatever it liked in front of the model. The screen names its keys; the
+     * server drops the rest.
+     */
+    const kept = pages.clampFacts('symbol', {
+      ticker: 'TSLA',
+      exchange: 'NASDAQ',
+      portfolioValue: '412000',
+      email: 'someone@example.com',
+    });
+    assert.deepEqual(Object.keys(kept).sort(), ['exchange', 'ticker']);
+  });
+
+  check('a comparison names its instruments rather than flattening them', () => {
+    const kept = pages.clampFacts('market', { symbols: 'AAPL, MSFT, NVDA', ticker: 'AAPL' });
+    assert.equal(kept.symbols, 'AAPL, MSFT, NVDA');
+    // `ticker` is not a fact the market screen declares.
+    assert.equal(kept.ticker, undefined);
+  });
+
+  check('fact values are bounded and stripped before they reach a model', () => {
+    const kept = pages.clampFacts('symbol', {
+      ticker: `TS${String.fromCharCode(0)}LA`,
+      exchange: 'x'.repeat(500),
+    });
+    assert.ok(!kept.ticker.includes(String.fromCharCode(0)));
+    assert.ok(kept.exchange.length <= 120);
+  });
+
+  check('a screen with nothing to declare keeps nothing', () => {
+    assert.equal(pages.clampFacts('generic', { ticker: 'TSLA' }), undefined);
+    assert.equal(pages.clampFacts('symbol', null), undefined);
+    assert.equal(pages.clampFacts('symbol', { ticker: 42 }), undefined);
+  });
+
+  check('"what can I do here" is answered about this page, not the portal', () => {
+    const symbol = pages.describePage('symbol', 'Tesla');
+    assert.equal(symbol.subject, 'Tesla');
+    assert.match(symbol.purpose, /instrument/i);
+    assert.ok(symbol.canDo.length >= 3);
+    assert.ok(symbol.knows.includes('ticker'));
+
+    const lesson = pages.describePage('academy');
+    assert.notEqual(lesson.purpose, symbol.purpose);
+  });
+
+  check('market data is a source only where the page is about markets', () => {
+    assert.ok(pages.sourcesForScreen('symbol').includes('market'));
+    assert.ok(!pages.sourcesForScreen('academy').includes('market'));
+    assert.ok(pages.sourcesForScreen('academy').includes('page'));
+  });
+
+  group('Portal knowledge comes from the portal, not from a paragraph');
+
+  /* The two fields portal knowledge takes from the header menu, with one row of
+     each kind — a built destination and an announced one that does not click. */
+  const MENU = [
+    { label: 'Supercharts', kind: 'route' },
+    { label: 'Academy', kind: 'route' },
+    { label: 'Expert Services', kind: 'route' },
+    { label: 'Screener', kind: 'inert' },
+    /* Announced in the header and not a link — the case Voyager must not blur.
+       The menu has carried exactly this for `/markets/compare` before. */
+    { label: 'Compare assets', kind: 'inert' },
+  ];
+
+  check('every section has a purpose and a real status', () => {
+    for (const section of portalKnowledge.portalSections(MENU)) {
+      assert.ok(section.purpose.length > 15, section.id);
+      assert.ok(['available', 'coming_soon'].includes(section.status), section.id);
+      if (section.action) {
+        assert.equal(acts.isVoyagerActionId(section.action), true, section.id);
+      }
+    }
+  });
+
+  check('availability is read off the header menu, not asserted here', () => {
+    /*
+     * The menu's own rule is that a row is either a link or marked Coming soon,
+     * never both. Reading it means Voyager cannot drift out of step with what a
+     * person sees in the header.
+     */
+    assert.equal(portalKnowledge.statusOf('Supercharts', true, MENU), 'available');
+    // A label the menu does not mention falls back to whether Voyager can open it.
+    assert.equal(portalKnowledge.statusOf('A section nobody has', false, MENU), 'coming_soon');
+    // Announced in the menu but not a link: coming soon, whatever else is true.
+    assert.equal(portalKnowledge.statusOf('Screener', true, MENU), 'coming_soon');
+  });
+
+  check('a coming-soon section is never offered as somewhere to go today', () => {
+    const soon = portalKnowledge
+      .portalSections(MENU)
+      .filter((section) => section.status === 'coming_soon');
+    assert.ok(soon.length > 0, 'the fixture menu marks nothing coming soon');
+    const described = portalKnowledge.describeSections(soon);
+    for (const section of soon) {
+      assert.match(described, new RegExp(`${section.label}[^\\n]*COMING SOON`));
+    }
+    // And nothing coming soon is presented with an opening action.
+    assert.match(portalKnowledge.describeSections(soon), /do not offer it as somewhere to go/);
+  });
+
+  check('the questions people actually ask have answers in the table', () => {
+    const byId = Object.fromEntries(portalKnowledge.portalSections(MENU).map((s) => [s.id, s]));
+
+    // "Where are paid courses?"
+    assert.match(byId.academy.purpose, /course/i);
+    assert.equal(byId.academy.action, 'open_academy');
+
+    // "Where can I find an expert?"
+    assert.match(byId.experts.purpose, /hire|adviser|specialist/i);
+
+    // "Where can I compare assets?"
+    assert.ok(byId.compare, 'no comparison section');
+
+    // "What is the difference between Learn and Academy?"
+    assert.ok(byId.learn.notToBeConfusedWith);
+    assert.ok(byId.academy.notToBeConfusedWith);
+    assert.match(byId.academy.notToBeConfusedWith, /Learn/);
+  });
+
+  check('a section nobody has is not invented', () => {
+    assert.equal(portalKnowledge.portalSection('crypto_casino', MENU), null);
+    assert.equal(portalKnowledge.portalSection(42, MENU), null);
+    assert.ok(portalKnowledge.portalSection('academy', MENU));
+    assert.ok(portalKnowledge.portalSection('Expert Services', MENU));
+  });
+
+  group('The pane limitation is a switch, not a permanent statement');
+
+  check('one flag decides both what is drawn and what is handed over', () => {
+    /*
+     * The `supercharts` dependency must not calcify. When a pane manager lands,
+     * flipping `ENGINE_DRAWS_SEPARATE_PANES` returns RSI and MACD to the chart
+     * and removes them from the handoff table together — no planner change, no
+     * handoff change, no answer-contract change.
+     */
+    const drawsPanes = engine.ENGINE_DRAWS_SEPARATE_PANES;
+
+    for (const id of ['rsi', 'macd']) {
+      assert.equal(chart.RENDERABLE_STUDIES.includes(id), drawsPanes, id);
+      assert.equal(tv.needsHandoff(id), !drawsPanes, id);
+    }
+
+    // Overlay studies never depended on it either way.
+    assert.ok(chart.RENDERABLE_STUDIES.includes('sma'));
+    assert.equal(tv.needsHandoff('moving_average'), false);
+  });
+
+  check('and both sides give the same reason for it', () => {
+    const spec = chart.clampChartSpec({
+      kind: 'line',
+      series: [{ assetId: 'a', symbol: 'TSLA', label: 'Tesla', field: 'close' }],
+      range: { start: '2026-01-01', end: '2026-08-09' },
+      interval: '1D',
+      studies: [{ id: 'rsi' }],
+      sourceMeta: { provider: 'Twelve Data', delayed: true },
+    });
+
+    if (engine.ENGINE_DRAWS_SEPARATE_PANES) {
+      assert.equal(spec.refused.length, 0);
+    } else {
+      assert.match(spec.refused[0].reason, new RegExp(engine.PANE_STUDY_NOTE));
+      assert.match(tv.CHART_FEATURES.rsi.reason, new RegExp(engine.PANE_STUDY_NOTE));
+    }
   });
 
   group('What needs TradingView is written down, not left to a prompt');

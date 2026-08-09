@@ -26,8 +26,10 @@
  * drawing, or Pine source. So those are reported as things to set once you
  * arrive, rather than described as transferred.
  *
- * Import-free, so the unit harness compiles it alone.
+ * Import-free beyond the engine switch, so the unit harness compiles it alone.
  */
+
+import { ENGINE_DRAWS_SEPARATE_PANES, PANE_STUDY_NOTE } from '../chart/engine';
 
 export const TRADINGVIEW_CHART_URL = 'https://www.tradingview.com/chart/';
 export const TRADINGVIEW_PINE_URL = 'https://www.tradingview.com/pine-editor/';
@@ -75,6 +77,22 @@ export type FeatureSupport = {
  * roadmap. "Not yet supported" invites somebody to wait for something nobody
  * has promised; "this chart has one pane" tells them what to do now.
  */
+/**
+ * A study that needs a pane of its own, placed by what the engine can do.
+ *
+ * The one line that decides this is `ENGINE_DRAWS_SEPARATE_PANES`. When the
+ * `supercharts` section ships a pane manager and secondary scales, flipping it
+ * moves these three back into Voyager and out of this table together — no
+ * planner change, no handoff change, no answer-contract change. Which is the
+ * point: a limitation of today's renderer must not calcify into a permanent
+ * statement about what this product is.
+ */
+function paneStudy(name: string): FeatureSupport {
+  return ENGINE_DRAWS_SEPARATE_PANES
+    ? { where: 'voyager' }
+    : { where: 'tradingview', reason: `${name} ${PANE_STUDY_NOTE}.` };
+}
+
 export const CHART_FEATURES: Record<ChartFeature, FeatureSupport> = {
   line: { where: 'voyager' },
   area: { where: 'voyager' },
@@ -94,18 +112,9 @@ export const CHART_FEATURES: Record<ChartFeature, FeatureSupport> = {
    * which is why the honest destination today is TradingView rather than
    * another screen in this portal.
    */
-  rsi: {
-    where: 'tradingview',
-    reason: 'RSI needs its own pane and its own scale, which the charts here do not have.',
-  },
-  macd: {
-    where: 'tradingview',
-    reason: 'MACD needs its own pane and its own scale, which the charts here do not have.',
-  },
-  volume_pane: {
-    where: 'tradingview',
-    reason: 'A separate volume pane needs its own scale, which the charts here do not have.',
-  },
+  rsi: paneStudy('RSI'),
+  macd: paneStudy('MACD'),
+  volume_pane: paneStudy('A separate volume pane'),
 
   renko: { where: 'tradingview', reason: 'Renko is not one of the chart types here.' },
   kagi: { where: 'tradingview', reason: 'Kagi is not one of the chart types here.' },
