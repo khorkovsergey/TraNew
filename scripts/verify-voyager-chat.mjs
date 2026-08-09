@@ -40,6 +40,54 @@ async function reset(page) {
   });
 }
 
+/**
+ * A fixed answer from the API, for the states that are about rendering it.
+ *
+ * Intercepted in the browser, so nothing in the application changes: the quota
+ * is still counted and still enforced on the server, and there is no flag,
+ * header or environment variable that turns it off. What this removes is the
+ * dependency on a shared counter — the daily allowance is per visitor and lives
+ * in the deployed database, so a suite that spends questions to check whether a
+ * button renders stops passing after the fifth run of the day and starts
+ * reporting a limit notice as a layout failure.
+ *
+ * The live path is not abandoned: the screen-acceptance probes below are GET
+ * requests, which the API answers without spending anything.
+ */
+async function stubAnswer(page, answer) {
+  await page.route('**/api/voyager', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        answer,
+        tier: 'basic',
+        remaining: 7,
+        used: 3,
+        total: 10,
+        quotaReached: false,
+      }),
+    });
+  });
+}
+
+/** A daily series a chart can actually be drawn from. */
+function fixtureBars(count) {
+  const start = Date.parse('2026-01-05T00:00:00Z') / 1000;
+  return Array.from({ length: count }, (_, index) => {
+    const close = 100 + index;
+    return {
+      time: start + index * 86_400,
+      open: close - 0.5,
+      high: close + 1,
+      low: close - 1,
+      close,
+      volume: 1000 + index,
+    };
+  });
+}
+
 const browser = await chromium.launch();
 
 try {
@@ -104,13 +152,29 @@ try {
 
   group('A question carried in from another page arrives asked');
 
+  await stubAnswer(page, {
+    contentType: 'AI explanation',
+    text: 'An ETF is a basket of holdings you can buy as one line.',
+    bullets: ['It trades like a share', 'It holds many things at once'],
+    sources: 'General knowledge',
+    confidence: 'high',
+    actions: [
+      { label: 'Explore markets', action: 'open_explore', primary: true },
+      { label: 'Start learning', action: 'open_academy' },
+    ],
+    followUps: ['How do I pick one?'],
+    citations: [{ label: 'Current page' }],
+    tools: ['portal-navigation(learn_free)'],
+    trace: [{ id: 'portal_navigation', ok: true, call: 'portal-navigation(learn_free)' }],
+  });
+
   await page.goto(`${BASE}/en`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(500);
   const homeAsk = page.getByRole('textbox', { name: 'Ask Voyager' }).first();
   await homeAsk.fill('What is an ETF?');
   await homeAsk.press('Enter');
   await page.waitForURL(/\/voyager/, { timeout: 10_000 });
-  await page.waitForTimeout(9000);
+  await page.waitForTimeout(2500);
 
   const afterEntry = await page.locator('body').innerText();
   check('the context follows the question', (await page.locator('[class*="contextChip"]').innerText()).includes('Home'));
@@ -124,6 +188,12 @@ try {
     'and the page source is one of them, so the context was really sent',
     (await page.locator('[class*="sourceChip"]').first().innerText()).length > 0
   );
+  check('the tool chips name the calls that returned', afterEntry.includes('portal-navigation'));
+  check(
+    'the bullets the backend sent are rendered rather than discarded',
+    afterEntry.includes('It trades like a share')
+  );
+  check('and the answer carries its own content-type label', afterEntry.includes('AI explanation'));
 
   group('Every page a link can hand off from is a page the API accepts');
 
@@ -174,6 +244,78 @@ try {
     !actionIds.some((id) => ['watchlist', 'save_workspace', 'portfolio_scenario', 'research'].includes(id ?? '')),
     actionIds.join(' · ')
   );
+
+  group('The chart says exactly what it drew');
+
+  /*
+   * The regression this group exists for: a module described "RSI and three
+   * detected levels" over a canvas drawing plain candles. The caption is now
+   * generated from the same specification the engine is given, after the
+   * unrenderable studies have been removed from it — so the check is that RSI
+   * is *absent* from the caption and *stated* as refused.
+   */
+  await page.unroute('**/api/voyager');
+  await stubAnswer(page, {
+    contentType: 'AI analysis',
+    text: 'Here is Tesla over the period you asked for.',
+    bullets: [],
+    sources: 'Twelve Data',
+    confidence: 'medium',
+    actions: [{ label: 'Open on chart', action: 'open_chart', primary: true }],
+    followUps: [],
+    citations: [{ label: 'Market data & news' }],
+    tools: ['history(TSLA 1D)', 'chart(line)'],
+    chart: {
+      spec: {
+        version: 1,
+        kind: 'line',
+        series: [
+          { assetId: 'stock:TSLA', symbol: 'TSLA', label: 'Tesla, Inc.', field: 'close' },
+        ],
+        range: { start: '2026-01-01', end: '2026-03-01' },
+        interval: '1D',
+        studies: [{ id: 'sma', params: { fast: 50, slow: 200 } }],
+        sourceMeta: {
+          provider: 'Twelve Data',
+          firstObservation: '2026-01-05',
+          lastObservation: '2026-02-27',
+          delayed: true,
+          derivedFromDaily: false,
+        },
+        refused: [
+          { study: 'rsi', reason: 'RSI needs its own pane and its own scale, which this chart does not have. It is available on the full chart.' },
+        ],
+      },
+      series: [{ assetId: 'stock:TSLA', bars: fixtureBars(40) }],
+    },
+  });
+
+  await page.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(600);
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Chart Tesla with RSI and 50/200 averages');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(2500);
+
+  const chartBlock = page.locator('figure').first();
+  check('the chart is drawn', (await chartBlock.count()) === 1);
+  check('on a canvas, by the engine', (await page.locator('figure canvas').count()) >= 1);
+
+  const caption = await page.locator('figcaption').first().innerText();
+  check('the caption names the study that is on the chart', /MA 50\/200/.test(caption), caption);
+  check('and never the one that is not', !/RSI/i.test(caption), caption);
+  check('it reports the dates it has, not the ones asked for', /2026-01-05/.test(caption), caption);
+  check('and says the data is delayed', /delayed/i.test(caption), caption);
+
+  const chartText = await chartBlock.innerText();
+  check(
+    'what the chart will not draw is said out loud rather than left to be noticed',
+    /RSI needs its own pane/i.test(chartText),
+    chartText.slice(0, 160)
+  );
+
+  await page.unroute('**/api/voyager');
 
   group('State 8 — a guest is gated, and the action is kept');
 
