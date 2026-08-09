@@ -95,6 +95,20 @@
       ],
       "smoke": ["/en/markets/global", "/en/market", "/en/economy"]
     },
+    "subscriptions": {
+      "branch": "feat/subscriptions",
+      "port": 3412,
+      "$comment": "The plans screen. Self-contained — its own CSS module and content files, no share of Marketplace.module.css — which is why it can be worked on beside anything else. Its handoff lives in the repository at docs/design/subscriptions/. The menu entry that points at it is shell's; the /marketplace hub page that also links it is still unowned.",
+      "owns": [
+        "src/app/[locale]/marketplace/subscriptions/",
+        "src/components/marketplace/Subscriptions.tsx",
+        "src/components/marketplace/Subscriptions.module.css",
+        "src/content/subscriptions.ts",
+        "src/content/subscriptionComparison.ts",
+        "docs/design/subscriptions/"
+      ],
+      "smoke": ["/en/marketplace/subscriptions"]
+    },
     "start": {
       "branch": "feat/start",
       "port": 3411,
