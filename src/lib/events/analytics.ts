@@ -69,6 +69,25 @@ export type AnalyticsEvent =
   | { name: 'registration_completed_from_plan'; steps: number }
   | { name: 'plan_resumed'; surface: string; completed: number; ofSteps: number }
   /*
+   * "Find my next step" — the product router that replaced the plan funnel
+   * above. Where somebody stops and where they end up; never what they said
+   * about themselves.
+   *
+   * The three step events carry no payload on purpose. "I already invest" and
+   * "improve what I already have" are facts about a person's money, and this
+   * file's existing rule is that those do not travel — the funnel questions
+   * (how many reach step two, how many finish) are all answerable by counting
+   * the events themselves. The destination key is a product area rather than a
+   * fact about the reader, so it is the one thing that does travel.
+   */
+  | { name: 'next_step_opened' }
+  | { name: 'next_step_level_selected' }
+  | { name: 'next_step_intent_selected' }
+  | { name: 'next_step_clarification_selected' }
+  | { name: 'next_step_recommendation_shown'; destination: string }
+  | { name: 'next_step_destination_clicked'; destination: string; external: boolean }
+  | { name: 'next_step_restarted' }
+  /*
    * Voyager. The source page and whether a question came with it — never the
    * question, which is the person's, and never the subject, which is a position
    * they may hold.
