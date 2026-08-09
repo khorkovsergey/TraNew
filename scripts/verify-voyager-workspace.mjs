@@ -30,10 +30,86 @@ function group(title) {
   console.log(`\n${title}`);
 }
 
+const MODEL_ANSWER = {
+  contentType: 'AI explanation',
+  text: 'Here is the short version, with what it rests on.',
+  bullets: ['One observation', 'And another'],
+  sources: 'General knowledge',
+  confidence: 'medium',
+  actions: [],
+  followUps: [],
+  citations: [{ label: 'Current page' }],
+};
+
+/**
+ * A daily allowance this suite decides, rather than one it inherits.
+ *
+ * The workspace is checked against a live route, and that route counts a real
+ * per-visitor quota: ten questions a day against a hash of the address the
+ * suite runs from. So the result depended on how many questions had been asked
+ * from this machine today, on which machine it was, and on how close to
+ * midnight UTC it ran — a suite that passes in the morning and fails after
+ * lunch, reporting a spent allowance as a broken workspace.
+ *
+ * Installed on the **context** rather than the page. Two groups below route
+ * `/api/voyager` themselves to drive the failure states, and a page route wins
+ * over a context route while it exists — so those keep working, and
+ * `page.unroute` cannot take this away with them.
+ *
+ * This changes nothing about the product: the quota is still counted and still
+ * enforced on the server, and there is no flag, parameter or user that turns it
+ * off. The suite simply stops depending on a number it does not own.
+ */
+async function freeQuota(context, answer = MODEL_ANSWER) {
+  await context.route('**/api/voyager?*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        tier: 'basic',
+        tierLabel: 'Voyager Basic',
+        limits: 'Basic',
+        sources: [{ id: 'page', label: 'Current page' }],
+        remaining: 10,
+        used: 0,
+        total: 10,
+        signedIn: false,
+        personalization: null,
+        modelConfigured: true,
+      }),
+    });
+  });
+
+  await context.route('**/api/voyager', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+
+    /*
+     * The canvas builds its own plan around whatever the answer says — the
+     * "You asked" card and the source list are the client's work, not the
+     * model's — so a fixed answer exercises the same rendering path a live one
+     * does, without spending a question to do it.
+     */
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        answer,
+        tier: 'basic',
+        remaining: 9,
+        used: 1,
+        total: 10,
+        quotaReached: false,
+      }),
+    });
+  });
+}
+
+
 const browser = await chromium.launch();
 
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await freeQuota(page.context());
 
   group('Reaching it from the portal');
 
@@ -555,6 +631,7 @@ try {
   group('Failure states name a cause and a way out');
 
   const failContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await freeQuota(failContext);
   const failPage = await failContext.newPage();
   await failPage.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
   await failPage.waitForTimeout(600);
@@ -608,6 +685,7 @@ try {
   group('Accessibility');
 
   const a11yContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await freeQuota(a11yContext);
   const a11yPage = await a11yContext.newPage();
   await a11yPage.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
   await a11yPage.waitForTimeout(600);
@@ -654,6 +732,7 @@ try {
   group('The tablet keeps the panel rather than losing it');
 
   const tabletContext = await browser.newContext({ viewport: { width: 1024, height: 900 } });
+  await freeQuota(tabletContext);
   const tabletPage = await tabletContext.newPage();
   await tabletPage.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
   await tabletPage.waitForTimeout(600);
@@ -684,6 +763,7 @@ try {
   group('Sign-up, tokens and plans');
 
   const moneyContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await freeQuota(moneyContext);
   const moneyPage = await moneyContext.newPage();
   await moneyPage.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
   await moneyPage.waitForTimeout(600);
@@ -771,6 +851,7 @@ try {
    * standing on.
    */
   const wealthContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await freeQuota(wealthContext);
   const wealthPage = await wealthContext.newPage();
   await wealthPage.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
   await wealthPage.waitForTimeout(600);
@@ -917,6 +998,7 @@ try {
   group('The phone gets the same screen, not a squeezed one');
 
   const phone = await browser.newContext({ ...devices['iPhone 13'] });
+  await freeQuota(phone);
   const small = await phone.newPage();
 
   await small.goto(`${BASE}/en/voyager/research`, { waitUntil: 'domcontentloaded' });
