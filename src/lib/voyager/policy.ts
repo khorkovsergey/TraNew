@@ -1,6 +1,7 @@
 import 'server-only';
 import { getConsent } from '@/lib/consent';
 import { hasPlan, type AuthedUser } from '@/lib/session';
+import { MARKET_DATA_SCREENS } from './screens';
 import type {
   VoyagerContext,
   VoyagerSource,
@@ -88,9 +89,11 @@ export async function sourcesFor(
   ];
 
   // Market data is only claimed where the page is actually about markets. A generic
-  // page listing it would overstate what the answer rests on.
-  const marketPages = ['chart', 'symbol', 'economy', 'indicator', 'news', 'portfolio', 'wealth'];
-  if (marketPages.includes(context.screen)) {
+  // page listing it would overstate what the answer rests on. The list is in
+  // `screens.ts` beside the screens themselves, so a screen added without a
+  // decision about its sources is a decision somebody has to make rather than
+  // one that defaults quietly.
+  if (MARKET_DATA_SCREENS.includes(context.screen)) {
     sources.push({ id: 'market', label: 'Market data & news' });
   }
 
@@ -125,6 +128,8 @@ function pageSourceLabel(context: VoyagerContext): string {
       return 'Current lesson & your progress';
     case 'events':
       return 'Upcoming events & your location';
+    case 'ideas':
+      return `Published idea: ${context.subject}`;
     case 'strategy':
       return 'Your interview answers';
     case 'generic':

@@ -6,8 +6,8 @@ import { clampSpec } from '@/lib/studies/registry';
 import { ANSWER_SCHEMA, CONTENT_TYPES } from './answerSchema';
 import { MAX_SEARCHES, wantsSearch } from './research';
 import { scriptedAnswer } from './scenarios';
+import { allowedActions, briefFor, isVoyagerActionId } from './actions';
 import {
-  VOYAGER_ACTIONS,
   type VoyagerAction,
   type VoyagerActionId,
   type VoyagerAnswer,
@@ -130,49 +130,19 @@ Suggest exactly three short follow-up questions the person might ask next, phras
 /**
  * Which actions this request may offer.
  *
- * Narrowing here is the enforcement point: an answer physically cannot contain a
- * wealth action for someone whose tier or consent does not reach the wealth
- * record, because the model was never shown that option.
+ * The list is `actions.ts`, so the widget, the chat and the model are narrowed
+ * by one function. Narrowing is the enforcement point: an answer physically
+ * cannot contain a wealth action for someone whose tier does not reach the
+ * wealth record, because the model was never shown that option — and it cannot
+ * offer to add something to a watchlist on a page with no instrument on it,
+ * which is how the fixed action row used to read.
  */
-function allowedActions(context: VoyagerContext, tier: VoyagerTier): VoyagerActionId[] {
-  const common: VoyagerActionId[] = [
-    'open_symbol',
-    'open_chart',
-    'open_news',
-    'open_economy',
-    'open_indicator',
-    'open_academy',
-    'open_experts',
-    'open_experts_intake',
-    'open_strategy',
-    'open_explore',
-    'open_screener',
-    // Events are public, so finding one is offered at every tier. "My events"
-    // is too — an anonymous visitor lands on the sign-in prompt, which is the
-    // intended path.
-    'open_events',
-    'open_my_events',
-    // Only where there is a chart to reveal the code on. Everywhere else the
-    // action would resolve to nothing and the button would be a dead end.
-    ...(context.screen === 'chart' ? (['view_pine'] as VoyagerActionId[]) : []),
-    // Offered at every tier: an anonymous visitor lands on the sign-in prompt,
-    // which is the intended path. This list exists to stop the model inventing a
-    // destination, not to re-implement route protection the server already does.
-    'create_alert',
-    'open_watchlist',
-    'none',
-  ];
-
-  if (tier === 'private') {
-    common.push('open_wealth', 'open_wealth_assets', 'open_wealth_scenarios', 'open_wealth_insights');
-  }
-
-  // On a lesson page, keep the person in the lesson rather than routing them away.
-  if (context.screen === 'academy') {
-    return ['open_academy', 'open_explore', 'none'];
-  }
-
-  return common;
+function actionsFor(context: VoyagerContext, tier: VoyagerTier): VoyagerActionId[] {
+  return allowedActions({
+    screen: context.screen,
+    tier,
+    hasTicker: Boolean(context.facts?.ticker),
+  });
 }
 
 function requestBrief(
@@ -207,7 +177,7 @@ function requestBrief(
     ...(sources.length === 0 ? ['- none — the person switched every source off; answer generally and say so'] : []),
     ``,
     `Allowed action ids for this answer:`,
-    ...actions.map((id) => `- ${id}: ${VOYAGER_ACTIONS[id]}`),
+    ...actions.map((id) => `- ${id}: ${briefFor(id)}`),
   ].join('\n');
 }
 
@@ -233,11 +203,11 @@ function coerce(raw: unknown, allowed: VoyagerActionId[], studiesAllowed: boolea
       if (typeof entry !== 'object' || entry === null) return null;
       const item = entry as Record<string, unknown>;
       const id = item.action;
-      if (typeof item.label !== 'string' || typeof id !== 'string') return null;
+      if (typeof item.label !== 'string' || !isVoyagerActionId(id)) return null;
       // Dropped rather than remapped: an action outside the allowlist is one this
       // person is not entitled to, and quietly substituting another would be worse.
-      if (!allowed.includes(id as VoyagerActionId)) return null;
-      return { label: item.label, action: id as VoyagerActionId };
+      if (!allowed.includes(id)) return null;
+      return { label: item.label, action: id };
     })
     .filter((entry): entry is VoyagerAction => entry !== null)
     .slice(0, 4);
@@ -344,7 +314,7 @@ export async function askVoyager(options: {
   history: { role: 'user' | 'assistant'; text: string }[];
 }): Promise<VoyagerAnswer> {
   const { question, context, tier, sources, history } = options;
-  const allowed = allowedActions(context, tier);
+  const allowed = actionsFor(context, tier);
   const scripted = () =>
     withAllowedActions(scriptedAnswer(question, context, tier), allowed, context.screen === 'chart');
 

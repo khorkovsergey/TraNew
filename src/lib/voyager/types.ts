@@ -13,23 +13,32 @@ import type { StudySpec } from '../studies/registry';
  * 2. Actions are chosen from a fixed list, not written by the model. A model that
  *    could emit its own link could send someone anywhere; picking from an
  *    allowlist means an answer can only ever point into a real part of the app.
+ *
+ * The screen vocabulary and the action registry both used to be written out
+ * here and again elsewhere. They are now `screens.ts` and `actions.ts`, which
+ * this file re-exports so that every caller keeps one import — a second copy of
+ * a closed set is a copy that drifts, and both of these already had.
  */
 
-/** Which page the person is on. Drives prompts, quick actions and the answer shape. */
-export type VoyagerScreen =
-  | 'chart'
-  | 'market'
-  | 'symbol'
-  | 'economy'
-  | 'indicator'
-  | 'wealth'
-  | 'academy'
-  | 'experts'
-  | 'news'
-  | 'portfolio'
-  | 'strategy'
-  | 'events'
-  | 'generic';
+export type { VoyagerScreen } from './screens';
+export {
+  VOYAGER_ACTION_IDS,
+  VOYAGER_ACTION_SPECS,
+  allowedActions,
+  briefFor,
+  isVoyagerActionId,
+  mutates,
+  requiresAccount,
+  requiresConfirmation,
+  specFor,
+  type ActionExecution,
+  type VoyagerAction,
+  type VoyagerActionId,
+  type VoyagerActionSpec,
+} from './actions';
+
+import type { VoyagerAction } from './actions';
+import type { VoyagerScreen } from './screens';
 
 /**
  * Entitlement level. Derived on the server from the session — never sent by the
@@ -68,44 +77,6 @@ export type VoyagerContentType =
   | 'AI summary'
   | 'AI structured'
   | 'Academy context';
-
-/**
- * Every action Voyager may offer. The model picks an id; the widget maps it to a
- * route. Adding a capability means adding a row here — not letting the model
- * invent a destination.
- */
-export const VOYAGER_ACTIONS = {
-  open_symbol: 'Open the symbol page',
-  open_chart: 'Open the chart',
-  open_news: 'Find related news',
-  open_economy: 'Open the economy overview',
-  open_indicator: 'Open the US CPI indicator page',
-  open_academy: 'Continue in Academy',
-  open_events: 'Find financial events',
-  view_pine: 'Show the Pine Script for the applied study',
-  open_my_events: 'See the events I signed up for',
-  open_experts: 'Browse the expert marketplace',
-  open_experts_intake: 'Structure my request for an expert',
-  open_strategy: 'Build my strategy',
-  open_explore: 'Explore markets',
-  open_screener: 'Open the screener',
-  open_wealth: 'Open the Wealth Hub',
-  open_wealth_assets: 'Update a valuation in the Wealth Hub',
-  open_wealth_scenarios: 'Run a Wealth scenario',
-  open_wealth_insights: 'See Wealth Health',
-  open_watchlist: 'Open my watchlist',
-  create_alert: 'Draft an alert',
-  none: 'No navigation — this action only continues the conversation',
-} as const;
-
-export type VoyagerActionId = keyof typeof VOYAGER_ACTIONS;
-
-export type VoyagerAction = {
-  label: string;
-  action: VoyagerActionId;
-  /** The first action renders as the primary button. */
-  primary?: boolean;
-};
 
 /** A contextual upgrade card. Decided by the policy layer, never by the model. */
 export type VoyagerUpgrade = {

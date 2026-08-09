@@ -117,6 +117,18 @@ export type AnalyticsEvent =
   | { name: 'voyager_restored_after_auth'; turns: number }
   | { name: 'voyager_action_clicked'; action: string; authenticated: boolean }
   /*
+   * What an action actually did. `voyager_action_clicked` above records the
+   * press; these two record the outcome, which is a different fact and until
+   * now an unrecorded one — the chat reported every confirmed action as a
+   * success without asking a server, so there was nothing to count.
+   *
+   * The action id and the failure code only. Not the instrument, which is a
+   * position somebody may hold, and not the title, which is their own words
+   * about their money.
+   */
+  | { name: 'voyager_action_confirmed'; action: string; execution: 'mutate' | 'prepare' }
+  | { name: 'voyager_action_failed'; action: string; code: string }
+  /*
    * The expert-services funnel. Counts and ids only — a brief holds what
    * somebody is trying to do with their money, and none of that goes here.
    */

@@ -1,5 +1,6 @@
 import { STUDY_IDS, STUDY_PARAM_NAMES } from '../studies/registry';
-import { VOYAGER_ACTIONS, type VoyagerContentType } from './types';
+import { VOYAGER_ACTION_IDS } from './actions';
+import type { VoyagerContentType } from './types';
 
 /**
  * The shape every model answer must take.
@@ -37,7 +38,7 @@ export const ANSWER_SCHEMA = {
         type: 'object',
         properties: {
           label: { type: 'string' },
-          action: { type: 'string', enum: Object.keys(VOYAGER_ACTIONS) },
+          action: { type: 'string', enum: VOYAGER_ACTION_IDS },
         },
         required: ['label', 'action'],
         additionalProperties: false,

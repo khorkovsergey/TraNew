@@ -107,6 +107,9 @@ try {
       'src/lib/start/path.ts',
       'src/lib/start/plan.ts',
       'src/lib/voyager/session.ts',
+      'src/lib/voyager/screens.ts',
+      'src/lib/voyager/actions.ts',
+      'src/lib/voyager/context.ts',
       'src/lib/voyager/chat/transcript.ts',
       'src/lib/academy/summary.ts',
       'src/lib/explore/answers.ts',
@@ -243,6 +246,9 @@ try {
   const start = await load('path', 'start');
   const plan = await load('plan', 'start');
   const session = await load('session', 'voyager');
+  const screens = await load('screens', 'voyager');
+  const acts = await load('actions', 'voyager');
+  const pageContext = await load('context', 'voyager');
   const transcript = await load('transcript', 'chat');
   const learn = await load('summary', 'academy');
   const answers = await load('answers', 'explore');
@@ -5883,10 +5889,11 @@ try {
      * The rule the sixth caller forgets. It lives in one place and is consulted
      * for every action rather than remembered at each call site.
      */
-    for (const [id, spec] of Object.entries(session.VOYAGER_ACTIONS)) {
-      assert.equal(session.requiresConfirmation(id), spec.mutates, id);
+    for (const [id, spec] of Object.entries(acts.VOYAGER_ACTION_SPECS)) {
+      const writes = spec.execution === 'mutate' || spec.execution === 'prepare';
+      assert.equal(session.requiresConfirmation(id), writes, id);
     }
-    assert.equal(session.requiresConfirmation('watchlist'), true);
+    assert.equal(session.requiresConfirmation('add_to_watchlist'), true);
     assert.equal(session.requiresConfirmation('create_alert'), true);
     assert.equal(session.requiresConfirmation('open_chart'), false);
   });
@@ -5996,9 +6003,9 @@ try {
   });
 
   check('a queued action round-trips, and an invented one does not', () => {
-    assert.deepEqual(session.parsePending({ kind: 'action', id: 'watchlist' }), {
+    assert.deepEqual(session.parsePending({ kind: 'action', id: 'add_to_watchlist' }), {
       kind: 'action',
-      id: 'watchlist',
+      id: 'add_to_watchlist',
     });
     assert.equal(session.parsePending({ kind: 'action', id: 'drain_account' }), null);
   });
@@ -6136,25 +6143,66 @@ try {
      * The two vocabularies are deliberately different — one is what a link may
      * carry, the other is what the server keys entitlements off. A kind with no
      * mapping would silently become the generic screen and lose its data.
+     *
+     * Derived from the registry rather than listed here: a hand-written list is
+     * a fifth copy of the same closed set, and four copies of it is what
+     * produced the failure below.
      */
-    const kinds = [
-      'home',
-      'symbol',
-      'chart',
-      'comparison',
-      'article',
-      'event',
-      'portfolio',
-      'plan',
-      'explore',
-      'learn',
-    ];
-    for (const kind of kinds) {
-      assert.ok(transcript.screenFor(kind), kind);
+    for (const kind of screens.CONTEXT_KINDS) {
+      const screen = transcript.screenFor(kind);
+      assert.ok(screen, kind);
+      assert.ok(screens.VOYAGER_SCREENS.includes(screen), `${kind} → ${screen}`);
     }
     assert.equal(transcript.screenFor('symbol'), 'symbol');
     assert.equal(transcript.screenFor('learn'), 'academy');
     assert.equal(transcript.screenFor(null), 'generic');
+  });
+
+  check('the screens a link can reach are screens the API accepts', () => {
+    /*
+     * The regression this whole file exists for.
+     *
+     * `market` and `events` were screens the chat could send, the mapping did
+     * send, the policy layer understood — and the API's own copy of the list did
+     * not contain. Every question asked from a comparison, an Explore page or an
+     * event page came back 400, and the chat rendered its "temporarily
+     * unavailable" card over a service that was up.
+     *
+     * `isVoyagerScreen` is now the API's accept check, so this asserts the real
+     * gate rather than a description of it.
+     */
+    for (const kind of screens.CONTEXT_KINDS) {
+      assert.equal(screens.isVoyagerScreen(transcript.screenFor(kind)), true, kind);
+    }
+    assert.equal(screens.isVoyagerScreen('market'), true);
+    assert.equal(screens.isVoyagerScreen('events'), true);
+    assert.equal(screens.isVoyagerScreen('ideas'), true);
+    assert.equal(screens.isVoyagerScreen('not_a_screen'), false);
+    assert.equal(screens.isVoyagerScreen(null), false);
+  });
+
+  check('the two handoffs that used to arrive under the wrong name', () => {
+    /*
+     * "Find my next step" passed `home`, because `start` was not a kind anybody
+     * could pass — so the strip said *Home* over a conversation about somebody's
+     * next step. Ideas passed `explore:<topic>`, so an answer about one
+     * published idea was told it was looking at the whole hub.
+     */
+    assert.equal(transcript.screenFor('start'), 'strategy');
+    assert.equal(transcript.screenFor('ideas'), 'ideas');
+    assert.equal(screens.contextLabel({ kind: 'start', subject: null }), 'Your next step');
+    assert.equal(screens.contextLabel({ kind: 'ideas', subject: null }), 'This idea');
+  });
+
+  check('and every screen has a page package to send', () => {
+    // A screen with no template throws on `buildContext`, which is a 500 on a
+    // page rather than a missing prompt.
+    for (const screen of screens.VOYAGER_SCREENS) {
+      const built = pageContext.buildContext(screen);
+      assert.ok(built.prompt, screen);
+      assert.ok(built.quick.length >= 3, screen);
+      assert.equal(built.screen, screen);
+    }
   });
 
   group('The counter a browser keeps is a display, not a permission');
@@ -6218,20 +6266,124 @@ try {
 
   group('Every action offered under an answer can be confirmed and undone');
 
-  check('a mutating action states where it lands and how to reverse it', () => {
-    for (const id of session.ANSWER_ACTIONS) {
-      const spec = session.VOYAGER_ACTIONS[id];
+  check('every action states where it lands and how to reverse it', () => {
+    for (const id of acts.VOYAGER_ACTION_IDS) {
+      const spec = acts.specFor(id);
       assert.ok(spec.about, id);
       assert.ok(spec.done, id);
       assert.ok(spec.where, id);
       assert.ok(spec.undo, id);
       assert.ok(spec.call, id);
+      assert.ok(
+        ['navigate', 'in_place', 'mutate', 'prepare'].includes(spec.execution),
+        `${id}: ${spec.execution}`
+      );
     }
   });
 
-  check('the row leads with the one that keeps the answer', () => {
-    assert.equal(session.ANSWER_ACTIONS[0], 'research');
-    assert.equal(session.ANSWER_ACTIONS.length, Object.keys(session.VOYAGER_ACTIONS).length);
+  check('nothing that only navigates describes itself as a change', () => {
+    /*
+     * The sentence in `done` is the one printed after the act. A navigation
+     * whose past tense reads "added", "saved" or "created" would print a claim
+     * about the account for pressing a link.
+     */
+    for (const id of acts.VOYAGER_ACTION_IDS) {
+      const spec = acts.specFor(id);
+      if (spec.execution === 'mutate' || spec.execution === 'prepare') continue;
+      assert.ok(
+        !/\b(added|saved|created|drafted|removed|deleted)\b/i.test(spec.done),
+        `${id}: ${spec.done}`
+      );
+      assert.match(spec.undo, /Nothing to undo/, id);
+    }
+  });
+
+  check('a draft is described as a draft and never as the thing itself', () => {
+    /*
+     * `draftAlert` writes a row with status `draft`. It watches nothing until it
+     * is switched on, so "Created the alert" would be a claim about something
+     * that is not running.
+     */
+    const alert = acts.specFor('create_alert');
+    assert.equal(alert.execution, 'prepare');
+    assert.match(alert.done, /draft/i);
+    assert.ok(!/^created the alert/i.test(alert.done), alert.done);
+  });
+
+  check('the two registries are one, and the six-button row is gone', () => {
+    /*
+     * There used to be a `VOYAGER_ACTIONS` in `session.ts` for the chat and
+     * another in `types.ts` for the model, and `ANSWER_ACTIONS` printed six of
+     * the first under every answer regardless of the question. An answer's
+     * actions now come from the answer.
+     */
+    assert.equal(session.ANSWER_ACTIONS, undefined);
+    assert.equal(acts.isVoyagerActionId('open_chart'), true);
+    assert.equal(acts.isVoyagerActionId('watchlist'), false);
+    assert.equal(acts.isVoyagerActionId('portfolio_scenario'), false);
+  });
+
+  check('an action from a queue written before the merge is dropped, not run', () => {
+    // Storage outlives a deploy. Restoring `watchlist` now would mean acting on
+    // a description that no longer exists.
+    assert.equal(session.parsePending({ kind: 'action', id: 'watchlist' }), null);
+    assert.deepEqual(session.parsePending({ kind: 'action', id: 'add_to_watchlist' }), {
+      kind: 'action',
+      id: 'add_to_watchlist',
+    });
+  });
+
+  group('What an answer may offer is narrowed before the model sees it');
+
+  check('nothing is offered that has nothing to act on', () => {
+    /*
+     * The fixed row offered *Add to watchlist* under "What is an ETF?". There
+     * was no instrument in the request, so there was nothing the button could
+     * have added — it existed because a constant said six.
+     */
+    const generic = acts.allowedActions({ screen: 'generic', tier: 'basic', hasTicker: false });
+    assert.ok(!generic.includes('add_to_watchlist'));
+    assert.ok(!generic.includes('create_alert'));
+
+    const symbol = acts.allowedActions({ screen: 'symbol', tier: 'basic', hasTicker: true });
+    assert.ok(symbol.includes('add_to_watchlist'));
+    assert.ok(symbol.includes('create_alert'));
+  });
+
+  check('a tier that cannot read the wealth record is never shown its actions', () => {
+    for (const tier of ['basic', 'personal']) {
+      const allowed = acts.allowedActions({ screen: 'symbol', tier, hasTicker: true });
+      assert.ok(!allowed.some((id) => id.startsWith('open_wealth')), tier);
+    }
+    const priv = acts.allowedActions({ screen: 'symbol', tier: 'private', hasTicker: true });
+    assert.ok(priv.includes('open_wealth'));
+  });
+
+  check('the Pine action exists only where there is a chart to reveal it on', () => {
+    assert.ok(
+      acts.allowedActions({ screen: 'chart', tier: 'basic', hasTicker: true }).includes('view_pine')
+    );
+    assert.ok(
+      !acts.allowedActions({ screen: 'symbol', tier: 'basic', hasTicker: true }).includes('view_pine')
+    );
+  });
+
+  check('a lesson page keeps somebody in the lesson', () => {
+    const lesson = acts.allowedActions({ screen: 'academy', tier: 'private', hasTicker: true });
+    assert.ok(!lesson.includes('open_screener'), lesson.join(','));
+    assert.ok(lesson.includes('open_academy'));
+  });
+
+  check('and every id it may offer is one the registry can describe', () => {
+    for (const screen of screens.VOYAGER_SCREENS) {
+      for (const tier of ['basic', 'personal', 'private']) {
+        for (const hasTicker of [true, false]) {
+          for (const id of acts.allowedActions({ screen, tier, hasTicker })) {
+            assert.equal(acts.isVoyagerActionId(id), true, `${screen}/${tier}: ${id}`);
+          }
+        }
+      }
+    }
   });
 
   /* ============================ Superchart layouts ============================ */

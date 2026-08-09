@@ -483,6 +483,72 @@
   color: var(--tn-text-muted);
 }
 
+/*
+ * The answer's own label — "AI explanation", "AI analysis".
+ *
+ * Quieter than a tool chip on purpose: a tool chip is a claim that something
+ * ran, and this only says what kind of answer this is.
+ */
+.kindChip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9px;
+  padding: 5px 10px;
+  margin: 0 8px 10px 0;
+  border: 1px solid var(--tn-border-hairline);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--tn-text-muted);
+}
+
+.bullets {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--tn-text-nav);
+}
+
+/* The contextual upgrade card, when the policy layer decided there is one. */
+.upgrade {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: var(--tn-radius-option);
+  border: 1px solid var(--tn-border-inner);
+  background: var(--tn-surface-inner);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.upgradeText {
+  margin: 0;
+  flex: 1 1 220px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+.upgradeCta {
+  padding: 7px 13px;
+  border-radius: var(--tn-radius-chip-sm);
+  border: 1px solid var(--tn-border-control);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+  text-decoration: none;
+  transition: border-color var(--tn-transition-hover);
+}
+
+.upgradeCta:hover {
+  border-color: var(--tn-border-hover);
+}
+
 .modules {
   display: flex;
   flex-direction: column;

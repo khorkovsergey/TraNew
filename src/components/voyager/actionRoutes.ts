@@ -59,9 +59,20 @@ export function routeFor(
       return '/account/wealth';
     case 'open_watchlist':
       return '/account/workspace';
+    case 'open_practice':
+      return '/portfolio';
+    case 'open_research':
+      return '/voyager/research';
+    /*
+     * The three that write something.
+     *
+     * They are listed here for where the result *lands*, so a surface with no
+     * confirmation card can send somebody to look at it rather than perform it.
+     * The performing is `runVoyagerAction`, on the server, after a Confirm.
+     */
+    case 'add_to_watchlist':
+    case 'save_conversation':
     case 'create_alert':
-      // An alert is a reversible action, but it still belongs to the person's
-      // account — the draft is made where they can see and confirm it.
       return '/account/workspace';
     // Reveals the Pine block on the chart already open. Nothing to navigate to,
     // which is why it resolves to null like `none` does.

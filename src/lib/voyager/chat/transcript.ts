@@ -14,12 +14,12 @@
  * under the unit harness alone.
  */
 
+import type { VoyagerAction } from '../actions';
 import {
   allowanceToday,
   EMPTY_ALLOWANCE,
   FREE_DAILY_LIMIT,
   type Allowance,
-  type ContextKind,
 } from '../session';
 
 /* --------------------------------------------------------------- The turns */
@@ -45,6 +45,36 @@ export type Turn = {
   sources?: { label: string; detail?: string }[];
   /** Assistant only — three follow-ups the person might ask next. */
   followUps?: string[];
+  /** Assistant only — the label the answer carries: "AI explanation", and so on. */
+  contentType?: string;
+  /** Assistant only — at most four one-line observations under the text. */
+  bullets?: string[];
+  /**
+   * Assistant only — the actions *this* answer offers.
+   *
+   * Held on the turn rather than drawn from a constant, which is what the chat
+   * used to do: the same six buttons under every answer, including under "What
+   * is an ETF?", where *Add to watchlist* had nothing to add. The server
+   * narrows the list by tier, screen and whether the request even knows which
+   * instrument it is about, and this is what came back.
+   */
+  actions?: VoyagerAction[];
+  /**
+   * Assistant only — the instrument the answer was about, if any.
+   *
+   * Kept with the turn so an action pressed three answers later acts on the
+   * answer it sits under rather than on whatever is newest.
+   */
+  ticker?: string;
+  /**
+   * Assistant only — a full investment assessment, when the engine produced one.
+   *
+   * `unknown` for the same reason `output` is: this module owns the shape of a
+   * conversation, not the shape of an assessment, and the renderer is the gate.
+   */
+  investment?: unknown;
+  /** Assistant only — the contextual upgrade card the policy layer decided on. */
+  upgrade?: { text: string; cta: string; intent: 'sign_up' | 'unlock_private' };
   /**
    * Assistant only — a validated structured plan, when the answer produced one.
    *
@@ -115,46 +145,11 @@ export function historyFor(turns: Turn[]): { role: TurnRole; text: string }[] {
 
 /* -------------------------------------------------------- The page context */
 
-/**
- * Which server-side screen a page context maps to.
- *
- * The chat's context vocabulary is the one a link may carry — `symbol:TSLA`,
- * `learn` — and the orchestrator's is the one the policy layer keys sources
- * off. They are deliberately different lists, and this is the single place they
- * meet: a page that starts sending its own screen name would be choosing which
- * sources the server offers it.
+/*
+ * The mapping lives in `screens.ts` now, next to both vocabularies it joins.
+ * Re-exported under the old name so the chat's import does not move.
  */
-export type VoyagerScreenName =
-  | 'chart'
-  | 'market'
-  | 'symbol'
-  | 'economy'
-  | 'indicator'
-  | 'wealth'
-  | 'academy'
-  | 'experts'
-  | 'news'
-  | 'portfolio'
-  | 'strategy'
-  | 'events'
-  | 'generic';
-
-const SCREEN_OF: Record<ContextKind, VoyagerScreenName> = {
-  home: 'generic',
-  symbol: 'symbol',
-  chart: 'chart',
-  comparison: 'market',
-  article: 'news',
-  event: 'events',
-  portfolio: 'portfolio',
-  plan: 'strategy',
-  explore: 'market',
-  learn: 'academy',
-};
-
-export function screenFor(kind: ContextKind | null): VoyagerScreenName {
-  return kind ? SCREEN_OF[kind] : 'generic';
-}
+export { screenFor, type VoyagerScreen as VoyagerScreenName } from '../screens';
 
 /* ------------------------------------------------------------- The counter */
 

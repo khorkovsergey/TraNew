@@ -23,6 +23,8 @@
  *   never fires or one that fires twice.
  */
 
+import { isVoyagerActionId, type VoyagerActionId } from './actions';
+
 export type ConversationState =
   | 'empty'
   | 'processing'
@@ -103,135 +105,27 @@ export function canSend(options: {
 
 /* --------------------------------------------------------------- actions */
 
-/**
- * What an answer offers to do next, and which of those change something.
+/*
+ * The action registry moved to `actions.ts`, and this is the re-export so the
+ * chat keeps one import.
  *
- * A closed record rather than a flag on each call site. The question "does this
- * need a confirmation" has to have one answer per action, in one place, or the
- * sixth caller will be the one that forgets.
+ * There were two registries — one the model chose from, one the chat printed —
+ * and the chat's was a fixed row of six under every answer regardless of what
+ * had been asked. Merging them is what makes "the model decides which actions
+ * are relevant" a fact about the code rather than a sentence in a brief.
  */
-export type VoyagerActionId =
-  | 'research'
-  | 'open_chart'
-  | 'watchlist'
-  | 'save_workspace'
-  | 'portfolio_scenario'
-  | 'create_alert';
-
-type ActionSpec = {
-  label: string;
-  /** Changes something the person owns. Everything true here is confirmed first. */
-  mutates: boolean;
-  /** Needs an account, so a guest is gated and the action queued. */
-  needsAccount: boolean;
-  /**
-   * What the confirmation card says is about to happen, in the first person.
-   *
-   * Written here rather than at the call site so a button cannot describe
-   * itself more kindly than it behaves — the sentence somebody agrees to is
-   * built from the action, never from the label that offered it.
-   */
-  about: string;
-  /** The same act reported after the fact, so the reply is not written in the future tense. */
-  done: string;
-  /** Where the change lands, so nobody has to guess which part of the portal moved. */
-  where: string;
-  /** How to undo it, in words. Every mutating action has one or it is not here. */
-  undo: string;
-  /** The tool signature the answer shows once it has run. */
-  call: string;
-};
-
-export const VOYAGER_ACTIONS: Record<VoyagerActionId, ActionSpec> = {
-  research: {
-    label: 'Turn this answer into research',
-    mutates: false,
-    needsAccount: false,
-    about: 'open a research session seeded with this answer and its sources',
-    done: 'opened a research session seeded with this answer and its sources',
-    where: 'The research workspace',
-    undo: 'Nothing to undo — this only opens a session.',
-    call: 'research.open',
-  },
-  open_chart: {
-    label: 'Open on chart',
-    mutates: false,
-    needsAccount: false,
-    about: 'open this on the advanced chart',
-    done: 'opened this on the advanced chart',
-    where: 'Advanced Charts',
-    undo: 'Nothing to undo — this only navigates.',
-    call: 'chart.open',
-  },
-  watchlist: {
-    label: 'Add to watchlist',
-    mutates: true,
-    needsAccount: true,
-    about: 'add this to your watchlist',
-    done: 'added this to your watchlist',
-    where: 'Your workspace, under watchlists',
-    undo: 'Removing it from the list undoes this; nothing else changes.',
-    call: 'watchlist.add',
-  },
-  save_workspace: {
-    label: 'Save to workspace',
-    mutates: true,
-    needsAccount: true,
-    about: 'save this conversation to your workspace',
-    done: 'saved this conversation to your workspace',
-    where: 'Your saved workspaces',
-    undo: 'Deleting the saved copy removes it; what is on screen stays.',
-    call: 'workspace.save',
-  },
-  portfolio_scenario: {
-    label: 'Add to portfolio scenario',
-    mutates: true,
-    needsAccount: false,
-    about: 'add this to your practice portfolio as a virtual position',
-    done: 'added this to your practice portfolio as a virtual position',
-    where: 'Practice portfolio — simulated money only',
-    undo: 'You can remove the position in the simulator at any time.',
-    call: 'portfolio.add',
-  },
-  create_alert: {
-    label: 'Create alert',
-    mutates: true,
-    needsAccount: true,
-    about: 'draft an alert for this',
-    done: 'drafted an alert for this',
-    where: 'Your workspace, under alerts',
-    undo: 'Switching the alert off stops it immediately.',
-    call: 'alert.create',
-  },
-};
-
-/** The action row, in the order the design puts it: research first, then the rest. */
-export const ANSWER_ACTIONS: VoyagerActionId[] = [
-  'research',
-  'open_chart',
-  'watchlist',
-  'save_workspace',
-  'portfolio_scenario',
-  'create_alert',
-];
-
-/**
- * Whether this action must be confirmed before it runs.
- *
- * Defaults to true for anything unrecognised. A new action that somebody forgot
- * to describe should ask before it acts, not act because nobody said otherwise —
- * the failure of a wrong `true` is one extra click, and the failure of a wrong
- * `false` is something changing in an account without permission.
- */
-export function requiresConfirmation(id: string): boolean {
-  const spec = VOYAGER_ACTIONS[id as VoyagerActionId];
-  return spec ? spec.mutates : true;
-}
-
-export function requiresAccount(id: string): boolean {
-  const spec = VOYAGER_ACTIONS[id as VoyagerActionId];
-  return spec ? spec.needsAccount : true;
-}
+export {
+  VOYAGER_ACTION_IDS,
+  VOYAGER_ACTION_SPECS,
+  isVoyagerActionId,
+  mutates,
+  requiresAccount,
+  requiresConfirmation,
+  specFor,
+  type VoyagerAction,
+  type VoyagerActionId,
+  type VoyagerActionSpec,
+} from './actions';
 
 /* ------------------------------------------------------------- the queue */
 
@@ -257,67 +151,35 @@ export function parsePending(raw: unknown): Pending {
     // anything on the page.
     return { kind: 'question', text: value.text.slice(0, 2000) };
   }
-  if (value.kind === 'action' && typeof value.id === 'string' && value.id in VOYAGER_ACTIONS) {
-    return { kind: 'action', id: value.id as VoyagerActionId };
+  /*
+   * An id that is no longer in the registry is dropped rather than restored.
+   * Storage outlives a deploy, so a queue written before the two action lists
+   * were merged can still hold `watchlist` or `portfolio_scenario`; running one
+   * of those now would mean acting on a description nothing has any more.
+   */
+  if (value.kind === 'action' && isVoyagerActionId(value.id)) {
+    return { kind: 'action', id: value.id };
   }
   return null;
 }
 
 /* ------------------------------------------------------------- page context */
 
-/**
- * Where a question came from.
+/*
+ * The context vocabulary moved to `screens.ts`, beside the screens it maps to.
  *
- * A closed set, because it is read from a URL and shown to the person as "what
- * Voyager can see". An unrecognised value is dropped rather than displayed:
- * a status strip that echoes whatever a link put in it is a status strip that
- * can be made to lie.
+ * It was here, the screen list was in `types.ts`, the map between them was in
+ * `chat/transcript.ts` and the API kept a fourth copy of what it would accept —
+ * so `market` and `events` were screens three of the four knew about, and every
+ * question asked from a comparison or an event page was answered with a 400.
  */
-export type ContextKind =
-  | 'home'
-  | 'symbol'
-  | 'chart'
-  | 'comparison'
-  | 'article'
-  | 'event'
-  | 'portfolio'
-  | 'plan'
-  | 'explore'
-  | 'learn';
-
-const CONTEXT_LABEL: Record<ContextKind, string> = {
-  home: 'Home',
-  symbol: 'This asset',
-  chart: 'This chart',
-  comparison: 'This comparison',
-  article: 'This article',
-  event: 'This event',
-  portfolio: 'Your practice portfolio',
-  plan: 'Your plan',
-  explore: 'Explore',
-  learn: 'A lesson',
-};
-
-export type PageContext = { kind: ContextKind; subject: string | null };
-
-/** `symbol:TSLA`, `comparison:etfs,bonds`, `home`. Anything else is nothing. */
-export function parseContext(raw: unknown): PageContext | null {
-  if (typeof raw !== 'string' || !raw.trim()) return null;
-
-  const [kind, ...rest] = raw.trim().toLowerCase().split(':');
-  if (!(kind in CONTEXT_LABEL)) return null;
-
-  const subject = rest.join(':').trim();
-  return {
-    kind: kind as ContextKind,
-    // Bounded and stripped of anything that is not a plain identifier — this is
-    // rendered in the status strip.
-    subject: subject ? subject.replace(/[^a-z0-9,.\-\s]/gi, '').slice(0, 48) || null : null,
-  };
-}
-
-export function contextLabel(context: PageContext | null): string {
-  if (!context) return 'This conversation only';
-  const base = CONTEXT_LABEL[context.kind];
-  return context.subject ? `${base} · ${context.subject.toUpperCase()}` : base;
-}
+export {
+  CONTEXT_KINDS,
+  CONTEXT_LABEL,
+  contextLabel,
+  parseContext,
+  screenFor,
+  SCREEN_OF,
+  type ContextKind,
+  type PageContext,
+} from './screens';

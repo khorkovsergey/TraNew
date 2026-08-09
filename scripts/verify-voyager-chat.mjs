@@ -125,40 +125,93 @@ try {
     (await page.locator('[class*="sourceChip"]').first().innerText()).length > 0
   );
 
-  group('Every completed answer offers the action row, led by research');
-
-  const actions = await page.locator('[class*="actionRow"] button').allInnerTexts();
-  check('six actions', actions.length === 6, actions.join(' · '));
-  check('research is first', actions[0] === 'Turn this answer into research', actions[0]);
-
-  group('State 9 — nothing changes without a Confirm');
+  group('Every page a link can hand off from is a page the API accepts');
 
   /*
-   * The practice portfolio needs no account, so a guest reaches the
-   * confirmation itself rather than the sign-in gate — which is the state being
-   * checked here.
+   * `market` and `events` were screens the chat sent and the API rejected, so a
+   * question asked from a comparison, an Explore page or an event came back 400
+   * and the chat showed the card it shows when the network is down. Nothing was
+   * down, and the card said so for weeks.
+   *
+   * Checked through GET rather than by asking, because GET runs the same accept
+   * list without spending one of the ten questions a day this suite is metered
+   * at.
    */
-  await page.getByRole('button', { name: 'Add to portfolio scenario' }).first().click();
-  await page.waitForTimeout(400);
+  for (const screen of ['market', 'events', 'ideas', 'symbol', 'strategy', 'generic']) {
+    const probe = await page.request.get(`${BASE}/api/voyager?screen=${screen}&subject=test`);
+    check(`the API accepts ${screen}`, probe.status() === 200, `${probe.status()}`);
+  }
 
-  const dialog = page.getByRole('dialog', { name: 'Confirmation required' });
-  check('a mutating action asks first', await dialog.isVisible());
+  const rejected = await page.request.get(`${BASE}/api/voyager?screen=not_a_screen`);
+  check('and still refuses one it does not know', rejected.status() === 400, `${rejected.status()}`);
 
-  const dialogText = await dialog.innerText();
-  check('it says what it is about to do', /I.m about to/.test(dialogText), dialogText.slice(0, 90));
-  check('where it lands', /Practice portfolio/.test(dialogText), dialogText.slice(0, 160));
-  check('and how to undo it', /remove the position/.test(dialogText), dialogText.slice(0, 220));
+  group('The actions under an answer are the answer’s, not a constant');
 
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await page.waitForTimeout(300);
+  /*
+   * There used to be six, from a list in `session.ts`, under every answer that
+   * was not a failure — the same six in the same order under "What is an ETF?",
+   * where *Add to watchlist* had nothing to add and *Add to portfolio scenario*
+   * reported adding a position to a table this database does not have.
+   *
+   * What is checked here is what stays true whichever actions the model picked:
+   * a bounded row, and every button carrying an id the registry knows. The
+   * per-action wording is asserted in the unit suite, where it is deterministic.
+   */
+  const actionButtons = page.locator('[class*="actionRow"] button');
+  const actionCount = await actionButtons.count();
+  const actionIds = await actionButtons.evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute('data-action'))
+  );
+
+  check('at most four, never the fixed six', actionCount <= 4, `${actionCount}: ${actionIds}`);
   check(
-    'cancelling does nothing and says nothing happened',
-    !(await page.locator('body').innerText()).includes('Done —')
+    'every button carries the id it will run',
+    actionIds.length === actionCount && actionIds.every((id) => typeof id === 'string' && id),
+    actionIds.join(' · ')
+  );
+  check(
+    'and none of them are the ids the merge removed',
+    !actionIds.some((id) => ['watchlist', 'save_workspace', 'portfolio_scenario', 'research'].includes(id ?? '')),
+    actionIds.join(' · ')
   );
 
   group('State 8 — a guest is gated, and the action is kept');
 
-  await page.getByRole('button', { name: 'Add to watchlist' }).first().click();
+  /*
+   * Driven from a seeded transcript rather than from whatever the model chose
+   * this time. The restore path is the real one — these turns render through
+   * the same code an answer does — and it makes the state reachable on every
+   * run instead of on the runs where the model happened to offer a write.
+   */
+  const seeded = [
+    { id: 'u1', role: 'user', text: 'What about Tesla?', at: new Date().toISOString() },
+    {
+      id: 'a1',
+      role: 'assistant',
+      text: 'Tesla trades on NASDAQ and is one of the more volatile large caps.',
+      at: new Date().toISOString(),
+      ticker: 'TSLA',
+      actions: [
+        { label: 'Add to watchlist', action: 'add_to_watchlist', primary: true },
+        { label: 'Open on chart', action: 'open_chart' },
+      ],
+    },
+  ];
+
+  await page.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate((turns) => {
+    sessionStorage.setItem('tn.voyager.dialog.v1', JSON.stringify(turns));
+    sessionStorage.removeItem('tn.voyager.pending.v1');
+  }, seeded);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(700);
+
+  check(
+    'a seeded answer renders exactly the actions it carries',
+    (await page.locator('[class*="actionRow"] button').count()) === 2
+  );
+
+  await page.locator('[data-action="add_to_watchlist"]').first().click();
   await page.waitForTimeout(400);
 
   const gate = await page.locator('[class*="authGate"]').innerText();
@@ -168,17 +221,32 @@ try {
   const queued = await page.evaluate(() => sessionStorage.getItem('tn.voyager.pending.v1'));
   check('the action is queued rather than dropped', /watchlist/.test(queued ?? ''), queued);
 
+  group('Nothing reports success that a server did not perform');
+
+  /*
+   * The regression that matters most here. "Done — I added this to your
+   * watchlist" used to be printed the moment Confirm was pressed, with a
+   * `watchlist.add ✓` chip beside it and no request sent anywhere; the row was
+   * not in the workspace the message said to look in.
+   *
+   * A guest cannot reach a Confirm at all, so what is asserted is the outcome:
+   * no success sentence and no ✓ chip anywhere on the way through the gate.
+   */
+  const afterGate = await page.locator('body').innerText();
+  check('no "Done —" without an account', !afterGate.includes('Done —'), afterGate.slice(0, 120));
+  check('and no tool chip claiming a call returned', !/Tool:.*✓/.test(afterGate));
+
   group('The dialogue survives the trip through sign-in');
 
   const stored = await page.evaluate(() => sessionStorage.getItem('tn.voyager.dialog.v1'));
-  check('the transcript is kept for the return', /What is an ETF\?/.test(stored ?? ''));
+  check('the transcript is kept for the return', /What about Tesla\?/.test(stored ?? ''));
 
   await page.goto(`${BASE}/en/sign-in?next=/voyager`, { waitUntil: 'domcontentloaded' });
   await page.goBack({ waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
   check(
     'and it is still there on the way back',
-    (await page.locator('body').innerText()).includes('What is an ETF?')
+    (await page.locator('body').innerText()).includes('What about Tesla?')
   );
 
   group('State 6 — the API is down and the portal still works');

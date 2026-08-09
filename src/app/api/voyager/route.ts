@@ -13,7 +13,8 @@ import {
 } from '@/lib/voyager/policy';
 import { quotaAnswer } from '@/lib/voyager/scenarios';
 import { consumeQuestion, peekUsage } from '@/lib/voyager/usage';
-import type { VoyagerRequest, VoyagerResponse, VoyagerScreen } from '@/lib/voyager/types';
+import { isVoyagerScreen } from '@/lib/voyager/screens';
+import type { VoyagerRequest, VoyagerResponse } from '@/lib/voyager/types';
 
 /**
  * The one entry point Voyager answers through.
@@ -22,23 +23,16 @@ import type { VoyagerRequest, VoyagerResponse, VoyagerScreen } from '@/lib/voyag
  * Tier is read from the session, never from the request body — a widget that could
  * name its own tier could name `private` and ask about a wealth record it has no
  * claim to.
+ *
+ * What this route accepts is `screens.ts`, not a list written out here again.
+ * The copy that used to live in this file was missing `market` and `events`,
+ * both of which the chat could legitimately send and the policy layer already
+ * understood — so a question asked from a comparison, an Explore page or an
+ * event came back 400 and the chat showed the card it shows when the network is
+ * down. Nothing was down.
  */
 
 export const dynamic = 'force-dynamic';
-
-const SCREENS: VoyagerScreen[] = [
-  'chart',
-  'symbol',
-  'economy',
-  'indicator',
-  'wealth',
-  'academy',
-  'experts',
-  'news',
-  'portfolio',
-  'strategy',
-  'generic',
-];
 
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
@@ -82,10 +76,10 @@ async function currentUser(): Promise<AuthedUser | null> {
  * is derived from the session here rather than guessed on the client.
  */
 export async function GET(request: NextRequest) {
-  const screen = request.nextUrl.searchParams.get('screen') as VoyagerScreen | null;
+  const screen = request.nextUrl.searchParams.get('screen');
   const subject = request.nextUrl.searchParams.get('subject') ?? '';
 
-  if (!screen || !SCREENS.includes(screen)) {
+  if (!isVoyagerScreen(screen)) {
     return badRequest('A valid screen is required.');
   }
 
@@ -132,7 +126,7 @@ export async function POST(request: NextRequest) {
   if (question.length > 2000) return badRequest('That question is too long.');
 
   const context = body.context;
-  if (!context || !SCREENS.includes(context.screen)) {
+  if (!context || !isVoyagerScreen(context.screen)) {
     return badRequest('A valid page context is required.');
   }
 
