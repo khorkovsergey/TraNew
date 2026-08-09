@@ -36,7 +36,6 @@ export const EXPLORE_ICON_IDS = [
   'calendar',
   'map',
   'yield',
-  'compare',
 ] as const;
 
 export type ExploreIconId = (typeof EXPLORE_ICON_IDS)[number];
@@ -295,39 +294,6 @@ export function ExploreMenuSprite() {
             stroke="currentColor"
             strokeWidth="1.6"
             strokeLinecap="round"
-          />
-        </g>
-
-        {/* Two bars of different height with a dashed divider between them —
-            the comparison, drawn rather than described. */}
-        <g id={id('compare')}>
-          <rect
-            x="4.2"
-            y="9.4"
-            width="5.6"
-            height="10.2"
-            rx="1.4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          />
-          <rect
-            x="14.2"
-            y="4.4"
-            width="5.6"
-            height="15.2"
-            rx="1.4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          />
-          <path
-            d="M12 7.4v9.2"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeDasharray="2 2.6"
           />
         </g>
       </defs>

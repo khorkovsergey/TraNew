@@ -12,15 +12,8 @@ import type { ExploreIconId } from './ExploreMenuIcons';
  * the difference between them is the shape of the panel, not the shape of a row.
  *
  * Explore is still the exception in what it promises: it announces a market data
- * product that is being built, so almost nothing in it clicks. Everywhere else a
- * row that looks clickable is clickable.
- *
- * The chips are the annotation system for that, and there are exactly three
- * states. `Live` or `New` means the route is shipped and the row is a link;
- * `Coming soon` means the functionality is not built and the row does not click
- * at all; no chip means an ordinary link to something that has always existed.
- * A row is never a link and `Coming soon` at the same time — a badge that warns
- * and then navigates still spends the click it warned about.
+ * product that is being built, so nothing in it clicks yet. Everywhere else a row
+ * that looks clickable is clickable.
  *
  * `Start Investing` used to be here. Its menu named five ways into a
  * questionnaire, which put a form on the same level as four sections of the
@@ -36,14 +29,8 @@ import type { ExploreIconId } from './ExploreMenuIcons';
 export type MenuEntry = {
   label: string;
   sub?: string;
-  /** Carries the "Soon" badge. Never set on a row that is also a link. */
+  /** Carries the "Soon" badge. */
   soon?: boolean;
-  /**
-   * The other badge: this row goes somewhere, and here is why it is worth
-   * noticing. `live` for a destination that is now real, `new` for one this
-   * release introduced. Only ever on a `route` row.
-   */
-  chip?: 'live' | 'new';
   /**
    * The glyph on the left of the row, from the Explore sprite.
    *
@@ -126,28 +113,16 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
    * It held five groups of working links — investment types, and the three
    * sections that used to be top-level headings, plus an advanced layer. What it
    * describes now is the market data product being built: three questions, in
-   * the order somebody actually asks them. A row that navigates to a page which
-   * cannot answer it spends the trust the row was meant to build, so a row is
-   * only a link once the thing it names is built.
-   *
-   * `Market overview` is the first of them to become one. It is also where
-   * Home's "Explore markets" button now goes: the button says markets, and both
-   * it and this row land on the same canonical page rather than on two
-   * variations of one.
+   * the order somebody actually asks them, and twenty answers none of which
+   * exists yet. So none of them clicks. A row that navigates to a page which
+   * cannot answer it spends the trust the row was meant to build.
    */
   explore: [
     {
       title: 'MARKET',
       hint: 'What is happening?',
       items: [
-        {
-          kind: 'route',
-          href: '/markets/global',
-          chip: 'live',
-          label: 'Market overview',
-          sub: 'Global markets at a glance',
-          icon: 'overview',
-        },
+        soon('Market overview', 'See what is moving today', 'overview'),
         soon('Stocks', 'Global equity markets', 'stocks'),
         soon('ETFs', 'Funds across markets and themes', 'etfs'),
         soon('Indices', 'Major global benchmarks', 'indices'),
@@ -162,18 +137,6 @@ export const MENUS: Record<MenuKey, MenuGroup[]> = {
       hint: 'What is this asset?',
       items: [
         soon('Search an asset', 'Stocks, ETFs, crypto and more', 'search'),
-        /*
-         * Named here before it is built, deliberately.
-         *
-         * Compare assets is one of the two screens the Explore redesign
-         * introduces, and the rule it enforces is that no major screen is
-         * missing from this menu. Its route is `/markets/compare` and the
-         * markets section has not built it yet, so the row stays inert and
-         * keeps the `Coming soon` badge: a `New` chip on a link that 404s is
-         * worse than an honest promise. When that route ships, this becomes a
-         * `route` row with `chip: 'new'` and nothing else about it changes.
-         */
-        soon('Compare assets', 'Put 2–4 instruments side by side', 'compare'),
         soon('Stock screener', 'Find stocks by fundamentals and performance', 'filter'),
         soon('ETF screener', 'Compare funds and strategies', 'filter'),
         soon('Crypto screener', 'Explore digital assets', 'filterCrypto'),

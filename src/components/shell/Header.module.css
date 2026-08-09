@@ -462,34 +462,6 @@
   color: #7ea6c9;
 }
 
-/*
- * The other half of the annotation: this row is ready.
- *
- * Same shape as the Soon badge on purpose — one badge slot per row, two
- * meanings, and the colour is the only thing that separates them. Blue-grey
- * says "later", mint says "now".
- */
-.chipLive {
-  display: inline-block;
-  border-radius: 6px;
-  background: var(--tn-mint-tint);
-  border: 1px solid var(--tn-mint-border);
-  padding: 2.5px 8px;
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: var(--tn-mint);
-}
-
-/* The tile follows the badge, so the ready row reads as one thing. */
-.menuIconLive {
-  background: var(--tn-mint-tint);
-  border-color: var(--tn-mint-border);
-  color: var(--tn-mint);
-}
-
 .soonShort {
   display: none;
 }

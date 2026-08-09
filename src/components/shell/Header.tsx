@@ -143,16 +143,10 @@ export function Header() {
      */
     const row = `${styles.menuItem} ${entry.icon || entry.glyph ? styles.menuItemWide : ''}`;
 
-    /*
-     * A row that goes somewhere in a panel where most rows do not is
-     * distinguished by state, not by a block of its own: the same anatomy, with
-     * the tile and the badge in mint. Anything else would read as a promotion
-     * rather than as the one entry that is ready.
-     */
     const body = (
       <>
         {(entry.icon || entry.glyph) && (
-          <span className={`${styles.menuIcon} ${entry.chip ? styles.menuIconLive : ''}`}>
+          <span className={styles.menuIcon}>
             {entry.icon ? (
               <ExploreIcon name={entry.icon} />
             ) : (
@@ -176,11 +170,6 @@ export function Header() {
                     for the long one, and CSS cannot rewrite text. */}
                 <span className={styles.soonLong}>Coming soon</span>
                 <span className={styles.soonShort}>Soon</span>
-              </span>
-            )}
-            {entry.chip && (
-              <span className={styles.chipLive}>
-                {entry.chip === 'live' ? 'Live' : 'New'}
               </span>
             )}
           </span>
