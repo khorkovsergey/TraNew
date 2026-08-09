@@ -26,7 +26,7 @@ export function AssetClassPage({ entry }: { entry: AssetClass }) {
     <div className={styles.page}>
       <Link className={styles.back} href="/explore">
         <Icon name="arrowLeft" size={14} strokeWidth={2.2} />
-        Explore
+        Investment options
       </Link>
 
       <header className={styles.header}>

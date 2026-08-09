@@ -45,13 +45,14 @@ export default async function Page({ params }: Props) {
       <div className={styles.page}>
         <Link className={styles.back} href="/explore">
           <Icon name="arrowLeft" size={14} strokeWidth={2.2} />
-          Explore
+          Investment options
         </Link>
 
         <h1 className={styles.h1}>Every option, in one list</h1>
         <p className={styles.lead}>
           Six categories money can go into, and the product shapes people usually start from. Each
-          one opens an explanation, or a comparison against its closest alternatives.
+          one opens an explanation, or a comparison against its closest alternatives. Educational
+          orientation — there are no live prices on these pages.
         </p>
 
         <section className={styles.section}>

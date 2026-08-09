@@ -1,28 +1,27 @@
 import { assetClass, type AssetClassKey } from '@/content/assetClasses';
 
 /**
- * Where "Compare in detail" goes, and how the comparison screen reads it back.
+ * Where "Compare" goes.
  *
- * Both halves live here so they cannot drift: the link is built from the same
- * list the page parses, and a class the parser does not recognise is dropped
- * rather than rendered as an empty column.
+ * It used to go to `/research` — the instrument-research workspace, with a
+ * search box, a chart and a canned answer on it. Somebody still deciding
+ * whether they want bonds or a fund at all was being handed a screen built for
+ * choosing between two tickers, and the way back was the browser button.
  *
- * `q` is written out in words as well as `assets` being listed. The words are
- * what a person sees at the top of the answer and what a shared link says it
- * is about; the list is what the page actually renders from. One without the
- * other is either an unreadable URL or an unparseable one.
+ * The comparison lives on the Investment options page now, at `#compare`, so
+ * this is a link into the page rather than out of it. The class travels in
+ * `tab` because the comparison always opens with the class you were reading
+ * about in the first column.
+ *
+ * `/research?assets=…` still renders a comparison for anyone holding an old
+ * link — see `parseCompare`, which is why it is still here although nothing in
+ * this section builds those URLs any more.
  */
 export function compareHref(key: AssetClassKey) {
-  const entry = assetClass(key);
-  const set = entry ? [entry.key, ...entry.alternatives] : ['stocks', 'etfs', 'bonds'];
-  const names = set.map((slug) => assetClass(slug)?.name ?? slug);
-
   return {
-    pathname: '/research' as const,
-    query: {
-      q: `Compare ${names.join(', ')}`,
-      assets: set.join(','),
-    },
+    pathname: '/explore' as const,
+    query: { tab: key },
+    hash: 'compare',
   };
 }
 

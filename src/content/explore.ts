@@ -1,14 +1,18 @@
-import type { IconName } from '@/components/ui/Icon';
 import type { AssetAccent, AssetClassKey } from '@/content/assetClasses';
-import type { StaticPathname } from '@/i18n/routing';
 
 /**
- * Explore, minus the classes themselves.
+ * Investment options, minus the classes themselves.
  *
- * The asset classes and the comparison matrix moved to `assetClasses.ts`, which
- * is the single place they are described. What is left here is the furniture:
- * the products people start from, the market tiles, and the sections that are
- * not asset classes and were never tabs.
+ * The asset classes and the comparison matrix live in `assetClasses.ts`, which
+ * is the single place they are described. What is left here is the catalogue
+ * behind "Every option, in one list".
+ *
+ * The market tiles and the "Explore more" cards used to be here too. Both were
+ * removed with the Investment options redesign: this is an education section
+ * that states at the top that it carries no live prices, and four tiles with a
+ * percentage on them made that untrue on the same screen that said it. The live
+ * markets are one link away, at `/markets/global`, which is where somebody who
+ * wanted them should have been all along.
  */
 
 export type ExploreAccent = AssetAccent | 'cyan';
@@ -76,79 +80,5 @@ export const STARTERS: Array<{
     accent: 'rose',
     seed: 6.3,
     klass: 'property',
-  },
-];
-
-/** Four tiles of what moved. Illustrative shapes, delayed figures, both labelled. */
-export const MARKET_TILES: Array<{
-  name: string;
-  change: string;
-  up: boolean;
-  accent: ExploreAccent;
-  seed: number;
-}> = [
-  { name: 'Global markets', change: '+0.68%', up: true, accent: 'green', seed: 2.3 },
-  { name: 'US stocks', change: '+0.92%', up: true, accent: 'green', seed: 4.8 },
-  { name: 'Global bonds', change: '−0.12%', up: false, accent: 'rose', seed: 6.6 },
-  { name: 'Gold', change: '+0.31%', up: true, accent: 'amber', seed: 8.9 },
-];
-
-/**
- * "Explore more" — the sections that are not asset classes.
- *
- * These six used to sit in the row above the tabs, styled as pills beside
- * "Investment types", so switching a tab and leaving the page looked like the
- * same gesture. Economy was worse: it was a seventh tab in a row of asset
- * classes, and it is not one. They are a labelled block at the foot of the page
- * now, which is what they always were.
- */
-export const EXPLORE_MORE: Array<{
-  label: string;
-  text: string;
-  icon: IconName;
-  accent: ExploreAccent;
-  href: StaticPathname;
-}> = [
-  {
-    label: 'Economy & your money',
-    text: 'Rates, inflation and growth, and what they do to a plan.',
-    icon: 'globe',
-    accent: 'cyan',
-    href: '/economy',
-  },
-  {
-    label: 'Today in markets',
-    text: 'What moved, and whether it matters.',
-    icon: 'bars',
-    accent: 'green',
-    href: '/markets/global',
-  },
-  {
-    label: 'News',
-    text: 'Headlines with the reason underneath them.',
-    icon: 'fileSearch',
-    accent: 'blue',
-    href: '/news',
-  },
-  {
-    label: 'Market Views',
-    text: 'What other people think, labelled as opinion.',
-    icon: 'chat',
-    accent: 'amber',
-    href: '/ideas',
-  },
-  {
-    label: 'Research an asset',
-    text: 'Ask about one company or fund in particular.',
-    icon: 'search',
-    accent: 'purple',
-    href: '/research',
-  },
-  {
-    label: 'Advanced charts',
-    text: 'The professional workspace, when you want it.',
-    icon: 'chart',
-    accent: 'rose',
-    href: '/supercharts',
   },
 ];

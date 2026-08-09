@@ -1,9 +1,13 @@
 /*
- * Explore.
+ * Investment options.
  *
- * Three columns across the top — explain, compare, ask — because those are the
- * three things somebody does with a category they have just met, and putting
- * them side by side is what stops the page becoming a taxonomy to scroll.
+ * An education screen, laid out as one: the explanation gets the wide column,
+ * everything that leads away from it gets the narrow one, and the comparison
+ * sits at the foot of the page where somebody arrives having already read what
+ * they are comparing.
+ *
+ * Nothing on this page carries a price, so nothing on it is coloured green or
+ * red. The only accent is mint, and it means "this is the one you selected".
  */
 
 .page {
@@ -12,136 +16,156 @@
   padding: 40px var(--tn-page-pad) 48px;
 }
 
-.h1 {
-  margin: 0;
-  font-size: clamp(36px, 4vw, 54px);
+/* ---- The contract at the top ---- */
+
+.eyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.eyebrowMark {
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: -1.8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tn-cyan);
+}
+
+.eyebrowNote {
+  font-size: 12px;
+  color: var(--tn-text-muted);
+}
+
+.h1 {
+  margin: 10px 0 0;
+  font-size: clamp(32px, 3.4vw, 44px);
+  font-weight: 800;
+  letter-spacing: -1.4px;
   line-height: 1.1;
 }
 
-.accentText {
-  background: var(--tn-accent-fill);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-
 .lead {
-  margin: 16px 0 0;
-  font-size: 16px;
+  margin: 14px 0 0;
+  font-size: 16.5px;
   color: var(--tn-text-secondary);
-  max-width: 520px;
+  max-width: 640px;
 }
 
-/* ---- Sub-nav ---- */
+/*
+ * The way out to live markets, offered in the first screenful.
+ *
+ * This page is what "Explore markets" used to open, and some of the people who
+ * arrive still want a price. Telling them where to go costs one line; letting
+ * them find out by scrolling an education page to the end costs the visit.
+ */
+.marketsOut {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tn-text-soft);
+  transition: color var(--tn-transition-fast);
+}
 
+.marketsOut:hover {
+  color: var(--tn-mint);
+}
 
+/* ---- Category chips ---- */
 
-
-
-
-/* ---- Category tabs ---- */
-
+/* One row, always. Six categories that wrap to two lines read as two groups. */
 .tabs {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 9px;
-  padding: 14px 10px;
-  border-radius: 12px;
-  font-size: 13.5px;
-  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 600;
   white-space: nowrap;
   background: var(--tn-surface-veil);
-  border: 1.5px solid var(--tn-border-inner);
-  color: var(--tn-text-nav);
-  transition: border-color var(--tn-transition-fast), color var(--tn-transition-fast);
+  border: 1px solid var(--tn-border-inner);
+  color: var(--tn-text-soft);
+  transition: border-color var(--tn-transition-fast), color var(--tn-transition-fast),
+    background var(--tn-transition-fast);
 }
 
 .tab:hover {
   border-color: var(--tn-border-hover);
-  color: var(--tn-text);
+  color: var(--tn-text-nav);
 }
 
 .tabOn {
-  background: var(--tn-blue-tint);
-  border-color: var(--tn-blue);
-  color: #fff;
-  box-shadow: 0 0 18px rgba(56, 189, 248, 0.18);
+  background: var(--tn-mint-tint);
+  border-color: var(--tn-mint);
+  color: var(--tn-text);
 }
 
-/* ---- Rows ---- */
+/* ---- The split ---- */
 
-.topRow {
+.main {
   display: grid;
-  grid-template-columns: 400px minmax(0, 1fr) 400px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
   gap: 16px;
   margin-top: 18px;
-  align-items: stretch;
+  animation: rise 0.3s ease both;
 }
 
-.bottomRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  gap: 16px;
-  margin-top: 16px;
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
-.card {
-  background: var(--tn-surface-veil);
+@media (prefers-reduced-motion: reduce) {
+  .main {
+    animation: none;
+  }
+}
+
+.detail {
+  padding: 28px 28px 24px;
+  border-radius: 18px;
   border: 1px solid var(--tn-border-card);
-  border-radius: 16px;
-  padding: 24px 26px;
+  background: var(--tn-surface-veil);
   min-width: 0;
 }
-
-.compareCard {
-  display: flex;
-  flex-direction: column;
-}
-
-.cardHead {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.cardTitle {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.cardSub {
-  font-size: 13.5px;
-  color: var(--tn-text-soft);
-  margin-top: 2px;
-}
-
-/* ---- Understand this option ---- */
 
 .catHead {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 18px;
 }
 
 .catMark {
   width: 46px;
   height: 46px;
   flex-shrink: 0;
-  border-radius: 12px;
+  border-radius: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -149,62 +173,328 @@
 }
 
 .catName {
-  font-size: 19px;
+  margin: 0;
+  font-size: 26px;
   font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1.15;
 }
 
 .catTagline {
-  font-size: 13.5px;
-  color: var(--tn-text-soft);
-  line-height: 1.45;
-  margin-top: 2px;
-}
-
-.facts {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin: 20px 0 0;
-}
-
-.fact {
-  display: flex;
-  gap: 12px;
-}
-
-.fact > :first-child {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.factTerm {
-  font-size: 13.5px;
-  font-weight: 800;
-}
-
-.factDetail {
   margin: 2px 0 0;
   font-size: 13.5px;
   color: var(--tn-text-soft);
-  line-height: 1.5;
+}
+
+.what {
+  margin: 20px 0 0;
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--tn-text-body);
+}
+
+/* ---- Fact tiles ---- */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 22px 0 0;
+}
+
+.fact {
+  padding: 14px 15px;
+  border-radius: 12px;
+  border: 1px solid var(--tn-border-inner);
+  background: var(--tn-surface-inner);
+  min-width: 0;
+}
+
+.factTerm {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}
+
+.factDetail {
+  display: block;
+  margin: 7px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+/* ---- Good to know / Watch out for ---- */
+
+.block {
+  margin-top: 24px;
+}
+
+.blockRule {
+  padding-top: 20px;
+  border-top: 1px solid var(--tn-border-hairline);
+}
+
+.blockTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tn-text-soft);
+}
+
+.bullets {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bullet {
+  display: flex;
+  gap: 11px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--tn-text-secondary);
+}
+
+.bulletDot {
+  flex-shrink: 0;
+  margin-top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tn-mint);
+}
+
+.watchOut {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--tn-text-secondary);
+}
+
+/* ---- The side column ---- */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  padding: 22px;
+  border-radius: 16px;
+  border: 1px solid var(--tn-border-card);
+  background: var(--tn-surface-veil);
+  min-width: 0;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.cardSub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--tn-text-soft);
 }
 
 /*
- * The one level-1 action on this screen.
+ * Starting points are text, not links.
  *
- * Explore's job is to send somebody into a category, so that is the button that
- * gets the filled mint. It was an outline among four other outlines, which left
- * the screen with no next step at all.
+ * They were cards with an "Understand" button each, which made six product
+ * shapes look like six destinations the portal had built. They are examples of
+ * how people begin, the page says so, and a link would promise a page behind
+ * every one of them.
  */
-.learnMore {
+.starts {
+  display: flex;
+  flex-direction: column;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.start {
+  padding: 13px 0;
+  border-top: 1px solid var(--tn-border-hairline);
+}
+
+.startName {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+.startText {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tn-text-soft);
+}
+
+/* ---- Where this leads ---- */
+
+.leads {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.leadRow {
   display: flex;
   align-items: center;
-  gap: 8px;
   justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  border-radius: 12px;
+  border: 1px solid var(--tn-border-control);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tn-text-nav);
+  transition: border-color var(--tn-transition-fast);
+}
+
+.leadRow:hover {
+  border-color: var(--tn-border-hover);
+}
+
+/* The comparison is where this page wants people to go next. */
+.leadPrimary {
+  border-color: var(--tn-mint-border);
+  background: var(--tn-mint-tint);
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+.leadPrimary:hover {
+  border-color: var(--tn-mint);
+}
+
+.leadSub {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--tn-text-muted);
+}
+
+/* ---- Compare investment types ---- */
+
+.compare {
+  margin-top: 44px;
+  padding: 26px 26px 22px;
+  border-radius: 18px;
+  border: 1px solid var(--tn-border-card);
+  background: var(--tn-surface-veil);
+  /* The anchor lands under a sticky header without this. */
+  scroll-margin-top: calc(var(--tn-header-h) + 16px);
+}
+
+.compareHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.compareIntro {
+  min-width: 0;
+}
+
+.compareTitleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.compareEyebrow {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tn-cyan);
+}
+
+.h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+.compareSub {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--tn-text-soft);
+  max-width: 620px;
+}
+
+.rivalChips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rivalChip {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--tn-border-inner);
+  background: var(--tn-surface-inner);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tn-text-soft);
+  transition: border-color var(--tn-transition-fast), color var(--tn-transition-fast),
+    background var(--tn-transition-fast);
+}
+
+.rivalChip:hover {
+  border-color: var(--tn-border-hover);
+  color: var(--tn-text-nav);
+}
+
+.rivalChipOn {
+  border-color: var(--tn-mint);
+  background: var(--tn-mint-tint);
+  color: var(--tn-text);
+}
+
+.matrixSlot {
   margin-top: 20px;
-  padding: 13px 18px;
+}
+
+.compareCtas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.ctaPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 20px;
   border-radius: 11px;
-  border: 1px solid transparent;
   background: var(--tn-cta);
   color: var(--tn-cta-text);
   font-size: 14px;
@@ -212,91 +502,58 @@
   transition: filter var(--tn-transition-fast);
 }
 
-.learnMore:hover {
+.ctaPrimary:hover {
   filter: brightness(1.08);
 }
 
-.soon {
-  border-radius: var(--tn-radius-chip-sm);
-  background: #101c2a;
-  border: 1px solid #1e2c3c;
-  padding: 1px 6px;
-  margin-left: auto;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--tn-text-muted);
-}
-
-/* ---- Compare ---- */
-
-.ghostChip {
-  padding: 8px 14px;
-  border-radius: 9px;
+.ctaGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 11px;
   border: 1px solid var(--tn-border-control);
-  color: #c3d2e0;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 700;
-  white-space: nowrap;
+  color: var(--tn-text-nav);
   transition: border-color var(--tn-transition-fast);
 }
 
-.ghostChip:hover {
+.ctaGhost:hover {
   border-color: var(--tn-border-hover);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-.delayNote {
-  margin-top: 12px;
-  font-size: 10.5px;
-  color: var(--tn-text-faint);
+.compareNote {
+  font-size: 12.5px;
+  color: var(--tn-text-muted);
 }
 
 /* ---- Ask Voyager ---- */
 
 .voyagerCard {
-  position: relative;
-  background: #070f18;
-  border: 1px solid #16303a;
-  border-radius: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: center;
+  margin-top: 44px;
   padding: 24px 26px;
+  border-radius: 18px;
+  border: 1px solid var(--tn-border-focus);
+  background: var(--tn-raised);
   overflow: hidden;
+}
+
+.voyagerBody {
   min-width: 0;
 }
 
-.voyagerIntro {
+.voyagerTitle {
   display: flex;
-  gap: 14px;
   align-items: center;
-  margin-top: 14px;
-}
-
-.robot {
-  width: 96px;
-  height: auto;
-  flex-shrink: 0;
-  margin: -8px 0 -8px -12px;
-  pointer-events: none;
-}
-
-.voyagerLine {
+  gap: 10px;
   margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.5;
+  font-size: 18px;
+  font-weight: 800;
 }
 
 .askForm {
@@ -306,8 +563,8 @@
   margin-top: 14px;
   background: var(--tn-input-bg);
   border: 1px solid var(--tn-border-input);
-  border-radius: 11px;
-  padding: 5px 5px 5px 14px;
+  border-radius: 12px;
+  padding: 6px 6px 6px 16px;
   transition: border-color var(--tn-transition-fast);
 }
 
@@ -322,7 +579,7 @@
   border: none;
   outline: none;
   background: transparent;
-  color: #e5eef7;
+  color: var(--tn-text);
   font-size: 16px;
   padding: 8px 0;
 }
@@ -332,10 +589,10 @@
 }
 
 .askSend {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--tn-cta-blue);
   color: #fff;
   display: flex;
@@ -348,29 +605,33 @@
   filter: brightness(1.1);
 }
 
-.tryLabel {
-  margin-top: 14px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #6e8195;
-}
-
 .questionList {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 12px;
+}
+
+/* What Voyager can see when it answers, named before it is asked. */
+.contextChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--tn-mint-border);
+  background: var(--tn-mint-tint);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-teal);
 }
 
 .questionChip {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 13px;
+  padding: 7px 12px;
   border-radius: 9px;
   border: 1px solid var(--tn-border-input);
-  background: #081120;
-  color: #c3d2e0;
+  background: var(--tn-chip-bg);
+  color: var(--tn-text-nav);
   font-size: 12.5px;
   font-weight: 600;
   text-align: left;
@@ -381,405 +642,77 @@
   border-color: var(--tn-mint);
 }
 
-/* ---- Starters ---- */
-
-.moreLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--tn-blue);
-  white-space: nowrap;
-}
-
-.moreLink:hover {
-  color: var(--tn-blue-hover);
-}
-
-.starterGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.starter {
-  display: flex;
-  flex-direction: column;
-  background: var(--tn-surface-inner);
-  border: 1px solid var(--tn-border-inner);
-  border-radius: 13px;
-  padding: 16px;
-  min-width: 0;
-}
-
-.starterTop {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.starterName {
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.starterText {
-  font-size: 11.5px;
-  color: var(--tn-text-soft);
-  line-height: 1.45;
-  margin-top: 4px;
-}
-
-.starterSpark {
-  width: 64px;
-  height: 30px;
-  flex-shrink: 0;
-}
-
-.badge {
-  align-self: flex-start;
-  display: inline-block;
-  margin-top: 10px;
-  padding: 3px 9px;
-  border-radius: 7px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-}
-
-.starterCta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  margin-top: 12px;
-  padding: 8px;
-  border-radius: 9px;
-  border: 1px solid var(--tn-border-control);
-  color: #c3d2e0;
-  font-size: 12.5px;
-  font-weight: 700;
-  transition: border-color var(--tn-transition-fast);
-}
-
-.starterCta:hover {
-  border-color: var(--tn-border-hover);
-}
-
-/* ---- Market tiles ---- */
-
-.tileGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.tile {
-  background: var(--tn-surface-inner);
-  border: 1px solid var(--tn-border-inner);
-  border-radius: 12px;
-  padding: 13px 13px 11px;
-  min-width: 0;
-}
-
-.tileName {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--tn-text-nav);
-  line-height: 1.3;
-}
-
-.tileChange {
-  font-size: 15px;
-  font-weight: 800;
-  margin-top: 4px;
-}
-
-.up {
-  color: var(--tn-green);
-}
-
-.down {
-  color: var(--tn-red);
-}
-
-.tileSpark {
-  width: 100%;
-  height: 26px;
-  margin-top: 6px;
-}
-
-/* ---- Accents ---- */
-
-.accent_green {
-  color: var(--tn-icon);
-}
-.accent_blue {
-  color: var(--tn-icon);
-}
-.accent_purple {
-  color: var(--tn-icon);
-}
-.accent_amber {
-  color: var(--tn-icon);
-}
-.accent_orange {
-  color: var(--tn-icon);
-}
-.accent_rose {
-  color: var(--tn-icon);
-}
-.accent_cyan {
-  color: var(--tn-icon);
-}
-
-.mark_green {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-.mark_blue {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-.mark_purple {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-.mark_amber {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-.mark_orange {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-.mark_rose {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-.mark_cyan {
-  background: #101c2a;
-  border-color: #22303f;
-  color: #aebdcd;
-}
-
-.dotOn_green {
-  background: var(--tn-text-faint);
-}
-.dotOn_blue {
-  background: var(--tn-text-faint);
-}
-.dotOn_purple {
-  background: var(--tn-text-faint);
-}
-.dotOn_amber {
-  background: var(--tn-text-faint);
-}
-.dotOn_orange {
-  background: var(--tn-text-faint);
-}
-.dotOn_rose {
-  background: var(--tn-text-faint);
-}
-.dotOn_cyan {
-  background: var(--tn-text-faint);
-}
-
-.tag_green {
-  background: #101c2a;
-  border: 1px solid #22303f;
-  color: #aebdcd;
-}
-.tag_blue {
-  background: #101c2a;
-  border: 1px solid #22303f;
-  color: #aebdcd;
-}
-.tag_purple {
-  background: #101c2a;
-  border: 1px solid #22303f;
-  color: #aebdcd;
-}
-.tag_amber {
-  background: #101c2a;
-  border: 1px solid #22303f;
-  color: #aebdcd;
-}
-.tag_orange {
-  background: #101c2a;
-  border: 1px solid #22303f;
-  color: #aebdcd;
-}
-.tag_rose {
-  background: #101c2a;
-  border: 1px solid #22303f;
-  color: #aebdcd;
-}
-.tag_cyan {
-  background: #101c2a;
-  border: 1px solid #22303f;
-  color: #aebdcd;
-}
-
-/* ---- Narrower ---- */
-
-@media (max-width: 1400px) {
-  .topRow {
-    grid-template-columns: 340px minmax(0, 1fr);
-  }
-
-  .voyagerCard {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 1180px) {
-  .tabs {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .topRow,
-  .bottomRow {
-    grid-template-columns: 1fr;
-  }
-
-  .starterGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 720px) {
-  .tabs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .compareGrid,
-  .starterGrid,
-  .tileGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ---- Added with the rebuild ---- */
-
-.matrixSlot {
-  margin-top: 18px;
-}
-
-.badge {
-  align-self: flex-start;
-  display: inline-block;
-  margin-top: 10px;
-  padding: 3px 9px;
-  border-radius: 7px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-}
-
-.starterCtas {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.note,
-.delayNote {
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--tn-text-muted);
-}
-
-.note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-}
-
-.delayNote {
-  margin-top: 12px;
-  font-size: 10.5px;
-  color: var(--tn-text-faint);
-}
-
-.section {
-  margin-top: 40px;
-}
-
-.h2 {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.4px;
-}
-
-/*
- * "Explore more" is deliberately not a tab and does not look like one. These
- * six used to sit in the row above the tabs as pills, so switching a class and
- * leaving the section were the same gesture.
- */
-.moreGrid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.moreCard {
-  display: block;
-  background: var(--tn-surface-veil);
-  border: 1px solid var(--tn-border-card);
-  border-radius: var(--tn-radius-card);
-  padding: 18px 16px;
-  color: var(--tn-text);
-  transition: border-color var(--tn-transition-hover);
-}
-
-.moreCard:hover {
-  border-color: var(--tn-mint);
-}
-
-.moreName {
-  font-size: 13.5px;
-  font-weight: 800;
-  margin-top: 12px;
-}
-
-.moreText {
-  font-size: 11.5px;
-  color: var(--tn-text-muted);
-  margin-top: 5px;
-  line-height: 1.45;
-}
-
-@media (max-width: 1180px) {
-  .moreGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 720px) {
-  .moreGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* The clarity line under the Ask Voyager box — same four facts, same order. */
 .clarity {
   margin: 12px 0 0;
   font-size: 11.5px;
   line-height: 1.55;
   color: var(--tn-text-faint);
+}
+
+.robot {
+  width: 150px;
+  height: auto;
+  flex-shrink: 0;
+  margin: -18px -8px -18px 0;
+  pointer-events: none;
+}
+
+/* ---- Accents ---- */
+
+.accent_green,
+.accent_blue,
+.accent_purple,
+.accent_amber,
+.accent_orange,
+.accent_rose,
+.accent_cyan {
+  color: var(--tn-icon);
+}
+
+.mark_green,
+.mark_blue,
+.mark_purple,
+.mark_amber,
+.mark_orange,
+.mark_rose,
+.mark_cyan {
+  background: var(--tn-mint-tint);
+  border-color: var(--tn-mint-border);
+  color: var(--tn-mint);
+}
+
+/* ---- Narrower ---- */
+
+@media (max-width: 1240px) {
+  .main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1000px) {
+  .facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .voyagerCard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .robot {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .detail {
+    padding: 22px 20px 20px;
+  }
+
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .compareHead {
+    align-items: flex-start;
+  }
 }
