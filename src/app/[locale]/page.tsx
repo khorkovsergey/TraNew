@@ -81,7 +81,20 @@ export default async function HomePage({ params }: Props) {
                 Find my next step
                 <Icon name="arrowRight" size={17} strokeWidth={2.4} />
               </Link>
-              <Link className={styles.ctaGhost} href="/explore">
+              {/*
+               * "Explore markets" means markets.
+               *
+               * It used to open `/explore`, which is the education section —
+               * what a stock is, what it risks, how the categories compare. The
+               * button says markets, so somebody pressing it wanted a price and
+               * met a lesson instead, and the readers who wanted the lesson were
+               * arriving through a door labelled for somebody else.
+               *
+               * Both halves exist now and are named for what they are: this
+               * goes to Market Overview, and the education is one link down
+               * from there under its own name, Investment options.
+               */}
+              <Link className={styles.ctaGhost} href="/markets/global">
                 Explore markets
                 <Icon name="arrowUpRight" size={16} strokeWidth={2.2} className={styles.iconMuted} />
               </Link>
