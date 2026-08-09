@@ -80,16 +80,20 @@
     "markets": {
       "branch": "feat/markets",
       "port": 3406,
+      "$comment": "Both spellings of the route are here on purpose: `/markets/*` are the real screens and `/market` is the thin hub that still points at them. A section that owned only the plural would leave the singular unowned, which is how `/market` came to be a stub nobody was responsible for.",
       "owns": [
         "src/app/[locale]/markets/",
+        "src/app/[locale]/market/",
         "src/app/[locale]/news/",
         "src/app/[locale]/economy/",
         "src/app/api/market/",
         "src/components/markets/",
         "src/components/economy/",
-        "src/content/markets.ts"
+        "src/content/markets.ts",
+        "src/content/market.ts",
+        "src/lib/market/"
       ],
-      "smoke": ["/en/markets", "/en/economy"]
+      "smoke": ["/en/markets/global", "/en/market", "/en/economy"]
     },
     "home": {
       "branch": "feat/home",
