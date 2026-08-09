@@ -26,6 +26,7 @@
 /* Relative, not aliased: the unit harness compiles this file with bare `tsc`,
    which has no idea what `@/` means. */
 import { STUDIES, type StudyId, type StudySpec } from '../../studies/registry';
+import { ENGINE_DRAWS_SEPARATE_PANES, PANE_STUDY_NOTE } from './engine';
 
 export const CHART_SPEC_VERSION = 1 as const;
 
@@ -84,7 +85,12 @@ export type VoyagerChartSpec = {
  * update it.
  */
 export const RENDERABLE_STUDIES: StudyId[] = (Object.keys(STUDIES) as StudyId[]).filter(
-  (id) => STUDIES[id].placement === 'overlay'
+  (id) =>
+    STUDIES[id].placement === 'overlay' ||
+    // Flipping `ENGINE_DRAWS_SEPARATE_PANES` brings RSI and MACD back here and
+    // out of the handoff table at the same time, without either list being
+    // edited. The dependency is on the engine, and it is written down once.
+    (STUDIES[id].placement === 'pane' && ENGINE_DRAWS_SEPARATE_PANES)
 );
 
 export function isRenderableStudy(id: string): id is StudyId {
@@ -94,10 +100,7 @@ export function isRenderableStudy(id: string): id is StudyId {
 function refusalFor(id: string): string {
   const study = STUDIES[id as StudyId];
   if (!study) return `${id} is not a study this platform computes.`;
-  return (
-    `${id.toUpperCase()} needs its own pane and its own scale, which this chart does not have. ` +
-    `It is available on the full chart.`
-  );
+  return `${id.toUpperCase()} ${PANE_STUDY_NOTE}. It is available on the professional chart.`;
 }
 
 /* --------------------------------------------------------------- Clamping */

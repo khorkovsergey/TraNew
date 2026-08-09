@@ -110,6 +110,23 @@ export const ANSWER_SCHEMA = {
       required: ['kind'],
       additionalProperties: false,
     },
+    /*
+     * Pine written for a free-form request.
+     *
+     * The source only — never a claim about it. The label, the lint and the
+     * sentence saying it has not been run are attached by `pineFromModel`, so
+     * there is no field here in which an answer could describe its own code as
+     * verified.
+     */
+    code: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        source: { type: 'string' },
+      },
+      required: ['title', 'source'],
+      additionalProperties: false,
+    },
   },
   required: ['contentType', 'text', 'bullets', 'sources', 'confidence', 'actions', 'followUps'],
   additionalProperties: false,

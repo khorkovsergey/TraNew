@@ -51,7 +51,10 @@ import type { InvestmentSummary } from '@/lib/investment/summary';
 import type { VoyagerResponse } from '@/lib/voyager/types';
 import { InvestmentAssessmentCard } from '@/components/voyager/InvestmentAssessment';
 import { VoyagerChart } from '@/components/voyager/chart/VoyagerChart';
+import { HandoffCard, PineBlock } from './PineBlock';
 import type { ChartPayload } from '@/lib/voyager/chart/build';
+import type { PineArtifact } from '@/lib/voyager/tools/pine';
+import type { TradingViewHandoff } from '@/lib/voyager/tools/tradingView';
 import { ModuleCard } from '@/components/voyager/workspace/ModuleCard';
 import styles from './VoyagerChat.module.css';
 
@@ -348,6 +351,8 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
           actions: quota ? undefined : payload.answer.actions,
           investment: quota ? undefined : payload.answer.investment,
           chart: quota ? undefined : payload.answer.chart,
+          code: quota ? undefined : payload.answer.code,
+          handoff: quota ? undefined : payload.answer.handoff,
           upgrade: quota ? undefined : payload.answer.upgrade,
           ticker: quota ? undefined : (voyagerContext.facts?.ticker ?? undefined),
           scripted: !quota && payload.answer.simulated === true,
@@ -922,6 +927,16 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
                               if (text) void deliver(text);
                             }}
                           />
+                        ) : null}
+
+                        {/* Pine, with its provenance and its never-executed sentence
+                            attached by the artefact rather than by the answer text. */}
+                        {turn.code ? <PineBlock artifact={turn.code as PineArtifact} /> : null}
+
+                        {/* Where the request goes when it is bigger than this surface.
+                            The link was built by code from an allowlisted host. */}
+                        {turn.handoff ? (
+                          <HandoffCard handoff={turn.handoff as TradingViewHandoff} />
                         ) : null}
 
                         {/* The deterministic assessment, when a question asked for one.

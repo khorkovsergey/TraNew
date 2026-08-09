@@ -79,6 +79,53 @@ export async function consumeQuestion(
   };
 }
 
+/**
+ * Gives a question back.
+ *
+ * Two callers, and both are the same idea: the person is only charged for
+ * answers they actually received.
+ *
+ * The counter is spent on the way in, before the model runs, so a slow answer
+ * cannot be replayed for free — that part is deliberate and stays. What was
+ * missing is the other half. A request that was refused for being over the
+ * limit had already been counted, so the row climbed for as long as somebody
+ * kept asking and the number shown to them stopped meaning anything: a live
+ * row reads 22 against a ceiling of 10. And an attempt that produced no
+ * answer — a model outage, a request that took longer than something between
+ * the browser and the server was willing to wait — was charged in full, so a
+ * person pressing the *Retry now* button the outage card offers them paid for
+ * each attempt at an answer they never got.
+ *
+ * Floored at zero: a refund that ran twice must not mint questions.
+ */
+export async function releaseQuestion(
+  userId: string | null,
+  quota: number | null
+): Promise<UsageVerdict> {
+  const subject = await subjectKey(userId);
+
+  const [row] = await db
+    .update(schema.voyagerUsage)
+    .set({
+      count: sql`greatest(0, ${schema.voyagerUsage.count} - 1)`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(eq(schema.voyagerUsage.subject, subject), eq(schema.voyagerUsage.day, today()))
+    )
+    .returning({ count: schema.voyagerUsage.count });
+
+  const used = row?.count ?? 0;
+  if (quota === null) return { remaining: null, quotaReached: false, used, total: null };
+
+  return {
+    remaining: Math.max(0, quota - used),
+    quotaReached: used >= quota,
+    used,
+    total: quota,
+  };
+}
+
 /** Reads the counter without spending a question — for rendering the limit line. */
 export async function peekUsage(
   userId: string | null,

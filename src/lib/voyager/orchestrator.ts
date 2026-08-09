@@ -20,8 +20,10 @@ import {
   type VoyagerToolResult,
 } from './tools/types';
 import { chartFromComparison, chartFromHistory } from './chart/build';
+import { pineFromModel, type PineArtifact } from './tools/pine';
 import type { ComparisonResult } from './tools/comparison';
 import type { HistoryResult } from './tools/marketData';
+import type { TradingViewHandoff } from './tools/tradingView';
 import {
   type VoyagerAction,
   type VoyagerActionId,
@@ -330,6 +332,14 @@ export async function askVoyager(options: {
 }): Promise<VoyagerAnswer> {
   const { question, context, tier, sources, history } = options;
   const allowed = actionsFor(context, tier);
+
+  /*
+   * The demo layer, and only for the case it was written for.
+   *
+   * With no key configured every answer on this deployment is written rather
+   * than generated, which is what the scripted layer is for and what its label
+   * says. It is *not* what to serve when a model call fails — see `incomplete`.
+   */
   const scripted = () =>
     withAllowedActions(scriptedAnswer(question, context, tier), allowed, context.screen === 'chart');
 
@@ -394,6 +404,8 @@ export async function askVoyager(options: {
   let investment: InvestmentSummary | undefined;
   let lastHistory: HistoryResult | undefined;
   let lastComparison: ComparisonResult | undefined;
+  let code: PineArtifact | undefined;
+  let handoff: TradingViewHandoff | undefined;
 
   try {
     /*
@@ -409,7 +421,22 @@ export async function askVoyager(options: {
 
       const response = await client.messages.create({
         model: MODEL,
-        max_tokens: 8000,
+        /*
+         * A ceiling, not a target.
+         *
+         * This model thinks by default and `max_tokens` bounds the thinking and
+         * the reply together, so eight thousand — comfortable for a single-shot
+         * answer — is not comfortable for one that has read several tool
+         * results first. The reply it truncates is JSON, so the failure arrives
+         * as a parse error rather than as a short answer.
+         *
+         * Nothing here asks for longer answers. How much is written is set by
+         * the answer rules ("two or three sentences", at most four bullets) and
+         * by `effort`, both unchanged; raising the ceiling costs nothing when
+         * the reply does not reach it, because output is billed by what is
+         * generated rather than by what was allowed.
+         */
+        max_tokens: 16000,
         ...(tools.length ? { tools } : {}),
         // On the final pass the tools stay declared — the history contains
         // their calls and results — but nothing new may be started.
@@ -496,6 +523,18 @@ export async function askVoyager(options: {
           if (call.trace.id === 'compare_assets' && call.result.ok) {
             lastComparison = call.result.data as ComparisonResult;
           }
+          /*
+           * Both travel as themselves. The Pine artefact carries its own
+           * provenance and its own never-executed sentence, and the handoff
+           * carries a destination this code built — neither is something the
+           * answer should be paraphrasing.
+           */
+          if (call.trace.id === 'pine_script' && call.result.ok) {
+            code = call.result.data as PineArtifact;
+          }
+          if (call.trace.id === 'tradingview_handoff' && call.result.ok) {
+            handoff = call.result.data as TradingViewHandoff;
+          }
         }
         continue;
       }
@@ -508,14 +547,39 @@ export async function askVoyager(options: {
        * about what it was about to look up, and the answer would be dropped for
        * failing to parse as JSON.
        */
+      /*
+       * Cut off mid-answer.
+       *
+       * `max_tokens` bounds thinking and response text together on this model,
+       * and a truncated reply is truncated JSON: parsing it throws, the throw
+       * is caught below, and what the person used to get was this platform's
+       * written navigation blurb presented as the answer to their market
+       * question. Recognised here so it is reported as what it is.
+       *
+       * It is also the likeliest thing to bite a question asked in a language
+       * that tokenises longer than English, on a run that also spent its budget
+       * on several tool results — which is the shape of the failure that was
+       * reported from production.
+       */
+      if (response.stop_reason === 'max_tokens') {
+        return incomplete('the answer ran past its length budget');
+      }
+
       const texts = response.content.filter((entry) => entry.type === 'text');
       const block = texts[texts.length - 1];
       if (!block || block.type !== 'text') {
-        return scripted();
+        return incomplete('the model returned no answer text');
       }
 
-      const coerced = coerce(JSON.parse(block.text), allowed, context.screen === 'chart');
-      if (!coerced) return scripted();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(block.text);
+      } catch {
+        return incomplete('the answer did not come back as a complete structure');
+      }
+
+      const coerced = coerce(parsed, allowed, context.screen === 'chart');
+      if (!coerced) return incomplete('the answer came back without any text in it');
 
       /*
        * The chips are read off what returned, never off what was offered. A
@@ -534,6 +598,15 @@ export async function askVoyager(options: {
           ? chartFromHistory(lastHistory, requestedChart(block.text))
           : null;
 
+      /*
+       * Pine the model wrote, if it wrote any and no deterministic template
+       * already answered. The template wins: it comes from the registry that
+       * also draws the line, so it is the same calculation rather than a
+       * description of one. Either way `pineFromModel` attaches the label, the
+       * lint and the never-executed sentence — the answer never gets to.
+       */
+      const written = code ?? pineFromModel(requestedCode(block.text)?.title, requestedCode(block.text)?.source);
+
       const chips = [
         ...(searches > 0 ? [`web-search(${searches})`] : []),
         ...traceChips(trace),
@@ -545,6 +618,8 @@ export async function askVoyager(options: {
         ...coerced,
         ...(investment ? { investment } : {}),
         ...(chart ? { chart } : {}),
+        ...(written ? { code: written } : {}),
+        ...(handoff ? { handoff } : {}),
         ...(chips.length ? { tools: chips } : {}),
         ...(trace.length ? { trace } : {}),
         ...(citations.length ? { citations: dedupeCitations(citations) } : {}),
@@ -553,13 +628,51 @@ export async function askVoyager(options: {
 
     // Every pass produced a tool call and none produced an answer. Structurally
     // unreachable — the final pass cannot call tools — and handled anyway.
-    return scripted();
+    return incomplete('the answer never settled');
   } catch (error) {
-    // Surfaced in the server log rather than to the person: the scripted answer
-    // below is honest about being general, and an error toast is not more useful.
-    console.error('[voyager] model call failed, falling back to scripted answer', error);
-    return scripted();
+    console.error('[voyager] model call failed', error);
+    return incomplete('the model could not be reached');
   }
+}
+
+/**
+ * A model failure, said as one.
+ *
+ * This replaces serving the scripted layer whenever the model did not answer,
+ * which was how «Почему сегодня упала Tesla?» came back as *"I can help with
+ * that. The fastest path: tell me your goal…"* — a navigation blurb, written
+ * for somebody who asked what to do next, handed to somebody who asked why a
+ * stock moved. It carried an honest label saying it was written rather than
+ * generated, and it was still the wrong answer to the question, which is worse
+ * than no answer: it looks like Voyager understood and had nothing better.
+ *
+ * The scripted layer keeps its real job — the demo deployment with no key
+ * configured, where every answer is written and says so. What it stops doing is
+ * standing in for an outage.
+ *
+ * The failure is named, not blamed on the question. A person whose Russian went
+ * unanswered must not be left thinking the language was the problem: the tools,
+ * the sources and the planner are identical whatever it was asked in, and the
+ * unit suite asserts that.
+ */
+function incomplete(reason: string): VoyagerAnswer {
+  console.warn(`[voyager] no answer produced — ${reason}`);
+
+  return {
+    contentType: 'AI explanation',
+    text: `I could not finish that one — ${reason}. Nothing is wrong with the question, and nothing about it was answered from memory: asking again usually goes straight through.`,
+    bullets: [],
+    sources: 'Voyager — no answer produced',
+    confidence: 'low',
+    actions: [],
+    followUps: [],
+    /*
+     * Not model-generated, so the interface still labels it as written by this
+     * platform. The difference from the scripted layer is what it says: that
+     * the answer failed, rather than a paragraph about something else.
+     */
+    simulated: true,
+  };
 }
 
 /**
@@ -574,6 +687,16 @@ function requestedChart(text: string): { kind?: unknown; studies?: unknown } | u
   try {
     const parsed = JSON.parse(text) as { chart?: { kind?: unknown; studies?: unknown } };
     return parsed.chart;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Pine the model wrote for a free-form request, before it becomes an artefact. */
+function requestedCode(text: string): { title?: unknown; source?: unknown } | undefined {
+  try {
+    const parsed = JSON.parse(text) as { code?: { title?: unknown; source?: unknown } };
+    return parsed.code;
   } catch {
     return undefined;
   }

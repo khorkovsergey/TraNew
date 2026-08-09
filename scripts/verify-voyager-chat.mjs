@@ -54,7 +54,7 @@ async function reset(page) {
  * The live path is not abandoned: the screen-acceptance probes below are GET
  * requests, which the API answers without spending anything.
  */
-async function stubAnswer(page, answer) {
+async function stubAnswer(page, answer, usage = { used: 1, remaining: 9 }) {
   await page.route('**/api/voyager', async (route) => {
     if (route.request().method() !== 'POST') return route.fallback();
     await route.fulfill({
@@ -63,8 +63,10 @@ async function stubAnswer(page, answer) {
       body: JSON.stringify({
         answer,
         tier: 'basic',
-        remaining: 7,
-        used: 3,
+        /* Fixed rather than counted: what this asserts is that the browser
+           shows the number the server sent, not one it accumulated itself. */
+        remaining: usage.remaining,
+        used: usage.used,
         total: 10,
         quotaReached: false,
       }),
@@ -245,6 +247,93 @@ try {
     actionIds.join(' · ')
   );
 
+  group('One submit is one request, however many tools answer it');
+
+  /*
+   * From production: one question with several internal tool calls moved the
+   * visible counter by five. The counter is spent once per request, in the
+   * route handler, outside the tool loop — so the only way it moves by five is
+   * five requests. This is the client half of that invariant, measured rather
+   * than argued: every POST is intercepted, so nothing reaches the server and
+   * nothing touches the usage row.
+   */
+  let posts = 0;
+  await page.unroute('**/api/voyager');
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/api/voyager')) posts += 1;
+  });
+
+  await stubAnswer(page, {
+    contentType: 'AI analysis',
+    text: 'Tesla fell with the rest of the growth names in that session.',
+    bullets: [],
+    sources: 'Twelve Data',
+    confidence: 'medium',
+    actions: [],
+    followUps: [],
+    citations: [{ label: 'Market data & news' }],
+    // A six-tool answer, which is what the reported question ran.
+    tools: [
+      'web-search(2)',
+      'resolve-asset(Tesla)',
+      'quote(TSLA)',
+      'history(TSLA 1D)',
+      'chart(line)',
+    ],
+  });
+
+  await page.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => {
+    sessionStorage.clear();
+    localStorage.removeItem('tn.voyager.allowance.v1');
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(700);
+
+  posts = 0;
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Why did Tesla fall today?');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(3000);
+
+  check('one intentional question sends exactly one request', posts === 1, `${posts} POSTs`);
+  check(
+    'and the counter moves by one, not by the number of tools',
+    /Free: 1 of 10/.test(await page.locator('[class*="limitChip"]').innerText()),
+    await page.locator('[class*="limitChip"]').innerText()
+  );
+  check(
+    'even though the answer reports five tools',
+    (await page.locator('[class*="toolChip"]').count()) === 5,
+    `${await page.locator('[class*="toolChip"]').count()} chips`
+  );
+
+  group('A question in another language takes the same path');
+
+  /*
+   * The reported defect: the Russian question came back as this platform's
+   * navigation blurb. The planner, its tools and its sources are identical
+   * whatever the question was written in — what changed is that a model failure
+   * is now reported as a failure instead of being dressed as an answer.
+   */
+  posts = 0;
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(700);
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Почему сегодня упала Tesla?');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(3000);
+
+  const russian = await page.locator('body').innerText();
+  check('the question survives as the person typed it', russian.includes('Почему сегодня упала Tesla?'));
+  check('it is one request, like its English twin', posts === 1, `${posts} POSTs`);
+  check(
+    'and it is answered rather than handed a navigation blurb',
+    !/tell me your goal/i.test(russian),
+    russian.slice(0, 200)
+  );
+
+  await page.unroute('**/api/voyager');
+
   group('The chart says exactly what it drew');
 
   /*
@@ -313,6 +402,75 @@ try {
     'what the chart will not draw is said out loud rather than left to be noticed',
     /RSI needs its own pane/i.test(chartText),
     chartText.slice(0, 160)
+  );
+
+  await page.unroute('**/api/voyager');
+
+  group('Pine is on screen with its caveat, and the handoff is a real destination');
+
+  await page.unroute('**/api/voyager');
+  await stubAnswer(page, {
+    contentType: 'AI structured',
+    text: 'Here is an EMA crossover with volume confirmation, and where to run it.',
+    bullets: [],
+    sources: 'Written for this question',
+    confidence: 'medium',
+    actions: [],
+    followUps: [],
+    citations: [],
+    tools: ['pine(template sma)', 'tradingview-handoff(pine)'],
+    code: {
+      language: 'pine',
+      title: 'EMA crossover',
+      source: '//@version=6\nindicator("EMA crossover", overlay = true)\nfast = ta.ema(close, 20)\nplot(fast)',
+      provenance: 'model-written',
+      notExecuted:
+        'I can write and explain Pine Script, but I cannot run it. Executing it needs TradingView’s own engine, which is not something this platform reimplements — so treat anything I write as a draft to review and test on a chart yourself, not as a script that has already been checked against live data.',
+      findings: [],
+      status: 'No errors found — checked for syntax and known built-ins only; not compiled and not run.',
+    },
+    handoff: {
+      kind: 'pine',
+      url: 'https://www.tradingview.com/pine-editor/',
+      carried: [],
+      manual: ['The script itself — copy it from here and paste it into the editor.'],
+      because: [
+        'Running Pine needs TradingView’s own engine. Voyager writes and explains Pine; it cannot execute it, here or anywhere.',
+      ],
+    },
+  });
+
+  await page.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(600);
+  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Write a Pine indicator for an EMA crossover');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(2500);
+
+  const pineBody = await page.locator('body').innerText();
+  check('the code is shown as code', (await page.locator('pre code').count()) >= 1);
+  check('with a copy button', (await page.getByRole('button', { name: 'Copy' }).count()) === 1);
+  check(
+    'and the permanent limit is stated, not implied',
+    /cannot run it/i.test(pineBody) && /TradingView’s own engine/i.test(pineBody)
+  );
+  check(
+    'nothing claims it was backtested or verified',
+    !/\bbacktested\b/i.test(pineBody) && !/verified against live data/i.test(pineBody.replace(/not .{0,20}verified against live data/gi, ''))
+  );
+  check(
+    'the linter says exactly what it checked',
+    /syntax and known built-ins only/i.test(pineBody)
+  );
+
+  const handoffLink = page.locator('a[href^="https://www.tradingview.com"]').first();
+  check('the handoff is a real link', (await handoffLink.count()) === 1);
+  check('to TradingView and nowhere else', (await handoffLink.getAttribute('href'))?.startsWith('https://www.tradingview.com/'));
+  check('opening in its own tab, safely', (await handoffLink.getAttribute('rel'))?.includes('noopener'));
+  check(
+    'and it says the paste is the step rather than pretending the code travelled',
+    /copy it from here/i.test(pineBody)
   );
 
   await page.unroute('**/api/voyager');

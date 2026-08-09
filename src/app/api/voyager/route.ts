@@ -12,7 +12,8 @@ import {
   upgradeFor,
 } from '@/lib/voyager/policy';
 import { quotaAnswer } from '@/lib/voyager/scenarios';
-import { consumeQuestion, peekUsage } from '@/lib/voyager/usage';
+import { consumeQuestion, peekUsage, releaseQuestion } from '@/lib/voyager/usage';
+import { clampFacts } from '@/lib/voyager/pages';
 import { isVoyagerScreen } from '@/lib/voyager/screens';
 import type { VoyagerRequest, VoyagerResponse } from '@/lib/voyager/types';
 
@@ -125,19 +126,54 @@ export async function POST(request: NextRequest) {
   if (!question) return badRequest('A question is required.');
   if (question.length > 2000) return badRequest('That question is too long.');
 
-  const context = body.context;
-  if (!context || !isVoyagerScreen(context.screen)) {
+  const rawContext = body.context;
+  if (!rawContext || !isVoyagerScreen(rawContext.screen)) {
     return badRequest('A valid page context is required.');
   }
+
+  /*
+   * The facts a page may state, and nothing else.
+   *
+   * `facts` was an open map, so anything that could reach this route could put
+   * whatever it liked in front of the model. Each screen names its own keys in
+   * the capability registry and the rest are dropped here, on the server, where
+   * the client cannot argue with it. What Voyager is allowed to see stays
+   * reviewable, which is the promise the structured context package exists to
+   * keep.
+   */
+  const context = {
+    ...rawContext,
+    facts: clampFacts(rawContext.screen, rawContext.facts),
+  };
 
   const user = await currentUser();
   const tier = tierFor(user);
 
-  // Counted before the model runs, so a slow or failing answer cannot be replayed
-  // for free.
-  const usage = await consumeQuestion(user?.id ?? null, quotaFor(user));
+  /*
+   * One intentional question costs one unit, whatever it takes to answer it.
+   *
+   * Counted here, before the model runs, so a slow answer cannot be replayed
+   * for free — and counted exactly once, outside everything that follows. The
+   * tool loop inside `askVoyager` may make six calls or none; it never reaches
+   * this line. Nothing under `lib/voyager/tools/` imports this module, and the
+   * unit suite asserts that it stays that way.
+   *
+   * What is given back is anything that did not buy an answer: see the two
+   * `releaseQuestion` calls below.
+   */
+  const quota = quotaFor(user);
+  let usage = await consumeQuestion(user?.id ?? null, quota);
 
   if (usage.quotaReached) {
+    /*
+     * Refused, so refunded. The increment is the check — it has to be, or two
+     * requests arriving together would both read the same count and both pass
+     * — but a refusal that keeps the charge makes the row climb for as long as
+     * somebody keeps asking, and the counter they are shown stops meaning
+     * anything.
+     */
+    usage = await releaseQuestion(user?.id ?? null, quota);
+
     const response: VoyagerResponse = {
       answer: {
         ...quotaAnswer(),
@@ -172,6 +208,21 @@ export async function POST(request: NextRequest) {
     : [];
 
   const answer = await askVoyager({ question, context, tier, sources: active, history });
+
+  /*
+   * Nothing was answered, so nothing is charged.
+   *
+   * `simulated` is set only by the scripted layer, which speaks in exactly two
+   * situations: no model is configured here, and the model call failed. Either
+   * way the person did not get an answer to their question — they got this
+   * platform's written background, labelled as such — and the outage card next
+   * to it invites them to press *Retry now*. Charging each of those attempts is
+   * how one question becomes five, and it is the likeliest reading of a live
+   * counter that moved by five while the client sent one request.
+   */
+  if (answer.simulated) {
+    usage = await releaseQuestion(user?.id ?? null, quota);
+  }
 
   /*
    * A question answered with the wealth record is a read of financial data and is
