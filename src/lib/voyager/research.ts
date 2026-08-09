@@ -1,14 +1,26 @@
 /**
- * When Voyager is allowed to go and look something up.
+ * What bounds a web search, now that the planner decides when to run one.
  *
- * Web search runs on Anthropic's infrastructure and is billed per search on top
- * of tokens. Every question is not a research question: "what is a drawdown" is
- * answered from a table written in this repository, and paying to search the
- * open web for it would be spending somebody's money to get a worse answer.
+ * There used to be a keyword gate here: a list of English words that meant
+ * "something that happened" — *today*, *earnings*, *why did* — checked against
+ * the question before the model ever saw it. It kept definitions from costing
+ * money, which was the point, and it also meant «почему сегодня упала Tesla»
+ * was answered from memory while its English twin was researched. A gate that
+ * only works in one language is not a gate; it is a bias with a budget
+ * justification.
  *
- * So the gate is narrow and deliberate. It opens for questions that turn on
- * something that happened — a price, a filing, a forecast, a date — and stays
- * shut for questions about how things work, which do not change.
+ * So the decision moved to the planner, which can read any language, and the
+ * spend is bounded by things that do not depend on one:
+ *
+ * - **Billing is per search actually run**, not per search offered, so opening
+ *   the door costs nothing on its own.
+ * - **`MAX_SEARCHES` caps one answer**, so no single question can run away
+ *   with the bill.
+ * - **`VOYAGER_WEB_SEARCH=off` stops it without a deploy.** A feature that
+ *   spends money per use needs a stop that is not a git push.
+ *
+ * The instruction not to search definitions still exists — it is in the tool
+ * brief, where it applies to every language rather than to a word list.
  *
  * No imports, on purpose: the unit harness compiles this file with bare `tsc`.
  */
@@ -16,52 +28,8 @@
 /** How many searches one answer may run. A ceiling on the bill, per question. */
 export const MAX_SEARCHES = 4;
 
-/**
- * Words that mean "something that happened", as opposed to "how something
- * works".
- *
- * Deliberately about recency and specificity rather than about topic. "Tesla"
- * alone is not a research question; "what do analysts forecast for Tesla" is.
- */
-const FRESH = [
-  'today', 'yesterday', 'this week', 'this month', 'this quarter', 'this year',
-  'latest', 'recent', 'recently', 'current', 'currently', 'now', 'so far',
-  'news', 'headline', 'headlines', 'announced', 'announcement', 'reported',
-  'earnings', 'results', 'guidance', 'filing', 'filings', 'sec', 'quarterly',
-  'forecast', 'forecasts', 'outlook', 'analyst', 'analysts', 'consensus',
-  'price target', 'upgrade', 'downgrade', 'rating',
-  'closed', 'close', 'session', 'rally', 'selloff', 'sell-off', 'plunge',
-  'happened', 'happening', 'why did', 'why has', 'why is',
-];
-
-/**
- * Questions that are about the shape of an idea, not about an event.
- *
- * Checked after the fresh words and beats them, because "what is the current
- * ratio" is still a definition question wearing the word "current".
- */
-const TIMELESS = [
-  ' what is ', ' what are ', ' what does ', ' explain ', ' definition ',
-  ' how does ', ' how do ', ' difference between ', ' meaning of ',
-];
-
 function pad(question: string): string {
   return ` ${question.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
-}
-
-/**
- * Whether this question is worth a search.
- *
- * `enabled` is the operator's switch and comes first: a feature that bills per
- * use needs a way to stop that does not require a deploy.
- */
-export function wantsSearch(question: string, enabled: boolean): boolean {
-  if (!enabled) return false;
-
-  const padded = pad(question);
-  if (TIMELESS.some((opener) => padded.includes(opener))) return false;
-
-  return FRESH.some((word) => padded.includes(` ${word.replace(/[^a-z0-9]+/g, ' ')} `));
 }
 
 /**

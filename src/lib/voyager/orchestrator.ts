@@ -1,13 +1,28 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
-import { analyze } from '@/lib/investment/graph';
-import { summarise } from '@/lib/investment/summary';
+import type { InvestmentSummary } from '@/lib/investment/summary';
 import { clampSpec } from '@/lib/studies/registry';
 import { ANSWER_SCHEMA, CONTENT_TYPES } from './answerSchema';
-import { MAX_SEARCHES, wantsSearch } from './research';
+import { MAX_SEARCHES } from './research';
 import { scriptedAnswer } from './scenarios';
+import { allowedActions, briefFor, isVoyagerActionId } from './actions';
 import {
-  VOYAGER_ACTIONS,
+  resultForModel,
+  runToolCalls,
+  toolSpecsFor,
+  type ToolCall,
+  type VoyagerToolContext,
+} from './tools/registry';
+import {
+  MAX_TOOL_STEPS,
+  traceChips,
+  type ToolTraceEntry,
+  type VoyagerToolResult,
+} from './tools/types';
+import { chartFromComparison, chartFromHistory } from './chart/build';
+import type { ComparisonResult } from './tools/comparison';
+import type { HistoryResult } from './tools/marketData';
+import {
   type VoyagerAction,
   type VoyagerActionId,
   type VoyagerAnswer,
@@ -130,49 +145,19 @@ Suggest exactly three short follow-up questions the person might ask next, phras
 /**
  * Which actions this request may offer.
  *
- * Narrowing here is the enforcement point: an answer physically cannot contain a
- * wealth action for someone whose tier or consent does not reach the wealth
- * record, because the model was never shown that option.
+ * The list is `actions.ts`, so the widget, the chat and the model are narrowed
+ * by one function. Narrowing is the enforcement point: an answer physically
+ * cannot contain a wealth action for someone whose tier does not reach the
+ * wealth record, because the model was never shown that option — and it cannot
+ * offer to add something to a watchlist on a page with no instrument on it,
+ * which is how the fixed action row used to read.
  */
-function allowedActions(context: VoyagerContext, tier: VoyagerTier): VoyagerActionId[] {
-  const common: VoyagerActionId[] = [
-    'open_symbol',
-    'open_chart',
-    'open_news',
-    'open_economy',
-    'open_indicator',
-    'open_academy',
-    'open_experts',
-    'open_experts_intake',
-    'open_strategy',
-    'open_explore',
-    'open_screener',
-    // Events are public, so finding one is offered at every tier. "My events"
-    // is too — an anonymous visitor lands on the sign-in prompt, which is the
-    // intended path.
-    'open_events',
-    'open_my_events',
-    // Only where there is a chart to reveal the code on. Everywhere else the
-    // action would resolve to nothing and the button would be a dead end.
-    ...(context.screen === 'chart' ? (['view_pine'] as VoyagerActionId[]) : []),
-    // Offered at every tier: an anonymous visitor lands on the sign-in prompt,
-    // which is the intended path. This list exists to stop the model inventing a
-    // destination, not to re-implement route protection the server already does.
-    'create_alert',
-    'open_watchlist',
-    'none',
-  ];
-
-  if (tier === 'private') {
-    common.push('open_wealth', 'open_wealth_assets', 'open_wealth_scenarios', 'open_wealth_insights');
-  }
-
-  // On a lesson page, keep the person in the lesson rather than routing them away.
-  if (context.screen === 'academy') {
-    return ['open_academy', 'open_explore', 'none'];
-  }
-
-  return common;
+function actionsFor(context: VoyagerContext, tier: VoyagerTier): VoyagerActionId[] {
+  return allowedActions({
+    screen: context.screen,
+    tier,
+    hasTicker: Boolean(context.facts?.ticker),
+  });
 }
 
 function requestBrief(
@@ -207,7 +192,7 @@ function requestBrief(
     ...(sources.length === 0 ? ['- none — the person switched every source off; answer generally and say so'] : []),
     ``,
     `Allowed action ids for this answer:`,
-    ...actions.map((id) => `- ${id}: ${VOYAGER_ACTIONS[id]}`),
+    ...actions.map((id) => `- ${id}: ${briefFor(id)}`),
   ].join('\n');
 }
 
@@ -233,11 +218,11 @@ function coerce(raw: unknown, allowed: VoyagerActionId[], studiesAllowed: boolea
       if (typeof entry !== 'object' || entry === null) return null;
       const item = entry as Record<string, unknown>;
       const id = item.action;
-      if (typeof item.label !== 'string' || typeof id !== 'string') return null;
+      if (typeof item.label !== 'string' || !isVoyagerActionId(id)) return null;
       // Dropped rather than remapped: an action outside the allowlist is one this
       // person is not entitled to, and quietly substituting another would be worse.
-      if (!allowed.includes(id as VoyagerActionId)) return null;
-      return { label: item.label, action: id as VoyagerActionId };
+      if (!allowed.includes(id)) return null;
+      return { label: item.label, action: id };
     })
     .filter((entry): entry is VoyagerAction => entry !== null)
     .slice(0, 4);
@@ -344,139 +329,231 @@ export async function askVoyager(options: {
   history: { role: 'user' | 'assistant'; text: string }[];
 }): Promise<VoyagerAnswer> {
   const { question, context, tier, sources, history } = options;
-  const allowed = allowedActions(context, tier);
+  const allowed = actionsFor(context, tier);
   const scripted = () =>
     withAllowedActions(scriptedAnswer(question, context, tier), allowed, context.screen === 'chart');
-
-  /*
-   * An investment question runs the engine rather than the model.
-   *
-   * The engine computes every figure, cites every claim and refuses the ones it
-   * cannot support — none of which a chat answer does. So when someone asks
-   * whether something is worth holding, the answer is the assessment, and the
-   * model is not asked to produce a second, less careful one alongside it.
-   */
-  if (wantsInvestmentAnalysis(question, context)) {
-    const assessment = await runInvestmentAnalysis(question, context);
-    if (assessment) {
-      return withAllowedActions(
-        {
-          ...assessment,
-          tools: [`investment-analysis(${context.subject || 'this instrument'})`],
-        },
-        allowed,
-        context.screen === 'chart'
-      );
-    }
-  }
 
   if (!client) {
     return scripted();
   }
 
+  const toolContext: VoyagerToolContext = {
+    screen: context.screen,
+    subject: context.subject,
+    question,
+    tier,
+    allowedActions: allowed,
+  };
+
+  const customTools = toolSpecsFor(toolContext);
+
   /*
-   * Whether this question is worth going to look something up for.
+   * Search is offered; the planner decides whether to use it.
    *
-   * Search runs on Anthropic's infrastructure — nothing is fetched from the
-   * browser, which is what §11 of the brief asks for — and it is billed per
-   * search on top of tokens. So it opens for questions that turn on something
-   * that happened and stays shut for questions about how things work, which do
-   * not change and are already answered from this repository.
+   * It used to be gated by a list of English words — "today", "earnings",
+   * "why did" — checked against the question before the model saw it. That
+   * spent nothing on definitions, which was the point, and it also meant
+   * "почему сегодня упала Tesla" was answered from memory while its English
+   * twin was researched. A gate that works in one language is not a gate, it is
+   * a bias.
    *
-   * `VOYAGER_WEB_SEARCH=off` stops it without a deploy. A feature that spends
-   * money per use needs a switch that is not a git push.
+   * The spend is still bounded, in three ways that do not depend on language:
+   * billing is per search actually run rather than per offer, `max_uses` caps
+   * one answer, and `VOYAGER_WEB_SEARCH=off` stops it without a deploy. The
+   * instruction not to search definitions moves into the prompt, where the
+   * model can apply it to any language.
    */
-  const searching = wantsSearch(question, process.env.VOYAGER_WEB_SEARCH !== 'off');
+  const searching = process.env.VOYAGER_WEB_SEARCH !== 'off';
+
+  const tools = [
+    ...customTools,
+    ...(searching
+      ? [
+          {
+            type: 'web_search_20260209' as const,
+            name: 'web_search' as const,
+            max_uses: MAX_SEARCHES,
+          },
+        ]
+      : []),
+  ];
+
+  const messages: Anthropic.MessageParam[] = [
+    ...history.slice(-8).map((turn) => ({
+      role: turn.role,
+      content: turn.text,
+    })),
+    { role: 'user' as const, content: question },
+  ];
+
+  /* What actually ran, accumulated across the rounds. */
+  const trace: ToolTraceEntry[] = [];
+  const seen = new Map<string, VoyagerToolResult>();
+  const citations: { label: string; detail?: string }[] = [];
+  let searches = 0;
+  let investment: InvestmentSummary | undefined;
+  let lastHistory: HistoryResult | undefined;
+  let lastComparison: ComparisonResult | undefined;
 
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      ...(searching
-        ? {
-            tools: [
-              {
-                type: 'web_search_20260209' as const,
-                name: 'web_search' as const,
-                max_uses: MAX_SEARCHES,
-              },
-            ],
-          }
-        : {}),
-      system: [
-        // Stable across every request, so it caches; the volatile brief follows it.
-        { type: 'text', text: RULES, cache_control: { type: 'ephemeral' } },
-        { type: 'text', text: requestBrief(context, tier, sources, allowed) },
-        ...(searching
-          ? [
-              {
-                type: 'text' as const,
-                text: `You may search the web for this question. Use it for facts that changed — prices, filings, forecasts, dates — and not for definitions. Every claim that came from a search must name where it came from in the sources field. Do not present a searched claim as more certain than the source made it, and if the searches do not answer the question, say what is missing rather than filling the gap.`,
-              },
-            ]
-          : []),
-      ],
-      output_config: {
-        effort: EFFORT,
-        format: { type: 'json_schema', schema: ANSWER_SCHEMA },
-      },
-      messages: [
-        ...history.slice(-8).map((turn) => ({
-          role: turn.role,
-          content: turn.text,
-        })),
-        { role: 'user' as const, content: question },
-      ],
-    });
+    /*
+     * The bounded agent loop.
+     *
+     * One extra pass beyond the cap, with tools switched off, so the last thing
+     * that happens is always an answer. A loop that runs out of steps mid-tool
+     * would otherwise return the scripted layer to somebody whose question was
+     * being worked on correctly.
+     */
+    for (let step = 0; step <= MAX_TOOL_STEPS; step += 1) {
+      const last = step === MAX_TOOL_STEPS;
 
-    if (response.stop_reason === 'refusal') {
+      const response = await client.messages.create({
+        model: MODEL,
+        max_tokens: 8000,
+        ...(tools.length ? { tools } : {}),
+        // On the final pass the tools stay declared — the history contains
+        // their calls and results — but nothing new may be started.
+        ...(last && tools.length ? { tool_choice: { type: 'none' as const } } : {}),
+        system: [
+          // Stable across every request, so it caches; the volatile brief follows it.
+          { type: 'text', text: RULES, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: requestBrief(context, tier, sources, allowed) },
+          { type: 'text', text: toolBrief(searching, customTools.length > 0) },
+        ],
+        output_config: {
+          effort: EFFORT,
+          format: { type: 'json_schema', schema: ANSWER_SCHEMA },
+        },
+        messages,
+      });
+
+      if (response.stop_reason === 'refusal') {
+        return {
+          contentType: 'AI explanation',
+          text: 'I can’t help with that one. If you rephrase it as a question about how something works or what the risks are, I can take another look.',
+          bullets: [],
+          sources: 'Declined by safety policy',
+          confidence: 'high',
+          actions: [],
+          followUps: [],
+        };
+      }
+
+      searches += searchCount(response.content);
+      citations.push(...searchCitations(response.content));
+
+      /*
+       * The server ran its own tool loop to its limit and stopped mid-turn.
+       * Re-sending the assistant turn resumes it where it left off; adding a
+       * "continue" message would be read as a new instruction.
+       */
+      if (response.stop_reason === 'pause_turn') {
+        messages.push({ role: 'assistant', content: response.content });
+        continue;
+      }
+
+      if (response.stop_reason === 'tool_use') {
+        const calls: ToolCall[] = response.content
+          .filter((block): block is Anthropic.ToolUseBlock => block.type === 'tool_use')
+          .map((block) => ({
+            id: block.id,
+            name: block.name,
+            input: (block.input ?? {}) as Record<string, unknown>,
+          }));
+
+        const executed = await runToolCalls(calls, toolContext, seen);
+
+        messages.push({ role: 'assistant', content: response.content });
+        messages.push({
+          role: 'user',
+          content: executed.map((call) => ({
+            type: 'tool_result' as const,
+            tool_use_id: call.toolUseId,
+            content: resultForModel(call.result),
+            is_error: !call.result.ok,
+          })),
+        });
+
+        for (const call of executed) {
+          trace.push(call.trace);
+          /*
+           * The assessment travels as itself, not as prose the model wrote
+           * about it. Every figure in that card was computed and is traceable;
+           * a paraphrase of it would be neither.
+           */
+          if (call.trace.id === 'investment_analysis' && call.result.ok) {
+            investment = call.result.data as InvestmentSummary;
+          }
+          /*
+           * The last market result is kept so a chart can be drawn from it.
+           * Kept rather than drawn now: the model has not yet said which view
+           * it wants, and a chart built before that choice would be a second
+           * chart to reconcile with the one that ends up on screen.
+           */
+          if (call.trace.id === 'get_history' && call.result.ok) {
+            lastHistory = call.result.data as HistoryResult;
+          }
+          if (call.trace.id === 'compare_assets' && call.result.ok) {
+            lastComparison = call.result.data as ComparisonResult;
+          }
+        }
+        continue;
+      }
+
+      /*
+       * The last text block, not the first.
+       *
+       * With tools the content array also carries the calls, their results and
+       * any text the model wrote on the way — so `find` would return a sentence
+       * about what it was about to look up, and the answer would be dropped for
+       * failing to parse as JSON.
+       */
+      const texts = response.content.filter((entry) => entry.type === 'text');
+      const block = texts[texts.length - 1];
+      if (!block || block.type !== 'text') {
+        return scripted();
+      }
+
+      const coerced = coerce(JSON.parse(block.text), allowed, context.screen === 'chart');
+      if (!coerced) return scripted();
+
+      /*
+       * The chips are read off what returned, never off what was offered. A
+       * question the model answered without looking anything up shows no search
+       * chip, or the chip stops meaning anything.
+       */
+      /*
+       * The chart, built from the data that was fetched and the view the model
+       * asked for — in that order, and never the other way round. A comparison
+       * outranks a single history because somebody who asked for both wanted
+       * the comparison; the single fetch was a step towards it.
+       */
+      const chart = lastComparison
+        ? chartFromComparison(lastComparison)
+        : lastHistory
+          ? chartFromHistory(lastHistory, requestedChart(block.text))
+          : null;
+
+      const chips = [
+        ...(searches > 0 ? [`web-search(${searches})`] : []),
+        ...traceChips(trace),
+        ...(chart ? [`chart(${chart.spec.kind})`] : []),
+        ...(coerced.study ? [`study(${coerced.study.id})`] : []),
+      ];
+
       return {
-        contentType: 'AI explanation',
-        text: 'I can’t help with that one. If you rephrase it as a question about how something works or what the risks are, I can take another look.',
-        bullets: [],
-        sources: 'Declined by safety policy',
-        confidence: 'high',
-        actions: [],
-        followUps: [],
+        ...coerced,
+        ...(investment ? { investment } : {}),
+        ...(chart ? { chart } : {}),
+        ...(chips.length ? { tools: chips } : {}),
+        ...(trace.length ? { trace } : {}),
+        ...(citations.length ? { citations: dedupeCitations(citations) } : {}),
       };
     }
 
-    /*
-     * The last text block, not the first.
-     *
-     * Without tools there is exactly one and the distinction is academic. With
-     * web search the content array also carries the search calls and their
-     * results, and any text the model wrote on the way — so `find` would return
-     * a sentence about what it was about to look up, and the answer would be
-     * dropped for failing to parse as JSON.
-     */
-    const texts = response.content.filter((entry) => entry.type === 'text');
-    const block = texts[texts.length - 1];
-    if (!block || block.type !== 'text') {
-      return scripted();
-    }
-
-    const coerced = coerce(JSON.parse(block.text), allowed, context.screen === 'chart');
-    if (!coerced) return scripted();
-
-    /*
-     * What ran, named from the response rather than from the intent.
-     *
-     * `searching` only says search was *offered*; a question the model answered
-     * without looking anything up must not show a search chip, or the chip
-     * stops meaning anything.
-     */
-    const searches = searchCount(response.content);
-    const tools = [
-      ...(searches > 0 ? [`web-search(${searches})`] : []),
-      ...(coerced.study ? [`study(${coerced.study.id})`] : []),
-    ];
-
-    return {
-      ...coerced,
-      ...(tools.length ? { tools } : {}),
-      ...(searches > 0 ? { citations: searchCitations(response.content) } : {}),
-    };
+    // Every pass produced a tool call and none produced an answer. Structurally
+    // unreachable — the final pass cannot call tools — and handled anyway.
+    return scripted();
   } catch (error) {
     // Surfaced in the server log rather than to the person: the scripted answer
     // below is honest about being general, and an error toast is not more useful.
@@ -485,84 +562,58 @@ export async function askVoyager(options: {
   }
 }
 
-/* ------------------------------------------------ Investment analysis */
-
 /**
- * Whether this question wants an assessment rather than an explanation.
+ * The chart view the answer asked for, if it asked for one.
  *
- * Substring matching, and deliberately narrow: an assessment is a heavier,
- * slower and more committing answer than a chat reply, so the bar for producing
- * one unasked is high. "Explain this chart" is not an investment question;
- * "is this worth holding" is.
+ * Read back out of the JSON rather than off `coerce`, because `coerce` is the
+ * answer contract and a chart is a request about data the contract knows
+ * nothing about. Unparseable is not an error: no view stated means the builder
+ * picks the sensible default for the period.
  */
-function wantsInvestmentAnalysis(question: string, context: VoyagerContext): boolean {
-  if (context.screen !== 'symbol' && context.screen !== 'chart') return false;
-
-  const q = question.toLowerCase();
-  const asks = [
-    'worth holding',
-    'worth buying',
-    'worth considering',
-    'good investment',
-    'should i invest',
-    'long-term portfolio',
-    'long term portfolio',
-    'analyse this company',
-    'analyze this company',
-    'investment analysis',
-    'is it overvalued',
-    'is it undervalued',
-    'fundamentals',
-  ];
-
-  return asks.some((phrase) => q.includes(phrase));
+function requestedChart(text: string): { kind?: unknown; studies?: unknown } | undefined {
+  try {
+    const parsed = JSON.parse(text) as { chart?: { kind?: unknown; studies?: unknown } };
+    return parsed.chart;
+  } catch {
+    return undefined;
+  }
 }
 
-async function runInvestmentAnalysis(
-  question: string,
-  context: VoyagerContext
-): Promise<VoyagerAnswer | null> {
-  try {
-    const assessment = await analyze({
-      runId: `voyager_${Date.now().toString(36)}`,
-      mode: 'standard',
-      asOf: new Date().toISOString().slice(0, 10),
-      pageContext: {
-        pageType: context.screen,
-        pageUrl: null,
-        locale: 'en',
-        country: null,
-        selectedMarket: null,
-        selectedInstrument: context.subject,
-        visibleModules: [],
-        userQuestion: question,
-      },
-      chartContext: null,
-      // No portfolio is passed here: the widget has no consent to share one, so
-      // the assessment says what it cannot judge rather than guessing.
-      user: null,
-    });
+/** One entry per host, keeping the first mention — five pages from one site is one source. */
+function dedupeCitations(found: { label: string; detail?: string }[]) {
+  const seen = new Set<string>();
+  return found.filter((citation) => {
+    const key = citation.label.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
-    const summary = summarise(assessment);
+/**
+ * What the model is told about the tools it has.
+ *
+ * Kept out of `RULES` because it varies with the request — a page with no
+ * instrument on it has no assessment tool — and `RULES` is the block that
+ * caches.
+ */
+function toolBrief(searching: boolean, hasTools: boolean): string {
+  const lines: string[] = ['## Tools'];
 
-    return {
-      contentType: 'AI analysis',
-      text: `${summary.instrumentName}: the evidence available leans ${summary.stance.replace(/_/g, ' ')} over ${summary.horizon.replace(/_/g, ' ')}. Every figure below was computed rather than written, and each is traceable to a dated source.`,
-      bullets: [],
-      sources: `${summary.evidence.length} sources · analysis dated ${summary.analysisAsOf}`,
-      confidence: summary.confidenceLabel,
-      actions: [],
-      followUps: [
-        'What would change this assessment?',
-        'Show me the arithmetic',
-        'Mark these levels on the chart',
-      ],
-      investment: summary,
-    };
-  } catch (error) {
-    // A failed analysis falls back to an ordinary answer rather than an error:
-    // the person asked a question, and "the engine broke" is not a reply to it.
-    console.error('[voyager] investment analysis failed', error);
-    return null;
+  if (hasTools) {
+    lines.push(
+      '',
+      'Use a tool when the answer depends on something you would otherwise be guessing at — where a feature lives, what an assessment concludes. Never state a tool result you did not receive, and never work around a failed tool by supplying the answer yourself: say what could not be checked.',
+      'A tool that failed with "Do not retry this call" will fail the same way again. Answer without it and say what is missing.'
+    );
   }
+
+  if (searching) {
+    lines.push(
+      '',
+      'You may search the web. Use it for facts that changed — prices, filings, forecasts, dates, what happened — whatever language the question is in. Do not search for definitions or for how something works: those do not change, and this platform already answers them. Every claim that came from a search must name where it came from in the sources field, must not be presented as more certain than its source made it, and if the searches do not answer the question, say what is missing rather than filling the gap.'
+    );
+  }
+
+  return lines.join('\n');
 }

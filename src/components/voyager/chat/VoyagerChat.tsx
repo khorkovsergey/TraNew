@@ -26,7 +26,6 @@ import {
 } from '@/lib/voyager/chat/transcript';
 import {
   allowanceToday,
-  ANSWER_ACTIONS,
   canSend,
   contextLabel,
   EMPTY_ALLOWANCE,
@@ -38,7 +37,7 @@ import {
   requiresAccount,
   requiresConfirmation,
   spend,
-  VOYAGER_ACTIONS,
+  specFor,
   type Allowance,
   type Pending,
   type VoyagerActionId,
@@ -46,7 +45,13 @@ import {
 import { parsePlan, type VoyagerModule, type VoyagerPlan } from '@/lib/voyager/workspace/contract';
 import { confirmationFor, type Confirmation } from '@/lib/voyager/workspace/actions';
 import { responseFor } from '@/lib/voyager/workspace/scenarios';
+import { routeFor } from '@/components/voyager/actionRoutes';
+import { runVoyagerAction } from '@/app/actions/voyagerActions';
+import type { InvestmentSummary } from '@/lib/investment/summary';
 import type { VoyagerResponse } from '@/lib/voyager/types';
+import { InvestmentAssessmentCard } from '@/components/voyager/InvestmentAssessment';
+import { VoyagerChart } from '@/components/voyager/chart/VoyagerChart';
+import type { ChartPayload } from '@/lib/voyager/chart/build';
 import { ModuleCard } from '@/components/voyager/workspace/ModuleCard';
 import styles from './VoyagerChat.module.css';
 
@@ -94,8 +99,14 @@ type Props = {
 };
 
 type Confirming =
-  /** An action offered under an answer. */
-  | { kind: 'answer'; id: VoyagerActionId }
+  /**
+   * An action offered under an answer, with what it will act on.
+   *
+   * The subject is captured when the button is pressed rather than read when
+   * the confirmation is accepted: three answers later, "add this to my
+   * watchlist" still means the instrument in the answer the button sat under.
+   */
+  | { kind: 'answer'; id: VoyagerActionId; ticker?: string; title: string; note: string }
   /** An action declared by a module inside an answer. */
   | { kind: 'module'; confirmation: Confirmation };
 
@@ -103,6 +114,25 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
   const router = useRouter();
   const authed = Boolean(personName);
   const context = useMemo(() => parseContext(pageContext), [pageContext]);
+
+  /**
+   * The context package, built once and used by both the request and the
+   * actions.
+   *
+   * Built here rather than inside `deliver` because an action needs the same
+   * facts the question was sent with — the instrument in particular. Two
+   * derivations of "which symbol is this about" is how a watchlist row ends up
+   * keyed by the word "chart".
+   */
+  const voyagerContext = useMemo(
+    () =>
+      buildContext(
+        screenFor(context?.kind ?? null),
+        context?.subject ?? undefined,
+        context?.subject ? { ticker: context.subject.toUpperCase() } : undefined
+      ),
+    [context]
+  );
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
@@ -113,6 +143,8 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
   const [pending, setPending] = useState<Pending>(null);
   const [gate, setGate] = useState<'auth' | 'limit' | 'error' | null>(null);
   const [confirming, setConfirming] = useState<Confirming | null>(null);
+  /** An action is with the server. The Confirm button says so and cannot be pressed twice. */
+  const [running, setRunning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   /** Ticks inside a permission-request module — a decision, not display. */
   const [ticked, setTicked] = useState<string[]>([]);
@@ -189,7 +221,16 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
        * as a confirmation, never as a fait accompli.
        */
       if (authed && queued.kind === 'action') {
-        setConfirming({ kind: 'answer', id: queued.id });
+        setConfirming({
+          kind: 'answer',
+          id: queued.id,
+          // The dialogue is restored in the same effect, so what the action
+          // will act on is read from what came back rather than from an empty
+          // transcript.
+          ticker: [...restored].reverse().find((turn) => turn.ticker)?.ticker,
+          title: lastQuestion(restored) ?? 'Voyager conversation',
+          note: transcriptText(restored),
+        });
         setPending(null);
         try {
           sessionStorage.removeItem(PENDING_KEY);
@@ -246,17 +287,6 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
       setGate(null);
       inFlight.current = question;
 
-      /*
-       * The structured side, computed from the question rather than asked for.
-       *
-       * Ten analyses are written in this repository — a comparison table, a
-       * chart build, a screener, a Pine draft — and they produce validated
-       * modules with their own sources and provenance. They render under the
-       * answer that prompted them, so a conversation about Nvidia and AMD ends
-       * with the actual comparison rather than a description of one.
-       */
-      const scripted = parsePlan(responseFor(question));
-
       try {
         const response = await fetch('/api/voyager', {
           method: 'POST',
@@ -271,11 +301,7 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
              * layer offered the model no market data — the context chip said
              * "This asset" over an answer that had never been told which one.
              */
-            context: buildContext(
-              screenFor(context?.kind ?? null),
-              context?.subject ?? undefined,
-              context?.subject ? { ticker: context.subject.toUpperCase() } : undefined
-            ),
+            context: voyagerContext,
             disabledSources: [],
             /* Prior turns, so a follow-up is a follow-up rather than a first question. */
             history: historyFor(turns),
@@ -297,6 +323,17 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
          * suggest a question was answered.
          */
         const quota = payload.quotaReached === true;
+        /*
+         * Everything under the text comes from this response.
+         *
+         * The chat used to run the scripted scenario layer alongside every
+         * request and attach whatever matched a keyword to the live answer. So
+         * a question about Apple could be answered correctly and then followed
+         * by a written comparison of NVDA, AMD and AVGO with prices in it —
+         * real-looking figures about companies nobody had asked about, under an
+         * answer that had done nothing to produce them. The scripted layer now
+         * appears only where the model did not answer at all, and says so.
+         */
         const answer: Turn = {
           id: `a_${answerAt}`,
           role: 'assistant',
@@ -306,7 +343,13 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
           tools: quota ? undefined : payload.answer.tools,
           sources: quota ? undefined : payload.answer.citations,
           followUps: quota ? undefined : payload.answer.followUps,
-          output: quota ? undefined : (scripted?.plan ?? undefined),
+          contentType: quota ? undefined : payload.answer.contentType,
+          bullets: quota ? undefined : payload.answer.bullets,
+          actions: quota ? undefined : payload.answer.actions,
+          investment: quota ? undefined : payload.answer.investment,
+          chart: quota ? undefined : payload.answer.chart,
+          upgrade: quota ? undefined : payload.answer.upgrade,
+          ticker: quota ? undefined : (voyagerContext.facts?.ticker ?? undefined),
           scripted: !quota && payload.answer.simulated === true,
         };
 
@@ -321,11 +364,13 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
         /*
          * The failure is said, not swallowed, and the question is kept.
          *
-         * A scripted analysis that already matched the question is worth more
-         * than an apology, so it is shown — labelled as written rather than
-         * answered, because a fallback that passes for a live answer is the
-         * outage nobody finds out about.
+         * This is the one place the scripted layer is consulted, and it is
+         * consulted *because* nothing answered. A written analysis that matches
+         * the question is worth more than an apology, so it is shown — labelled
+         * as written rather than answered, because a fallback that passes for a
+         * live answer is the outage nobody finds out about.
          */
+        const scripted = parsePlan(responseFor(question));
         const failedAt = new Date().toISOString();
         setTurns((current) => [
           ...current,
@@ -348,7 +393,7 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
         inFlight.current = null;
       }
     },
-    [context, turns, rememberAllowance, queue]
+    [voyagerContext, turns, rememberAllowance, queue]
   );
 
   const send = useCallback(
@@ -495,9 +540,23 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
 
   /* -------------------------------------------------------------- actions */
 
+  /**
+   * A report of something that happened, in the transcript.
+   *
+   * `notice` rather than an answer: it is the platform describing an act, so it
+   * carries no sources, no follow-ups and nothing to act on further.
+   */
+  const report = useCallback((text: string, tools?: string[]) => {
+    const at = new Date().toISOString();
+    setTurns((current) => [
+      ...current,
+      { id: `a_${at}`, role: 'assistant', at, text, tools, notice: true },
+    ]);
+  }, []);
+
   const runAction = useCallback(
-    (id: VoyagerActionId) => {
-      const spec = VOYAGER_ACTIONS[id];
+    (id: VoyagerActionId, turn?: Turn) => {
+      const spec = specFor(id);
       track({ name: 'voyager_action_clicked', action: id, authenticated: authed });
 
       if (requiresAccount(id) && !authed) {
@@ -509,70 +568,112 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
       }
 
       if (requiresConfirmation(id)) {
-        setConfirming({ kind: 'answer', id });
+        setConfirming({
+          kind: 'answer',
+          id,
+          ticker: turn?.ticker ?? voyagerContext.facts?.ticker,
+          title: lastQuestion(turns) ?? 'Voyager conversation',
+          note: transcriptText(turns),
+        });
         return;
       }
 
-      // Read-only: it navigates, and making somebody confirm before a link
-      // teaches them to click through confirmations.
-      if (id === 'open_chart') router.push('/supercharts');
-      if (id === 'research') {
+      /*
+       * Read-only, so it navigates — making somebody confirm before a link
+       * teaches them to click through confirmations.
+       *
+       * The destination comes from `actionRoutes`, the same table the widget
+       * uses, rather than from a couple of hardcoded cases here. Two of the
+       * twenty navigations were wired up; the other eighteen showed a toast
+       * naming a screen and stayed where they were.
+       */
+      if (id === 'open_research') {
         const seed = lastQuestion(turns);
         router.push(
           seed
             ? ({ pathname: '/voyager/research', query: { q: seed } } as never)
             : ('/voyager/research' as never)
         );
+        return;
+      }
+
+      const target = routeFor(id, voyagerContext);
+      if (target) {
+        router.push(target as never);
+        return;
+      }
+
+      // `none` and `view_pine` have nowhere to go: the first continues the
+      // conversation, and the second belongs to a chart this screen is not.
+      if (id === 'none') {
+        const label = turn?.actions?.find((action) => action.action === 'none')?.label;
+        if (label) send(label, 'explain');
+        return;
       }
       setNotice(`${spec.label} — ${spec.where}.`);
     },
-    [authed, router, turns, queue]
+    [authed, router, turns, queue, voyagerContext, send]
   );
 
-  const acceptConfirmation = useCallback(() => {
-    if (!confirming) return;
-
-    const at = new Date().toISOString();
+  const acceptConfirmation = useCallback(async () => {
+    if (!confirming || running) return;
 
     if (confirming.kind === 'module') {
+      /*
+       * A module's actions describe changes to a canvas this screen does not
+       * have. Nothing is claimed for them: the card says where the action
+       * belongs and the person goes there.
+       */
       const action = confirming.confirmation.action;
-      setTurns((current) => [
-        ...current,
-        {
-          id: `a_${at}`,
-          role: 'assistant',
-          at,
-          text: `Done — ${action.title.toLowerCase()}. ${action.undo}`,
-          tools: [`${action.id} ✓`],
-          notice: true,
-        },
-      ]);
+      report(
+        `That one lives in ${action.where.toLowerCase()} — I have not changed anything from here. ${action.caveat}`
+      );
       setConfirming(null);
       return;
     }
 
-    const spec = VOYAGER_ACTIONS[confirming.id];
-    setTurns((current) => [
-      ...current,
-      {
-        id: `a_${at}`,
-        role: 'assistant',
-        at,
-        text: `Done — I ${spec.done}. It landed in ${spec.where.toLowerCase()}. ${spec.undo}`,
-        tools: [`${spec.call} ✓`],
-        /* A report of what happened, not an answer — so it offers nothing to act on. */
-        notice: true,
-      },
-    ]);
-    track({ name: 'voyager_tool_executed', tool: spec.call });
+    const { id, ticker, title, note } = confirming;
+    setRunning(true);
+
+    /*
+     * The result decides what is said. Not the intent, not the label, and not
+     * the fact that somebody pressed Confirm.
+     *
+     * This is the whole of §4.5: "Done — I added this to your watchlist" used
+     * to be printed the moment the button was pressed, with a `watchlist.add ✓`
+     * chip beside it, and no request had been made to anything. The row was not
+     * in the workspace it said to look in.
+     */
+    const result = await runVoyagerAction({ id, ticker, title, note }).catch(() => null);
+    setRunning(false);
     setConfirming(null);
     queue(null);
 
-    if (confirming.id === 'portfolio_scenario') router.push('/portfolio');
-    if (confirming.id === 'watchlist' || confirming.id === 'create_alert') {
-      router.push('/account/workspace');
+    if (!result) {
+      report('That did not go through — I could not reach the server. Nothing was changed.');
+      track({ name: 'voyager_action_failed', action: id, code: 'unreachable' });
+      return;
     }
-  }, [confirming, router, queue]);
+
+    if (!result.ok) {
+      report(result.message);
+      track({ name: 'voyager_action_failed', action: id, code: result.code });
+      if (result.code === 'sign_in_required') {
+        queue({ kind: 'action', id });
+        setGate('auth');
+      }
+      return;
+    }
+
+    // Only here. The chip names a call that returned, and the sentence is the
+    // registry's own past tense rather than a hopeful paraphrase of the label.
+    report(
+      `Done — I ${result.done}. It is in ${result.where.toLowerCase()}. ${result.undo}`,
+      [`${result.call} ✓`]
+    );
+    track({ name: 'voyager_action_confirmed', action: id, execution: result.execution });
+    track({ name: 'voyager_tool_executed', tool: result.call });
+  }, [confirming, running, queue, report]);
 
   const onModuleAction = useCallback((module: VoyagerModule, actionId: string) => {
     const outcome = confirmationFor(module, actionId);
@@ -774,6 +875,9 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
                             Tool: {tool}
                           </span>
                         ))}
+                        {turn.contentType && (
+                          <span className={styles.kindChip}>{turn.contentType}</span>
+                        )}
 
                         <p className={styles.botText}>
                           {reveal?.id === turn.id && reveal.chars < turn.text.length ? (
@@ -793,6 +897,39 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
                             Written by TradingNew, not generated for this question.
                           </p>
                         )}
+
+                        {/* The observations the answer carried. Four at most; the
+                            server clamps them, and the model is asked for one line each. */}
+                        {turn.bullets && turn.bullets.length > 0 && (
+                          <ul className={styles.bullets}>
+                            {turn.bullets.map((bullet) => (
+                              <li key={bullet}>{bullet}</li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {/* The chart, drawn by the Supercharts engine from the same
+                            specification the caption and this answer were written
+                            from. Nothing here can describe a study the canvas did
+                            not draw, because the caption is generated from the spec
+                            after everything unrenderable was removed from it. */}
+                        {turn.chart ? (
+                          <VoyagerChart
+                            spec={(turn.chart as ChartPayload).spec}
+                            series={(turn.chart as ChartPayload).series}
+                            onRetry={() => {
+                              const text = lastQuestion(turns);
+                              if (text) void deliver(text);
+                            }}
+                          />
+                        ) : null}
+
+                        {/* The deterministic assessment, when a question asked for one.
+                            Every figure in it was computed and is traceable to a dated
+                            source — which is why it renders as itself rather than as prose. */}
+                        {turn.investment ? (
+                          <InvestmentAssessmentCard data={turn.investment as InvestmentSummary} />
+                        ) : null}
 
                         {/* The structured analysis this question produced, if any. */}
                         {turn.output ? (
@@ -822,17 +959,53 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
                           </div>
                         )}
 
-                        {offersActions(turn) && (
+                        {/*
+                          * The actions this answer chose, and nothing else.
+                          *
+                          * There used to be six here under every answer, from a
+                          * constant, in the same order every time — so an
+                          * explanation of what an ETF is offered *Add to
+                          * watchlist*, and there was nothing it could have added.
+                          * The server narrows what may be offered and the model
+                          * picks from that; an answer with nothing worth doing
+                          * next now shows no row at all, which is the correct
+                          * number of buttons.
+                          */}
+                        {offersActions(turn) && (turn.actions?.length ?? 0) > 0 && (
                           <div className={styles.actionRow}>
-                            {ANSWER_ACTIONS.map((id, index) => (
+                            {turn.actions!.map((action, index) => (
                               <button
-                                key={id}
+                                key={`${action.action}_${index}`}
                                 className={index === 0 ? styles.actionPrimary : styles.action}
-                                onClick={() => runAction(id)}
+                                /* The id behind the label. The label is the model's
+                                   words and changes per answer; this is what the
+                                   button will actually do, and what a test can
+                                   check without reading English. */
+                                data-action={action.action}
+                                onClick={() => runAction(action.action, turn)}
                               >
-                                {VOYAGER_ACTIONS[id].label}
+                                {action.label}
                               </button>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Decided by the policy layer from tier and screen, never by
+                            the model — whether to sell somebody a plan is an
+                            entitlement fact, not something to improvise mid-answer. */}
+                        {turn.upgrade && (
+                          <div className={styles.upgrade}>
+                            <p className={styles.upgradeText}>{turn.upgrade.text}</p>
+                            <Link
+                              className={styles.upgradeCta}
+                              href={
+                                turn.upgrade.intent === 'sign_up'
+                                  ? ({ pathname: '/sign-up', query: { next: '/voyager' } } as never)
+                                  : '/marketplace/subscriptions'
+                              }
+                            >
+                              {turn.upgrade.cta}
+                            </Link>
                           </div>
                         )}
 
@@ -952,9 +1125,9 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
                       <p className={styles.confirmBody}>
                         {confirming.kind === 'answer' ? (
                           <>
-                            I&apos;m about to {VOYAGER_ACTIONS[confirming.id].about}. It lands in{' '}
-                            <b>{VOYAGER_ACTIONS[confirming.id].where}</b>. Nothing changes without
-                            your OK.
+                            I&apos;m about to {specFor(confirming.id).about}
+                            {confirming.ticker ? ` (${confirming.ticker})` : ''}. It lands in{' '}
+                            <b>{specFor(confirming.id).where}</b>. Nothing changes without your OK.
                           </>
                         ) : (
                           <>
@@ -966,15 +1139,20 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
                       </p>
                       <p className={styles.confirmCaveat}>
                         {confirming.kind === 'answer'
-                          ? VOYAGER_ACTIONS[confirming.id].undo
+                          ? specFor(confirming.id).undo
                           : `${confirming.confirmation.action.caveat} ${confirming.confirmation.action.undo}`}
                       </p>
                       <div className={styles.confirmActions}>
-                        <button className={styles.confirmYes} onClick={acceptConfirmation}>
-                          Confirm
+                        <button
+                          className={styles.confirmYes}
+                          onClick={() => void acceptConfirmation()}
+                          disabled={running}
+                        >
+                          {running ? 'Working…' : 'Confirm'}
                         </button>
                         <button
                           className={styles.confirmNo}
+                          disabled={running}
                           onClick={() => {
                             setConfirming(null);
                             queue(null);
@@ -1093,6 +1271,23 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
       )}
     </>
   );
+}
+
+/**
+ * The conversation as one block of text, for the actions that keep a copy.
+ *
+ * Bounded, and failures are left out: what somebody saves should be what they
+ * read, not a transcript with "Voyager is temporarily unavailable" in the
+ * middle of it. It is sealed with the person's own key on the server, like
+ * every other note.
+ */
+function transcriptText(turns: Turn[]): string {
+  return turns
+    .filter((turn) => !turn.failed && !turn.notice && turn.text.trim())
+    .slice(-20)
+    .map((turn) => `${turn.role === 'user' ? 'You' : 'Voyager'}: ${turn.text}`)
+    .join('\n\n')
+    .slice(0, 4000);
 }
 
 /**

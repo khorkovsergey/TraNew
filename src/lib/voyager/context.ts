@@ -55,6 +55,18 @@ const TEMPLATES: Record<VoyagerScreen, Template> = {
       'What am I registered for?',
     ],
   },
+  ideas: {
+    subject: 'this idea',
+    prompt: 'Ask about this idea',
+    // A published idea is somebody's argument about an instrument, so the
+    // questions worth offering are the ones that test it rather than repeat it.
+    quick: [
+      'What is the argument here, in plain terms?',
+      'What would have to be true for this to work?',
+      'What are the risks the author does not mention?',
+      'Show me the chart behind this',
+    ],
+  },
   economy: {
     subject: 'the economy',
     prompt: 'Ask about the economy',

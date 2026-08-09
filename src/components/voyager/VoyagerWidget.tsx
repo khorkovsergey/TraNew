@@ -10,6 +10,7 @@ import type {
   VoyagerSource,
   VoyagerTier,
 } from '@/lib/voyager/types';
+import { mutates } from '@/lib/voyager/actions';
 import { routeFor } from './actionRoutes';
 import { onVoyagerOpenRequest } from '@/lib/voyager/openRequest';
 import { VoyagerMark } from './VoyagerMark';
@@ -234,6 +235,27 @@ export function VoyagerWidget({ chartWorkspaceLive = false }: { chartWorkspaceLi
     if (actionId === 'view_pine') {
       requestPine();
       setMode('collapsed');
+      return;
+    }
+
+    /*
+     * Anything that writes is handed to the full page rather than performed
+     * here.
+     *
+     * The widget has no confirmation card, and the rule is that nothing changes
+     * without one. Routing it to the screen the action lands on instead would
+     * be worse than doing nothing: somebody who pressed *Add to watchlist* and
+     * arrived at an empty workspace would reasonably conclude the portal had
+     * lost it. So the request travels with its context and is confirmed where
+     * confirming exists.
+     */
+    if (mutates(actionId)) {
+      const ticker = context.facts?.ticker;
+      setMode('collapsed');
+      router.push({
+        pathname: '/voyager',
+        query: ticker ? { context: `symbol:${ticker}` } : {},
+      } as never);
       return;
     }
 

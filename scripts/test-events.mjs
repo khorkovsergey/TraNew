@@ -107,6 +107,15 @@ try {
       'src/lib/start/path.ts',
       'src/lib/start/plan.ts',
       'src/lib/voyager/session.ts',
+      'src/lib/voyager/screens.ts',
+      'src/lib/voyager/actions.ts',
+      'src/lib/voyager/context.ts',
+      'src/lib/voyager/tools/types.ts',
+      'src/lib/voyager/tools/navigation.ts',
+      'src/lib/voyager/tools/assets.ts',
+      'src/lib/voyager/tools/range.ts',
+      'src/lib/voyager/tools/metrics.ts',
+      'src/lib/voyager/chart/spec.ts',
       'src/lib/voyager/chat/transcript.ts',
       'src/lib/academy/summary.ts',
       'src/lib/explore/answers.ts',
@@ -243,6 +252,15 @@ try {
   const start = await load('path', 'start');
   const plan = await load('plan', 'start');
   const session = await load('session', 'voyager');
+  const screens = await load('screens', 'voyager');
+  const acts = await load('actions', 'voyager');
+  const toolTypes = await load('types', 'tools');
+  const nav = await load('navigation', 'tools');
+  const assets = await load('assets', 'tools');
+  const ranges = await load('range', 'tools');
+  const metrics = await load('metrics', 'tools');
+  const chart = await load('spec', 'chart');
+  const pageContext = await load('context', 'voyager');
   const transcript = await load('transcript', 'chat');
   const learn = await load('summary', 'academy');
   const answers = await load('answers', 'explore');
@@ -4019,50 +4037,672 @@ try {
     assert.ok(!settings.DEFAULT_SOURCES.includes('personal-files'));
   });
 
-  group('Looking things up costs money, so the gate is narrow');
+  group('Looking things up costs money, so the ceiling is in code');
 
-  check('a question about an event opens it', () => {
-    for (const q of [
-      'What do analysts forecast for Tesla?',
-      'Summarize how the US stock market closed today',
-      'Why has gold risen recently?',
-      'What were the latest earnings for Nvidia?',
-      'Any news on the Fed this week?',
-    ]) {
-      assert.equal(research.wantsSearch(q, true), true, q);
-    }
-  });
-
-  check('a question about how something works does not', () => {
+  check('the English keyword gate is gone', () => {
     /*
-     * "What is a drawdown" is answered from a table written in this repository.
-     * Paying to search the open web for it would spend somebody's money to get
-     * a worse answer.
+     * It decided whether to search by looking for words like "today" and
+     * "earnings" in the question. That kept definitions from costing anything,
+     * and it also meant «почему сегодня упала Tesla» was answered from memory
+     * while "why did Tesla fall today" was researched. The decision moved to
+     * the planner, which reads every language; what stays here is the ceiling.
      */
-    for (const q of [
-      'What is a drawdown?',
-      'Explain diversification',
-      'What is the difference between an ETF and a stock?',
-      'How does compounding work?',
-    ]) {
-      assert.equal(research.wantsSearch(q, false || true), false, q);
-    }
-  });
-
-  check('a definition wearing a recent-sounding word is still a definition', () => {
-    // "current" is in the fresh list, and this is not a research question.
-    assert.equal(research.wantsSearch('What is the current ratio?', true), false);
-    assert.equal(research.wantsSearch('What does a price target mean?', true), false);
-  });
-
-  check('the operator switch beats everything', () => {
-    // A feature billed per use needs a stop that does not require a deploy.
-    assert.equal(research.wantsSearch('What happened in markets today?', false), false);
+    assert.equal(research.wantsSearch, undefined);
   });
 
   check('one answer cannot run away with the bill', () => {
     assert.equal(typeof research.MAX_SEARCHES, 'number');
     assert.ok(research.MAX_SEARCHES > 0 && research.MAX_SEARCHES <= 6, research.MAX_SEARCHES);
+  });
+
+  group('Tools: a failure is a value, and what ran is recorded');
+
+  check('every tool id the registry names is one the executor knows', () => {
+    for (const id of toolTypes.VOYAGER_TOOL_IDS) {
+      assert.equal(toolTypes.isVoyagerToolId(id), true, id);
+    }
+    assert.equal(toolTypes.isVoyagerToolId('rm_rf'), false);
+    assert.equal(toolTypes.isVoyagerToolId(null), false);
+  });
+
+  check('the loop is bounded, and the bound is small enough to wait for', () => {
+    assert.ok(toolTypes.MAX_TOOL_STEPS >= 2 && toolTypes.MAX_TOOL_STEPS <= 6);
+    assert.ok(toolTypes.MAX_CALLS_PER_STEP >= 2 && toolTypes.MAX_CALLS_PER_STEP <= 10);
+  });
+
+  check('the same call twice has the same key, and a different one does not', () => {
+    // The guard that stops a planner retrying an identical failed call until
+    // the step cap, spending somebody's wait on an answered question.
+    const a = toolTypes.callKey('investment_analysis', { symbol: 'TSLA' });
+    assert.equal(a, toolTypes.callKey('investment_analysis', { symbol: 'TSLA' }));
+    assert.notEqual(a, toolTypes.callKey('investment_analysis', { symbol: 'NVDA' }));
+    assert.notEqual(a, toolTypes.callKey('portal_navigation', { symbol: 'TSLA' }));
+  });
+
+  check('only the calls that worked become chips', () => {
+    /*
+     * A chip claiming a tool ran when it failed is the same lie as an invented
+     * source. The failures are kept — they are what lets an answer say which
+     * lookup is missing — but they are not evidence.
+     */
+    const trace = [
+      { id: 'portal_navigation', ok: true, call: 'portal-navigation(expert_help)' },
+      { id: 'investment_analysis', ok: false, code: 'no_data', call: 'investment-analysis(ABC)' },
+    ];
+    assert.deepEqual(toolTypes.traceChips(trace), ['portal-navigation(expert_help)']);
+    assert.equal(toolTypes.failureNotes(trace).length, 1);
+    assert.match(toolTypes.failureNotes(trace)[0], /no_data/);
+  });
+
+  check('arguments from the model are bounded before they are used', () => {
+    assert.equal(toolTypes.argString('  spaced   out  '), 'spaced out');
+    assert.equal(toolTypes.argString('x'.repeat(500), 10).length, 10);
+    assert.equal(toolTypes.argString(42), null);
+    assert.equal(toolTypes.argString('   '), null);
+  });
+
+  check('a ticker argument is a ticker or nothing', () => {
+    // `ref` is a key other parts of the portal join on. A row keyed by a
+    // sentence is a row nothing will ever find again.
+    assert.equal(toolTypes.argTicker('tsla'), 'TSLA');
+    assert.equal(toolTypes.argTicker('BRK.B'), 'BRK.B');
+    assert.equal(toolTypes.argTicker('this chart'), null);
+    assert.equal(toolTypes.argTicker('<script>'), null);
+    assert.equal(toolTypes.argTicker(''), null);
+  });
+
+  group('Navigation resolves intent to routes that exist');
+
+  check('a topic resolves to real actions, narrowed to what is allowed', () => {
+    const allowed = acts.allowedActions({ screen: 'generic', tier: 'basic', hasTicker: false });
+    const found = nav.findDestinations('expert_help', allowed);
+    assert.equal(found.ok, true);
+    assert.ok(found.data.destinations.length > 0);
+    for (const destination of found.data.destinations) {
+      assert.equal(acts.isVoyagerActionId(destination.action), true, destination.action);
+      assert.ok(allowed.includes(destination.action), destination.action);
+      assert.ok(destination.where, destination.action);
+    }
+  });
+
+  check('a topic this visitor cannot reach is refused, not substituted', () => {
+    /*
+     * Naming the Wealth Hub to somebody whose tier does not reach it sends them
+     * to a screen that will refuse them. Saying there is nothing here is worse
+     * news and better information.
+     */
+    const basic = acts.allowedActions({ screen: 'generic', tier: 'basic', hasTicker: false });
+    const wealth = nav.findDestinations('wealth', basic);
+    assert.equal(wealth.ok, false);
+    assert.equal(wealth.code, 'not_permitted');
+
+    const priv = acts.allowedActions({ screen: 'generic', tier: 'private', hasTicker: false });
+    assert.equal(nav.findDestinations('wealth', priv).ok, true);
+  });
+
+  check('an invented topic is refused rather than guessed at', () => {
+    for (const topic of ['crypto_casino', '', null, 42]) {
+      const found = nav.findDestinations(topic, ['open_explore']);
+      assert.equal(found.ok, false, JSON.stringify(topic));
+      assert.equal(found.code, 'bad_arguments');
+    }
+  });
+
+  check('every topic in the closed set maps to actions the registry describes', () => {
+    // A topic with no destinations is a topic the model can classify into and
+    // get nothing back from — a dead end with a name.
+    const everything = acts.VOYAGER_ACTION_IDS;
+    for (const topic of nav.NAV_TOPICS) {
+      const found = nav.findDestinations(topic, everything);
+      assert.equal(found.ok, true, topic);
+      assert.ok(found.data.destinations.length > 0, topic);
+    }
+  });
+
+  /* ============ Voyager: which instrument, over which period ============== */
+
+  group('An instrument is resolved, never guessed');
+
+  check('a ticker and a name reach the same instrument', () => {
+    for (const query of ['TSLA', 'tsla', 'Tesla', 'тесла', 'chart Tesla for me']) {
+      const found = assets.resolveAsset(query);
+      assert.equal(found.status, 'exact', query);
+      assert.equal(found.asset.symbol, 'TSLA', query);
+    }
+  });
+
+  check('a name is matched whole, never inside another word', () => {
+    /*
+     * The old dictionary matched substrings, so "metallurgy" contained "meta"
+     * and "a metaphor for risk" charted Meta Platforms.
+     */
+    assert.notEqual(assets.resolveAsset('what is a metaphor for risk').status, 'exact');
+    assert.notEqual(assets.resolveAsset('metallurgy stocks').status, 'exact');
+  });
+
+  check('a word that means two instruments asks instead of choosing', () => {
+    // Gold is an ETF holding bullion and a spot rate. They do not move
+    // identically, and picking one silently is how somebody reads the wrong one.
+    const found = assets.resolveAsset('gold');
+    assert.equal(found.status, 'ambiguous');
+    assert.ok(found.alternatives.length >= 2);
+    assert.match(assets.clarification(found.alternatives), /which did you mean/i);
+    assert.equal(assets.resolveAsset('золото').status, 'ambiguous');
+  });
+
+  check('an unknown ticker is held for verification, not accepted', () => {
+    /*
+     * "Chart ABC" must not chart something. It is ticker-shaped, so it goes to
+     * the provider; if no quote comes back it does not exist here.
+     */
+    const found = assets.resolveAsset('ABC');
+    assert.equal(found.status, 'unverified');
+    assert.equal(found.symbol, 'ABC');
+  });
+
+  check('and a sentence that names nothing resolves to nothing', () => {
+    for (const query of ['how do I start investing', '', null, 42]) {
+      assert.equal(assets.resolveAsset(query).status, 'unknown', JSON.stringify(query));
+    }
+  });
+
+  group('A period is a period, not "about 260 bars"');
+
+  const TODAY = '2026-08-09';
+
+  check('the defaults are the ones somebody means by leaving them out', () => {
+    const both = ranges.normalizeRange({}, TODAY);
+    assert.equal(both.ok, true);
+    assert.equal(both.range.end, TODAY);
+    assert.equal(both.range.start, '2025-08-09');
+  });
+
+  check('an end date in the future is pulled back, not refused', () => {
+    // "Through the end of the year", asked in August, has an obvious right answer.
+    const clamped = ranges.normalizeRange({ start: '2026-01-01', end: '2026-12-31' }, TODAY);
+    assert.equal(clamped.ok, true);
+    assert.equal(clamped.range.end, TODAY);
+  });
+
+  check('a backwards or unparseable period is refused by name', () => {
+    assert.equal(ranges.normalizeRange({ start: '2026-06-01', end: '2026-01-01' }, TODAY).problem, 'reversed');
+    assert.equal(ranges.normalizeRange({ start: '2027-01-01' }, TODAY).problem, 'future');
+    assert.equal(ranges.normalizeRange({ start: 'last January' }, TODAY).problem, 'bad_dates');
+    assert.equal(ranges.normalizeRange({ start: '2026-13-45' }, TODAY).problem, 'bad_dates');
+  });
+
+  check('the request reaches back to the start date, and no further', () => {
+    /*
+     * The provider returns the most recent N daily bars, so a period beginning
+     * in January 2024 costs the walk back to January 2024 — the old code asked
+     * for 260 whatever was wanted, which is why a two-year request drew one year.
+     */
+    const short = ranges.outputsizeFor({ start: '2026-08-04', end: TODAY }, TODAY);
+    const long = ranges.outputsizeFor({ start: '2024-01-01', end: '2025-06-30' }, TODAY);
+    assert.ok(long > short, `${long} vs ${short}`);
+    // Roughly five sevenths of the calendar, plus an edge buffer.
+    assert.ok(long > 600 && long < 800, long);
+  });
+
+  check('a five-day period still fetches enough to come back at all', () => {
+    // The market client returns nothing below thirty bars, so a short period
+    // cannot ask for five. It asks for a floor and is trimmed afterwards.
+    const size = ranges.outputsizeFor({ start: '2026-08-04', end: TODAY }, TODAY);
+    assert.ok(size >= ranges.PROVIDER_MIN_BARS * 2, size);
+  });
+
+  check('and a request older than the provider is capped rather than refused', () => {
+    const ancient = ranges.outputsizeFor({ start: '1970-01-01', end: TODAY }, TODAY);
+    assert.equal(ancient, ranges.MAX_OUTPUTSIZE);
+  });
+
+  /* A deterministic daily series: one bar per weekday, close walking upward. */
+  const unixDay = (iso) => Date.parse(`${iso}T00:00:00Z`) / 1000;
+  function weekdays(from, count) {
+    const out = [];
+    let cursor = Date.parse(`${from}T00:00:00Z`);
+    while (out.length < count) {
+      const date = new Date(cursor);
+      const weekday = date.getUTCDay();
+      if (weekday !== 0 && weekday !== 6) out.push(date.toISOString().slice(0, 10));
+      cursor += 86_400_000;
+    }
+    return out;
+  }
+  function fixtureBars(from, count, startClose = 100, step = 1) {
+    return weekdays(from, count).map((date, index) => {
+      const close = startClose + index * step;
+      return {
+        time: unixDay(date),
+        open: close - step / 2,
+        high: close + 1,
+        low: close - 1,
+        close,
+        volume: 1000 + index,
+      };
+    });
+  }
+
+  check('only the bars inside the period survive the trim', () => {
+    const bars = fixtureBars('2026-06-01', 40);
+    const kept = ranges.trimToRange(bars, { start: '2026-06-15', end: '2026-06-19' });
+    assert.equal(kept.length, 5);
+    assert.equal(ranges.isoOf(kept[0].time), '2026-06-15');
+    assert.equal(ranges.isoOf(kept[4].time), '2026-06-19');
+  });
+
+  group('Weekly and monthly bars are folded from daily ones');
+
+  check('a week is first open, highest high, lowest low, last close, summed volume', () => {
+    // Monday 1 June 2026 through Friday the 5th.
+    const week = ranges.trimToRange(fixtureBars('2026-06-01', 20), {
+      start: '2026-06-01',
+      end: '2026-06-05',
+    });
+    const [folded] = ranges.resample(week, '1W');
+
+    assert.equal(ranges.isoOf(folded.time), '2026-06-01');
+    assert.equal(folded.open, week[0].open);
+    assert.equal(folded.close, week[4].close);
+    assert.equal(folded.high, Math.max(...week.map((bar) => bar.high)));
+    assert.equal(folded.low, Math.min(...week.map((bar) => bar.low)));
+    assert.equal(folded.volume, week.reduce((total, bar) => total + bar.volume, 0));
+  });
+
+  check('a week is labelled by its Monday however the series starts', () => {
+    /*
+     * Two runs over the same data must label the bar identically, or a chart
+     * redrawn after a holiday moves every weekly point by a day.
+     */
+    const fromWednesday = ranges.trimToRange(fixtureBars('2026-06-01', 20), {
+      start: '2026-06-03',
+      end: '2026-06-05',
+    });
+    assert.equal(ranges.isoOf(ranges.resample(fromWednesday, '1W')[0].time), '2026-06-01');
+  });
+
+  check('a month folds by calendar month, and a partial one is kept', () => {
+    const bars = ranges.trimToRange(fixtureBars('2026-06-01', 60), {
+      start: '2026-06-01',
+      end: '2026-07-10',
+    });
+    const months = ranges.resample(bars, '1M');
+    assert.equal(months.length, 2);
+    assert.equal(ranges.isoOf(months[0].time), '2026-06-01');
+    assert.equal(ranges.isoOf(months[1].time), '2026-07-01');
+    // Dropping the part-month would move the end date away from the one asked for.
+    assert.equal(months[1].close, bars[bars.length - 1].close);
+  });
+
+  check('a daily request is not resampled at all', () => {
+    const bars = fixtureBars('2026-06-01', 10);
+    assert.equal(ranges.resample(bars, '1D'), bars);
+  });
+
+  group('Coverage says which dates it actually has');
+
+  check('a period starting on a weekend is not called truncated', () => {
+    // 2026-06-06 is a Saturday; the first bar is the Monday, and that is
+    // ordinary rather than a failure to reach back.
+    const bars = ranges.trimToRange(fixtureBars('2026-06-01', 30), {
+      start: '2026-06-06',
+      end: '2026-06-19',
+    });
+    const coverage = ranges.coverageOf(bars, { start: '2026-06-06', end: '2026-06-19' }, '1D', {
+      reachedProviderCap: false,
+    });
+    assert.equal(coverage.truncated, false);
+    assert.equal(coverage.firstObservation, '2026-06-08');
+    assert.match(ranges.describeCoverage(coverage), /first trading day on or after/);
+  });
+
+  check('but running out of provider history is', () => {
+    const bars = fixtureBars('2020-01-01', 30);
+    const coverage = ranges.coverageOf(bars, { start: '1995-01-01', end: '2020-02-15' }, '1D', {
+      reachedProviderCap: true,
+    });
+    assert.equal(coverage.truncated, true);
+    assert.match(ranges.describeCoverage(coverage), /does not reach 1995-01-01/);
+  });
+
+  check('an empty period says so rather than reporting nothing', () => {
+    const coverage = ranges.coverageOf([], { start: '2026-06-01', end: '2026-06-05' }, '1D', {
+      reachedProviderCap: false,
+    });
+    assert.equal(coverage.firstObservation, null);
+    assert.match(ranges.describeCoverage(coverage), /no observations/);
+  });
+
+  check('a derived interval always admits it was derived', () => {
+    const coverage = ranges.coverageOf(fixtureBars('2026-06-01', 8), { start: '2026-06-01', end: '2026-07-01' }, '1W', {
+      reachedProviderCap: false,
+    });
+    assert.equal(coverage.derivedFromDaily, true);
+    assert.match(ranges.describeCoverage(coverage), /folded from daily/);
+  });
+
+  group('The arithmetic is arithmetic, and refuses when it would mislead');
+
+  check('return and change are computed from first and last close', () => {
+    const bars = fixtureBars('2026-01-01', 60, 100, 1);
+    const measured = metrics.seriesMetrics(bars, '1D');
+    assert.equal(measured.observations, 60);
+    assert.equal(measured.first.close, 100);
+    assert.equal(measured.last.close, 159);
+    assert.equal(measured.change, 59);
+    assert.equal(measured.changePercent, 59);
+  });
+
+  check('the high and low carry the day they happened', () => {
+    const bars = fixtureBars('2026-01-01', 30, 100, 1);
+    bars[7].high = 999;
+    bars[12].low = 1;
+    const measured = metrics.seriesMetrics(bars, '1D');
+    assert.equal(measured.periodHigh.value, 999);
+    assert.equal(measured.periodHigh.date, ranges.isoOf(bars[7].time));
+    assert.equal(measured.periodLow.value, 1);
+    assert.equal(measured.periodLow.date, ranges.isoOf(bars[12].time));
+  });
+
+  check('a drawdown is measured peak to trough on closes', () => {
+    // 100 → 200 → 150: a third off the peak, and never mind that it started at 100.
+    const bars = [100, 200, 150].map((close, index) => ({
+      time: unixDay(`2026-01-0${index + 1}`),
+      open: close,
+      high: close,
+      low: close,
+      close,
+    }));
+    assert.equal(metrics.maxDrawdown(bars), -25);
+  });
+
+  check('a series that only rises has no drawdown', () => {
+    assert.equal(metrics.maxDrawdown(fixtureBars('2026-01-01', 20, 100, 1)), 0);
+  });
+
+  check('volatility is refused when there is not enough of it to measure', () => {
+    /*
+     * Twelve daily closes annualised is a fortnight of noise wearing a yearly
+     * headline. Null with a stated reason beats a number somebody would quote.
+     */
+    const short = metrics.seriesMetrics(fixtureBars('2026-01-01', 10), '1D');
+    assert.equal(short.annualisedVolatility, null);
+    assert.ok(short.caveats.some((note) => /volatility needs at least/.test(note)));
+
+    const long = metrics.seriesMetrics(fixtureBars('2026-01-01', 120), '1D');
+    assert.equal(typeof long.annualisedVolatility, 'number');
+  });
+
+  check('a flat series has zero volatility rather than none', () => {
+    const flat = Array.from({ length: 40 }, (_, index) => ({
+      time: unixDay('2026-01-01') + index * 86_400,
+      open: 50,
+      high: 50,
+      low: 50,
+      close: 50,
+    }));
+    assert.equal(metrics.annualisedVolatility(flat, '1D'), 0);
+  });
+
+  check('CAGR is not quoted for a period under a year', () => {
+    // A four-month gain annualises to a number that will be read as a forecast.
+    const months = metrics.seriesMetrics(fixtureBars('2026-01-01', 80), '1D');
+    assert.equal(months.cagr, null);
+    assert.ok(months.caveats.some((note) => /under a year/.test(note)));
+
+    const years = metrics.seriesMetrics(fixtureBars('2023-01-02', 520), '1D');
+    assert.equal(typeof years.cagr, 'number');
+  });
+
+  check('a doubling over two years is about 41% a year', () => {
+    const bars = [
+      { time: unixDay('2024-01-02'), open: 100, high: 100, low: 100, close: 100 },
+      { time: unixDay('2026-01-02'), open: 200, high: 200, low: 200, close: 200 },
+    ];
+    const rate = metrics.cagr(bars);
+    assert.ok(Math.abs(rate - 41.4) < 0.5, rate);
+  });
+
+  check('missing volume is said rather than counted as zero', () => {
+    const bars = fixtureBars('2026-01-01', 40).map((bar, index) =>
+      index % 2 === 0 ? { ...bar, volume: undefined } : bar
+    );
+    const measured = metrics.seriesMetrics(bars, '1D');
+    assert.ok(measured.averageVolume > 0);
+    assert.ok(measured.caveats.some((note) => /volume is missing on 20 of 40/.test(note)));
+
+    const none = metrics.seriesMetrics(
+      fixtureBars('2026-01-01', 40).map((bar) => ({ ...bar, volume: undefined })),
+      '1D'
+    );
+    assert.equal(none.averageVolume, null);
+  });
+
+  check('one observation is a price, not a period', () => {
+    assert.equal(metrics.seriesMetrics(fixtureBars('2026-01-01', 1), '1D'), null);
+    assert.equal(metrics.seriesMetrics([], '1D'), null);
+  });
+
+  group('A comparison is aligned by date, never by index');
+
+  check('only the trading days every instrument has are compared', () => {
+    /*
+     * Instruments do not share a holiday calendar. Pairing the nth bar of one
+     * with the nth of another drifts a day at a time, and every figure
+     * downstream inherits the drift with nothing on screen to show it.
+     */
+    const a = fixtureBars('2026-06-01', 10);
+    const b = fixtureBars('2026-06-01', 10).filter((_, index) => index !== 3);
+    const shared = metrics.commonDates([a, b]);
+
+    assert.equal(shared.length, 9);
+    assert.ok(!shared.includes(ranges.isoOf(a[3].time)));
+
+    const alignedA = metrics.alignTo(a, shared);
+    const alignedB = metrics.alignTo(b, shared);
+    assert.equal(alignedA.length, alignedB.length);
+    for (let index = 0; index < shared.length; index += 1) {
+      assert.equal(ranges.isoOf(alignedA[index].time), ranges.isoOf(alignedB[index].time));
+    }
+  });
+
+  check('series that never overlap share nothing', () => {
+    const older = fixtureBars('2020-01-01', 10);
+    const newer = fixtureBars('2026-01-01', 10);
+    assert.equal(metrics.commonDates([older, newer]).length, 0);
+  });
+
+  check('normalising rebases to 100 so different price levels can be read together', () => {
+    // A $400 share and a $40 share plotted raw are a chart of the first one.
+    const expensive = fixtureBars('2026-01-01', 5, 400, 40);
+    const cheap = fixtureBars('2026-01-01', 5, 40, 4);
+    const one = metrics.normalise(expensive);
+    const two = metrics.normalise(cheap);
+
+    assert.equal(one[0], 100);
+    assert.equal(two[0], 100);
+    assert.deepEqual(one, two);
+  });
+
+  group('A chart cannot promise what the canvas will not draw');
+
+  const specOf = (patch = {}) =>
+    chart.clampChartSpec({
+      kind: 'line',
+      series: [{ assetId: 'stock:TSLA', symbol: 'TSLA', label: 'Tesla, Inc.', field: 'close' }],
+      range: { start: '2026-01-01', end: '2026-08-09' },
+      interval: '1D',
+      studies: [],
+      sourceMeta: {
+        provider: 'Twelve Data',
+        firstObservation: '2026-01-02',
+        lastObservation: '2026-08-07',
+        delayed: true,
+        derivedFromDaily: false,
+      },
+      ...patch,
+    });
+
+  check('what is renderable comes from the registry, not from a list here', () => {
+    /*
+     * `placement: 'overlay'` is the studies that share the price pane, which is
+     * what the canvas paints. A study gaining or losing a pane in the registry
+     * changes this set without anybody remembering to update it.
+     */
+    for (const id of chart.RENDERABLE_STUDIES) {
+      assert.equal(studies.STUDIES[id].placement, 'overlay', id);
+    }
+    assert.ok(chart.RENDERABLE_STUDIES.includes('sma'));
+    assert.ok(!chart.RENDERABLE_STUDIES.includes('rsi'));
+  });
+
+  check('a study that needs its own pane is refused with a reason', () => {
+    /*
+     * The defect this whole file exists for: a module described "RSI and three
+     * detected levels" while the renderer drew plain candles. The engine skips
+     * anything whose pane is not `main` — Supercharts' own workspace included —
+     * so RSI is refused here rather than claimed and silently dropped.
+     */
+    const spec = specOf({ studies: [{ id: 'rsi', params: { length: 14 } }, { id: 'sma' }] });
+    assert.equal(spec.studies.length, 1);
+    assert.equal(spec.studies[0].id, 'sma');
+    assert.equal(spec.refused.length, 1);
+    assert.equal(spec.refused[0].study, 'rsi');
+    assert.match(chart.refusalNotes(spec)[0], /own pane/i);
+  });
+
+  check('and the caption cannot mention it, because it is not in the spec', () => {
+    // The mechanism, not the discipline: the caption is generated from the
+    // clamped spec, so there is nowhere for a refused study's name to come from.
+    const spec = specOf({ studies: [{ id: 'macd' }, { id: 'rsi' }] });
+    const caption = chart.describeChart(spec);
+    assert.ok(!/rsi/i.test(caption), caption);
+    assert.ok(!/macd/i.test(caption), caption);
+  });
+
+  check('a study that is drawn is named in the caption with its real parameters', () => {
+    const spec = specOf({ studies: [{ id: 'sma', params: { fast: 50, slow: 200 } }] });
+    assert.match(chart.describeChart(spec), /MA 50\/200/);
+    assert.equal(chart.refusalNotes(spec).length, 0);
+  });
+
+  check('out-of-range study numbers are pulled in rather than drawn blank', () => {
+    // A 4,000-period average on a 200-bar series is an empty line that the
+    // caption would still announce.
+    const spec = specOf({ studies: [{ id: 'sma', params: { fast: 9999, slow: -5 } }] });
+    assert.equal(spec.studies[0].params.fast, studies.STUDIES.sma.params.fast.max);
+    assert.equal(spec.studies[0].params.slow, studies.STUDIES.sma.params.slow.min);
+  });
+
+  check('several instruments cannot be candles, so the kind is corrected', () => {
+    // Five candlestick bodies on one pane is five overlapping bodies, and the
+    // engine only has bars for one series anyway.
+    const spec = specOf({
+      kind: 'candles',
+      series: [
+        { assetId: 'a', symbol: 'AAPL', label: 'Apple', field: 'normalized' },
+        { assetId: 'b', symbol: 'MSFT', label: 'Microsoft', field: 'normalized' },
+      ],
+    });
+    assert.equal(spec.kind, 'performance');
+    assert.equal(spec.normalization.enabled, true);
+    assert.equal(spec.normalization.base, 100);
+    assert.match(chart.describeChart(spec), /rebased to 100/);
+  });
+
+  check('a study on a comparison is refused rather than drawn across all of it', () => {
+    const spec = specOf({
+      kind: 'performance',
+      series: [
+        { assetId: 'a', symbol: 'AAPL', label: 'Apple', field: 'normalized' },
+        { assetId: 'b', symbol: 'MSFT', label: 'Microsoft', field: 'normalized' },
+      ],
+      studies: [{ id: 'sma' }],
+    });
+    assert.equal(spec.studies.length, 0);
+    assert.equal(spec.refused.length, 1);
+  });
+
+  check('the caption says the dates it has, not the ones it was asked for', () => {
+    const caption = chart.describeChart(specOf());
+    assert.match(caption, /2026-01-02 to 2026-08-07/);
+    assert.ok(!caption.includes('2026-01-01'), caption);
+  });
+
+  check('delayed and folded-from-daily are always said out loud', () => {
+    const spec = specOf({ interval: '1W', sourceMeta: {
+      provider: 'Twelve Data',
+      firstObservation: '2026-01-05',
+      lastObservation: '2026-08-03',
+      delayed: true,
+      derivedFromDaily: true,
+    } });
+    const caption = chart.describeChart(spec);
+    assert.match(caption, /folded from daily/);
+    assert.match(caption, /delayed/);
+  });
+
+  check('rubbish is no chart rather than an empty one', () => {
+    assert.equal(chart.clampChartSpec(null), null);
+    assert.equal(chart.clampChartSpec({ kind: 'renko', series: [] }), null);
+    assert.equal(chart.clampChartSpec({ kind: 'line', series: [] }), null);
+    assert.equal(chart.clampChartSpec({ kind: 'line', series: [{ label: 'no symbol' }] }), null);
+  });
+
+  group('A follow-up edits the chart instead of starting again');
+
+  check('"show it as candles" keeps the instrument and the period', () => {
+    const before = specOf({ studies: [{ id: 'sma' }] });
+    const after = chart.applyChartEdit(before, { kind: 'chart_kind', value: 'candles' });
+
+    assert.equal(after.kind, 'candles');
+    assert.equal(after.series[0].symbol, 'TSLA');
+    assert.deepEqual(after.range, before.range);
+    assert.deepEqual(after.studies, before.studies);
+  });
+
+  check('an edit cannot smuggle in what the original could not contain', () => {
+    // Asking for RSI third is refused exactly as asking for it first was.
+    const after = chart.applyChartEdit(specOf(), {
+      kind: 'add_study',
+      study: { id: 'rsi', params: { length: 14 } },
+    });
+    assert.equal(after.studies.length, 0);
+    assert.equal(after.refused.length, 1);
+    assert.ok(!/rsi/i.test(chart.describeChart(after)));
+  });
+
+  check('removing a study takes its apology with it', () => {
+    const withStudy = chart.applyChartEdit(specOf(), {
+      kind: 'add_study',
+      study: { id: 'sma', params: { fast: 20, slow: 50 } },
+    });
+    assert.equal(withStudy.studies.length, 1);
+
+    const without = chart.applyChartEdit(withStudy, { kind: 'remove_study', study: 'sma' });
+    assert.equal(without.studies.length, 0);
+    assert.ok(!/MA 20\/50/.test(chart.describeChart(without)));
+  });
+
+  check('changing the period keeps everything else', () => {
+    const after = chart.applyChartEdit(specOf(), {
+      kind: 'range',
+      start: '2021-01-01',
+      end: '2026-01-01',
+    });
+    assert.equal(after.range.start, '2021-01-01');
+    assert.equal(after.series[0].symbol, 'TSLA');
+  });
+
+  check('correlation needs both alignment and enough of a period', () => {
+    const a = fixtureBars('2026-01-01', 40, 100, 1);
+    const b = fixtureBars('2026-01-01', 40, 200, 2);
+    assert.ok(Math.abs(metrics.correlation(a, b) - 1) < 0.05);
+
+    // Different lengths mean they were not aligned, and a single number would
+    // hide that.
+    assert.equal(metrics.correlation(a, b.slice(0, 30)), null);
+    assert.equal(metrics.correlation(a.slice(0, 5), b.slice(0, 5)), null);
   });
 
   group('Pine is written, never run');
@@ -5883,10 +6523,11 @@ try {
      * The rule the sixth caller forgets. It lives in one place and is consulted
      * for every action rather than remembered at each call site.
      */
-    for (const [id, spec] of Object.entries(session.VOYAGER_ACTIONS)) {
-      assert.equal(session.requiresConfirmation(id), spec.mutates, id);
+    for (const [id, spec] of Object.entries(acts.VOYAGER_ACTION_SPECS)) {
+      const writes = spec.execution === 'mutate' || spec.execution === 'prepare';
+      assert.equal(session.requiresConfirmation(id), writes, id);
     }
-    assert.equal(session.requiresConfirmation('watchlist'), true);
+    assert.equal(session.requiresConfirmation('add_to_watchlist'), true);
     assert.equal(session.requiresConfirmation('create_alert'), true);
     assert.equal(session.requiresConfirmation('open_chart'), false);
   });
@@ -5996,9 +6637,9 @@ try {
   });
 
   check('a queued action round-trips, and an invented one does not', () => {
-    assert.deepEqual(session.parsePending({ kind: 'action', id: 'watchlist' }), {
+    assert.deepEqual(session.parsePending({ kind: 'action', id: 'add_to_watchlist' }), {
       kind: 'action',
-      id: 'watchlist',
+      id: 'add_to_watchlist',
     });
     assert.equal(session.parsePending({ kind: 'action', id: 'drain_account' }), null);
   });
@@ -6136,25 +6777,66 @@ try {
      * The two vocabularies are deliberately different — one is what a link may
      * carry, the other is what the server keys entitlements off. A kind with no
      * mapping would silently become the generic screen and lose its data.
+     *
+     * Derived from the registry rather than listed here: a hand-written list is
+     * a fifth copy of the same closed set, and four copies of it is what
+     * produced the failure below.
      */
-    const kinds = [
-      'home',
-      'symbol',
-      'chart',
-      'comparison',
-      'article',
-      'event',
-      'portfolio',
-      'plan',
-      'explore',
-      'learn',
-    ];
-    for (const kind of kinds) {
-      assert.ok(transcript.screenFor(kind), kind);
+    for (const kind of screens.CONTEXT_KINDS) {
+      const screen = transcript.screenFor(kind);
+      assert.ok(screen, kind);
+      assert.ok(screens.VOYAGER_SCREENS.includes(screen), `${kind} → ${screen}`);
     }
     assert.equal(transcript.screenFor('symbol'), 'symbol');
     assert.equal(transcript.screenFor('learn'), 'academy');
     assert.equal(transcript.screenFor(null), 'generic');
+  });
+
+  check('the screens a link can reach are screens the API accepts', () => {
+    /*
+     * The regression this whole file exists for.
+     *
+     * `market` and `events` were screens the chat could send, the mapping did
+     * send, the policy layer understood — and the API's own copy of the list did
+     * not contain. Every question asked from a comparison, an Explore page or an
+     * event page came back 400, and the chat rendered its "temporarily
+     * unavailable" card over a service that was up.
+     *
+     * `isVoyagerScreen` is now the API's accept check, so this asserts the real
+     * gate rather than a description of it.
+     */
+    for (const kind of screens.CONTEXT_KINDS) {
+      assert.equal(screens.isVoyagerScreen(transcript.screenFor(kind)), true, kind);
+    }
+    assert.equal(screens.isVoyagerScreen('market'), true);
+    assert.equal(screens.isVoyagerScreen('events'), true);
+    assert.equal(screens.isVoyagerScreen('ideas'), true);
+    assert.equal(screens.isVoyagerScreen('not_a_screen'), false);
+    assert.equal(screens.isVoyagerScreen(null), false);
+  });
+
+  check('the two handoffs that used to arrive under the wrong name', () => {
+    /*
+     * "Find my next step" passed `home`, because `start` was not a kind anybody
+     * could pass — so the strip said *Home* over a conversation about somebody's
+     * next step. Ideas passed `explore:<topic>`, so an answer about one
+     * published idea was told it was looking at the whole hub.
+     */
+    assert.equal(transcript.screenFor('start'), 'strategy');
+    assert.equal(transcript.screenFor('ideas'), 'ideas');
+    assert.equal(screens.contextLabel({ kind: 'start', subject: null }), 'Your next step');
+    assert.equal(screens.contextLabel({ kind: 'ideas', subject: null }), 'This idea');
+  });
+
+  check('and every screen has a page package to send', () => {
+    // A screen with no template throws on `buildContext`, which is a 500 on a
+    // page rather than a missing prompt.
+    for (const screen of screens.VOYAGER_SCREENS) {
+      const built = pageContext.buildContext(screen);
+      assert.ok(built.prompt, screen);
+      assert.ok(built.quick.length >= 3, screen);
+      assert.equal(built.screen, screen);
+    }
   });
 
   group('The counter a browser keeps is a display, not a permission');
@@ -6218,20 +6900,124 @@ try {
 
   group('Every action offered under an answer can be confirmed and undone');
 
-  check('a mutating action states where it lands and how to reverse it', () => {
-    for (const id of session.ANSWER_ACTIONS) {
-      const spec = session.VOYAGER_ACTIONS[id];
+  check('every action states where it lands and how to reverse it', () => {
+    for (const id of acts.VOYAGER_ACTION_IDS) {
+      const spec = acts.specFor(id);
       assert.ok(spec.about, id);
       assert.ok(spec.done, id);
       assert.ok(spec.where, id);
       assert.ok(spec.undo, id);
       assert.ok(spec.call, id);
+      assert.ok(
+        ['navigate', 'in_place', 'mutate', 'prepare'].includes(spec.execution),
+        `${id}: ${spec.execution}`
+      );
     }
   });
 
-  check('the row leads with the one that keeps the answer', () => {
-    assert.equal(session.ANSWER_ACTIONS[0], 'research');
-    assert.equal(session.ANSWER_ACTIONS.length, Object.keys(session.VOYAGER_ACTIONS).length);
+  check('nothing that only navigates describes itself as a change', () => {
+    /*
+     * The sentence in `done` is the one printed after the act. A navigation
+     * whose past tense reads "added", "saved" or "created" would print a claim
+     * about the account for pressing a link.
+     */
+    for (const id of acts.VOYAGER_ACTION_IDS) {
+      const spec = acts.specFor(id);
+      if (spec.execution === 'mutate' || spec.execution === 'prepare') continue;
+      assert.ok(
+        !/\b(added|saved|created|drafted|removed|deleted)\b/i.test(spec.done),
+        `${id}: ${spec.done}`
+      );
+      assert.match(spec.undo, /Nothing to undo/, id);
+    }
+  });
+
+  check('a draft is described as a draft and never as the thing itself', () => {
+    /*
+     * `draftAlert` writes a row with status `draft`. It watches nothing until it
+     * is switched on, so "Created the alert" would be a claim about something
+     * that is not running.
+     */
+    const alert = acts.specFor('create_alert');
+    assert.equal(alert.execution, 'prepare');
+    assert.match(alert.done, /draft/i);
+    assert.ok(!/^created the alert/i.test(alert.done), alert.done);
+  });
+
+  check('the two registries are one, and the six-button row is gone', () => {
+    /*
+     * There used to be a `VOYAGER_ACTIONS` in `session.ts` for the chat and
+     * another in `types.ts` for the model, and `ANSWER_ACTIONS` printed six of
+     * the first under every answer regardless of the question. An answer's
+     * actions now come from the answer.
+     */
+    assert.equal(session.ANSWER_ACTIONS, undefined);
+    assert.equal(acts.isVoyagerActionId('open_chart'), true);
+    assert.equal(acts.isVoyagerActionId('watchlist'), false);
+    assert.equal(acts.isVoyagerActionId('portfolio_scenario'), false);
+  });
+
+  check('an action from a queue written before the merge is dropped, not run', () => {
+    // Storage outlives a deploy. Restoring `watchlist` now would mean acting on
+    // a description that no longer exists.
+    assert.equal(session.parsePending({ kind: 'action', id: 'watchlist' }), null);
+    assert.deepEqual(session.parsePending({ kind: 'action', id: 'add_to_watchlist' }), {
+      kind: 'action',
+      id: 'add_to_watchlist',
+    });
+  });
+
+  group('What an answer may offer is narrowed before the model sees it');
+
+  check('nothing is offered that has nothing to act on', () => {
+    /*
+     * The fixed row offered *Add to watchlist* under "What is an ETF?". There
+     * was no instrument in the request, so there was nothing the button could
+     * have added — it existed because a constant said six.
+     */
+    const generic = acts.allowedActions({ screen: 'generic', tier: 'basic', hasTicker: false });
+    assert.ok(!generic.includes('add_to_watchlist'));
+    assert.ok(!generic.includes('create_alert'));
+
+    const symbol = acts.allowedActions({ screen: 'symbol', tier: 'basic', hasTicker: true });
+    assert.ok(symbol.includes('add_to_watchlist'));
+    assert.ok(symbol.includes('create_alert'));
+  });
+
+  check('a tier that cannot read the wealth record is never shown its actions', () => {
+    for (const tier of ['basic', 'personal']) {
+      const allowed = acts.allowedActions({ screen: 'symbol', tier, hasTicker: true });
+      assert.ok(!allowed.some((id) => id.startsWith('open_wealth')), tier);
+    }
+    const priv = acts.allowedActions({ screen: 'symbol', tier: 'private', hasTicker: true });
+    assert.ok(priv.includes('open_wealth'));
+  });
+
+  check('the Pine action exists only where there is a chart to reveal it on', () => {
+    assert.ok(
+      acts.allowedActions({ screen: 'chart', tier: 'basic', hasTicker: true }).includes('view_pine')
+    );
+    assert.ok(
+      !acts.allowedActions({ screen: 'symbol', tier: 'basic', hasTicker: true }).includes('view_pine')
+    );
+  });
+
+  check('a lesson page keeps somebody in the lesson', () => {
+    const lesson = acts.allowedActions({ screen: 'academy', tier: 'private', hasTicker: true });
+    assert.ok(!lesson.includes('open_screener'), lesson.join(','));
+    assert.ok(lesson.includes('open_academy'));
+  });
+
+  check('and every id it may offer is one the registry can describe', () => {
+    for (const screen of screens.VOYAGER_SCREENS) {
+      for (const tier of ['basic', 'personal', 'private']) {
+        for (const hasTicker of [true, false]) {
+          for (const id of acts.allowedActions({ screen, tier, hasTicker })) {
+            assert.equal(acts.isVoyagerActionId(id), true, `${screen}/${tier}: ${id}`);
+          }
+        }
+      }
+    }
   });
 
   /* ============================ Superchart layouts ============================ */

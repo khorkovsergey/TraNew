@@ -1,0 +1,117 @@
+/**
+ * The Voyager chart block.
+ *
+ * Geometry only — the drawing is Supercharts' canvas engine, which reads its
+ * colours from the tokens resolved in the component. Nothing here is a literal
+ * colour, so `check-tokens.mjs` can still see every one of them.
+ */
+
+.figure {
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.stage {
+  height: 280px;
+  width: 100%;
+  border-radius: var(--tn-radius-option);
+  border: 1px solid var(--tn-border-inner);
+  background: var(--tn-surface-inner);
+  overflow: hidden;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 9px;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+}
+
+.legendSwatch {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--tn-text-muted);
+}
+
+/* The same five the component hands the engine, in the same order, so the key
+   beside the chart names the line that is actually on it. */
+.legendSwatch[data-series='0'] {
+  background: var(--tn-blue);
+}
+.legendSwatch[data-series='1'] {
+  background: var(--tn-amber-text);
+}
+.legendSwatch[data-series='2'] {
+  background: var(--tn-mint);
+}
+.legendSwatch[data-series='3'] {
+  background: var(--tn-text-muted);
+}
+.legendSwatch[data-series='4'] {
+  background: var(--tn-red);
+}
+
+.caption {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+/* What the chart does not show, said rather than left to be noticed. */
+.refused {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tn-amber-text);
+}
+
+.empty {
+  margin: 12px 0 0;
+  padding: 18px;
+  border-radius: var(--tn-radius-option);
+  border: 1px dashed var(--tn-border-control);
+  background: var(--tn-surface-inner);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--tn-text);
+}
+
+.emptyBody {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--tn-text-muted);
+}
+
+.retry {
+  margin-top: 12px;
+  padding: 7px 13px;
+  border-radius: var(--tn-radius-chip-sm);
+  border: 1px solid var(--tn-border-control);
+  background: none;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+  cursor: pointer;
+  transition: border-color var(--tn-transition-hover);
+}
+
+.retry:hover {
+  border-color: var(--tn-border-hover);
+}

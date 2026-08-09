@@ -1,5 +1,7 @@
 import { STUDY_IDS, STUDY_PARAM_NAMES } from '../studies/registry';
-import { VOYAGER_ACTIONS, type VoyagerContentType } from './types';
+import { VOYAGER_ACTION_IDS } from './actions';
+import { CHART_KINDS } from './chart/spec';
+import type { VoyagerContentType } from './types';
 
 /**
  * The shape every model answer must take.
@@ -37,7 +39,7 @@ export const ANSWER_SCHEMA = {
         type: 'object',
         properties: {
           label: { type: 'string' },
-          action: { type: 'string', enum: Object.keys(VOYAGER_ACTIONS) },
+          action: { type: 'string', enum: VOYAGER_ACTION_IDS },
         },
         required: ['label', 'action'],
         additionalProperties: false,
@@ -67,6 +69,45 @@ export const ANSWER_SCHEMA = {
         },
       },
       required: ['id'],
+      additionalProperties: false,
+    },
+    /*
+     * How to draw the data a market tool already returned.
+     *
+     * Only a shape and a study list — never the numbers, which came from the
+     * provider, and never a symbol, which came from the resolver. The model is
+     * choosing a view of something that already exists, so there is nothing
+     * here it could use to describe a chart that was never drawn.
+     */
+    chart: {
+      type: 'object',
+      properties: {
+        kind: {
+          type: 'string',
+          enum: CHART_KINDS as unknown as string[],
+          description:
+            'line for a price over time, candles for day-to-day movement, area for the same as a filled line, performance for comparing instruments, drawdown for falls from each peak.',
+        },
+        studies: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', enum: STUDY_IDS },
+              params: {
+                type: 'object',
+                properties: Object.fromEntries(
+                  STUDY_PARAM_NAMES.map((name) => [name, { type: 'number' }])
+                ),
+                additionalProperties: false,
+              },
+            },
+            required: ['id'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['kind'],
       additionalProperties: false,
     },
   },
