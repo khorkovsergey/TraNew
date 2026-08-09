@@ -98,7 +98,7 @@
     "subscriptions": {
       "branch": "feat/subscriptions",
       "port": 3412,
-      "$comment": "The plans screen. Self-contained — its own CSS module and content files, no share of Marketplace.module.css — which is why it can be worked on beside anything else. Its handoff lives in the repository at docs/design/subscriptions/. The menu entry that points at it is shell's; the /marketplace hub page that also links it is still unowned.",
+      "$comment": "HELD until Voyager v2 lands — do not start. The screen is self-contained (own CSS module, own content files, no share of Marketplace.module.css), but the work is not: the real brief, `Subscriptions_Redesign/design_handoff_subscriptions/Claude_Code_TradingNew_Voyager_Subscriptions.md`, is a six-phase programme whose core is a server-side Voyager entitlement layer in `src/lib/voyager/` — another section's files — and whose §1.5 requires the finished Voyager v2 before entitlements can be defined. The screen is phase D of six. NOTE: `docs/design/subscriptions/` in this repository is SUPERSEDED — it describes five plans (Essential, Plus, Premium, Ultimate, Voyager Private); the lineup is now four (Free, Plus, Pro, Private). The menu entry that points at the screen is shell's; the /marketplace hub page that also links it is still unowned.",
       "owns": [
         "src/app/[locale]/marketplace/subscriptions/",
         "src/components/marketplace/Subscriptions.tsx",
