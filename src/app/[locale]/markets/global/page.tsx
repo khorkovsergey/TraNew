@@ -8,11 +8,13 @@ import {
   MarketTrustFooter,
   RelatedMarkets,
 } from '@/components/markets/MarketShell';
+import { MarketOverview } from '@/components/markets/MarketOverview';
 import { getMarket } from '@/content/markets';
-import { NEWS } from '@/content/market';
+import { SYMBOLS } from '@/content/symbols';
 import { pick } from '@/content/types';
-import { Link } from '@/i18n/navigation';
-import type { Locale, StaticPathname } from '@/i18n/routing';
+import { marketSession } from '@/lib/market/session';
+import type { SymbolHit } from '@/lib/market/overview';
+import type { Locale } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/metadata';
 import { VoyagerPageContext } from '@/components/voyager/VoyagerProvider';
 import { buildContext } from '@/lib/voyager/context';
@@ -42,51 +44,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: MARKET.seo.description,
   });
 }
-
-const SCENARIOS: Array<{ title: string; text: string; cta: string; href: StaticPathname }> = [
-  {
-    title: 'What is happening now?',
-    text: 'Today’s brief: what moved, by how much, and what is worth watching next.',
-    cta: 'Read today’s market brief',
-    href: '/market/brief',
-  },
-  {
-    title: 'Market news',
-    text: 'What moved and why, with the reporting it came from rather than a headline on its own.',
-    cta: 'Read market news',
-    href: '/news',
-  },
-  {
-    title: 'Explore assets',
-    text: 'Stocks, indices, currencies and commodities, and how to compare them against each other.',
-    cta: 'Explore assets',
-    href: '/explore',
-  },
-  {
-    title: 'Understand the charts',
-    text: 'Apply an indicator by asking for it in plain words, and see the Pine Script behind it.',
-    cta: 'Open Supercharts',
-    href: '/supercharts',
-  },
-  {
-    title: 'Communities and ideas',
-    text: 'Theses written by people investing their own money, argued with in public.',
-    cta: 'Read the ideas feed',
-    href: '/ideas',
-  },
-  {
-    title: 'Events',
-    text: 'Webinars, meetups and conferences, filtered by where you are and what you follow.',
-    cta: 'Find events',
-    href: '/events',
-  },
-  {
-    title: 'Learn how markets work',
-    text: 'Start from what an exchange is and why indices disagree, before touching a chart.',
-    cta: 'Open Academy',
-    href: '/academy',
-  },
-];
 
 const FAQ = [
   {
@@ -123,8 +80,6 @@ export default async function GlobalMarketsPage({ params }: Props) {
     timeZone: 'UTC',
   }).format(now);
 
-  const stories = NEWS.slice(0, 4);
-
   return (
     <div className={content.wrap}>
       <VoyagerPageContext context={buildContext('market', MARKET.name)} />
@@ -137,48 +92,27 @@ export default async function GlobalMarketsPage({ params }: Props) {
         ]}
       />
 
-      <h1 className={content.h1}>{MARKET.seo.h1}</h1>
-      <p className={content.lead}>{t('heroLead')}</p>
-
-      <MarketSelector current="global" />
-      <MarketContextNavigation market={MARKET} active="overview" />
-
-      <h2 className={styles.h2}>{t('intentHeading')}</h2>
-      <div className={styles.scenarioGrid}>
-        {SCENARIOS.map((card) => (
-          <Link className={styles.scenario} key={card.title} href={card.href}>
-            <span className={styles.scenarioTitle}>{card.title}</span>
-            <span className={styles.scenarioText}>{card.text}</span>
-            <span className={styles.scenarioCta}>{card.cta} →</span>
-          </Link>
-        ))}
-      </div>
+      {/*
+       * Market Overview is the page now.
+       *
+       * This route is the canonical live-markets destination — Home's "Explore
+       * markets" button and the Explore menu both land here, so what a person
+       * meets first has to be the market rather than an essay about what a
+       * market is. It carries the `h1`.
+       *
+       * The essay is still below it, and deliberately: this page ranks for how
+       * exchanges, markets and indices differ, and that traffic arrives wanting
+       * exactly the prose further down. What went was the material the overview
+       * now does better — the scenario cards it routes past, the three index
+       * descriptions its pulse replaced, and the story list its movers replaced.
+       */}
+      <MarketOverview session={marketSession(now)} symbols={symbolHits(locale)} />
 
       <h2 className={styles.h2}>{t('openNow')}</h2>
       <ExchangeSessions exchanges={MARKET.exchanges} now={now} note={t('holidaysUnknown')} />
 
-      <h2 className={styles.h2}>{t('pulse')}</h2>
-      <div className={styles.pulseGrid}>
-        {MARKET.indices.map((index) => (
-          <div className={styles.pulse} key={index.symbol}>
-            <div className={styles.pulseName}>{index.name}</div>
-            {/* What the index measures, not what it printed — a number here
-                without a source would be the one thing the brief forbids. */}
-            <div className={styles.pulseDescribes}>{index.describes}</div>
-          </div>
-        ))}
-      </div>
-
-      <h2 className={styles.h2}>Today’s key stories</h2>
-      <div className={styles.storyList}>
-        {stories.map((story) => (
-          <Link className={styles.story} key={story.id} href="/news">
-            <span className={styles.storyTitle}>{pick(story.title, locale)}</span>
-            <span className={styles.storySummary}>{pick(story.summary, locale)}</span>
-            <span className={styles.storyMeta}>{pick(story.source, locale)}</span>
-          </Link>
-        ))}
-      </div>
+      <MarketSelector current="global" />
+      <MarketContextNavigation market={MARKET} active="overview" />
 
       <h2 className={styles.h2}>{t('regions')}</h2>
       <RelatedMarkets market={MARKET} title="" />
@@ -201,6 +135,24 @@ export default async function GlobalMarketsPage({ params }: Props) {
       <MarketTrustFooter updated={updated} dataNote={t('sessionsSource')} disclaimer={t('disclaimer')} />
     </div>
   );
+}
+
+/**
+ * The symbols the search overlay can actually open.
+ *
+ * Built from the pages that exist rather than from a list of famous tickers.
+ * The prototype offered Apple and QQQ, which this portal does not carry, and a
+ * search result that 404s is a worse answer than a short list that works.
+ */
+function symbolHits(locale: Locale): SymbolHit[] {
+  return Object.values(SYMBOLS).map((symbol) => ({
+    ticker: symbol.ticker,
+    name: pick(symbol.name, locale),
+    meta: pick(symbol.type, locale),
+    price: symbol.price,
+    change: symbol.change,
+    up: symbol.up,
+  }));
 }
 
 /**
