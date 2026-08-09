@@ -95,10 +95,25 @@
       ],
       "smoke": ["/en/markets/global", "/en/market", "/en/economy"]
     },
+    "superchart": {
+      "branch": "feat/superchart",
+      "port": 3413,
+      "$comment": "The charting workspace and the engine under it. Registered 2026-08-09 with one job waiting: a pane manager and secondary scales in `lib/superchart/chart-engine/`. Until that exists a chart cannot show a study on its own axis, which is why Voyager's Acceptance E is open — deliberately, and not because Voyager is missing anything. `/marketplace/tools/supercharts` is the catalogue entry and belongs to `tools-data`, not here.",
+      "owns": [
+        "src/app/[locale]/supercharts/",
+        "src/app/actions/superchart.ts",
+        "src/components/superchart/",
+        "src/content/superchartCatalog.ts",
+        "src/lib/superchart/",
+        "scripts/verify-superchart-*.mjs",
+        "docs/superchart/"
+      ],
+      "smoke": ["/en/supercharts"]
+    },
     "subscriptions": {
       "branch": "feat/subscriptions",
       "port": 3412,
-      "$comment": "HELD until Voyager v2 lands — do not start. The screen is self-contained (own CSS module, own content files, no share of Marketplace.module.css), but the work is not: the real brief, `Subscriptions_Redesign/design_handoff_subscriptions/Claude_Code_TradingNew_Voyager_Subscriptions.md`, is a six-phase programme whose core is a server-side Voyager entitlement layer in `src/lib/voyager/` — another section's files — and whose §1.5 requires the finished Voyager v2 before entitlements can be defined. The screen is phase D of six. NOTE: `docs/design/subscriptions/` in this repository is SUPERSEDED — it describes five plans (Essential, Plus, Premium, Ultimate, Voyager Private); the lineup is now four (Free, Plus, Pro, Private). The menu entry that points at the screen is shell's; the /marketplace hub page that also links it is still unowned.",
+      "$comment": "Released 2026-08-09: Voyager v2 landed with the tier/policy layer its brief depends on, so the hold is lifted. The brief is `Subscriptions_Redesign/design_handoff_subscriptions/Claude_Code_TradingNew_Voyager_Subscriptions.md` — six phases, of which the screen is D; phases B, C and F touch `src/lib/voyager/` and are the `voyager` section's, not this one's. Start with phase A, the read-only audit and migration design. NOTE: `docs/design/subscriptions/` in this repository is SUPERSEDED — it describes five plans (Essential, Plus, Premium, Ultimate, Voyager Private); the lineup is now four (Free, Plus, Pro, Private). The menu entry that points at the screen is shell's; the /marketplace hub page that also links it is still unowned.",
       "owns": [
         "src/app/[locale]/marketplace/subscriptions/",
         "src/components/marketplace/Subscriptions.tsx",
