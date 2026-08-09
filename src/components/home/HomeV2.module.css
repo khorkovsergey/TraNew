@@ -302,10 +302,15 @@
 
 /* ---- Intent cards ---- */
 
+/*
+ * Five, filling the width — the space the removed Markets card left is
+ * redistributed rather than held open, which is why the gap and the card
+ * padding below both grow with the column.
+ */
 .intentGrid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
   margin-top: 18px;
 }
 
@@ -315,7 +320,7 @@
   background: var(--tn-surface-veil);
   border: 1px solid var(--tn-border-card);
   border-radius: var(--tn-radius-card);
-  padding: 20px 18px;
+  padding: 24px 22px;
   color: var(--tn-text);
   transition: border-color var(--tn-transition-hover);
 }
@@ -360,7 +365,7 @@
 
 /*
  * A card that leaves TradingNew says where it goes, in place of the chevron the
- * others carry. Five tiles that stay and one that hands somebody to another
+ * others carry. Four tiles that stay and one that hands somebody to another
  * company should not look identical at the moment of pressing.
  */
 .intentAway {
@@ -804,6 +809,10 @@
 }
 
 @media (max-width: 900px) {
+  .intentGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .hero {
     grid-template-columns: 1fr;
   }

@@ -9,7 +9,7 @@ import styles from './HomeV2.module.css';
 /**
  * "What do you want to do?"
  *
- * Six doors, each named by the thing somebody wants to do rather than by the
+ * Five doors, each named by the thing somebody wants to do rather than by the
  * kind of person who does it. A client component so the choice can be counted —
  * and the id that is counted is a card, not a person: no goal, no amount,
  * nothing about them.
@@ -33,7 +33,7 @@ function IntentTile({ card }: { card: IntentCard }) {
 
       {card.external ? (
         /*
-         * Said on the card, before the click. A tile that looks like the five
+         * Said on the card, before the click. A tile that looks like the four
          * beside it and silently hands somebody to another company is a small
          * deception, and this one leads to the community the portal points at —
          * worth arriving at deliberately.
@@ -78,8 +78,8 @@ function IntentTile({ card }: { card: IntentCard }) {
       href={card.href}
       /*
        * A grid of options is not a path anybody is about to take — they will
-       * follow at most one of these. Prefetching all six spends the network on
-       * the five that will not be opened.
+       * follow at most one of these. Prefetching all five spends the network on
+       * the four that will not be opened.
        */
       prefetch={false}
       onClick={onClick}
