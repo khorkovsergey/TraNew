@@ -110,6 +110,8 @@ try {
       'src/lib/voyager/screens.ts',
       'src/lib/voyager/actions.ts',
       'src/lib/voyager/context.ts',
+      'src/lib/voyager/tools/types.ts',
+      'src/lib/voyager/tools/navigation.ts',
       'src/lib/voyager/chat/transcript.ts',
       'src/lib/academy/summary.ts',
       'src/lib/explore/answers.ts',
@@ -248,6 +250,8 @@ try {
   const session = await load('session', 'voyager');
   const screens = await load('screens', 'voyager');
   const acts = await load('actions', 'voyager');
+  const toolTypes = await load('types', 'tools');
+  const nav = await load('navigation', 'tools');
   const pageContext = await load('context', 'voyager');
   const transcript = await load('transcript', 'chat');
   const learn = await load('summary', 'academy');
@@ -4025,50 +4029,126 @@ try {
     assert.ok(!settings.DEFAULT_SOURCES.includes('personal-files'));
   });
 
-  group('Looking things up costs money, so the gate is narrow');
+  group('Looking things up costs money, so the ceiling is in code');
 
-  check('a question about an event opens it', () => {
-    for (const q of [
-      'What do analysts forecast for Tesla?',
-      'Summarize how the US stock market closed today',
-      'Why has gold risen recently?',
-      'What were the latest earnings for Nvidia?',
-      'Any news on the Fed this week?',
-    ]) {
-      assert.equal(research.wantsSearch(q, true), true, q);
-    }
-  });
-
-  check('a question about how something works does not', () => {
+  check('the English keyword gate is gone', () => {
     /*
-     * "What is a drawdown" is answered from a table written in this repository.
-     * Paying to search the open web for it would spend somebody's money to get
-     * a worse answer.
+     * It decided whether to search by looking for words like "today" and
+     * "earnings" in the question. That kept definitions from costing anything,
+     * and it also meant «почему сегодня упала Tesla» was answered from memory
+     * while "why did Tesla fall today" was researched. The decision moved to
+     * the planner, which reads every language; what stays here is the ceiling.
      */
-    for (const q of [
-      'What is a drawdown?',
-      'Explain diversification',
-      'What is the difference between an ETF and a stock?',
-      'How does compounding work?',
-    ]) {
-      assert.equal(research.wantsSearch(q, false || true), false, q);
-    }
-  });
-
-  check('a definition wearing a recent-sounding word is still a definition', () => {
-    // "current" is in the fresh list, and this is not a research question.
-    assert.equal(research.wantsSearch('What is the current ratio?', true), false);
-    assert.equal(research.wantsSearch('What does a price target mean?', true), false);
-  });
-
-  check('the operator switch beats everything', () => {
-    // A feature billed per use needs a stop that does not require a deploy.
-    assert.equal(research.wantsSearch('What happened in markets today?', false), false);
+    assert.equal(research.wantsSearch, undefined);
   });
 
   check('one answer cannot run away with the bill', () => {
     assert.equal(typeof research.MAX_SEARCHES, 'number');
     assert.ok(research.MAX_SEARCHES > 0 && research.MAX_SEARCHES <= 6, research.MAX_SEARCHES);
+  });
+
+  group('Tools: a failure is a value, and what ran is recorded');
+
+  check('every tool id the registry names is one the executor knows', () => {
+    for (const id of toolTypes.VOYAGER_TOOL_IDS) {
+      assert.equal(toolTypes.isVoyagerToolId(id), true, id);
+    }
+    assert.equal(toolTypes.isVoyagerToolId('rm_rf'), false);
+    assert.equal(toolTypes.isVoyagerToolId(null), false);
+  });
+
+  check('the loop is bounded, and the bound is small enough to wait for', () => {
+    assert.ok(toolTypes.MAX_TOOL_STEPS >= 2 && toolTypes.MAX_TOOL_STEPS <= 6);
+    assert.ok(toolTypes.MAX_CALLS_PER_STEP >= 2 && toolTypes.MAX_CALLS_PER_STEP <= 10);
+  });
+
+  check('the same call twice has the same key, and a different one does not', () => {
+    // The guard that stops a planner retrying an identical failed call until
+    // the step cap, spending somebody's wait on an answered question.
+    const a = toolTypes.callKey('investment_analysis', { symbol: 'TSLA' });
+    assert.equal(a, toolTypes.callKey('investment_analysis', { symbol: 'TSLA' }));
+    assert.notEqual(a, toolTypes.callKey('investment_analysis', { symbol: 'NVDA' }));
+    assert.notEqual(a, toolTypes.callKey('portal_navigation', { symbol: 'TSLA' }));
+  });
+
+  check('only the calls that worked become chips', () => {
+    /*
+     * A chip claiming a tool ran when it failed is the same lie as an invented
+     * source. The failures are kept — they are what lets an answer say which
+     * lookup is missing — but they are not evidence.
+     */
+    const trace = [
+      { id: 'portal_navigation', ok: true, call: 'portal-navigation(expert_help)' },
+      { id: 'investment_analysis', ok: false, code: 'no_data', call: 'investment-analysis(ABC)' },
+    ];
+    assert.deepEqual(toolTypes.traceChips(trace), ['portal-navigation(expert_help)']);
+    assert.equal(toolTypes.failureNotes(trace).length, 1);
+    assert.match(toolTypes.failureNotes(trace)[0], /no_data/);
+  });
+
+  check('arguments from the model are bounded before they are used', () => {
+    assert.equal(toolTypes.argString('  spaced   out  '), 'spaced out');
+    assert.equal(toolTypes.argString('x'.repeat(500), 10).length, 10);
+    assert.equal(toolTypes.argString(42), null);
+    assert.equal(toolTypes.argString('   '), null);
+  });
+
+  check('a ticker argument is a ticker or nothing', () => {
+    // `ref` is a key other parts of the portal join on. A row keyed by a
+    // sentence is a row nothing will ever find again.
+    assert.equal(toolTypes.argTicker('tsla'), 'TSLA');
+    assert.equal(toolTypes.argTicker('BRK.B'), 'BRK.B');
+    assert.equal(toolTypes.argTicker('this chart'), null);
+    assert.equal(toolTypes.argTicker('<script>'), null);
+    assert.equal(toolTypes.argTicker(''), null);
+  });
+
+  group('Navigation resolves intent to routes that exist');
+
+  check('a topic resolves to real actions, narrowed to what is allowed', () => {
+    const allowed = acts.allowedActions({ screen: 'generic', tier: 'basic', hasTicker: false });
+    const found = nav.findDestinations('expert_help', allowed);
+    assert.equal(found.ok, true);
+    assert.ok(found.data.destinations.length > 0);
+    for (const destination of found.data.destinations) {
+      assert.equal(acts.isVoyagerActionId(destination.action), true, destination.action);
+      assert.ok(allowed.includes(destination.action), destination.action);
+      assert.ok(destination.where, destination.action);
+    }
+  });
+
+  check('a topic this visitor cannot reach is refused, not substituted', () => {
+    /*
+     * Naming the Wealth Hub to somebody whose tier does not reach it sends them
+     * to a screen that will refuse them. Saying there is nothing here is worse
+     * news and better information.
+     */
+    const basic = acts.allowedActions({ screen: 'generic', tier: 'basic', hasTicker: false });
+    const wealth = nav.findDestinations('wealth', basic);
+    assert.equal(wealth.ok, false);
+    assert.equal(wealth.code, 'not_permitted');
+
+    const priv = acts.allowedActions({ screen: 'generic', tier: 'private', hasTicker: false });
+    assert.equal(nav.findDestinations('wealth', priv).ok, true);
+  });
+
+  check('an invented topic is refused rather than guessed at', () => {
+    for (const topic of ['crypto_casino', '', null, 42]) {
+      const found = nav.findDestinations(topic, ['open_explore']);
+      assert.equal(found.ok, false, JSON.stringify(topic));
+      assert.equal(found.code, 'bad_arguments');
+    }
+  });
+
+  check('every topic in the closed set maps to actions the registry describes', () => {
+    // A topic with no destinations is a topic the model can classify into and
+    // get nothing back from — a dead end with a name.
+    const everything = acts.VOYAGER_ACTION_IDS;
+    for (const topic of nav.NAV_TOPICS) {
+      const found = nav.findDestinations(topic, everything);
+      assert.equal(found.ok, true, topic);
+      assert.ok(found.data.destinations.length > 0, topic);
+    }
   });
 
   group('Pine is written, never run');

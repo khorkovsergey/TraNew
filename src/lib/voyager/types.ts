@@ -109,6 +109,15 @@ export type VoyagerAnswer = {
    */
   tools?: string[];
   /**
+   * Every tool call this answer made, including the ones that failed.
+   *
+   * `tools` above is the chips — what worked. This is the record, and it exists
+   * because an answer built with one of its lookups missing is a different
+   * answer: somebody reading "I could not check the current price" is owed the
+   * difference between a limitation and a mistake.
+   */
+  trace?: { id: string; ok: boolean; code?: string; call: string }[];
+  /**
    * What the answer rests on, as chips rather than the one prose line.
    *
    * `sources` stays because the widget renders it and the model writes it; this
