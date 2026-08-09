@@ -1,0 +1,836 @@
+/*
+ * Compare assets.
+ *
+ * The chart takes the wide column and the reading takes the narrow one, because
+ * the sentence is what most people leave with. Below them the metric table is
+ * flex rather than grid: the column count follows the instruments on screen.
+ */
+
+.page {
+  max-width: var(--tn-page-max);
+  margin: 0 auto;
+  padding: 40px var(--tn-page-pad) 90px;
+}
+
+.headRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.headMain {
+  min-width: 0;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.eyebrowMark {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tn-mint);
+}
+
+.eyebrowNote {
+  font-size: 12px;
+  color: var(--tn-text-muted);
+}
+
+.h1 {
+  margin: 8px 0 0;
+  font-size: clamp(32px, 3.4vw, 42px);
+  font-weight: 800;
+  letter-spacing: -1.3px;
+  line-height: 1.1;
+}
+
+.lead {
+  margin: 12px 0 0;
+  font-size: 16px;
+  color: var(--tn-text-secondary);
+  max-width: 620px;
+}
+
+.sample {
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--tn-blue-border);
+  background: var(--tn-blue-tint);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tn-text-nav);
+  white-space: nowrap;
+}
+
+/* ---- Instrument bar ---- */
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--tn-mint-border);
+  background: var(--tn-mint-tint);
+}
+
+.chipDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.chipText {
+  display: block;
+  min-width: 0;
+}
+
+.chipSym {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--tn-text);
+}
+
+.chipName {
+  display: block;
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+}
+
+.chipRemove {
+  color: var(--tn-teal);
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 2px 4px;
+  transition: color var(--tn-transition-fast);
+}
+
+.chipRemove:hover:not(:disabled) {
+  color: var(--tn-mint);
+}
+
+/* Visible at the limit, not hidden — the rule is stated rather than enforced
+   by something disappearing. */
+.chipRemove:disabled,
+.addButton:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.addButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 15px;
+  border-radius: 11px;
+  border: 1px dashed var(--tn-border-control);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tn-text-soft);
+  transition: border-color var(--tn-transition-fast), color var(--tn-transition-fast);
+}
+
+.addButton:hover:not(:disabled) {
+  border-color: var(--tn-mint);
+  color: var(--tn-text-nav);
+}
+
+.slots {
+  font-size: 12px;
+  color: var(--tn-text-muted);
+}
+
+.presetRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.presetLabel {
+  font-size: 12px;
+  color: var(--tn-text-muted);
+  margin-right: 2px;
+}
+
+.preset {
+  padding: 8px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--tn-border-inner);
+  background: var(--tn-surface-veil);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tn-text-soft);
+  transition: border-color var(--tn-transition-fast), color var(--tn-transition-fast),
+    background var(--tn-transition-fast);
+}
+
+.preset:hover {
+  border-color: var(--tn-border-hover);
+  color: var(--tn-text-nav);
+}
+
+.presetOn {
+  border-color: var(--tn-mint);
+  background: var(--tn-mint-tint);
+  color: var(--tn-text);
+}
+
+/* ---- Chart and reading ---- */
+
+.chartRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 22px;
+  animation: rise 0.3s ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chartRow {
+    animation: none;
+  }
+}
+
+.card {
+  padding: 24px 24px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--tn-border-card);
+  background: var(--tn-surface-veil);
+  min-width: 0;
+  margin-top: 16px;
+}
+
+.chartRow .card {
+  margin-top: 0;
+  align-self: start;
+}
+
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.cardNote {
+  font-size: 12.5px;
+  color: var(--tn-text-muted);
+}
+
+.chart {
+  width: 100%;
+  height: 250px;
+  margin-top: 16px;
+  overflow: visible;
+}
+
+.gridLine {
+  stroke: var(--tn-border-hairline);
+  stroke-width: 1;
+}
+
+/* Zero. Every line starts on it, which is what rebasing means. */
+.baseLine {
+  stroke: var(--tn-border-inner);
+  stroke-width: 1;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--tn-border-hairline);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tn-text-nav);
+}
+
+.legendMark {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.legendValue {
+  font-weight: 800;
+}
+
+.up {
+  color: var(--tn-green);
+}
+
+.down {
+  color: var(--tn-red);
+}
+
+.takeaways {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.takeaway {
+  display: flex;
+  gap: 11px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--tn-text-secondary);
+}
+
+.takeawayDot {
+  flex-shrink: 0;
+  margin-top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tn-mint);
+}
+
+.disclaimer {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+}
+
+/* ---- Key metrics ---- */
+
+.tableScroll {
+  margin-top: 14px;
+  overflow-x: auto;
+}
+
+.table {
+  min-width: 540px;
+}
+
+.tableHead {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 10px 0 12px;
+}
+
+.tableRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--tn-border-hairline);
+}
+
+/* Flex, not a fixed grid: the columns follow the instruments on screen. */
+.metricCol {
+  flex: 1.3 1 170px;
+  min-width: 130px;
+}
+
+.valueCol {
+  flex: 1 1 110px;
+  min-width: 86px;
+  text-align: right;
+}
+
+.tableHead .metricCol {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}
+
+.colSym {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
+.colName {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+}
+
+.metricLabel {
+  display: block;
+  font-size: 13.5px;
+  color: var(--tn-text-secondary);
+}
+
+.metricHint {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--tn-text-muted);
+}
+
+.cellValue {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--tn-text);
+}
+
+/* Only where "better" is a claim the row makes. */
+.best {
+  color: var(--tn-mint);
+}
+
+.bar {
+  display: block;
+  height: 4px;
+  margin-top: 7px;
+  border-radius: 2px;
+  background: var(--tn-surface-inner);
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--tn-border-hover);
+}
+
+.barBest {
+  background: var(--tn-mint);
+}
+
+/* ---- Voyager ---- */
+
+.voyagerCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: center;
+  margin-top: 22px;
+  padding: 24px 26px;
+  border-radius: 18px;
+  border: 1px solid var(--tn-border-focus);
+  background: var(--tn-raised);
+  overflow: hidden;
+}
+
+.voyagerBody {
+  min-width: 0;
+}
+
+.voyagerTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.iconCyan {
+  color: var(--tn-cyan);
+}
+
+.iconMuted {
+  color: var(--tn-text-soft);
+}
+
+.askForm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  background: var(--tn-input-bg);
+  border: 1px solid var(--tn-border-input);
+  border-radius: 12px;
+  padding: 6px 6px 6px 16px;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.askForm:focus-within {
+  border-color: var(--tn-mint-border);
+}
+
+/* 16px: below that iOS zooms the page the moment the field takes focus. */
+.askInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--tn-text);
+  font-size: 16px;
+  padding: 8px 0;
+}
+
+.askInput::placeholder {
+  color: var(--tn-text-faint);
+}
+
+.askSend {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: var(--tn-cta-blue);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter var(--tn-transition-fast);
+}
+
+.askSend:hover {
+  filter: brightness(1.1);
+}
+
+.promptRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.contextChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--tn-mint-border);
+  background: var(--tn-mint-tint);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-teal);
+}
+
+.promptChip {
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--tn-border-input);
+  background: var(--tn-chip-bg);
+  color: var(--tn-text-nav);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.promptChip:hover {
+  border-color: var(--tn-mint);
+}
+
+.clarity {
+  margin: 12px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--tn-text-faint);
+}
+
+.robot {
+  width: 150px;
+  height: auto;
+  flex-shrink: 0;
+  margin: -18px -8px -18px 0;
+  pointer-events: none;
+}
+
+/* ---- Footer ---- */
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 34px;
+  padding-top: 22px;
+  border-top: 1px solid var(--tn-border-hairline);
+}
+
+.footerTitle {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.footerSub {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--tn-text-soft);
+}
+
+.footerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ghostCta,
+.mintCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  font-weight: 700;
+  transition: border-color var(--tn-transition-fast);
+}
+
+.ghostCta {
+  border: 1px solid var(--tn-border-control);
+  color: var(--tn-text-nav);
+}
+
+.ghostCta:hover {
+  border-color: var(--tn-border-hover);
+}
+
+.mintCta {
+  border: 1px solid var(--tn-mint-border);
+  background: var(--tn-mint-tint);
+  color: var(--tn-text);
+}
+
+.mintCta:hover {
+  border-color: var(--tn-mint);
+}
+
+/* ---- Add dialog ---- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--tn-overlay);
+}
+
+.dialog {
+  position: fixed;
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 61;
+  width: min(620px, calc(100vw - 28px));
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
+  padding: 20px 22px 22px;
+  background: var(--tn-surface);
+  border: 1px solid var(--tn-border-hover);
+  border-radius: 18px;
+  box-shadow: var(--tn-shadow-modal);
+}
+
+.dialogSearch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 16px;
+  background: var(--tn-input-bg);
+  border: 1px solid var(--tn-border-input);
+  border-radius: 12px;
+}
+
+.dialogSearch:focus-within {
+  border-color: var(--tn-mint-border);
+}
+
+.dialogInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--tn-text);
+  font-size: 16px;
+  padding: 10px 0;
+}
+
+.dialogInput::placeholder {
+  color: var(--tn-text-faint);
+}
+
+.escButton {
+  flex-shrink: 0;
+  padding: 7px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--tn-border-control);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--tn-text-muted);
+  transition: border-color var(--tn-transition-fast);
+}
+
+.escButton:hover {
+  border-color: var(--tn-border-hover);
+}
+
+.resultsLabel {
+  margin-top: 16px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tn-text-muted);
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+
+.result {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 10px;
+  border-radius: 11px;
+  color: var(--tn-text);
+  text-align: left;
+}
+
+.result:hover:not(:disabled) {
+  background: var(--tn-surface-inner);
+}
+
+.result:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.resultBadge {
+  width: 40px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--tn-border-inner);
+  background: var(--tn-surface-inner);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--tn-text-nav);
+}
+
+.resultText {
+  display: block;
+  min-width: 0;
+}
+
+.resultName {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.resultMeta {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--tn-text-muted);
+}
+
+.resultAction {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tn-mint);
+}
+
+.result:disabled .resultAction {
+  color: var(--tn-text-muted);
+}
+
+.noResults {
+  margin: 12px 10px 4px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tn-text-soft);
+}
+
+/* ---- Narrower ---- */
+
+@media (max-width: 1240px) {
+  .chartRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1000px) {
+  .voyagerCard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .robot {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .h1 {
+    font-size: 30px;
+  }
+
+  /* The bars are decoration; below this width the numbers need the room. */
+  .bar {
+    display: none;
+  }
+}

@@ -32,6 +32,13 @@ export const routing = defineRouting({
      * click.
      */
     '/markets/global': '/markets/global',
+    /*
+     * Compare assets — 2–4 real instruments side by side. Declared before the
+     * dynamic segment for the same reason the directory sorts that way: a
+     * static child wins over `[market]`, so this is the compare screen and
+     * never a market whose slug happens to be "compare".
+     */
+    '/markets/compare': '/markets/compare',
     '/markets/[market]': '/markets/[market]',
     '/markets/[market]/news': '/markets/[market]/news',
     '/news': '/news',
