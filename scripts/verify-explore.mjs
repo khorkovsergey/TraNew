@@ -312,11 +312,19 @@ try {
    * ---- The header menu ----
    *
    * The section's own screens are above; this is the panel that names them from
-   * the top of every page. It announces a market data product that does not
-   * exist yet — twenty rows, none of which goes anywhere — which is an unusual
-   * thing to ship on purpose and an easy thing to undo by accident. One `href`
-   * put back, one `<a>` instead of a `<div>`, and the menu starts making
-   * promises the portal cannot keep. Most of what follows exists to catch that.
+   * the top of every page. It announces a market data product that mostly does
+   * not exist yet, which is an unusual thing to ship on purpose and an easy
+   * thing to undo by accident. One `href` put back, one `<a>` instead of a
+   * `<div>`, and the menu starts making promises the portal cannot keep. Most
+   * of what follows exists to catch that.
+   *
+   * It is no longer twenty inert rows. `Market overview` is a real link now —
+   * `/markets/global` exists, and it is where Home's "Explore markets" button
+   * goes — so the rule being checked is not "nothing clicks" any more. It is
+   * that a row clicks *if and only if* it carries a Live or New chip, and
+   * carries a Coming soon badge otherwise. Those two states are exclusive, and
+   * every count below is written against that rule rather than against a
+   * number that happened to be true in August.
    */
 
   const MARKET = [
@@ -331,12 +339,15 @@ try {
   ];
   const SYMBOLS = [
     'Search an asset',
+    'Compare assets',
     'Stock screener',
     'ETF screener',
     'Crypto screener',
     'Bond screener',
     'Popular symbols',
   ];
+  /* The rows that are meant to be links, and where each one goes. */
+  const LIVE = { 'Market overview': '/en/markets/global' };
   const ECONOMY = [
     'World economy',
     'Countries',
@@ -397,57 +408,109 @@ try {
     hints.join(' | ')
   );
 
-  group('Twenty rows, none of them a way anywhere');
+  group('Every row is named, and only the ready ones are a way anywhere');
 
-  const rows = panel().locator('div[class*="menuItemWide"]');
-  check('twenty of them', (await rows.count()) === 20, `${await rows.count()}`);
+  const EXPECTED = [...MARKET, ...SYMBOLS, ...ECONOMY];
+  const liveNames = Object.keys(LIVE);
+
+  /* Every row, whichever element it is: the ready ones are `<a>`. */
+  const rows = panel().locator('[class*="menuItemWide"]');
+  check(
+    `${EXPECTED.length} of them`,
+    (await rows.count()) === EXPECTED.length,
+    `${await rows.count()}`
+  );
 
   const named = (await panel().locator('[class*="menuItemLabel"]').allInnerTexts()).map((text) =>
     text.split('\n')[0].trim()
   );
-  for (const expected of [...MARKET, ...SYMBOLS, ...ECONOMY]) {
+  for (const expected of EXPECTED) {
     check(`"${expected}" is listed`, named.includes(expected));
   }
 
+  const links = await panel()
+    .locator('a[href]')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => ({
+        href: node.getAttribute('href'),
+        label: node.innerText.split('\n')[0].trim(),
+      }))
+    );
   check(
-    'nothing in the panel is a link',
-    (await panel().locator('a[href]').count()) === 0,
-    (
-      await panel()
-        .locator('a[href]')
-        .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))
-    ).join(' ')
+    'exactly the ready rows are links',
+    links.length === liveNames.length,
+    links.map((link) => `${link.label} → ${link.href}`).join(', ') || '(none)'
   );
+  for (const [label, href] of Object.entries(LIVE)) {
+    const link = links.find((entry) => entry.label.startsWith(label));
+    check(`"${label}" goes to ${href}`, link?.href === href, link?.href ?? 'not a link');
+  }
+
+  const inert = EXPECTED.length - liveNames.length;
   check(
-    'every row is announced as disabled',
-    (await panel().locator('div[class*="menuItemWide"][aria-disabled="true"]').count()) === 20
+    'and every other row is announced as disabled',
+    (await panel().locator('div[class*="menuItemWide"][aria-disabled="true"]').count()) === inert,
+    `${await panel().locator('div[class*="menuItemWide"][aria-disabled="true"]').count()} of ${inert}`
   );
-  // The drawer's close button is the one control in here, and only on a phone.
+  /*
+   * The drawer's close button and the ready rows are the controls in here.
+   * Nothing else takes focus — a row that cannot be used should not be a stop
+   * on the way through the panel with a keyboard.
+   */
   check(
-    'nothing in the panel takes focus',
+    'nothing else in the panel takes focus',
     (await panel()
-      .locator('a, button:not([class*="drawerClose"]), input, [tabindex]:not([tabindex="-1"])')
+      .locator('button:not([class*="drawerClose"]), input, [tabindex]:not([tabindex="-1"])')
       .count()) === 0
   );
 
-  const cursors = await rows.evaluateAll((nodes) => [
-    ...new Set(nodes.map((node) => getComputedStyle(node).cursor)),
-  ]);
-  check('the pointer says so too', cursors.length === 1 && cursors[0] === 'default', cursors.join(','));
+  const cursors = await panel()
+    .locator('div[class*="menuItemWide"]')
+    .evaluateAll((nodes) => [...new Set(nodes.map((node) => getComputedStyle(node).cursor))]);
+  check(
+    'the pointer says so too',
+    cursors.length === 1 && cursors[0] === 'default',
+    cursors.join(',')
+  );
 
   /*
-   * Not dimmed. The menu is a public roadmap, and a greyed-out list of twenty
-   * things nobody can quite read announces nothing.
+   * Not dimmed. The menu is a public roadmap, and a greyed-out list of things
+   * nobody can quite read announces nothing.
    */
   const dimmed = await rows.evaluateAll(
     (nodes) => nodes.filter((node) => Number(getComputedStyle(node).opacity) < 1).length
   );
   check('and the rows are not dimmed to say it', dimmed === 0, `${dimmed} dimmed`);
 
-  group('The Coming Soon badge');
+  group('The two badges, and what each one promises');
 
   const badges = panel().locator('[class*="menuItemLabel"] > [class*="soon"]');
-  check('one on every row', (await badges.count()) === 20, `${await badges.count()}`);
+  check(
+    'one on every row that is not ready',
+    (await badges.count()) === inert,
+    `${await badges.count()} of ${inert}`
+  );
+
+  const chips = panel().locator('[class*="menuItemLabel"] > [class*="chipLive"]');
+  check(
+    'and one on every row that is',
+    (await chips.count()) === liveNames.length,
+    (await chips.allInnerTexts()).join(', ') || '(none)'
+  );
+  /*
+   * The two are exclusive. A row that both warns and navigates spends the click
+   * it warned about, and a link with no chip is indistinguishable from the
+   * nineteen rows that are not one.
+   */
+  check(
+    'no row carries both',
+    (await panel().locator('[class*="menuItemLabel"]:has([class*="soon"]):has([class*="chipLive"])').count()) === 0
+  );
+  check(
+    'the ready chip reads Live or New',
+    (await chips.allInnerTexts()).every((text) => /^(live|new)$/i.test(text.trim())),
+    (await chips.allInnerTexts()).join(', ')
+  );
 
   const badge = await badges.first().evaluate((node) => {
     const style = getComputedStyle(node);
@@ -491,12 +554,30 @@ try {
 
   group('One glyph per row, all of one weight');
 
-  check('twenty, drawn from the sprite', (await panel().locator('span[class*="menuIcon"] svg use').count()) === 20);
+  check(
+    'one per row, drawn from the sprite',
+    (await panel().locator('span[class*="menuIcon"] svg use').count()) === EXPECTED.length,
+    `${await panel().locator('span[class*="menuIcon"] svg use').count()} of ${EXPECTED.length}`
+  );
 
+  /*
+   * Monochrome, still — the tile is what distinguishes a ready row, and it is
+   * distinguished by state rather than by a colour per row. Twenty grey and one
+   * mint is two colours; twenty grey and six is a decorated list.
+   */
   const colours = await panel()
-    .locator('span[class*="menuIcon"]')
+    .locator('span[class*="menuIcon"]:not([class*="menuIconLive"])')
     .evaluateAll((nodes) => [...new Set(nodes.map((node) => getComputedStyle(node).color))]);
   check('and monochrome', colours.length === 1, colours.join(','));
+
+  const liveTiles = await panel()
+    .locator('span[class*="menuIconLive"]')
+    .evaluateAll((nodes) => [...new Set(nodes.map((node) => getComputedStyle(node).color))]);
+  check(
+    'the ready row takes the mint tile, and only it',
+    liveTiles.length === 1 && liveTiles[0] === 'rgb(46, 230, 168)',
+    liveTiles.join(',')
+  );
 
   group('Nothing else got into the menu');
 
