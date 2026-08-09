@@ -136,10 +136,12 @@
     "explore": {
       "branch": "feat/explore",
       "port": 3408,
+      "$comment": "The hub and the asset-class pages under it. `content/assetClasses.ts` is the list the hub is built from and was unowned until 2026-08-09 — the file a change to this section is most likely to need.",
       "owns": [
         "src/app/[locale]/explore/",
         "src/components/explore/",
         "src/content/explore.ts",
+        "src/content/assetClasses.ts",
         "src/lib/explore/",
         "scripts/verify-explore.mjs"
       ],
