@@ -4,6 +4,8 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { requestFingerprint } from '@/lib/session';
 
+export { quotaDelta } from './quota';
+
 /**
  * Daily question counting.
  *

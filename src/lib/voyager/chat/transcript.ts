@@ -185,9 +185,28 @@ export function parseAllowance(raw: unknown): Allowance {
   return { used: Math.max(0, Math.min(Math.floor(used), FREE_DAILY_LIMIT)), day };
 }
 
-/** The counter line: "Free: 3 of 10 questions used today", or the unmetered one. */
-export function limitLabel(allowance: Allowance, at: Date, unlimited: boolean): string {
+/**
+ * The counter line: "Free: 3 of 10 questions used today", or the unmetered one.
+ *
+ * `known` is the whole point of the fourth argument. The daily allowance is
+ * counted on the server against a subject this browser cannot see, so until the
+ * server has been asked, the honest answer is that the number is not known yet
+ * — not zero.
+ *
+ * Zero was what this used to say, and it was a confident lie: a fresh browser
+ * on an address that had already spent nine questions rendered "Free: 0 of 10",
+ * then jumped to 9 the moment the first answer came back. Read as a live
+ * counter, that looks exactly like one question costing nine.
+ */
+export function limitLabel(
+  allowance: Allowance,
+  at: Date,
+  unlimited: boolean,
+  known = true
+): string {
   if (unlimited) return 'Unlimited questions on your plan';
+  if (!known) return `Free: — of ${FREE_DAILY_LIMIT} questions used today`;
+
   const used = allowanceToday(allowance, at).used;
   return `Free: ${Math.min(used, FREE_DAILY_LIMIT)} of ${FREE_DAILY_LIMIT} questions used today`;
 }

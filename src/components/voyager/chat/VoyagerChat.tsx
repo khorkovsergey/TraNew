@@ -148,6 +148,15 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
   const [confirming, setConfirming] = useState<Confirming | null>(null);
   /** An action is with the server. The Confirm button says so and cannot be pressed twice. */
   const [running, setRunning] = useState(false);
+  /**
+   * Whether the server has told us what has been spent today.
+   *
+   * False until it has, and the counter says "—" rather than a number for
+   * exactly that long. The allowance is per visitor and lives on the server; a
+   * browser that has never asked knows nothing about it, and drawing zero is
+   * the difference between not knowing and claiming.
+   */
+  const [usageKnown, setUsageKnown] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   /** Ticks inside a permission-request module — a decision, not display. */
   const [ticked, setTicked] = useState<string[]>([]);
@@ -158,6 +167,15 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
   const composer = useRef<HTMLInputElement>(null);
   /** The question already in flight, so nothing is asked twice. */
   const inFlight = useRef<string | null>(null);
+  /**
+   * Whether the counter has been settled by something authoritative.
+   *
+   * The bootstrap read and the first answer race. The answer wins whichever
+   * lands second, because it was counted after the question — a bootstrap
+   * arriving late would otherwise walk the number backwards in front of
+   * somebody who had just watched it move.
+   */
+  const usageSettled = useRef(false);
 
   const now = useCallback(() => new Date(), []);
 
@@ -191,12 +209,20 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
       /* Unreadable storage means an empty dialogue, which is recoverable. */
     }
 
+    /*
+     * The browser's copy is a head start, not an answer.
+     *
+     * It is read so the number has something to show the instant the server
+     * replies, but `usageKnown` stays false until it does — the count lives on
+     * the server against a subject this browser cannot see, and anything here
+     * is at best this device's share of it.
+     */
     try {
       const raw = localStorage.getItem(ALLOWANCE_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setAllowance(allowanceToday(parseAllowance(JSON.parse(raw)), new Date()));
     } catch {
-      /* Private mode. The server's count corrects this on the first answer. */
+      /* Private mode. The server's count is what decides anything anyway. */
     }
 
     let queued: Pending = null;
@@ -245,6 +271,61 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
     // Once, on arrival: a starting point rather than a subscription.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /*
+   * What the server says has been spent today.
+   *
+   * The counter is kept on the server against a subject the browser cannot
+   * compute — for a guest it is a hash of their address, which is shared with
+   * every other tab and window on it. So this page has to ask, and until it has
+   * an answer it must not draw a number.
+   *
+   * It used to draw zero. A fresh browser on an address that had already spent
+   * nine questions showed "Free: 0 of 10", and the first answer corrected it to
+   * 9 — which reads exactly like one question costing nine, and was reported as
+   * a quota bug that did not exist. The counter was fine; the placeholder was
+   * the defect.
+   *
+   * A GET here spends nothing: the route peeks for this and only counts on POST.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    const params = new URLSearchParams({
+      screen: voyagerContext.screen,
+      subject: voyagerContext.subject,
+    });
+
+    fetch(`/api/voyager?${params}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { used?: number; total?: number | null } | null) => {
+        if (cancelled || !data || typeof data.used !== 'number') return;
+        /*
+         * An answer that has already come back knows more than this does.
+         *
+         * The bootstrap and the first question race, and the bootstrap can lose
+         * — it was read before the question was counted. Letting it land second
+         * would walk the counter backwards in front of somebody who had just
+         * watched it move.
+         */
+        if (usageSettled.current) return;
+
+        usageSettled.current = true;
+        setAllowance(adoptServerCount(data.used, data.total, new Date()) ?? EMPTY_ALLOWANCE);
+        setUsageKnown(true);
+      })
+      .catch(() => {
+        /*
+         * The count could not be fetched. The line keeps saying it does not
+         * know rather than inventing a number, and the first answer will
+         * correct it — the server's own reply carries the real figure.
+         */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [voyagerContext.screen, voyagerContext.subject]);
 
   /* The dialogue is written back on every change, so sign-in cannot lose it. */
   useEffect(() => {
@@ -317,6 +398,13 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
 
         const corrected = adoptServerCount(payload.used, payload.total, new Date());
         if (corrected) rememberAllowance(corrected);
+        /*
+         * An answer carries the server's own figure, counted after this
+         * question. It outranks the bootstrap read whichever arrives first,
+         * which is what `usageSettled` is for.
+         */
+        usageSettled.current = true;
+        setUsageKnown(true);
 
         const answerAt = new Date().toISOString();
         /*
@@ -697,10 +785,19 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
 
   const at = now();
   const left = remaining(allowance, at);
-  const limitReached = !unlimited && left <= 0;
+  /*
+   * The limit is only known once the server has said so.
+   *
+   * Before that this was computed from a browser counter that starts at zero,
+   * so somebody who had already spent their ten arrived at an open composer and
+   * found out by being refused. Now the composer waits the moment it takes to
+   * ask, and the banner appears with the answer rather than after a wasted
+   * attempt.
+   */
+  const limitReached = !unlimited && usageKnown && left <= 0;
   const gateShown = gate === 'auth' || (!authed && askedInDialog(turns) >= GUEST_GATE_AFTER);
   const composerDisabled = limitReached || sending;
-  const counter = limitLabel(allowance, at, unlimited);
+  const counter = limitLabel(allowance, at, unlimited, usageKnown);
   const contextName = contextLabel(context);
   const empty = turns.length === 0 && !sending;
 

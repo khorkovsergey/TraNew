@@ -54,7 +54,34 @@ async function reset(page) {
  * The live path is not abandoned: the screen-acceptance probes below are GET
  * requests, which the API answers without spending anything.
  */
-async function stubAnswer(page, answer, usage = { used: 1, remaining: 9 }) {
+async function stubAnswer(page, answer, usage = { used: 1, remaining: 9, before: 0 }) {
+  /*
+   * The bootstrap read as well as the answer.
+   *
+   * The page asks the server what has been spent before it draws a figure, and
+   * refuses to send when the answer is "all of it" — correct behaviour, and it
+   * would make every one of these checks depend on how many questions this
+   * address happened to have spent today.
+   */
+  await page.route('**/api/voyager?*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        tier: 'basic',
+        tierLabel: 'Voyager Basic',
+        limits: 'Basic',
+        sources: [{ id: 'page', label: 'Current page' }],
+        remaining: 10 - (usage.before ?? 0),
+        used: usage.before ?? 0,
+        total: 10,
+        signedIn: false,
+        personalization: null,
+        modelConfigured: true,
+      }),
+    });
+  });
+
   await page.route('**/api/voyager', async (route) => {
     if (route.request().method() !== 'POST') return route.fallback();
     await route.fulfill({
@@ -146,10 +173,28 @@ try {
   for (const fact of ['Context:', 'Model: Voyager 3', 'Tools:', 'Memory: On', 'Private']) {
     check(`the strip states ${fact.replace(':', '')}`, strip.includes(fact), strip);
   }
+  /*
+   * The counter is there from the start, but it is honest about not knowing
+   * yet: the allowance lives on the server against a subject this browser
+   * cannot compute, so a figure appears only once the server has given one.
+   */
   check(
-    'and the free counter is there before anything is asked',
-    /Free: \d+ of 10 questions used today/.test(strip),
+    'the free counter is present before anything is asked',
+    /Free: .+ of 10 questions used today/.test(strip),
     strip
+  );
+
+  await page.waitForFunction(
+    () => !/—/.test(document.querySelector('[class*="limitChip"]')?.textContent ?? '—'),
+    undefined,
+    { timeout: 10_000 }
+  );
+  check(
+    'and settles on the figure the server actually holds',
+    /Free: \d+ of 10 questions used today/.test(
+      await page.locator('[class*="limitChip"]').innerText()
+    ),
+    await page.locator('[class*="limitChip"]').innerText()
   );
 
   group('A question carried in from another page arrives asked');
@@ -247,6 +292,69 @@ try {
     actionIds.join(' · ')
   );
 
+  group('The counter never invents a number it has not been told');
+
+  /*
+   * The defect behind a production report that one question had cost nine.
+   *
+   * The allowance is counted on the server against a subject the browser cannot
+   * compute — for a guest, a hash of their address, shared with every window on
+   * it. This page had no bootstrap request at all, so a fresh browser drew
+   * "Free: 0 of 10" and the first answer corrected it to the real figure. Read
+   * as a live counter, a jump from 0 to 9 looks exactly like a question costing
+   * nine. The counter was right; the placeholder was the lie.
+   */
+  const slowBootstrap = await browser.newContext();
+  const bootPage = await slowBootstrap.newPage();
+
+  await bootPage.route('**/api/voyager?*', async (route) => {
+    // Held open, so the state before the server answers is observable rather
+    // than a race.
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        tier: 'basic',
+        tierLabel: 'Voyager Basic',
+        limits: 'Basic',
+        sources: [],
+        remaining: 1,
+        used: 9,
+        total: 10,
+        signedIn: false,
+        personalization: null,
+        modelConfigured: true,
+      }),
+    });
+  });
+
+  await bootPage.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await bootPage.waitForTimeout(700);
+
+  const beforeBootstrap = await bootPage.locator('[class*="limitChip"]').innerText();
+  check(
+    'before the server answers it shows no figure at all',
+    !/\b0 of 10\b/.test(beforeBootstrap),
+    beforeBootstrap
+  );
+  check('saying plainly that it does not know yet', /—\s*of 10/.test(beforeBootstrap), beforeBootstrap);
+
+  await bootPage.waitForTimeout(3000);
+  const afterBootstrap = await bootPage.locator('[class*="limitChip"]').innerText();
+  check(
+    'and once the server answers it shows the server’s figure',
+    /Free: 9 of 10/.test(afterBootstrap),
+    afterBootstrap
+  );
+  check(
+    'a visitor already at their limit is told before they type, not after',
+    (await bootPage.locator('[class*="limitChipHot"]').count()) === 0,
+    'nine of ten is not the ceiling'
+  );
+
+  await slowBootstrap.close();
+
   group('One submit is one request, however many tools answer it');
 
   /*
@@ -259,6 +367,7 @@ try {
    */
   let posts = 0;
   await page.unroute('**/api/voyager');
+  await page.unroute('**/api/voyager?*');
   page.on('request', (request) => {
     if (request.method() === 'POST' && request.url().includes('/api/voyager')) posts += 1;
   });
@@ -333,6 +442,7 @@ try {
   );
 
   await page.unroute('**/api/voyager');
+  await page.unroute('**/api/voyager?*');
 
   group('The chart says exactly what it drew');
 
@@ -344,6 +454,7 @@ try {
    * is *absent* from the caption and *stated* as refused.
    */
   await page.unroute('**/api/voyager');
+  await page.unroute('**/api/voyager?*');
   await stubAnswer(page, {
     contentType: 'AI analysis',
     text: 'Here is Tesla over the period you asked for.',
@@ -405,10 +516,12 @@ try {
   );
 
   await page.unroute('**/api/voyager');
+  await page.unroute('**/api/voyager?*');
 
   group('Pine is on screen with its caveat, and the handoff is a real destination');
 
   await page.unroute('**/api/voyager');
+  await page.unroute('**/api/voyager?*');
   await stubAnswer(page, {
     contentType: 'AI structured',
     text: 'Here is an EMA crossover with volume confirmation, and where to run it.',
@@ -474,6 +587,7 @@ try {
   );
 
   await page.unroute('**/api/voyager');
+  await page.unroute('**/api/voyager?*');
 
   group('State 8 — a guest is gated, and the action is kept');
 

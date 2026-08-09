@@ -12,6 +12,7 @@ import {
   upgradeFor,
 } from '@/lib/voyager/policy';
 import { quotaAnswer } from '@/lib/voyager/scenarios';
+import { quotaDelta } from '@/lib/voyager/quota';
 import { consumeQuestion, peekUsage, releaseQuestion } from '@/lib/voyager/usage';
 import { clampFacts } from '@/lib/voyager/pages';
 import { isVoyagerScreen } from '@/lib/voyager/screens';
@@ -220,7 +221,13 @@ export async function POST(request: NextRequest) {
    * how one question becomes five, and it is the likeliest reading of a live
    * counter that moved by five while the client sent one request.
    */
-  if (answer.simulated) {
+  const decision = quotaDelta({
+    before: usage.used - 1,
+    quota,
+    answered: answer.simulated !== true,
+  });
+
+  if (!decision.charged) {
     usage = await releaseQuestion(user?.id ?? null, quota);
   }
 
