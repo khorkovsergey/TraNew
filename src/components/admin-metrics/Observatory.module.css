@@ -1,0 +1,180 @@
+/*
+ * The Observatory shell.
+ *
+ * Phase 1 only: enough structure to read a real number and a real absence side
+ * by side. The fourteen-section design lands in Phase 6 and will replace most
+ * of this.
+ *
+ * One visual rule is already load-bearing and will survive that replacement: a
+ * card without a number must not look like a card with a small number. The
+ * `data-state` attribute drives the border colour, so an absent metric reads as
+ * a different kind of thing across the page rather than as a low value.
+ */
+
+.page {
+  max-width: var(--tn-page-max);
+  margin: 0 auto;
+  padding: 32px var(--tn-page-pad) 96px;
+  color: var(--tn-text);
+}
+
+.header {
+  border-bottom: 1px solid var(--tn-border-hairline);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  color: var(--tn-text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.notice {
+  border: 1px solid var(--tn-amber-border);
+  background: var(--tn-amber-tint);
+  color: var(--tn-amber-text);
+  border-radius: var(--tn-radius-card);
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.card {
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  background: var(--tn-surface);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Present, and measured. */
+.card[data-state='live'],
+.card[data-state='derived'] {
+  border-color: var(--tn-mint-border);
+}
+
+/* Present, but with no past. The amber is the "read the footnote" colour. */
+.card[data-state='instrumented_going_forward'] {
+  border-color: var(--tn-amber-border);
+}
+
+/* Absent, and each for a different reason. Muted rather than red: a missing
+   source is not an error, it is a fact about what is connected. */
+.card[data-state='source_not_connected'],
+.card[data-state='not_measurable'],
+.card[data-state='feature_disabled'],
+.card[data-state='coming_soon'],
+.card[data-state='insufficient_sample'],
+.card[data-state='legacy'],
+.card[data-state='stale'],
+.card[data-state='external'] {
+  border-style: dashed;
+  border-color: var(--tn-border-control);
+  background: var(--tn-surface-inner);
+}
+
+.cardLabel {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tn-text-muted);
+  margin: 0;
+}
+
+.cardValue {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.cardAbsent {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--tn-text-secondary);
+  margin: 0;
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--tn-text-faint);
+  margin-top: auto;
+}
+
+.state {
+  border: 1px solid var(--tn-border-inner);
+  border-radius: var(--tn-radius-chip-sm);
+  padding: 1px 6px;
+}
+
+.source {
+  font-family: ui-monospace, monospace;
+}
+
+.warn {
+  color: var(--tn-amber-text);
+  flex-basis: 100%;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--tn-text-muted);
+  border-bottom: 1px solid var(--tn-border-hairline);
+  padding: 6px 8px;
+}
+
+.table td {
+  border-bottom: 1px solid var(--tn-hairline-soft);
+  padding: 6px 8px;
+  color: var(--tn-text-body);
+}
+
+.table code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.gate {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--tn-text-muted);
+  font-size: 14px;
+}
