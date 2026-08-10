@@ -1,4 +1,6 @@
 import type { Bar } from '../chart-engine/types';
+import { MAIN_PANE, type PaneFormat, type PaneRequest, type PaneScalePolicy } from '../chart-engine/panes';
+import { STUDIES, type StudyDefinition } from '../../studies/registry';
 
 /**
  * Indicators for the chart.
@@ -10,12 +12,17 @@ import type { Bar } from '../chart-engine/types';
  *
  * So this does not recompute anything. It wraps that registry in the shape the
  * chart needs — where a study is drawn, in what colour, and what its legend
- * says — and adds the two the chart needs that the registry has no reason to
- * carry: a volume moving average and a volume-anomaly flag.
+ * says — and adds the ones the chart needs that the registry has no reason to
+ * carry: volume, a volume moving average and a volume-anomaly flag.
  *
  * Reusing rather than reimplementing matters here beyond tidiness: the Pine the
  * registry emits and the line the chart draws have to be the same calculation,
  * or the code beside the chart describes something else.
+ *
+ * This is also where a study says which pane it wants and how that pane scales.
+ * The renderer reads `paneRequestFor` and nothing else — there is no branch
+ * anywhere that names RSI, and adding the next oscillator is a row in the table
+ * below rather than a change to the engine.
  */
 
 export type IndicatorPane = 'main' | 'separate';
@@ -28,11 +35,31 @@ export type IndicatorPlot = {
   style: 'line' | 'histogram' | 'flags';
 };
 
+/**
+ * Where a study is drawn and how that strip of canvas scales.
+ *
+ * Optional on an instance so an ad-hoc one — the Pine preview builds its own —
+ * still renders on the price pane without filling this in. `paneRequestFor`
+ * resolves the defaults, and it is the only place that decides.
+ */
+export type IndicatorPaneSpec = {
+  /** Which pane. Studies naming the same id share one rectangle and one scale. */
+  id: string;
+  title: string;
+  scale: PaneScalePolicy;
+  guides?: number[];
+  weight?: number;
+  format?: PaneFormat;
+  precision?: number;
+};
+
 export type IndicatorInstance = {
   id: string;
   definitionId: string;
   label: string;
   pane: IndicatorPane;
+  /** Present on separate-pane studies; absent means the price pane. */
+  paneSpec?: IndicatorPaneSpec;
   params: Record<string, number>;
   plots: IndicatorPlot[];
   hidden: boolean;
@@ -44,6 +71,8 @@ export type IndicatorDefinition = {
   id: string;
   name: string;
   pane: IndicatorPane;
+  /** Required when `pane` is 'separate'; a pane needs a scale to be one. */
+  paneSpec?: IndicatorPaneSpec;
   defaults: Record<string, number>;
   /** Bounds, so a value from anywhere cannot produce a blank or a divide by zero. */
   ranges: Record<string, { min: number; max: number }>;
@@ -111,6 +140,128 @@ function ema(values: number[], length: number): (number | null)[] {
   return out;
 }
 
+/* --------------------------------------------------------------- Panes */
+
+/**
+ * The panes the built-in studies ask for.
+ *
+ * Named constants rather than literals on each definition, because sharing is
+ * the point: volume, its average and the anomaly flags all name `VOLUME_PANE`
+ * and therefore land in one rectangle with one domain computed over all three.
+ * Two studies that happened to write the same id inline would work by accident
+ * and break by typo.
+ */
+const VOLUME_PANE: IndicatorPaneSpec = {
+  id: 'volume',
+  title: 'Volume',
+  scale: { kind: 'zeroBased' },
+  format: 'compact',
+  precision: 0,
+};
+
+const RSI_PANE: IndicatorPaneSpec = {
+  id: 'rsi',
+  title: 'RSI',
+  // Bounded by what the index is, not by what this window happens to contain: an
+  // RSI that spent a month between 45 and 55 is a flat middle, and a pane fitted
+  // to those two numbers would draw it as a mountain range.
+  scale: { kind: 'fixed', min: 0, max: 100 },
+  guides: [30, 70],
+  precision: 0,
+};
+
+const MACD_PANE: IndicatorPaneSpec = {
+  id: 'macd',
+  title: 'MACD',
+  // Symmetric so zero is the middle of the pane and the sign of the histogram is
+  // legible without reading the axis.
+  scale: { kind: 'symmetric' },
+  precision: 2,
+};
+
+/* --------------------------------------------------------- Definitions */
+
+/**
+ * A chart indicator built from a study in `lib/studies/registry.ts`.
+ *
+ * The registry owns the calculation, the parameter ranges and the Pine; this
+ * adds only what the chart knows about — which pane, which plot style, which
+ * palette slot. Nothing is recomputed here, so the line on the chart and the
+ * code Script Lab exports cannot drift apart.
+ */
+function fromStudy(
+  study: StudyDefinition,
+  options: {
+    name: string;
+    pane: IndicatorPane;
+    paneSpec?: IndicatorPaneSpec;
+    /** Plot style per series key; anything unlisted is a line. */
+    styles?: Record<string, IndicatorPlot['style']>;
+  }
+): IndicatorDefinition {
+  const defaults: Record<string, number> = {};
+  const ranges: Record<string, { min: number; max: number }> = {};
+
+  for (const [name, range] of Object.entries(study.params)) {
+    defaults[name] = range.default;
+    ranges[name] = { min: range.min, max: range.max };
+  }
+
+  return {
+    id: study.id,
+    name: options.name,
+    pane: options.pane,
+    paneSpec: options.paneSpec,
+    defaults,
+    ranges,
+    compute: (bars, params) =>
+      study.compute(
+        bars.map((bar) => bar.close),
+        params
+      ).map((line) => ({
+        key: line.key,
+        colour: line.color,
+        values: line.values,
+        style: options.styles?.[line.key] ?? 'line',
+      })),
+    label: study.label,
+    pine: study.pine,
+  };
+}
+
+/**
+ * Volume, as a study rather than as a fixture of the canvas.
+ *
+ * It used to be a strip the engine always drew, below the price and outside the
+ * pane model — which is why it could not be turned off, could not be reordered,
+ * and had no axis. Making it an ordinary consumer of the pane manager costs it
+ * nothing: it is on by default, so a chart nobody has touched looks exactly as
+ * it did.
+ */
+const volume: IndicatorDefinition = {
+  id: 'volume',
+  name: 'Volume',
+  pane: 'separate',
+  paneSpec: VOLUME_PANE,
+  defaults: {},
+  ranges: {},
+  compute: (bars) => [
+    {
+      key: 'volume',
+      colour: 3,
+      style: 'histogram',
+      // Null rather than zero where a bar carries no volume at all: the provider
+      // behind this portal returns daily closes without it, and a row of
+      // zero-height bars claims a quiet market rather than an absent field.
+      values: bars.map((bar) => (typeof bar.volume === 'number' ? bar.volume : null)),
+    },
+  ],
+  label: () => 'Volume',
+  pine: () => lf(`//@version=6
+indicator("Volume")
+plot(volume, "Volume", style = plot.style_columns, color = close >= open ? color.new(color.green, 40) : color.new(color.red, 40))`),
+};
+
 /* --------------------------------------------------------- Definitions */
 
 /**
@@ -125,6 +276,9 @@ const volumeAnomaly: IndicatorDefinition = {
   id: 'volume-anomaly',
   name: 'Anomalous volume',
   pane: 'separate',
+  // The volume pane, not one of its own: a threshold drawn anywhere other than
+  // over the bars it is a threshold for says nothing.
+  paneSpec: VOLUME_PANE,
   defaults: { lookback: 20, multiple: 2 },
   ranges: { lookback: { min: 2, max: 200 }, multiple: { min: 1.1, max: 10 } },
   compute: (bars, params) => {
@@ -197,6 +351,7 @@ const volumeAverage: IndicatorDefinition = {
   id: 'volume-ma',
   name: 'Volume moving average',
   pane: 'separate',
+  paneSpec: VOLUME_PANE,
   defaults: { length: 20 },
   ranges: { length: { min: 2, max: 200 } },
   compute: (bars, params) => [
@@ -268,12 +423,105 @@ crossed = ta.cross(fastEma, slowEma)
 plotshape(crossed, "Crossover", shape.circle, location.absolute, color.new(color.green, 0), size = size.tiny)`),
 };
 
+/**
+ * The three the registry already computed and the chart could not draw.
+ *
+ * RSI and MACD were in `lib/studies` from the beginning, with tests against a
+ * hand-worked reference and a Pine template each, and the chart skipped them
+ * because it had nowhere to put a second vertical scale. Bollinger sits on the
+ * price and only ever needed listing.
+ */
+const relativeStrength = fromStudy(STUDIES.rsi, {
+  name: 'RSI',
+  pane: 'separate',
+  paneSpec: RSI_PANE,
+});
+
+const macd = fromStudy(STUDIES.macd, {
+  name: 'MACD',
+  pane: 'separate',
+  paneSpec: MACD_PANE,
+  styles: { hist: 'histogram' },
+});
+
+const bollinger = fromStudy(STUDIES.bbands, {
+  name: 'Bollinger Bands',
+  pane: 'main',
+});
+
 export const INDICATORS: Record<string, IndicatorDefinition> = {
   [movingAverages.id]: movingAverages,
   [exponentialMovingAverages.id]: exponentialMovingAverages,
+  [bollinger.id]: bollinger,
+  [volume.id]: volume,
   [volumeAverage.id]: volumeAverage,
   [volumeAnomaly.id]: volumeAnomaly,
+  [relativeStrength.id]: relativeStrength,
+  [macd.id]: macd,
 };
+
+/**
+ * The pane a study instance renders into, or null for the price pane.
+ *
+ * The single place that decides. A renderer asking "is this RSI?" is the shape
+ * this function exists to prevent — it asks "which pane, scaled how?", gets an
+ * answer that came from the study's own row in the registry, and draws.
+ */
+export function paneRequestFor(instance: IndicatorInstance): IndicatorPaneSpec | null {
+  if (instance.hidden) return null;
+
+  const spec = instance.paneSpec ?? INDICATORS[instance.definitionId]?.paneSpec ?? null;
+  if (!spec) return null;
+
+  // A study marked `main` cannot be dragged onto its own scale by a stray spec,
+  // and one marked `separate` with no spec stays on the price pane rather than
+  // being given an invented domain.
+  const pane = instance.pane ?? INDICATORS[instance.definitionId]?.pane;
+  if (pane === 'main' || spec.id === MAIN_PANE) return null;
+
+  return spec;
+}
+
+/**
+ * The panes a list of studies needs, in the order they were added, each with
+ * the series that decide its domain.
+ *
+ * Studies sharing a pane id are merged — one rectangle, one scale, every series
+ * in it counted. This is the whole contract between the studies and the layout:
+ * the engine calls it, hands the result to `buildPaneLayout`, and never learns
+ * what any of them are.
+ */
+export function collectPaneRequests(
+  instances: IndicatorInstance[]
+): Array<PaneRequest & { series: Array<(number | null)[]> }> {
+  const out: Array<PaneRequest & { series: Array<(number | null)[]> }> = [];
+  const byId = new Map<string, PaneRequest & { series: Array<(number | null)[]> }>();
+
+  for (const instance of instances) {
+    const spec = paneRequestFor(instance);
+    if (!spec) continue;
+
+    let entry = byId.get(spec.id);
+    if (!entry) {
+      entry = {
+        id: spec.id,
+        title: spec.title,
+        scale: spec.scale,
+        guides: spec.guides ?? [],
+        weight: spec.weight ?? 1,
+        format: spec.format ?? 'plain',
+        precision: spec.precision ?? 2,
+        series: [],
+      };
+      byId.set(spec.id, entry);
+      out.push(entry);
+    }
+
+    for (const plot of instance.plots) entry.series.push(plot.values);
+  }
+
+  return out;
+}
 
 /**
  * The only way an indicator is created.
@@ -304,6 +552,7 @@ export function createIndicator(
     definitionId,
     label: definition.label(resolved),
     pane: definition.pane,
+    paneSpec: definition.paneSpec,
     params: resolved,
     plots: definition.compute(bars, resolved),
     hidden: false,
