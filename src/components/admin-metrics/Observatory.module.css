@@ -137,6 +137,44 @@
   flex-basis: 100%;
 }
 
+/*
+ * The definition drawer. Closed by default and unstyled beyond legibility: it
+ * is reference material somebody opens when they doubt a number, not something
+ * the page should compete with the number to show.
+ */
+.definition {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--tn-text-muted);
+}
+
+.definition summary {
+  cursor: pointer;
+  color: var(--tn-text-secondary);
+}
+
+.definition dl {
+  margin: 8px 0 0;
+  display: grid;
+  gap: 2px;
+}
+
+.definition dt {
+  font-weight: 600;
+  color: var(--tn-text-secondary);
+  margin-top: 6px;
+}
+
+.definition dd {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.definition ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
 .sectionTitle {
   font-size: 16px;
   font-weight: 600;
@@ -177,4 +215,12 @@
   gap: 8px;
   color: var(--tn-text-muted);
   font-size: 14px;
+}
+
+/* The journey breakdowns, side by side while there is room for them. */
+.tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
 }

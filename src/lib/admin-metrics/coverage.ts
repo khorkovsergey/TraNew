@@ -46,6 +46,28 @@ export type CoverageRow = {
   note?: string;
 };
 
+/**
+ * Whether a KPI's inputs are instrumented well enough to believe it.
+ *
+ * The question a coverage table has to answer is not "which events exist" but
+ * "can I trust this number", and the two are different: a metric whose required
+ * event has never been emitted shows a confident zero unless something says
+ * otherwise. This is that something.
+ */
+export type KpiReadiness = {
+  metricId: string;
+  label: string;
+  requires: string[];
+  observed: string[];
+  /** Declared, reachable, and still never seen. */
+  awaiting: string[];
+  /** Declared but behind a flag that is off — silence here is correct. */
+  unexposed: string[];
+  /** Not in the registry at all. The metric cannot be computed. */
+  missing: string[];
+  verdict: 'trustworthy' | 'partial' | 'awaiting_data' | 'not_instrumented';
+};
+
 export type CoverageReport = {
   rows: CoverageRow[];
   totals: {
@@ -55,10 +77,44 @@ export type CoverageReport = {
     unused: number;
     legacy: number;
   };
+  kpis: KpiReadiness[];
   /** True until the first row ever lands. Every "unused" is meaningless before then. */
   collectingSince: string | null;
   queriedAt: string;
 };
+
+/**
+ * What each Phase 2 KPI actually needs on the wire.
+ *
+ * Only the events without which the metric is wrong, not every event it might
+ * incidentally read. PMCR needs a page view to have a denominator and an
+ * engagement checkpoint to apply the eligibility floor; it does not need any
+ * *particular* meaningful event, because a portal where nobody continues is a
+ * finding rather than a measurement failure — which is why the meaningful
+ * events are not listed as required.
+ */
+const KPI_INPUTS: ReadonlyArray<{ metricId: string; label: string; requires: string[] }> = [
+  {
+    metricId: 'pmcr',
+    label: 'Portal Meaningful Continuation Rate',
+    requires: ['portal_page_viewed', 'portal_engagement_checkpoint'],
+  },
+  {
+    metricId: 'ttfa_median',
+    label: 'Time to first meaningful action',
+    requires: ['portal_session_started', 'portal_page_viewed'],
+  },
+  {
+    metricId: 'second_action_rate',
+    label: 'Second meaningful action rate',
+    requires: ['portal_page_viewed', 'portal_engagement_checkpoint'],
+  },
+  {
+    metricId: 'retention_d7',
+    label: 'Authenticated D7 return',
+    requires: ['portal_page_viewed'],
+  },
+];
 
 export async function instrumentationCoverage(since: Date): Promise<CoverageReport> {
   const flags = {
@@ -109,6 +165,8 @@ export async function instrumentationCoverage(since: Date): Promise<CoverageRepo
     };
   });
 
+  const byEvent = new Map(rows.map((row) => [row.event, row]));
+
   return {
     rows,
     totals: {
@@ -118,9 +176,45 @@ export async function instrumentationCoverage(since: Date): Promise<CoverageRepo
       unused: rows.filter((row) => row.status === 'unused').length,
       legacy: rows.filter((row) => row.lifecycle === 'legacy').length,
     },
+    kpis: KPI_INPUTS.map((kpi) => readinessOf(kpi, byEvent)),
     collectingSince: collectingSince ? new Date(collectingSince).toISOString() : null,
     queriedAt: new Date().toISOString(),
   };
+}
+
+function readinessOf(
+  kpi: { metricId: string; label: string; requires: string[] },
+  byEvent: ReadonlyMap<string, CoverageRow>
+): KpiReadiness {
+  const observed: string[] = [];
+  const awaiting: string[] = [];
+  const unexposed: string[] = [];
+  const missing: string[] = [];
+
+  for (const event of kpi.requires) {
+    const row = byEvent.get(event);
+    if (!row) missing.push(event);
+    else if (row.status === 'observed') observed.push(event);
+    else if (row.status === 'unexposed') unexposed.push(event);
+    else awaiting.push(event);
+  }
+
+  /*
+   * The order matters. A missing declaration is a code problem and outranks
+   * everything; an unexposed input means the metric is measuring something
+   * unreachable; and "awaiting" is the ordinary state of a portal whose
+   * telemetry started this week — not a defect, but not a number to act on
+   * either.
+   */
+  const verdict: KpiReadiness['verdict'] = missing.length
+    ? 'not_instrumented'
+    : unexposed.length
+      ? 'partial'
+      : awaiting.length
+        ? 'awaiting_data'
+        : 'trustworthy';
+
+  return { ...kpi, observed, awaiting, unexposed, missing, verdict };
 }
 
 function statusFor(

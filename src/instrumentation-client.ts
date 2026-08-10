@@ -33,18 +33,30 @@ import { routeTemplateFor, surfaceForRoute } from '@/lib/analytics/surfaces';
 
 let sink: HttpAnalyticsSink | null = null;
 let lastArea = '';
+let lastRoute = '';
 let hops = 0;
 
 /** Route templates only — a populated path can name a position somebody holds. */
-function here(): { route: string; area: string } {
-  const route = routeTemplateFor(location.pathname);
+function here(pathname = location.pathname): { route: string; area: string } {
+  const route = routeTemplateFor(pathname);
   return { route, area: surfaceForRoute(route) };
 }
 
-function viewed(): void {
+/**
+ * Records a view of a route, once.
+ *
+ * The guard is the point. A `replace` transition that does not change the route
+ * — a query-string edit, a shallow update — is not a second view of anything,
+ * and a duplicate page view inflates the only signal that decides whether a
+ * session is eligible at all. Returning early is cheaper than teaching every
+ * downstream query to deduplicate.
+ */
+function viewed(pathname: string): void {
   if (!sink) return;
 
-  const { route, area } = here();
+  const { route, area } = here(pathname);
+  if (route === lastRoute) return;
+
   sink.enqueue('portal_page_viewed', { route, area });
 
   if (lastArea && lastArea !== area) {
@@ -53,6 +65,7 @@ function viewed(): void {
   }
 
   lastArea = area;
+  lastRoute = route;
   armEngagement(area);
 }
 
@@ -89,6 +102,7 @@ try {
 
   const { route, area } = here();
   lastArea = area;
+  lastRoute = route;
 
   sink.enqueue('portal_session_started', {
     entry: route,
@@ -108,15 +122,28 @@ try {
 /**
  * Client-side navigation.
  *
- * Next calls this as a transition begins; the URL has not changed yet, so the
- * view is recorded on the next frame once the router has committed. A
- * `<Link>` press is emphatically *not* a meaningful action — it is a route
- * change, and what it means comes from the action taxonomy, not from the fact
- * that something was clicked.
+ * Next calls this as a client-side transition begins and hands over the target
+ * URL. That URL is used rather than `location`, which has not been updated yet
+ * — an earlier version read `location` from a zero-delay timeout and was
+ * racing the router for the answer.
+ *
+ * **This hook fires for client-side transitions only.** A full page load does
+ * not go through the router at all; it re-runs this whole module, which emits a
+ * session start and a page view of its own. That asymmetry is correct and is
+ * left alone: making a full reload look like an SPA transition would invent a
+ * navigation that the browser, not the product, performed. The production smoke
+ * that noticed `portal_navigation_completed` missing on a hard navigation was
+ * observing this working as intended.
+ *
+ * A `<Link>` press is emphatically **not** a meaningful action. It is a route
+ * change; what it meant comes from the action taxonomy, and neither
+ * `portal_page_viewed` nor `portal_navigation_completed` is marked meaningful,
+ * so no combination of them can manufacture continuation. A feature event fired
+ * by the same click is the thing that counts, and it counts once.
  */
-export function onRouterTransitionStart(): void {
+export function onRouterTransitionStart(url: string): void {
   try {
-    setTimeout(viewed, 0);
+    viewed(new URL(url, location.origin).pathname);
   } catch {
     /* ignore */
   }
