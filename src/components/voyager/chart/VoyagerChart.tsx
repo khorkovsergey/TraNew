@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { CanvasChartEngine } from '@/lib/superchart/chart-engine/canvas';
 import type { Bar, ChartPalette, ChartType } from '@/lib/superchart/chart-engine/types';
-import type { IndicatorInstance } from '@/lib/superchart/indicators';
-import { STUDIES } from '@/lib/studies/registry';
+import { createIndicator, type IndicatorInstance } from '@/lib/superchart/indicators';
 import { describeChart, refusalNotes, type VoyagerChartSpec } from '@/lib/voyager/chart/spec';
 import styles from './VoyagerChart.module.css';
 
@@ -121,30 +120,32 @@ function baseBars(spec: VoyagerChartSpec, series: ChartSeriesData[]): Bar[] {
   });
 }
 
-/** The overlay studies, computed by the registry rather than described by a model. */
+/**
+ * The studies, built by the chart's own indicator registry.
+ *
+ * `createIndicator` is what the full workspace calls, and it is what decides
+ * placement: a study's row says whether it wants the price pane or one of its
+ * own, and with what scale, guides and plot styles. Constructing the instance
+ * here by hand — which this did, with `pane: 'main'` written in — is how RSI
+ * ends up as a line at 62 drawn across a price chart at 430, or as nothing at
+ * all. One registry, one answer, no branch in this file that knows what an
+ * oscillator is.
+ *
+ * A null means the id is not one the chart has, which `clampChartSpec` has
+ * already ruled out; dropped rather than substituted, on the same principle as
+ * everywhere else.
+ */
 function studyIndicators(spec: VoyagerChartSpec, bars: Bar[]): IndicatorInstance[] {
   if (!bars.length) return [];
-  const closes = bars.map((bar) => bar.close);
 
-  return spec.studies.map((study, index) => {
-    const definition = STUDIES[study.id];
-    return {
-      id: `voyager_${study.id}`,
-      definitionId: study.id,
-      label: definition.label(study.params),
-      pane: 'main',
-      params: study.params,
-      plots: definition.compute(closes, study.params).map((line) => ({
-        key: line.key,
-        colour: (line.color + index) % 5,
-        values: line.values,
-        style: 'line' as const,
-      })),
-      hidden: false,
-      source: 'voyager',
-      draft: false,
-    };
-  });
+  return spec.studies
+    .map((study) =>
+      createIndicator(study.id, bars, study.params, {
+        source: 'voyager',
+        id: `voyager_${study.id}`,
+      })
+    )
+    .filter((instance): instance is IndicatorInstance => instance !== null);
 }
 
 /** The other lines of a comparison, as main-pane plots on the rebased scale. */

@@ -29,14 +29,18 @@
  * Import-free beyond the engine switch, so the unit harness compiles it alone.
  */
 
-import { ENGINE_DRAWS_SEPARATE_PANES, PANE_STUDY_NOTE } from '../chart/engine';
+import {
+  ENGINE_DRAWS_SEPARATE_PANES,
+  MAX_SECONDARY_PANES,
+  PANE_STUDY_NOTE,
+} from '../chart/engine';
 
 export const TRADINGVIEW_CHART_URL = 'https://www.tradingview.com/chart/';
 export const TRADINGVIEW_PINE_URL = 'https://www.tradingview.com/pine-editor/';
 
 /** Everything a chart request can ask for that this table has an opinion about. */
 export type ChartFeature =
-  /* Drawn here. */
+  /* Drawn here, on the price pane. */
   | 'line'
   | 'area'
   | 'candles'
@@ -45,10 +49,11 @@ export type ChartFeature =
   | 'drawdown'
   | 'moving_average'
   | 'bollinger_bands'
-  /* Computed here, drawn nowhere in this product yet. */
+  /* Drawn here, each in a pane of its own beneath the price. */
   | 'rsi'
   | 'macd'
   | 'volume_pane'
+  | 'multi_pane_layout'
   /* Professional chart types and workflows this product does not do. */
   | 'renko'
   | 'kagi'
@@ -56,7 +61,6 @@ export type ChartFeature =
   | 'range_bars'
   | 'tpo_profile'
   | 'session_volume_profile'
-  | 'multi_pane_layout'
   | 'complex_drawings'
   | 'large_indicator_stack'
   | 'bar_replay'
@@ -78,14 +82,18 @@ export type FeatureSupport = {
  * has promised; "this chart has one pane" tells them what to do now.
  */
 /**
- * A study that needs a pane of its own, placed by what the engine can do.
+ * A capability that needs a pane of its own, placed by what the engine can do.
  *
- * The one line that decides this is `ENGINE_DRAWS_SEPARATE_PANES`. When the
- * `supercharts` section ships a pane manager and secondary scales, flipping it
- * moves these three back into Voyager and out of this table together — no
- * planner change, no handoff change, no answer-contract change. Which is the
- * point: a limitation of today's renderer must not calcify into a permanent
- * statement about what this product is.
+ * The one line that decides this is `ENGINE_DRAWS_SEPARATE_PANES`, and it now
+ * reads `true`: the `supercharts` section shipped a pane manager with secondary
+ * scales, so these are drawn here and are out of this table. Setting it back
+ * moves all four the other way together — no planner change, no handoff change,
+ * no answer-contract change. Which was always the point: neither a limitation
+ * of today's renderer nor an ability of today's renderer should calcify into a
+ * permanent statement about what this product is.
+ *
+ * The checks are not deleted now that they pass. A feature that stops being
+ * drawable — a smaller surface, a reverted engine — has somewhere to be said.
  */
 function paneStudy(name: string): FeatureSupport {
   return ENGINE_DRAWS_SEPARATE_PANES
@@ -104,17 +112,18 @@ export const CHART_FEATURES: Record<ChartFeature, FeatureSupport> = {
   bollinger_bands: { where: 'voyager' },
 
   /*
-   * Computed by the study registry, and drawn by nothing.
+   * Computed by the study registry, and now drawn by the chart.
    *
-   * An oscillator needs its own strip of canvas and its own vertical scale.
-   * The chart engine paints the price pane and its overlays and skips
-   * everything else, so this is true of the full chart workspace as well —
-   * which is why the honest destination today is TradingView rather than
-   * another screen in this portal.
+   * An oscillator needs its own strip of canvas and its own vertical scale, and
+   * the engine has both: RSI on a fixed 0–100 pane with its 30 and 70 guides,
+   * MACD on a symmetric one with the histogram either side of zero, volume on a
+   * zero-based one. The price scale is computed from the price alone, so none
+   * of them distorts the chart above.
    */
   rsi: paneStudy('RSI'),
   macd: paneStudy('MACD'),
   volume_pane: paneStudy('A separate volume pane'),
+  multi_pane_layout: paneStudy('A chart with panes beneath the price'),
 
   renko: { where: 'tradingview', reason: 'Renko is not one of the chart types here.' },
   kagi: { where: 'tradingview', reason: 'Kagi is not one of the chart types here.' },
@@ -128,17 +137,16 @@ export const CHART_FEATURES: Record<ChartFeature, FeatureSupport> = {
     where: 'tradingview',
     reason: 'Session volume profile is not built here.',
   },
-  multi_pane_layout: {
-    where: 'tradingview',
-    reason: 'These charts are a single pane.',
-  },
   complex_drawings: {
     where: 'tradingview',
     reason: 'Drawing tools live on the professional chart, not in an answer.',
   },
   large_indicator_stack: {
     where: 'tradingview',
-    reason: 'Only overlay studies fit on a chart this size.',
+    /* True of this surface's size rather than of its abilities: the panes work,
+       and four of them under a chart the height of a chat message leaves each
+       one too short to read. */
+    reason: `A chart in an answer holds the price and ${MAX_SECONDARY_PANES} panes beneath it; a stack deeper than that belongs on a full-size chart.`,
   },
   bar_replay: { where: 'tradingview', reason: 'Bar replay is not something this surface does.' },
   strategy_backtest: {
@@ -161,6 +169,30 @@ export function isChartFeature(value: unknown): value is ChartFeature {
 
 export function needsHandoff(feature: ChartFeature): boolean {
   return CHART_FEATURES[feature].where === 'tradingview';
+}
+
+/**
+ * The features in a request that this product draws itself.
+ *
+ * Used to stop a handoff that has no reason to happen. Somebody asking for RSI
+ * used to be sent to TradingView because the chart could not draw it; now that
+ * it can, sending them anyway is the same defect wearing the opposite face —
+ * an answer that gives away work the product does, and a person who leaves for
+ * something that was already on the page.
+ */
+export function nativeFeatures(features: ChartFeature[]): ChartFeature[] {
+  return features.filter((feature) => !needsHandoff(feature));
+}
+
+/**
+ * Whether a chart handoff is the wrong answer to this request.
+ *
+ * True only when features were named and every one of them is drawn here. An
+ * empty list is not a mistake — "open Tesla on TradingView" names nothing and
+ * is a perfectly good reason to leave — so it goes through.
+ */
+export function handoffIsUnnecessary(features: ChartFeature[]): boolean {
+  return features.length > 0 && features.every((feature) => !needsHandoff(feature));
 }
 
 /* --------------------------------------------------------- The destination */

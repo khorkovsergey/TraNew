@@ -10,7 +10,9 @@ import { pineReview, pineTemplate } from './pine';
 import {
   CHART_FEATURE_IDS,
   chartHandoff,
+  handoffIsUnnecessary,
   isChartFeature,
+  nativeFeatures,
   pineHandoff,
   type TradingViewHandoff,
 } from './tradingView';
@@ -339,12 +341,13 @@ export const VOYAGER_TOOLS: Record<VoyagerToolId, VoyagerToolDefinition> = {
     id: 'tradingview_handoff',
     description:
       'Hand a request to TradingView and get the destination back. Call it when somebody wants ' +
-      'something these charts do not do — Renko, Kagi, Point & Figure, range bars, volume or TPO ' +
-      'profiles, RSI or MACD panes, multi-pane layouts, drawing workflows, bar replay, a strategy ' +
-      'backtest, or running Pine. This is a feature, not a failure: say plainly what this surface ' +
-      'does and that the professional chart does the rest. It returns the destination, what the ' +
-      'link actually carries and what has to be set on arrival — state those, and never invent a ' +
-      'URL or claim state travelled that this did not list as carried.',
+      'something these charts do not do — Renko, Kagi, Point & Figure, range bars, session volume ' +
+      'or TPO profiles, drawing workflows, bar replay, a strategy backtest, or running Pine. This ' +
+      'is a feature, not a failure: say plainly what this surface does and that the professional ' +
+      'chart does the rest. It returns the destination, what the link actually carries and what ' +
+      'has to be set on arrival — state those, and never invent a URL or claim state travelled ' +
+      'that this did not list as carried. Do not call it for RSI, MACD, a volume pane or several ' +
+      'panes at once: those are drawn here, and asking for one is a chart request, not a handoff.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -377,6 +380,27 @@ export const VOYAGER_TOOLS: Record<VoyagerToolId, VoyagerToolDefinition> = {
 
       const symbol = argString(input.symbol, 16) ?? context.subject;
       const features = (Array.isArray(input.features) ? input.features : []).filter(isChartFeature);
+
+      /*
+       * A handoff nobody needs is refused rather than built.
+       *
+       * The planner is told which capabilities are native, and this is the same
+       * fact enforced instead of described — the table is the authority, so a
+       * capability moving between the two sides changes what this refuses
+       * without a line here being edited. Only a request whose every named
+       * feature is drawn here is turned back; naming nothing still goes
+       * through, because "open it on TradingView" is a request in itself.
+       */
+      if (handoffIsUnnecessary(features)) {
+        return toolFailure(
+          'bad_arguments',
+          `${nativeFeatures(features)
+            .map((feature) => feature.replace(/_/g, ' '))
+            .join(', ')} is drawn on the chart here. Put it on the chart instead of handing this over.`,
+          false
+        );
+      }
+
       const handoff = chartHandoff({
         symbol,
         exchange: argString(input.exchange, 12) ?? undefined,

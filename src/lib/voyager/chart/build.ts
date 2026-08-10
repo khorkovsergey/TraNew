@@ -60,6 +60,14 @@ export function chartFromHistory(
       lastObservation: history.meta.coverage.lastObservation,
       delayed: history.meta.delayed,
       derivedFromDaily: history.meta.coverage.derivedFromDaily,
+      /*
+       * Asked of the bars that came back, not of the provider's documentation.
+       * `getBars` carries `volume` only when the row had one, and whether it
+       * did varies by instrument — so this is the only place the answer can be
+       * true. A spec that says `false` refuses the volume pane out loud rather
+       * than drawing an empty strip.
+       */
+      hasVolume: history.bars.some((bar) => typeof bar.volume === 'number'),
     },
   });
 
@@ -94,6 +102,9 @@ export function chartFromComparison(comparison: ComparisonResult): ChartPayload 
       lastObservation: comparison.dates[comparison.dates.length - 1] ?? null,
       delayed: comparison.delayed,
       derivedFromDaily: comparison.interval !== '1D',
+      /* A comparison takes no studies at all, so there is no volume pane for
+         this to enable; stated rather than left to a default. */
+      hasVolume: false,
     },
   });
 
