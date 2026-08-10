@@ -1,9 +1,17 @@
 import 'server-only';
-import { getHistoryFor, MAX_COMPARE_ASSETS, type HistoryResult } from './marketData';
+import { getHistoryFor, MAX_COMPARE_ASSETS, resolveVerified, type HistoryResult } from './marketData';
 import { alignTo, commonDates, correlation, normalise, seriesMetrics } from './metrics';
-import { isValidInterval, type Bar, type Interval } from './range';
+import {
+  coverageOf,
+  isValidInterval,
+  normalizeRange,
+  trimToRange,
+  type Bar,
+  type Interval,
+} from './range';
 import { toolFailure, type VoyagerToolResult } from './types';
 import type { AssetCandidate } from './assets';
+import { planComparisonReuse, type ChartArtifact } from '../chart/artifact';
 
 /**
  * Comparing instruments, computed rather than written down.
@@ -55,12 +63,111 @@ export type ComparisonResult = {
   provider: string;
 };
 
-export async function compareAssets(input: {
-  queries?: unknown;
-  start?: unknown;
-  end?: unknown;
-  interval?: unknown;
-}): Promise<VoyagerToolResult<ComparisonResult>> {
+/**
+ * Instruments already on screen, so a comparison that grows fetches the growth.
+ *
+ * "Compare NVDA and AMD", then "add Microsoft": the second question needs
+ * Microsoft. It used to need all three, because this tool takes a list of names
+ * and knew nothing about the chart the question was about — three requests
+ * against a free-tier allowance the whole portal shares, where one was the
+ * answer.
+ *
+ * Reuse is conditional and the conditions are the point: same interval, and the
+ * held bars have to reach the start of the period being asked about. A series
+ * that falls short is fetched, because a comparison drawn from two instruments
+ * over different windows is not a comparison.
+ */
+export type ComparisonReuse = {
+  artifact: ChartArtifact;
+  /** Called once per symbol that was redrawn rather than requested. */
+  onReuse?: (symbol: string) => void;
+  onFetch?: (symbol: string) => void;
+};
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * The instruments this comparison can draw from what is already held.
+ *
+ * Keyed by the query the model wrote, because that is what the loop below has
+ * in hand; matched by resolved symbol, because "Nvidia" and "NVDA" are the same
+ * instrument and a reuse table keyed on typing would miss it.
+ *
+ * Everything that could make reuse wrong is checked here rather than assumed:
+ * the interval has to be the artifact's, the held bars have to reach the start
+ * of the period being asked about, and what survives the trim has to be enough
+ * to measure. Any of those failing means the symbol is simply fetched.
+ */
+async function heldFor(
+  artifact: ChartArtifact,
+  queries: string[],
+  interval: Interval,
+  range: { start: string; end: string }
+): Promise<Map<string, HistoryResult>> {
+  const ready = new Map<string, HistoryResult>();
+
+  /*
+   * Resolved first, because reuse is decided on the instrument rather than on
+   * what somebody typed: "Nvidia" and "NVDA" are one series, and a table keyed
+   * on typing would fetch it twice.
+   */
+  const wanted: { query: string; symbol: string }[] = [];
+  const assets = new Map<string, AssetCandidate>();
+
+  for (const query of queries) {
+    const resolved = await resolveVerified(query);
+    if (!resolved.ok) continue;
+    wanted.push({ query, symbol: resolved.data.symbol });
+    assets.set(query, resolved.data);
+  }
+
+  const plan = planComparisonReuse({ artifact, wanted, interval, range });
+  const bySymbol = new Map(artifact.series.map((entry) => [entry.symbol.toUpperCase(), entry]));
+
+  for (const item of plan.reuse) {
+    const asset = assets.get(item.query);
+    const match = bySymbol.get(item.symbol.toUpperCase());
+    if (!asset || !match) continue;
+
+    const query = item.query;
+    const bars = trimToRange(match.bars, range);
+    const metrics = seriesMetrics(bars, interval);
+    if (!metrics) continue;
+
+    ready.set(query, {
+      asset,
+      bars,
+      metrics,
+      meta: {
+        provider: artifact.provider,
+        symbol: asset.symbol,
+        displayName: asset.displayName,
+        currency: asset.currency,
+        exchange: asset.exchange,
+        interval,
+        requested: range,
+        coverage: coverageOf(bars, range, interval, { reachedProviderCap: false }),
+        asOf: coverageOf(bars, range, interval, { reachedProviderCap: false }).lastObservation,
+        delayed: artifact.delayed,
+        notes: [...metrics.caveats, 'redrawn from bars already fetched for this conversation'],
+      },
+    });
+  }
+
+  return ready;
+}
+
+export async function compareAssets(
+  input: {
+    queries?: unknown;
+    start?: unknown;
+    end?: unknown;
+    interval?: unknown;
+  },
+  reuse?: ComparisonReuse
+): Promise<VoyagerToolResult<ComparisonResult>> {
   const queries = Array.isArray(input.queries)
     ? input.queries.filter((item): item is string => typeof item === 'string' && item.trim() !== '')
     : [];
@@ -87,8 +194,29 @@ export async function compareAssets(input: {
    */
   const histories: HistoryResult[] = [];
   const failures: string[] = [];
+  const reused: string[] = [];
+  const fetched: string[] = [];
+
+  /*
+   * The period, resolved before anything is fetched, because deciding whether
+   * held bars are usable is a question about this period rather than about the
+   * one the artifact was built for.
+   */
+  const period = normalizeRange({ start: input.start, end: input.end }, todayIso());
+  const held =
+    reuse && period.ok
+      ? await heldFor(reuse.artifact, queries, interval, period.range)
+      : null;
 
   for (const query of queries) {
+    const ready = held?.get(query);
+    if (ready) {
+      histories.push(ready);
+      reused.push(ready.asset.symbol);
+      reuse?.onReuse?.(ready.asset.symbol);
+      continue;
+    }
+
     const history = await getHistoryFor({
       query,
       start: input.start,
@@ -96,8 +224,13 @@ export async function compareAssets(input: {
       interval,
     });
 
-    if (history.ok) histories.push(history.data);
-    else failures.push(`${query}: ${history.message}`);
+    if (history.ok) {
+      histories.push(history.data);
+      fetched.push(history.data.asset.symbol);
+      reuse?.onFetch?.(history.data.asset.symbol);
+    } else {
+      failures.push(`${query}: ${history.message}`);
+    }
   }
 
   if (histories.length < 2) {
@@ -155,6 +288,7 @@ export async function compareAssets(input: {
   const notes = [
     ...failures.map((failure) => `left out — ${failure}`),
     ...(interval === '1D' ? [] : ['weekly and monthly bars are folded from daily data']),
+    ...(reused.length ? [`${reused.join(', ')} redrawn from bars already fetched`] : []),
   ];
 
   const ranked = [...entries].sort((a, b) => b.changePercent - a.changePercent);
@@ -177,6 +311,22 @@ export async function compareAssets(input: {
       delayed: true,
       provider: histories[0].meta.provider,
     },
+    /*
+     * What happened, rather than what was asked for. Three instruments compared
+     * with one fetched is one provider request, and a chip reading
+     * `compare(NVDA, AMD, MSFT)` would report three. Only emitted when
+     * something was genuinely reused — otherwise the argument signature is the
+     * truth and stays.
+     */
+    ...(reused.length
+      ? {
+          chips: [
+            `reuse-history(${reused.join(' ')})`,
+            ...(fetched.length ? [`history(${fetched.join(' ')} ${interval})`] : []),
+            `compare(${histories.map((entry) => entry.asset.symbol).join(' ')})`,
+          ],
+        }
+      : {}),
     summary:
       `Over ${dates[0]} to ${dates[dates.length - 1]} (${dates.length} shared ${interval} bars, normalised to 100): ` +
       ranked

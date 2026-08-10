@@ -208,7 +208,23 @@ export async function POST(request: NextRequest) {
         .slice(-8)
     : [];
 
-  const answer = await askVoyager({ question, context, tier, sources: active, history });
+  /*
+   * The chart the last answer drew, by name.
+   *
+   * Passed through unvalidated on purpose: `recallChart` is the gate, and it
+   * accepts nothing but an identifier this process minted. There is no shape a
+   * browser can send here that becomes data — the worst case is a lookup that
+   * misses and a question answered by fetching, which is what every question
+   * did before artifacts existed.
+   */
+  const answer = await askVoyager({
+    question,
+    context,
+    tier,
+    sources: active,
+    history,
+    artifact: body.artifact,
+  });
 
   /*
    * Nothing was answered, so nothing is charged.

@@ -123,6 +123,7 @@ try {
       'src/lib/voyager/tools/tradingView.ts',
       'src/lib/voyager/tools/pine.ts',
       'src/lib/voyager/chart/spec.ts',
+      'src/lib/voyager/chart/artifact.ts',
       'src/lib/voyager/chat/transcript.ts',
       'src/lib/academy/summary.ts',
       'src/lib/explore/answers.ts',
@@ -268,6 +269,7 @@ try {
   const ranges = await load('range', 'tools');
   const metrics = await load('metrics', 'tools');
   const chart = await load('spec', 'chart');
+  const artifacts = await load('artifact', 'chart');
   const tv = await load('tradingView', 'tools');
   const quota = await load('quota', 'voyager');
   const pages = await load('pages', 'voyager');
@@ -5260,6 +5262,439 @@ try {
     assert.equal(portalKnowledge.portalSection(42, MENU), null);
     assert.ok(portalKnowledge.portalSection('academy', MENU));
     assert.ok(portalKnowledge.portalSection('Expert Services', MENU));
+  });
+
+  group('A follow-up works on the chart already drawn');
+
+  /*
+   * §29. Every question used to start from nothing: "show NVDA for three
+   * months" fetched a series, and "show it as candles" fetched the same series
+   * again, because the server kept no memory of the first answer. The provider
+   * cache hid the cost rather than removing it — the request was still made,
+   * still counted against an allowance the whole portal shares, and would still
+   * have been made against a cold cache.
+   *
+   * These tests are about *whether a fetch is planned*, never about whether one
+   * was cheap. That distinction is the whole of §29, and it is why the decision
+   * lives in a module that cannot reach a provider at all.
+   */
+
+  const artifactBars = (from, count, base = 100) => {
+    const start = Date.parse(`${from}T00:00:00Z`) / 1000;
+    return Array.from({ length: count }, (_, index) => {
+      const close = base + Math.sin(index / 6) * 8 + index * 0.15;
+      return {
+        time: start + index * 86_400,
+        open: close - 0.4,
+        high: close + 1,
+        low: close - 1,
+        close,
+        volume: 1_000_000 + index * 1000,
+      };
+    });
+  };
+
+  /** A chart that was drawn, as the thing a follow-up gets to work on. */
+  const artifactOf = (patch = {}) => {
+    const bars = patch.bars ?? artifactBars('2026-05-11', 90);
+    const spec = chart.clampChartSpec({
+      kind: 'line',
+      series: [{ assetId: 'stock:NVDA', symbol: 'NVDA', label: 'NVIDIA', field: 'close' }],
+      range: { start: '2026-05-09', end: '2026-08-09' },
+      interval: '1D',
+      studies: [],
+      sourceMeta: {
+        provider: 'Twelve Data',
+        firstObservation: '2026-05-11',
+        lastObservation: '2026-08-08',
+        delayed: true,
+        derivedFromDaily: false,
+        hasVolume: true,
+      },
+      ...(patch.spec ?? {}),
+    });
+
+    return artifacts.artifactFor({
+      id: 'a'.repeat(64),
+      createdAt: 1_000_000,
+      spec,
+      series: patch.series ?? [{ assetId: 'stock:NVDA', bars }],
+    });
+  };
+
+  /** The same, as a comparison of two. */
+  const comparisonOf = () => {
+    const spec = chart.clampChartSpec({
+      kind: 'performance',
+      series: [
+        { assetId: 'stock:NVDA', symbol: 'NVDA', label: 'NVIDIA', field: 'normalized' },
+        { assetId: 'stock:AMD', symbol: 'AMD', label: 'AMD', field: 'normalized' },
+      ],
+      range: { start: '2026-05-09', end: '2026-08-09' },
+      interval: '1D',
+      studies: [],
+      sourceMeta: {
+        provider: 'Twelve Data',
+        firstObservation: '2026-05-11',
+        lastObservation: '2026-08-08',
+        delayed: true,
+        derivedFromDaily: false,
+        hasVolume: true,
+      },
+    });
+
+    return artifacts.artifactFor({
+      id: 'b'.repeat(64),
+      createdAt: 1_000_000,
+      spec,
+      series: [
+        { assetId: 'stock:NVDA', bars: artifactBars('2026-05-11', 90, 100) },
+        { assetId: 'stock:AMD', bars: artifactBars('2026-05-11', 90, 140) },
+      ],
+    });
+  };
+
+  check('the artifact is the chart that was drawn, not a description of it', () => {
+    const artifact = artifactOf();
+    assert.equal(artifact.mode, 'single');
+    assert.equal(artifact.kind, 'line');
+    assert.equal(artifact.interval, '1D');
+    assert.deepEqual(artifact.series.map((entry) => entry.symbol), ['NVDA']);
+
+    const coverage = artifacts.artifactCoverage(artifact);
+    assert.equal(coverage.firstObservation, '2026-05-11');
+    assert.equal(coverage.bars, 90);
+  });
+
+  check('an edit of how it is drawn needs no data at all', () => {
+    /* A — "show it as candles". */
+    const edited = artifacts.planChartEdit(artifactOf(), { kind: 'candles' });
+    assert.equal(edited.ok, true);
+    assert.equal(edited.spec.kind, 'candles');
+    assert.deepEqual(edited.reused, ['NVDA']);
+    assert.equal(edited.series[0].bars.length, 90, 'the same bars, not fewer');
+    assert.match(edited.summary, /no market request/i);
+  });
+
+  check('adding a study reuses the bars and computes from them', () => {
+    /* B — "add RSI". The study arrives at its standard settings and the spec
+       carries it; the numbers come from the bars already held. */
+    const edited = artifacts.planChartEdit(artifactOf(), {
+      kind: 'candles',
+      addStudies: [{ id: 'rsi', params: {} }],
+    });
+    assert.equal(edited.ok, true);
+    assert.deepEqual(edited.spec.studies.map((study) => study.id), ['rsi']);
+    assert.equal(edited.spec.studies[0].params.length, 14, 'standard settings');
+    assert.equal(edited.spec.refused.length, 0);
+  });
+
+  check('and removing one takes it off the same way', () => {
+    /* C — "remove RSI". */
+    const withStudy = artifacts.planChartEdit(artifactOf(), {
+      kind: 'candles',
+      addStudies: [{ id: 'rsi', params: {} }, { id: 'macd', params: {} }],
+    });
+    const artifact = artifacts.artifactFor({
+      id: 'c'.repeat(64),
+      createdAt: 1_000_000,
+      spec: withStudy.spec,
+      series: withStudy.series,
+    });
+
+    const edited = artifacts.planChartEdit(artifact, { removeStudies: ['rsi'] });
+    assert.equal(edited.ok, true);
+    assert.deepEqual(edited.spec.studies.map((study) => study.id), ['macd']);
+  });
+
+  check('a shorter period is cut out of what is held', () => {
+    /* E — "only show the last three months" over a chart that holds more. */
+    const edited = artifacts.planChartEdit(artifactOf(), {
+      range: { start: '2026-07-01', end: '2026-08-09' },
+    });
+    assert.equal(edited.ok, true);
+    assert.ok(edited.series[0].bars.length < 90, 'it was actually trimmed');
+    assert.ok(edited.series[0].bars.length > 10);
+    assert.equal(edited.spec.sourceMeta.firstObservation, '2026-07-01');
+    assert.deepEqual(edited.reused, ['NVDA']);
+  });
+
+  check('a longer period is refused, and says what it has instead', () => {
+    /*
+     * D — "show one year". This is the case reuse must not serve. Quietly
+     * narrowing to the three months held would put a chart under a question it
+     * does not answer, so the refusal names the coverage and the planner
+     * fetches.
+     */
+    const edited = artifacts.planChartEdit(artifactOf(), {
+      range: { start: '2025-08-09', end: '2026-08-09' },
+    });
+    assert.equal(edited.ok, false);
+    assert.equal(edited.code, 'no_data');
+    assert.match(edited.message, /2026-05-11 to 2026-08-08/);
+    assert.match(edited.message, /fetch it instead/i);
+  });
+
+  check('an end past the last bar is not a refusal', () => {
+    // Nothing newer exists to fetch: the last observation is the most recent
+    // trading day the provider has, and "up to today" on a Sunday is ordinary.
+    const edited = artifacts.planChartEdit(artifactOf(), {
+      range: { start: '2026-06-01', end: '2026-12-31' },
+    });
+    assert.equal(edited.ok, true);
+  });
+
+  check('dropping an instrument rebuilds from the rest, with nothing fetched', () => {
+    /* G — "remove AMD". */
+    const edited = artifacts.planChartEdit(comparisonOf(), { removeSymbols: ['AMD'] });
+    assert.equal(edited.ok, true);
+    assert.deepEqual(edited.reused, ['NVDA']);
+    assert.deepEqual(edited.spec.series.map((entry) => entry.symbol), ['NVDA']);
+    // One instrument left, so it stops being a rebased comparison.
+    assert.notEqual(edited.spec.kind, 'performance');
+  });
+
+  check('and an instrument that is not on the chart is named, not invented', () => {
+    const edited = artifacts.planChartEdit(comparisonOf(), { removeSymbols: ['MSFT'] });
+    assert.equal(edited.ok, false);
+    assert.equal(edited.code, 'not_found');
+    assert.match(edited.message, /NVDA, AMD/);
+  });
+
+  check('a comparison that grows fetches only what it is missing', () => {
+    /*
+     * F — "add Microsoft" to NVDA vs AMD. The count is the assertion: one
+     * fetch, not three. A test that watched the provider instead would pass on
+     * a warm cache while three requests were still being planned.
+     */
+    const plan = artifacts.planComparisonReuse({
+      artifact: comparisonOf(),
+      wanted: [
+        { query: 'NVDA', symbol: 'NVDA' },
+        { query: 'AMD', symbol: 'AMD' },
+        { query: 'Microsoft', symbol: 'MSFT' },
+      ],
+      interval: '1D',
+      range: { start: '2026-05-11', end: '2026-08-09' },
+    });
+
+    assert.deepEqual(plan.fetch.map((item) => item.symbol), ['MSFT']);
+    assert.deepEqual(plan.reuse.map((item) => item.symbol), ['NVDA', 'AMD']);
+  });
+
+  check('reuse is matched on the instrument, not on what somebody typed', () => {
+    const plan = artifacts.planComparisonReuse({
+      artifact: comparisonOf(),
+      wanted: [
+        { query: 'Nvidia', symbol: 'NVDA' },
+        { query: 'амд', symbol: 'AMD' },
+      ],
+      interval: '1D',
+      range: { start: '2026-05-11', end: '2026-08-09' },
+    });
+    assert.equal(plan.fetch.length, 0);
+    assert.equal(plan.reuse.length, 2);
+  });
+
+  check('and refused whenever it would compare two different windows', () => {
+    const artifact = comparisonOf();
+
+    // A period starting before the held bars: every instrument is fetched.
+    const earlier = artifacts.planComparisonReuse({
+      artifact,
+      wanted: [{ query: 'NVDA', symbol: 'NVDA' }, { query: 'AMD', symbol: 'AMD' }],
+      interval: '1D',
+      range: { start: '2024-01-01', end: '2026-08-09' },
+    });
+    assert.equal(earlier.reuse.length, 0);
+    assert.equal(earlier.fetch.length, 2);
+
+    // Weekly bars cannot be served from a daily artifact, or the other way.
+    const weekly = artifacts.planComparisonReuse({
+      artifact,
+      wanted: [{ query: 'NVDA', symbol: 'NVDA' }],
+      interval: '1W',
+      range: { start: '2026-05-11', end: '2026-08-09' },
+    });
+    assert.equal(weekly.reuse.length, 0);
+    assert.deepEqual(weekly.fetch.map((item) => item.symbol), ['NVDA']);
+  });
+
+  check('an edit that would empty the chart is refused', () => {
+    const edited = artifacts.planChartEdit(artifactOf(), { removeSymbols: ['NVDA'] });
+    assert.equal(edited.ok, false);
+    assert.equal(edited.code, 'bad_arguments');
+  });
+
+  check('an edit that asks for nothing is refused rather than redrawn', () => {
+    const edited = artifacts.planChartEdit(artifactOf(), {});
+    assert.equal(edited.ok, false);
+    assert.equal(edited.code, 'bad_arguments');
+  });
+
+  check('a study the chart does not have is refused by name', () => {
+    const edited = artifacts.planChartEdit(artifactOf(), {
+      addStudies: [{ id: 'ichimoku', params: {} }],
+    });
+    assert.equal(edited.ok, false);
+    assert.equal(edited.code, 'not_found');
+  });
+
+  check('Renko is not something an edit can express', () => {
+    /*
+     * H — "turn it into Renko". There is no value of `kind` that means Renko,
+     * so an edit cannot mutate the artifact into a fake one; the handoff table
+     * is still the only answer, and still says so.
+     */
+    assert.ok(!chart.CHART_KINDS.includes('renko'));
+
+    const edited = artifacts.planChartEdit(artifactOf(), { kind: 'renko' });
+    assert.equal(edited.ok, false);
+    assert.equal(edited.code, 'not_found');
+    assert.match(edited.message, /not one of the chart types here/);
+    // Refused rather than ignored: ignoring it would silently apply whatever
+    // else was in the edit and report a change that did not happen.
+    assert.equal(tv.needsHandoff('renko'), true);
+  });
+
+  check('an edit cannot reach a market data provider, cache or no cache', () => {
+    /*
+     * The structural claim behind every count above, and the reason they cannot
+     * be fooled by a warm cache: the module that decides and performs a redraw
+     * imports nothing that can make a request. Not the market client, not the
+     * history tool, not `fetch`. A chart edit therefore makes zero provider
+     * requests by construction rather than by measurement.
+     */
+    const source = readFileSync('src/lib/voyager/chart/artifact.ts', 'utf8');
+    const imports = [...source.matchAll(/from '([^']+)'/g)].map((match) => match[1]);
+    assert.deepEqual(imports.sort(), ['../tools/metrics', '../tools/range', './spec']);
+    assert.ok(!/fetch\(|market\/client|getBars|getHistoryFor/.test(source), 'it can reach a provider');
+  });
+
+  check('and it decides on structure, never on the words of the question', () => {
+    /*
+     * Which is what makes "покажи свечами" and "show it as candles" the same
+     * request: neither this module nor the tool that calls it ever sees the
+     * sentence. The model classifies; this applies.
+     */
+    const source = readFileSync('src/lib/voyager/chart/artifact.ts', 'utf8')
+      // The prose explains itself in English; what matters is the code.
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '');
+    assert.ok(!/question/i.test(source), 'the edit rule reads the question');
+    assert.ok(!/toLowerCase\(\)\.includes|\.match\(/.test(source), 'the edit rule matches on text');
+
+    const registry = readFileSync('src/lib/voyager/tools/registry.ts', 'utf8');
+    const tool = registry.slice(registry.indexOf('chart_edit: {'), registry.indexOf('page_capabilities: {'));
+    assert.ok(!tool.includes('context.question'), 'the edit tool reads the question');
+    assert.match(tool, /may be in any language/);
+  });
+
+  check('the chips say what happened, not what was asked for', () => {
+    /*
+     * A comparison of three that fetched one is one provider request. The
+     * argument signature would report three, so a tool that reused says so
+     * itself — and only a tool that actually reused may.
+     */
+    assert.deepEqual(
+      toolTypes.traceChips([
+        { id: 'chart_edit', ok: true, call: 'chart-edit(candles)', chips: ['chart-edit(candles)', 'reuse-history(NVDA)'] },
+        { id: 'compare_assets', ok: true, call: 'compare(NVDA,AMD,MSFT)' },
+        { id: 'get_history', ok: false, code: 'no_data', call: 'history(XXX 1D)' },
+      ]),
+      ['chart-edit(candles)', 'reuse-history(NVDA)', 'compare(NVDA,AMD,MSFT)']
+    );
+  });
+
+  check('what a follow-up may quote is a name, never a price series', () => {
+    /*
+     * The security decision of §29, asserted rather than described. Anything a
+     * browser posts is something a browser can write, so a request that could
+     * carry a series would be a request that could make Voyager present
+     * invented prices as the provider's. The wire carries an identifier; the
+     * bars never leave the server.
+     */
+    const store = readFileSync('src/lib/voyager/artifacts.ts', 'utf8');
+    assert.match(store, /randomBytes\(32\)/);
+    assert.match(store, /\^\[0-9a-f\]\{64\}\$/);
+    assert.ok(!/db\.|schema\.|localStorage|sessionStorage/.test(store), 'an artifact was persisted');
+
+    const route = readFileSync('src/app/api/voyager/route.ts', 'utf8');
+    assert.ok(route.includes('artifact: body.artifact'));
+    // Nothing but the identifier is read off the body.
+    assert.ok(!/body\.(bars|series|chart)/.test(route));
+
+    const wire = readFileSync('src/lib/voyager/chat/transcript.ts', 'utf8');
+    assert.match(wire, /export function lastArtifact/);
+  });
+
+  check('a name that is not one of ours is not looked up', () => {
+    const store = readFileSync('src/lib/voyager/artifacts.ts', 'utf8');
+    // Shape-checked before the store is touched, so a crafted key cannot probe it.
+    assert.ok(store.indexOf('test(id)') < store.indexOf('store.get(id)'));
+  });
+
+  check('reuse expires, and the window is the one the data cache already uses', () => {
+    /*
+     * An hour, because the market client caches a daily series for an hour:
+     * fetching again inside that window returns the same bars. Reuse therefore
+     * never shows anybody something staler than a fresh call would have, which
+     * is the only argument for this number that is not a guess.
+     */
+    assert.equal(artifacts.ARTIFACT_TTL_MS, 60 * 60 * 1000);
+
+    const artifact = artifactOf();
+    assert.equal(artifacts.artifactIsFresh(artifact, artifact.createdAt + 60_000), true);
+    assert.equal(artifacts.artifactIsFresh(artifact, artifact.createdAt + 60 * 60 * 1000), false);
+  });
+
+  check('and what is held is bounded, in series and in bars', () => {
+    // An artifact store is memory somebody else is paying for. "As much as was
+    // fetched" is not a bound.
+    const long = artifactOf({ series: [{ assetId: 'stock:NVDA', bars: artifactBars('2016-01-01', 2400) }] });
+    assert.equal(long.series[0].bars.length, artifacts.MAX_ARTIFACT_BARS);
+    // The recent end is kept, because that is the end every follow-up is about.
+    assert.equal(
+      long.series[0].bars[long.series[0].bars.length - 1].time,
+      artifactBars('2016-01-01', 2400)[2399].time
+    );
+
+    assert.ok(artifacts.MAX_ARTIFACT_SERIES <= 5);
+    const store = readFileSync('src/lib/voyager/artifacts.ts', 'utf8');
+    assert.match(store, /MAX_ARTIFACTS = \d+/);
+    assert.match(store, /while \(store\.size >= MAX_ARTIFACTS\)/);
+  });
+
+  check('a chart too thin to follow up on is not kept at all', () => {
+    // So that a caller cannot end up quoting an artifact that refuses every
+    // edit it is asked for.
+    const thin = artifactOf({ series: [{ assetId: 'stock:NVDA', bars: artifactBars('2026-08-01', 1) }] });
+    assert.equal(thin, null);
+  });
+
+  check('the planner is told what is on screen, in bounded terms', () => {
+    /*
+     * Dates and counts, never a price. A model handed a series is a model that
+     * will do arithmetic on it, and arithmetic is what the deterministic half
+     * of this architecture is for.
+     */
+    const described = artifacts.describeArtifact(artifactOf());
+    assert.match(described, /NVDA/);
+    assert.match(described, /2026-05-11 to 2026-08-08/);
+    assert.match(described, /90 bars held/);
+    assert.match(described, /Twelve Data, delayed/);
+    assert.ok(described.length < 200, described);
+    assert.ok(!/\d+\.\d\d/.test(described), 'a price reached the planner');
+  });
+
+  check('and the tool is offered only when there is a chart to edit', () => {
+    const registry = readFileSync('src/lib/voyager/tools/registry.ts', 'utf8');
+    const tool = registry.slice(registry.indexOf('chart_edit: {'), registry.indexOf('page_capabilities: {'));
+    assert.match(tool, /available: \(context\) => Boolean\(context\.artifact\)/);
+
+    const orchestrator = readFileSync('src/lib/voyager/orchestrator.ts', 'utf8');
+    // A missing or expired artifact is not an error anybody sees: it is a fetch.
+    assert.match(orchestrator, /recallChart\(options\.artifact\) \?\? undefined/);
   });
 
   group('The pane capability is a switch, not a permanent statement');

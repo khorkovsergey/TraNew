@@ -11,6 +11,7 @@ import {
   askedInDialog,
   framed,
   historyFor,
+  lastArtifact,
   lastQuestion,
   limitLabel,
   MODES,
@@ -409,6 +410,18 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
             disabledSources: [],
             /* Prior turns, so a follow-up is a follow-up rather than a first question. */
             history: historyFor(turns),
+            /*
+             * The chart on screen, by the name the server gave it.
+             *
+             * A name and nothing else. "Show it as candles" needs the bars the
+             * last answer drew, and the safe direction to move them is not at
+             * all: the server kept them, this quotes the identifier, and a
+             * browser therefore has no way to hand Voyager a price series of
+             * its own. Absent when no chart has been drawn, and harmless when
+             * stale — the lookup misses and the question is answered by
+             * fetching, exactly as it was before.
+             */
+            ...(lastArtifact(turns) ? { artifact: lastArtifact(turns) } : {}),
           }),
         });
 
@@ -460,6 +473,7 @@ export function VoyagerChat({ personName, unlimited, seedQuestion, pageContext }
           actions: quota ? undefined : payload.answer.actions,
           investment: quota ? undefined : payload.answer.investment,
           chart: quota ? undefined : payload.answer.chart,
+          artifactId: quota ? undefined : payload.answer.artifactId,
           code: quota ? undefined : payload.answer.code,
           handoff: quota ? undefined : payload.answer.handoff,
           upgrade: quota ? undefined : payload.answer.upgrade,

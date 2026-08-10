@@ -39,6 +39,16 @@ export type Turn = {
   role: TurnRole;
   text: string;
   at: string;
+  /**
+   * Assistant only — the name of the chart this answer drew.
+   *
+   * An opaque identifier the server issued, held so the next question can say
+   * which chart it is about. Never the data: the bars live on the server, and
+   * a browser that could send a price series is a browser that could invent
+   * one. Stale after a restart or an hour, which costs a fetch and nothing
+   * else.
+   */
+  artifactId?: string;
   /** Assistant only — the tool calls that actually ran, as short signatures. */
   tools?: string[];
   /** Assistant only — what the answer rests on. */
@@ -150,6 +160,26 @@ export function historyFor(turns: Turn[]): { role: TurnRole; text: string }[] {
     .filter((turn) => !turn.failed && turn.text.trim())
     .slice(-8)
     .map((turn) => ({ role: turn.role, text: turn.text }));
+}
+
+/**
+ * The chart a follow-up is about: the most recent one drawn.
+ *
+ * The most recent rather than all of them, deliberately. "Show it as candles"
+ * means the chart on screen, and a conversation that has drawn four charts has
+ * one the person is looking at. Carrying every chart ever drawn would be a
+ * larger promise — and a larger store on the server — for a question nobody
+ * asks.
+ *
+ * Returns the identifier only. There is no path by which a price series
+ * reaches the server from here; see `lib/voyager/artifacts.ts`.
+ */
+export function lastArtifact(turns: Turn[]): string | undefined {
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    const id = turns[index].artifactId;
+    if (typeof id === 'string' && id) return id;
+  }
+  return undefined;
 }
 
 /* -------------------------------------------------------- The page context */

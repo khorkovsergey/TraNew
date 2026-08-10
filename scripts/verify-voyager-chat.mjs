@@ -604,6 +604,136 @@ try {
   await page.unroute('**/api/voyager');
   await page.unroute('**/api/voyager?*');
 
+  group('A follow-up names the chart it is about, and never describes one');
+
+  /*
+   * §29 on the wire. The follow-up "покажи свечами" needs the bars the previous
+   * answer drew, and the safe direction to move them is not at all: the server
+   * keeps them, the browser holds an opaque name, and the next question quotes
+   * the name.
+   *
+   * That is a security property rather than a tidiness one — anything a browser
+   * posts is something a browser can write, so a request that could carry a
+   * price series would be a request that could make Voyager present invented
+   * prices as the provider's. This checks the wire, which is where the property
+   * either holds or does not.
+   */
+  await page.unroute('**/api/voyager');
+  await page.unroute('**/api/voyager?*');
+
+  const ARTIFACT_ID = 'f0'.repeat(32);
+  const posted = [];
+
+  await page.route('**/api/voyager?*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        tier: 'basic',
+        tierLabel: 'Voyager Basic',
+        limits: 'Basic',
+        sources: [{ id: 'page', label: 'Current page' }],
+        remaining: 10,
+        used: 0,
+        total: 10,
+        signedIn: false,
+        personalization: null,
+        modelConfigured: true,
+      }),
+    });
+  });
+
+  await page.route('**/api/voyager', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    posted.push(route.request().postDataJSON());
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        answer: {
+          contentType: 'AI analysis',
+          text: 'Here is the chart.',
+          bullets: [],
+          sources: 'Twelve Data',
+          confidence: 'medium',
+          actions: [],
+          followUps: [],
+          tools: ['history(NVDA 1D)', 'chart(line)'],
+          artifactId: ARTIFACT_ID,
+          chart: {
+            spec: {
+              version: 1,
+              kind: 'line',
+              series: [
+                { assetId: 'stock:NVDA', symbol: 'NVDA', label: 'NVIDIA', field: 'close' },
+              ],
+              range: { start: '2026-05-09', end: '2026-08-09' },
+              interval: '1D',
+              studies: [],
+              sourceMeta: {
+                provider: 'Twelve Data',
+                firstObservation: '2026-05-11',
+                lastObservation: '2026-08-08',
+                delayed: true,
+                derivedFromDaily: false,
+                hasVolume: true,
+              },
+              refused: [],
+            },
+            series: [{ assetId: 'stock:NVDA', bars: fixtureBars(40) }],
+          },
+        },
+        tier: 'basic',
+        remaining: 9,
+        used: 1,
+        total: 10,
+        quotaReached: false,
+      }),
+    });
+  });
+
+  await page.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(800);
+
+  const artifactComposer = page.getByRole('textbox', { name: 'Ask Voyager' });
+  await artifactComposer.fill('Show NVDA for the last 3 months');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('figure canvas', { timeout: 15_000 });
+
+  await artifactComposer.fill('покажи свечами');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelectorAll('figure').length >= 2, null, {
+    timeout: 15_000,
+  });
+
+  check('both questions reached the server', posted.length === 2, String(posted.length));
+  check(
+    'the first names no chart, because there was none',
+    posted[0] && posted[0].artifact === undefined,
+    JSON.stringify(posted[0]?.artifact ?? null)
+  );
+  check(
+    'the follow-up names the chart the answer drew',
+    posted[1] && posted[1].artifact === ARTIFACT_ID,
+    String(posted[1]?.artifact).slice(0, 24)
+  );
+  check(
+    'and sends a name rather than any of the data behind it',
+    posted[1] && !JSON.stringify(posted[1]).includes('"bars"'),
+    Object.keys(posted[1] ?? {}).join(',')
+  );
+  check(
+    'the whole follow-up body stays small — no series crossed the wire',
+    JSON.stringify(posted[1] ?? {}).length < 4000,
+    String(JSON.stringify(posted[1] ?? {}).length)
+  );
+
+  await page.unroute('**/api/voyager');
+  await page.unroute('**/api/voyager?*');
+
   group('Pine is on screen with its caveat, and the handoff is a real destination');
 
   await page.unroute('**/api/voyager');

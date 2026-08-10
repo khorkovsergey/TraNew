@@ -21,6 +21,8 @@ import {
 } from './tools/types';
 import { containerParam, nextContainer } from './tools/container';
 import { chartFromComparison, chartFromHistory } from './chart/build';
+import { describeArtifact, type ChartArtifact, type EditResult } from './chart/artifact';
+import { recallChart, rememberChart } from './artifacts';
 import { pineFromModel, type PineArtifact } from './tools/pine';
 import type { ComparisonResult } from './tools/comparison';
 import type { HistoryResult } from './tools/marketData';
@@ -175,7 +177,8 @@ function requestBrief(
   context: VoyagerContext,
   tier: VoyagerTier,
   sources: VoyagerSource[],
-  actions: VoyagerActionId[]
+  actions: VoyagerActionId[],
+  artifact?: ChartArtifact
 ): string {
   const factLines = context.facts
     ? Object.entries(context.facts).map(([key, value]) => `- ${key}: ${value}`)
@@ -204,6 +207,27 @@ function requestBrief(
     ``,
     `Allowed action ids for this answer:`,
     ...actions.map((id) => `- ${id}: ${briefFor(id)}`),
+    /*
+     * What is already drawn, and therefore what costs nothing to change.
+     *
+     * Stated as a capability rather than as a phrasebook: the planner is told
+     * what the chart holds and which changes that covers, and works out for
+     * itself whether "show it as candles" or "покажи свечами" is one of them.
+     * A list of English phrases here would serve one language and quietly fail
+     * the other, which is the failure this whole architecture is arranged to
+     * avoid.
+     */
+    ...(artifact
+      ? [
+          ``,
+          `## The chart already on screen`,
+          ``,
+          describeArtifact(artifact),
+          ``,
+          `Those bars are already fetched. chart_edit redraws them and makes no market request: a different chart type, a study on or off, a shorter period inside the one above, an instrument dropped from a comparison. Prefer it whenever the change is about how this chart is drawn.`,
+          `Fetch instead when the answer needs data this does not have — an earlier start, a different interval, an instrument that is not on it, a price now, or anything about news. Adding an instrument to a comparison is one compare call naming all of them: the ones already here are reused and only the new one is fetched.`,
+        ]
+      : []),
   ].join('\n');
 }
 
@@ -338,9 +362,21 @@ export async function askVoyager(options: {
   tier: VoyagerTier;
   sources: VoyagerSource[];
   history: { role: 'user' | 'assistant'; text: string }[];
+  /**
+   * The chart the previous answer drew, named rather than supplied.
+   *
+   * An opaque identifier the browser echoes back. It is looked up here, in the
+   * process that issued it, so what a follow-up works on is data this server
+   * fetched: a browser can name a chart and can never describe one.
+   */
+  artifact?: unknown;
 }): Promise<VoyagerAnswer> {
   const { question, context, tier, sources, history } = options;
   const allowed = actionsFor(context, tier);
+
+  /* Missing, expired and forged all land in the same place: no artifact, and
+     the request runs exactly as it would have before any of this existed. */
+  const artifact = recallChart(options.artifact) ?? undefined;
 
   /*
    * The demo layer, and only for the case it was written for.
@@ -362,6 +398,7 @@ export async function askVoyager(options: {
     question,
     tier,
     allowedActions: allowed,
+    ...(artifact ? { artifact } : {}),
   };
 
   const customTools = toolSpecsFor(toolContext);
@@ -423,6 +460,9 @@ export async function askVoyager(options: {
   let container: string | undefined;
   let lastHistory: HistoryResult | undefined;
   let lastComparison: ComparisonResult | undefined;
+  /* A redraw of the chart already on screen, which produced no market request
+     at all — see `chart/artifact.ts`. */
+  let lastEdit: EditResult | undefined;
   let code: PineArtifact | undefined;
   let handoff: TradingViewHandoff | undefined;
 
@@ -470,7 +510,7 @@ export async function askVoyager(options: {
         system: [
           // Stable across every request, so it caches; the volatile brief follows it.
           { type: 'text', text: RULES, cache_control: { type: 'ephemeral' } },
-          { type: 'text', text: requestBrief(context, tier, sources, allowed) },
+          { type: 'text', text: requestBrief(context, tier, sources, allowed, artifact) },
           { type: 'text', text: toolBrief(searching, customTools.length > 0) },
         ],
         output_config: {
@@ -555,6 +595,9 @@ export async function askVoyager(options: {
           if (call.trace.id === 'compare_assets' && call.result.ok) {
             lastComparison = call.result.data as ComparisonResult;
           }
+          if (call.trace.id === 'chart_edit' && call.result.ok) {
+            lastEdit = call.result.data as EditResult;
+          }
           /*
            * Both travel as themselves. The Pine artefact carries its own
            * provenance and its own never-executed sentence, and the handoff
@@ -628,7 +671,9 @@ export async function askVoyager(options: {
         ? chartFromComparison(lastComparison)
         : lastHistory
           ? chartFromHistory(lastHistory, requestedChart(block.text))
-          : null;
+          : lastEdit && lastEdit.ok
+            ? { spec: lastEdit.spec, series: lastEdit.series }
+            : null;
 
       /*
        * Pine the model wrote, if it wrote any and no deterministic template
@@ -646,10 +691,18 @@ export async function askVoyager(options: {
         ...(coerced.study ? [`study(${coerced.study.id})`] : []),
       ];
 
+      /*
+       * The chart this answer drew, kept so the next question can change it
+       * without fetching. Only the bars stay here; what travels to the browser
+       * is the identifier, which is the whole of the safety argument.
+       */
+      const kept = chart ? rememberChart({ spec: chart.spec, series: chart.series }) : null;
+
       return {
         ...coerced,
         ...(investment ? { investment } : {}),
         ...(chart ? { chart } : {}),
+        ...(kept ? { artifactId: kept.id } : {}),
         ...(written ? { code: written } : {}),
         ...(handoff ? { handoff } : {}),
         ...(chips.length ? { tools: chips } : {}),
