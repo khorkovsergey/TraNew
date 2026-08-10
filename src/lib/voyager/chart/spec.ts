@@ -12,23 +12,69 @@
  * has been removed from it. `describeChart` cannot mention a study that
  * `clampChartSpec` dropped, because by then the spec does not contain one.
  *
- * What is renderable is decided by the engine rather than by optimism.
- * Supercharts' canvas draws the price pane and main-pane overlays; studies that
- * need their own strip of canvas and their own vertical scale — RSI, MACD — are
- * the pane manager's job, and there is no pane manager. Not in Voyager, and not
- * in Supercharts either: its workspace calls the same `setIndicators`, and the
- * engine skips anything whose pane is not `main`. So those studies are refused
- * here with a reason, rather than claimed and quietly dropped.
+ * What is renderable is decided by the engine rather than by optimism, and it
+ * is asked in the engine's own vocabulary. `INDICATORS` is the table Supercharts
+ * renders from: it says which pane a study wants, how that pane scales, and how
+ * its plots are drawn. Reading placement from there rather than restating it
+ * here is what makes "the chart draws RSI" a fact about the renderer instead of
+ * a claim in a second file — and it is why the volume pane, which the study
+ * registry has no row for at all, can be offered without Voyager inventing one.
  *
- * Import-free beyond the study registry, so the unit harness compiles it.
+ * A study this surface cannot draw is refused here with a reason, rather than
+ * claimed and quietly dropped.
  */
 
 /* Relative, not aliased: the unit harness compiles this file with bare `tsc`,
    which has no idea what `@/` means. */
-import { STUDIES, type StudyId, type StudySpec } from '../../studies/registry';
-import { ENGINE_DRAWS_SEPARATE_PANES, PANE_STUDY_NOTE } from './engine';
+import type { StudyParams } from '../../studies/registry';
+import { INDICATORS } from '../../superchart/indicators';
+import {
+  ENGINE_DRAWS_SEPARATE_PANES,
+  MAX_SECONDARY_PANES,
+  PANE_STUDY_NOTE,
+} from './engine';
 
 export const CHART_SPEC_VERSION = 1 as const;
+
+/**
+ * The studies Voyager offers, in the chart engine's vocabulary.
+ *
+ * A subset of `INDICATORS` rather than all of it, because this is an offer and
+ * not a catalogue: every id here has to be worth a sentence in an answer and a
+ * row in the schema the model chooses from. `volume` is on the list and has no
+ * row in `lib/studies/registry.ts` — volume is a property of a bar, not a
+ * calculation over closes — which is exactly why the placement question is
+ * asked of the renderer's table and not of that one.
+ *
+ * The unit suite asserts every id is real, so a typo here is a failing test
+ * rather than a study that silently never appears.
+ */
+export const VOYAGER_STUDY_IDS = ['sma', 'bbands', 'rsi', 'macd', 'volume'] as const;
+
+export type VoyagerStudyId = (typeof VOYAGER_STUDY_IDS)[number];
+
+export type VoyagerStudySpec = { id: VoyagerStudyId; params: StudyParams };
+
+export function isVoyagerStudyId(value: unknown): value is VoyagerStudyId {
+  return typeof value === 'string' && (VOYAGER_STUDY_IDS as readonly string[]).includes(value);
+}
+
+/** True when the study wants a strip of canvas and a scale of its own. */
+export function needsOwnPane(id: VoyagerStudyId): boolean {
+  return INDICATORS[id]?.pane === 'separate';
+}
+
+/**
+ * Which pane a study lands in, by the renderer's own answer.
+ *
+ * Studies naming the same pane share one rectangle and one scale, so volume and
+ * a volume average cost one pane between them rather than two. Counting
+ * distinct ids is therefore the only correct way to ask how tall the chart is
+ * about to get.
+ */
+export function paneIdOf(id: VoyagerStudyId): string {
+  return INDICATORS[id]?.paneSpec?.id ?? 'main';
+}
 
 export type ChartKind = 'line' | 'area' | 'candles' | 'performance' | 'drawdown';
 
@@ -53,6 +99,16 @@ export type ChartSourceMeta = {
   delayed: boolean;
   /** True when weekly or monthly bars were folded from daily ones. */
   derivedFromDaily: boolean;
+  /**
+   * Whether the bars actually carry a traded volume.
+   *
+   * The provider behind this portal returns it for some instruments and not for
+   * others, and a volume pane drawn from an absent field is a row of empty
+   * canvas under a real company's name. So the question is asked of the data
+   * before the pane is promised, and a `false` here refuses the study out loud
+   * instead of drawing nothing.
+   */
+  hasVolume: boolean;
 };
 
 export type VoyagerChartSpec = {
@@ -61,8 +117,8 @@ export type VoyagerChartSpec = {
   series: ChartSeries[];
   range: { start: string; end: string };
   interval: ChartInterval;
-  /** Overlay studies that will actually be drawn on the price pane. */
-  studies: StudySpec[];
+  /** Studies that will actually be drawn — on the price pane or under it. */
+  studies: VoyagerStudySpec[];
   normalization?: { enabled: boolean; base: number };
   sourceMeta: ChartSourceMeta;
   /**
@@ -76,31 +132,31 @@ export type VoyagerChartSpec = {
 };
 
 /**
- * The studies this surface can draw, derived from the registry rather than
+ * The studies this surface can draw, derived from the renderer rather than
  * listed here.
  *
- * `placement: 'overlay'` means the study shares the price pane and the price
- * scale, which is exactly what the canvas engine paints. A study gaining or
- * losing a pane in the registry changes this set without anybody remembering to
- * update it.
+ * An overlay shares the price pane and the price scale, and was always
+ * drawable. A study that wants its own pane is drawable exactly when the engine
+ * has a pane manager — so `ENGINE_DRAWS_SEPARATE_PANES` decides that half, in
+ * one place, and moving it moves this set and the handoff table together
+ * without either being edited.
  */
-export const RENDERABLE_STUDIES: StudyId[] = (Object.keys(STUDIES) as StudyId[]).filter(
-  (id) =>
-    STUDIES[id].placement === 'overlay' ||
-    // Flipping `ENGINE_DRAWS_SEPARATE_PANES` brings RSI and MACD back here and
-    // out of the handoff table at the same time, without either list being
-    // edited. The dependency is on the engine, and it is written down once.
-    (STUDIES[id].placement === 'pane' && ENGINE_DRAWS_SEPARATE_PANES)
+export const RENDERABLE_STUDIES: VoyagerStudyId[] = VOYAGER_STUDY_IDS.filter(
+  (id) => !needsOwnPane(id) || ENGINE_DRAWS_SEPARATE_PANES
 );
 
-export function isRenderableStudy(id: string): id is StudyId {
+export function isRenderableStudy(id: string): id is VoyagerStudyId {
   return (RENDERABLE_STUDIES as string[]).includes(id);
 }
 
+/** The study's name as the chart legend writes it — "RSI 14", "Volume". */
+function studyLabel(spec: VoyagerStudySpec): string {
+  return INDICATORS[spec.id].label(spec.params);
+}
+
 function refusalFor(id: string): string {
-  const study = STUDIES[id as StudyId];
-  if (!study) return `${id} is not a study this platform computes.`;
-  return `${id.toUpperCase()} ${PANE_STUDY_NOTE}. It is available on the professional chart.`;
+  if (!isVoyagerStudyId(id)) return `${id} is not a study this platform computes.`;
+  return `${INDICATORS[id].name} ${PANE_STUDY_NOTE}. It is available on the professional chart.`;
 }
 
 /* --------------------------------------------------------------- Clamping */
@@ -150,9 +206,15 @@ export function clampChartSpec(raw: unknown): VoyagerChartSpec | null {
       ? 'performance'
       : kind;
 
+  const range = value.range as { start?: unknown; end?: unknown } | undefined;
+  const meta = (value.sourceMeta ?? {}) as Record<string, unknown>;
+  const hasVolume = meta.hasVolume === true;
+
   const refused: VoyagerChartSpec['refused'] = [];
   const seenStudies = new Set<string>();
-  const studies: StudySpec[] = [];
+  const studies: VoyagerStudySpec[] = [];
+  /* Panes, not studies: volume and a volume average would share one. */
+  const panes = new Set<string>();
 
   for (const entry of Array.isArray(value.studies) ? value.studies : []) {
     const id = (entry as { id?: unknown })?.id;
@@ -172,17 +234,47 @@ export function clampChartSpec(raw: unknown): VoyagerChartSpec | null {
     if (resolvedKind === 'performance' || resolvedKind === 'drawdown') {
       refused.push({
         study: id,
-        reason: `${id.toUpperCase()} is drawn on a price chart of one instrument, not on this one.`,
+        reason: `${INDICATORS[id].name} is drawn on a price chart of one instrument, not on this one.`,
+      });
+      continue;
+    }
+
+    /*
+     * Volume is the one study whose data can be missing while the price is
+     * fine, because it is a field on the bar rather than something computed
+     * from the closes. Refused with what is actually true — the provider did
+     * not send it — rather than with a statement about this chart's abilities.
+     */
+    if (paneIdOf(id) === 'volume' && !hasVolume) {
+      refused.push({
+        study: id,
+        reason:
+          'The data provider returned these prices without a traded volume, so there is no volume to draw.',
+      });
+      continue;
+    }
+
+    /*
+     * The height limit, counted in panes rather than in studies: a fourth strip
+     * under a chart this tall leaves every one of them too short to read. Said
+     * out loud, because a study somebody asked for and cannot see is the
+     * failure this whole file exists to prevent.
+     */
+    const pane = paneIdOf(id);
+    if (pane !== 'main' && !panes.has(pane) && panes.size >= MAX_SECONDARY_PANES) {
+      refused.push({
+        study: id,
+        reason: `A chart in an answer holds the price and ${MAX_SECONDARY_PANES} panes beneath it. The professional chart takes as many as you like.`,
       });
       continue;
     }
 
     const clamped = clampStudyParams(id, (entry as { params?: unknown }).params);
-    if (clamped) studies.push(clamped);
-  }
+    if (!clamped) continue;
 
-  const range = value.range as { start?: unknown; end?: unknown } | undefined;
-  const meta = (value.sourceMeta ?? {}) as Record<string, unknown>;
+    if (pane !== 'main') panes.add(pane);
+    studies.push(clamped);
+  }
 
   return {
     version: CHART_SPEC_VERSION,
@@ -205,22 +297,31 @@ export function clampChartSpec(raw: unknown): VoyagerChartSpec | null {
       lastObservation: typeof meta.lastObservation === 'string' ? meta.lastObservation : null,
       delayed: meta.delayed !== false,
       derivedFromDaily: meta.derivedFromDaily === true,
+      hasVolume,
     },
     refused,
   };
 }
 
-/** A study's numbers, pulled into the registry's own ranges. */
-function clampStudyParams(id: StudyId, raw: unknown): StudySpec | null {
-  const definition = STUDIES[id];
+/**
+ * A study's numbers, pulled into the renderer's own ranges.
+ *
+ * Read from `INDICATORS` rather than from the study registry, because that is
+ * the definition whose `compute` will run: clamping against one table and
+ * drawing with another is how a caption ends up describing an RSI 14 that was
+ * computed over 20 bars.
+ */
+function clampStudyParams(id: VoyagerStudyId, raw: unknown): VoyagerStudySpec | null {
+  const definition = INDICATORS[id];
   if (!definition) return null;
 
   const supplied = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-  const params: Record<string, number> = {};
+  const params: StudyParams = {};
 
-  for (const [name, range] of Object.entries(definition.params)) {
+  for (const [name, fallback] of Object.entries(definition.defaults)) {
+    const range = definition.ranges[name];
     const value = supplied[name];
-    const numeric = typeof value === 'number' && Number.isFinite(value) ? value : range.default;
+    const numeric = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
     params[name] = Math.min(range.max, Math.max(range.min, Math.round(numeric * 100) / 100));
   }
 
@@ -253,8 +354,22 @@ export function describeChart(spec: VoyagerChartSpec): string {
     parts.push(`${spec.sourceMeta.firstObservation} to ${spec.sourceMeta.lastObservation}`);
   }
 
-  if (spec.studies.length) {
-    parts.push(`with ${spec.studies.map((study) => STUDIES[study.id].label(study.params)).join(' and ')}`);
+  /*
+   * Overlays and panes are said differently because they are different things
+   * on screen, and a caption that flattens them invites "where is the RSI?"
+   * about a line drawn across the candles. Both lists come from `spec.studies`,
+   * which is what the engine is handed — so a pane named here is a pane drawn.
+   */
+  const overlays = spec.studies.filter((study) => paneIdOf(study.id) === 'main');
+  const below = spec.studies.filter((study) => paneIdOf(study.id) !== 'main');
+
+  if (overlays.length) parts.push(`with ${overlays.map(studyLabel).join(' and ')}`);
+
+  if (below.length) {
+    const paneCount = new Set(below.map((study) => paneIdOf(study.id))).size;
+    parts.push(
+      `${below.map(studyLabel).join(' and ')} in ${paneCount === 1 ? 'a pane' : `${paneCount} panes`} below the price`
+    );
   }
 
   if (spec.sourceMeta.derivedFromDaily) parts.push('folded from daily data');
@@ -286,7 +401,7 @@ export type ChartEdit =
   | { kind: 'chart_kind'; value: ChartKind }
   | { kind: 'interval'; value: ChartInterval }
   | { kind: 'range'; start: string; end: string }
-  | { kind: 'add_study'; study: StudySpec }
+  | { kind: 'add_study'; study: VoyagerStudySpec }
   | { kind: 'remove_study'; study: string };
 
 /**
@@ -296,8 +411,8 @@ export type ChartEdit =
  * starting again, so nobody is asked which instrument they meant for the second
  * time in two sentences. The result goes back through `clampChartSpec`, so an
  * edit cannot smuggle in something the original could not have contained —
- * asking for RSI on a chart that has no pane for it is refused the same way
- * whether it arrives first or third.
+ * asking for a volume pane on data with no volume in it, or for a fourth pane,
+ * is refused the same way whether it arrives first or third.
  */
 export function applyChartEdit(spec: VoyagerChartSpec, edit: ChartEdit): VoyagerChartSpec {
   const next: Record<string, unknown> = { ...spec };

@@ -1,6 +1,6 @@
 import { STUDY_IDS, STUDY_PARAM_NAMES } from '../studies/registry';
 import { VOYAGER_ACTION_IDS } from './actions';
-import { CHART_KINDS } from './chart/spec';
+import { CHART_KINDS, VOYAGER_STUDY_IDS } from './chart/spec';
 import type { VoyagerContentType } from './types';
 
 /**
@@ -90,10 +90,16 @@ export const ANSWER_SCHEMA = {
         },
         studies: {
           type: 'array',
+          /*
+           * The chart's own list, not the study registry's: it includes volume,
+           * which is a field on a bar rather than a calculation over closes and
+           * so has no row in `lib/studies`. What a chart can draw is a question
+           * about the renderer.
+           */
           items: {
             type: 'object',
             properties: {
-              id: { type: 'string', enum: STUDY_IDS },
+              id: { type: 'string', enum: VOYAGER_STUDY_IDS as unknown as string[] },
               params: {
                 type: 'object',
                 properties: Object.fromEntries(

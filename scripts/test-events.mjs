@@ -4903,45 +4903,136 @@ try {
         lastObservation: '2026-08-07',
         delayed: true,
         derivedFromDaily: false,
+        hasVolume: true,
       },
       ...patch,
     });
 
-  check('what is renderable comes from the registry, not from a list here', () => {
+  check('what is renderable is asked of the renderer, not listed here', () => {
     /*
-     * `placement: 'overlay'` is the studies that share the price pane, which is
-     * what the canvas paints. A study gaining or losing a pane in the registry
-     * changes this set without anybody remembering to update it.
+     * Placement comes from `INDICATORS`, the table the engine actually draws
+     * from. A study on the price pane was always drawable; one that wants a
+     * pane of its own is drawable exactly when the engine has a pane manager,
+     * and that is one constant rather than a second opinion.
      */
-    for (const id of chart.RENDERABLE_STUDIES) {
-      assert.equal(studies.STUDIES[id].placement, 'overlay', id);
+    for (const id of chart.VOYAGER_STUDY_IDS) {
+      assert.ok(indicators.INDICATORS[id], `${id} is not a study this chart has`);
+      assert.equal(
+        chart.RENDERABLE_STUDIES.includes(id),
+        !chart.needsOwnPane(id) || engine.ENGINE_DRAWS_SEPARATE_PANES,
+        id
+      );
     }
-    assert.ok(chart.RENDERABLE_STUDIES.includes('sma'));
-    assert.ok(!chart.RENDERABLE_STUDIES.includes('rsi'));
   });
 
-  check('a study that needs its own pane is refused with a reason', () => {
+  check('RSI, MACD and volume are drawn here, each in a pane of its own', () => {
     /*
-     * The defect this whole file exists for: a module described "RSI and three
-     * detected levels" while the renderer drew plain candles. The engine skips
-     * anything whose pane is not `main` — Supercharts' own workspace included —
-     * so RSI is refused here rather than claimed and silently dropped.
+     * Acceptance E. These were computed and then thrown away for as long as the
+     * canvas had one vertical scale. The merged pane manager gives each of them
+     * a scale of its own, so the chart carries the request instead of sending
+     * the person to TradingView for an oscillator.
      */
-    const spec = specOf({ studies: [{ id: 'rsi', params: { length: 14 } }, { id: 'sma' }] });
-    assert.equal(spec.studies.length, 1);
-    assert.equal(spec.studies[0].id, 'sma');
-    assert.equal(spec.refused.length, 1);
-    assert.equal(spec.refused[0].study, 'rsi');
-    assert.match(chart.refusalNotes(spec)[0], /own pane/i);
+    const spec = specOf({
+      kind: 'candles',
+      studies: [{ id: 'rsi' }, { id: 'macd' }, { id: 'volume' }],
+    });
+
+    assert.deepEqual(spec.studies.map((study) => study.id), ['rsi', 'macd', 'volume']);
+    assert.equal(spec.refused.length, 0);
+
+    for (const id of ['rsi', 'macd', 'volume']) {
+      assert.equal(chart.needsOwnPane(id), true, id);
+      assert.notEqual(chart.paneIdOf(id), 'main', id);
+      // A pane is a rectangle with a scale. Asserting the scale exists is what
+      // separates "the study is in the list" from "the study has somewhere to
+      // be drawn" — the distinction the whole of Acceptance E turns on.
+      assert.ok(indicators.INDICATORS[id].paneSpec.scale.kind, id);
+    }
+
+    // Three studies, three distinct panes, no two sharing a scale by accident.
+    assert.equal(new Set(spec.studies.map((study) => chart.paneIdOf(study.id))).size, 3);
   });
 
-  check('and the caption cannot mention it, because it is not in the spec', () => {
-    // The mechanism, not the discipline: the caption is generated from the
-    // clamped spec, so there is nowhere for a refused study's name to come from.
-    const spec = specOf({ studies: [{ id: 'macd' }, { id: 'rsi' }] });
+  check('and the caption describes an overlay and a pane differently', () => {
+    /*
+     * Both lists are read off `spec.studies`, which is the object the engine is
+     * handed — so a pane named in the caption is a pane that was requested of
+     * the renderer, not a sentence somebody wrote.
+     */
+    const spec = specOf({
+      kind: 'candles',
+      studies: [{ id: 'sma', params: { fast: 50, slow: 200 } }, { id: 'rsi' }, { id: 'volume' }],
+    });
     const caption = chart.describeChart(spec);
-    assert.ok(!/rsi/i.test(caption), caption);
-    assert.ok(!/macd/i.test(caption), caption);
+
+    assert.match(caption, /with MA 50\/200/);
+    assert.match(caption, /RSI 14 and Volume in 2 panes below the price/);
+  });
+
+  check('one pane is a pane, not "1 panes"', () => {
+    const spec = specOf({ kind: 'candles', studies: [{ id: 'macd' }] });
+    assert.match(chart.describeChart(spec), /MACD [\d/]+ in a pane below the price/);
+  });
+
+  check('a study the chart does not have is still refused with a reason', () => {
+    // The clamp is unchanged by any of this: an id from outside the vocabulary
+    // is named as absent rather than dropped in silence.
+    const spec = specOf({ studies: [{ id: 'ichimoku' }, { id: 'sma' }] });
+    assert.deepEqual(spec.studies.map((study) => study.id), ['sma']);
+    assert.equal(spec.refused[0].study, 'ichimoku');
+    assert.match(chart.refusalNotes(spec)[0], /not a study this platform computes/i);
+  });
+
+  check('volume is refused when the provider did not send any', () => {
+    /*
+     * The one study whose data can be missing while the price is fine. Drawing
+     * an empty strip under a real company's name is the failure this refuses:
+     * the reason says the provider returned no volume, which is what is true,
+     * rather than making a claim about what this chart can do.
+     */
+    const spec = specOf({
+      kind: 'candles',
+      studies: [{ id: 'volume' }, { id: 'rsi' }],
+      sourceMeta: {
+        provider: 'Twelve Data',
+        firstObservation: '2026-01-02',
+        lastObservation: '2026-08-07',
+        delayed: true,
+        derivedFromDaily: false,
+        hasVolume: false,
+      },
+    });
+
+    assert.deepEqual(spec.studies.map((study) => study.id), ['rsi']);
+    assert.equal(spec.refused[0].study, 'volume');
+    assert.match(spec.refused[0].reason, /no volume to draw/i);
+    assert.ok(!/volume/i.test(chart.describeChart(spec)), chart.describeChart(spec));
+  });
+
+  check('everything on offer fits on the surface it is offered for', () => {
+    /*
+     * The engine would scale a fourth pane down alongside the others and draw
+     * all of them, which is right for a full-page chart and wrong for one
+     * inside a message — every pane ends up too short to read.
+     *
+     * So the offer is kept inside the surface: the five studies here need three
+     * panes between them, which is exactly what a chart in an answer holds. The
+     * clamp enforces it, and this is the invariant the clamp is protecting — a
+     * sixth study wanting a fourth pane fails here first.
+     */
+    const wanted = new Set(
+      chart.VOYAGER_STUDY_IDS.filter((id) => chart.needsOwnPane(id)).map((id) => chart.paneIdOf(id))
+    );
+    assert.equal(wanted.size, 3);
+    assert.ok(wanted.size <= engine.MAX_SECONDARY_PANES, [...wanted].join(','));
+
+    const spec = specOf({
+      kind: 'candles',
+      studies: [{ id: 'rsi' }, { id: 'macd' }, { id: 'volume' }, { id: 'bbands' }],
+    });
+    // Four studies, three panes: an overlay costs the chart no height at all.
+    assert.equal(spec.studies.length, 4);
+    assert.equal(spec.refused.length, 0);
   });
 
   check('a study that is drawn is named in the caption with its real parameters', () => {
@@ -5171,19 +5262,66 @@ try {
     assert.ok(portalKnowledge.portalSection('Expert Services', MENU));
   });
 
-  group('The pane limitation is a switch, not a permanent statement');
+  group('The pane capability is a switch, not a permanent statement');
+
+  check('a spec becomes real pane requests, all the way to the engine', () => {
+    /*
+     * The end-to-end claim, checked without a browser: the studies in a clamped
+     * spec are built by the chart's own `createIndicator`, and what comes out
+     * asks the layout for panes.
+     *
+     * This is the check that would have caught the integration bug worth
+     * catching. Voyager used to assemble indicator instances by hand with
+     * `pane: 'main'` written in, so flipping the capability flag on its own
+     * would have produced an RSI at 62 drawn across a price chart at 430 — a
+     * feature flag saying yes over a renderer doing the old thing.
+     */
+    assert.equal(engine.ENGINE_DRAWS_SEPARATE_PANES, true);
+
+    const spec = chart.clampChartSpec({
+      kind: 'candles',
+      series: [{ assetId: 'a', symbol: 'TSLA', label: 'Tesla', field: 'close' }],
+      range: { start: '2026-01-01', end: '2026-08-09' },
+      interval: '1D',
+      studies: [{ id: 'sma' }, { id: 'rsi' }, { id: 'macd' }, { id: 'volume' }],
+      sourceMeta: { provider: 'Twelve Data', delayed: true, hasVolume: true },
+    });
+
+    const built = spec.studies.map((study) =>
+      indicators.createIndicator(study.id, testBars, study.params, { source: 'voyager' })
+    );
+    assert.ok(built.every(Boolean), 'a study in the spec that the chart cannot build');
+
+    const requests = indicators.collectPaneRequests(built);
+    assert.deepEqual(requests.map((request) => request.id), ['rsi', 'macd', 'volume']);
+
+    // A scale each, and none of them the price's.
+    assert.equal(requests[0].scale.kind, 'fixed');
+    assert.equal(requests[1].scale.kind, 'symmetric');
+    assert.equal(requests[2].scale.kind, 'zeroBased');
+    // RSI's guides travel with it, so 30 and 70 are drawn rather than described.
+    assert.deepEqual(requests[0].guides, [30, 70]);
+    // MACD arrives as three series in one pane: line, signal and histogram.
+    assert.equal(requests[1].series.length, 3);
+    // And the moving average asked for no pane at all — it is on the price.
+    assert.equal(requests.length, 3);
+  });
 
   check('one flag decides both what is drawn and what is handed over', () => {
     /*
-     * The `supercharts` dependency must not calcify. When a pane manager lands,
-     * flipping `ENGINE_DRAWS_SEPARATE_PANES` returns RSI and MACD to the chart
-     * and removes them from the handoff table together — no planner change, no
-     * handoff change, no answer-contract change.
+     * The `supercharts` dependency must not calcify in either direction. This
+     * constant returned RSI, MACD and the volume pane to the chart and removed
+     * them from the handoff table together — and setting it back moves all of
+     * them the other way, with no planner, handoff or answer-contract change.
      */
     const drawsPanes = engine.ENGINE_DRAWS_SEPARATE_PANES;
 
     for (const id of ['rsi', 'macd']) {
       assert.equal(chart.RENDERABLE_STUDIES.includes(id), drawsPanes, id);
+      assert.equal(tv.needsHandoff(id), !drawsPanes, id);
+    }
+
+    for (const id of ['volume_pane', 'multi_pane_layout']) {
       assert.equal(tv.needsHandoff(id), !drawsPanes, id);
     }
 
@@ -5241,7 +5379,8 @@ try {
       'range_bars',
       'tpo_profile',
       'session_volume_profile',
-      'multi_pane_layout',
+      'complex_drawings',
+      'large_indicator_stack',
       'bar_replay',
       'strategy_backtest',
       'pine_execution',
@@ -5251,18 +5390,86 @@ try {
   });
 
   check('and what this surface really draws is not', () => {
-    for (const id of ['line', 'area', 'candles', 'moving_average', 'bollinger_bands', 'drawdown']) {
+    for (const id of [
+      'line',
+      'area',
+      'candles',
+      'comparison',
+      'normalized_performance',
+      'drawdown',
+      'moving_average',
+      'bollinger_bands',
+      'rsi',
+      'macd',
+      'volume_pane',
+      'multi_pane_layout',
+    ]) {
       assert.equal(tv.needsHandoff(id), false, id);
+      // Nothing that is drawn here carries an apology for not being drawn here.
+      assert.equal(tv.CHART_FEATURES[id].reason, undefined, id);
     }
   });
 
-  check('the pane studies are handoffs, and say why', () => {
-    // Registered as a superchart dependency: an oscillator needs its own pane
-    // and its own scale, which the engine does not paint.
-    for (const id of ['rsi', 'macd', 'volume_pane']) {
-      assert.equal(tv.needsHandoff(id), true, id);
-      assert.match(tv.CHART_FEATURES[id].reason, /own pane|own scale/i);
+  check('the checks that sent the pane studies away are kept, not deleted', () => {
+    /*
+     * They stopped firing because the capability became real. The distinction
+     * matters: a table that had the feature checks removed cannot notice a
+     * regression, and would keep promising RSI to a surface that had lost its
+     * pane manager. `paneStudy` still asks the engine on every read.
+     */
+    const source = readFileSync('src/lib/voyager/tools/tradingView.ts', 'utf8');
+    for (const id of ['rsi', 'macd', 'volume_pane', 'multi_pane_layout']) {
+      assert.match(source, new RegExp(`${id}: paneStudy\\(`), id);
     }
+    assert.ok(source.includes('ENGINE_DRAWS_SEPARATE_PANES'));
+    assert.ok(source.includes('PANE_STUDY_NOTE'));
+  });
+
+  check('a handoff nobody needs is refused rather than built', () => {
+    /*
+     * The mirror of the old defect. Sending somebody to TradingView for an RSI
+     * this chart now draws gives away work the product does, and the person
+     * leaves for something that was already on their screen.
+     */
+    assert.equal(tv.handoffIsUnnecessary(['rsi', 'macd', 'volume_pane']), true);
+    assert.deepEqual(tv.nativeFeatures(['rsi', 'renko']), ['rsi']);
+
+    // One unsupported feature is enough to make the handoff the right answer.
+    assert.equal(tv.handoffIsUnnecessary(['rsi', 'renko']), false);
+    // And naming nothing is a request in itself — "open it on TradingView".
+    assert.equal(tv.handoffIsUnnecessary([]), false);
+  });
+
+  check('and the tool enforces that rather than only describing it', () => {
+    /*
+     * The rule lives in the capability table, and the tool asks the table. A
+     * capability moving between the two sides therefore changes what the tool
+     * refuses without this line being edited — which is the difference between
+     * a rule and a copy of one.
+     */
+    const source = readFileSync('src/lib/voyager/tools/registry.ts', 'utf8');
+    assert.ok(source.includes('handoffIsUnnecessary(features)'));
+    assert.ok(source.includes('nativeFeatures(features)'));
+  });
+
+  check('the planner is told what leaves and what stays, by capability', () => {
+    /*
+     * The distinction is semantic and stays in the closed vocabulary: the
+     * planner is not given a list of English words to match on. What it is
+     * given is which capabilities are here — and the tool that hands work over
+     * must no longer name an oscillator among its reasons to be called.
+     */
+    const source = readFileSync('src/lib/voyager/tools/registry.ts', 'utf8');
+    const description = source.slice(source.indexOf('tradingview_handoff: {'));
+    const brief = description.slice(0, description.indexOf('inputSchema'));
+
+    for (const professional of ['Renko', 'Kagi', 'Point & Figure', 'backtest', 'Pine']) {
+      assert.ok(brief.includes(professional), `${professional} stopped being a handoff`);
+    }
+    assert.ok(/Do not call it for RSI, MACD, a volume pane/.test(brief), brief.slice(-260));
+
+    const rules = readFileSync('src/lib/voyager/orchestrator.ts', 'utf8');
+    assert.ok(rules.includes('rsi, macd and volume each get a pane of their own beneath it'));
   });
 
   group('The destination is built here, never written by a model');
@@ -5289,10 +5496,14 @@ try {
      * drawing or a date range — so those are things to set on arrival, not
      * things that travelled.
      */
-    const handoff = tv.chartHandoff({ symbol: 'TSLA', interval: '1D', features: ['rsi', 'renko'] });
+    const handoff = tv.chartHandoff({
+      symbol: 'TSLA',
+      interval: '1D',
+      features: ['session_volume_profile', 'renko'],
+    });
     const carried = handoff.carried.map((item) => item.label.toLowerCase()).join(' ');
-    assert.ok(!/rsi|renko|range|study/.test(carried), carried);
-    assert.ok(handoff.manual.some((item) => /rsi/i.test(item)));
+    assert.ok(!/profile|renko|range|study/.test(carried), carried);
+    assert.ok(handoff.manual.some((item) => /volume profile/i.test(item)));
     assert.ok(handoff.manual.some((item) => /date range/i.test(item)));
   });
 
@@ -5401,14 +5612,37 @@ try {
   });
 
   check('an edit cannot smuggle in what the original could not contain', () => {
-    // Asking for RSI third is refused exactly as asking for it first was.
-    const after = chart.applyChartEdit(specOf(), {
+    /*
+     * Asking third is refused exactly as asking first was, because the edited
+     * spec goes back through the same clamp. Volume on data the provider sent
+     * without any is the case that survives the panes landing — the chart can
+     * draw a volume pane, and there is still no volume here to put in one.
+     */
+    const noVolume = specOf({
+      sourceMeta: {
+        provider: 'Twelve Data',
+        firstObservation: '2026-01-02',
+        lastObservation: '2026-08-07',
+        delayed: true,
+        derivedFromDaily: false,
+        hasVolume: false,
+      },
+    });
+
+    const after = chart.applyChartEdit(noVolume, { kind: 'add_study', study: { id: 'volume' } });
+    assert.equal(after.studies.length, 0);
+    assert.equal(after.refused.length, 1);
+    assert.ok(!/volume/i.test(chart.describeChart(after)));
+  });
+
+  check('and RSI added third is drawn, exactly as RSI asked for first is', () => {
+    const after = chart.applyChartEdit(specOf({ kind: 'candles' }), {
       kind: 'add_study',
       study: { id: 'rsi', params: { length: 14 } },
     });
-    assert.equal(after.studies.length, 0);
-    assert.equal(after.refused.length, 1);
-    assert.ok(!/rsi/i.test(chart.describeChart(after)));
+    assert.deepEqual(after.studies.map((study) => study.id), ['rsi']);
+    assert.equal(after.refused.length, 0);
+    assert.match(chart.describeChart(after), /RSI 14 in a pane below the price/);
   });
 
   check('removing a study takes its apology with it', () => {

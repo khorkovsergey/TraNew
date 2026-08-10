@@ -448,10 +448,14 @@ try {
 
   /*
    * The regression this group exists for: a module described "RSI and three
-   * detected levels" over a canvas drawing plain candles. The caption is now
-   * generated from the same specification the engine is given, after the
-   * unrenderable studies have been removed from it — so the check is that RSI
-   * is *absent* from the caption and *stated* as refused.
+   * detected levels" over a canvas drawing plain candles. The caption is
+   * generated from the same specification the engine is given, after everything
+   * unrenderable has been removed from it — so caption and picture cannot
+   * disagree in either direction.
+   *
+   * RSI, MACD and volume are now on the drawable side of that line, because the
+   * engine has a pane manager. The check is therefore the opposite of what it
+   * was: they must be *named*, and named as panes.
    */
   await page.unroute('**/api/voyager');
   await page.unroute('**/api/voyager?*');
@@ -464,29 +468,33 @@ try {
     actions: [{ label: 'Open on chart', action: 'open_chart', primary: true }],
     followUps: [],
     citations: [{ label: 'Market data & news' }],
-    tools: ['history(TSLA 1D)', 'chart(line)'],
+    tools: ['history(TSLA 1D)', 'chart(candles)'],
     chart: {
       spec: {
         version: 1,
-        kind: 'line',
+        kind: 'candles',
         series: [
           { assetId: 'stock:TSLA', symbol: 'TSLA', label: 'Tesla, Inc.', field: 'close' },
         ],
         range: { start: '2026-01-01', end: '2026-03-01' },
         interval: '1D',
-        studies: [{ id: 'sma', params: { fast: 50, slow: 200 } }],
+        studies: [
+          { id: 'sma', params: { fast: 50, slow: 200 } },
+          { id: 'rsi', params: { length: 14 } },
+          { id: 'macd', params: { fast: 12, slow: 26, signal: 9 } },
+          { id: 'volume', params: {} },
+        ],
         sourceMeta: {
           provider: 'Twelve Data',
           firstObservation: '2026-01-05',
           lastObservation: '2026-02-27',
           delayed: true,
           derivedFromDaily: false,
+          hasVolume: true,
         },
-        refused: [
-          { study: 'rsi', reason: 'RSI needs its own pane and its own scale, which this chart does not have. It is available on the full chart.' },
-        ],
+        refused: [],
       },
-      series: [{ assetId: 'stock:TSLA', bars: fixtureBars(40) }],
+      series: [{ assetId: 'stock:TSLA', bars: fixtureBars(60) }],
     },
   });
 
@@ -494,7 +502,9 @@ try {
   await page.evaluate(() => sessionStorage.clear());
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(600);
-  await page.getByRole('textbox', { name: 'Ask Voyager' }).fill('Chart Tesla with RSI and 50/200 averages');
+  await page
+    .getByRole('textbox', { name: 'Ask Voyager' })
+    .fill('Show Tesla candles with volume, RSI and MACD');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(2500);
 
@@ -503,16 +513,92 @@ try {
   check('on a canvas, by the engine', (await page.locator('figure canvas').count()) >= 1);
 
   const caption = await page.locator('figcaption').first().innerText();
-  check('the caption names the study that is on the chart', /MA 50\/200/.test(caption), caption);
-  check('and never the one that is not', !/RSI/i.test(caption), caption);
+  check('the caption names the overlay that is on the price', /MA 50\/200/.test(caption), caption);
+  check('and the oscillators, which are no longer refused', /RSI 14/.test(caption), caption);
+  check('MACD among them', /MACD 12\/26\/9/.test(caption), caption);
+  check('and volume', /Volume/.test(caption), caption);
+  check(
+    'said as panes, because that is where they are',
+    /3 panes below the price/.test(caption),
+    caption
+  );
   check('it reports the dates it has, not the ones asked for', /2026-01-05/.test(caption), caption);
   check('and says the data is delayed', /delayed/i.test(caption), caption);
 
   const chartText = await chartBlock.innerText();
   check(
-    'what the chart will not draw is said out loud rather than left to be noticed',
-    /RSI needs its own pane/i.test(chartText),
+    'nothing is apologised for on a chart that drew everything',
+    !/available on the professional chart/i.test(chartText),
     chartText.slice(0, 160)
+  );
+
+  /*
+   * The limitation that survives the panes landing: a volume pane the engine can
+   * draw, and no volume in the data to put in it. Still said out loud, and still
+   * absent from the caption.
+   */
+  await page.unroute('**/api/voyager');
+  await page.unroute('**/api/voyager?*');
+  await stubAnswer(page, {
+    contentType: 'AI analysis',
+    text: 'Here is the price. The provider sent no volume for this one.',
+    bullets: [],
+    sources: 'Twelve Data',
+    confidence: 'medium',
+    actions: [],
+    followUps: [],
+    citations: [{ label: 'Market data & news' }],
+    tools: ['history(TSLA 1D)', 'chart(candles)'],
+    chart: {
+      spec: {
+        version: 1,
+        kind: 'candles',
+        series: [
+          { assetId: 'stock:TSLA', symbol: 'TSLA', label: 'Tesla, Inc.', field: 'close' },
+        ],
+        range: { start: '2026-01-01', end: '2026-03-01' },
+        interval: '1D',
+        studies: [{ id: 'rsi', params: { length: 14 } }],
+        sourceMeta: {
+          provider: 'Twelve Data',
+          firstObservation: '2026-01-05',
+          lastObservation: '2026-02-27',
+          delayed: true,
+          derivedFromDaily: false,
+          hasVolume: false,
+        },
+        refused: [
+          {
+            study: 'volume',
+            reason:
+              'The data provider returned these prices without a traded volume, so there is no volume to draw.',
+          },
+        ],
+      },
+      series: [{ assetId: 'stock:TSLA', bars: fixtureBars(40).map(({ volume, ...bar }) => bar) }],
+    },
+  });
+
+  await page.goto(`${BASE}/en/voyager`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(600);
+  await page
+    .getByRole('textbox', { name: 'Ask Voyager' })
+    .fill('Show Tesla candles with volume');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(2500);
+
+  const missing = await page.locator('figure').first().innerText();
+  check(
+    'a volume pane with no volume behind it is refused out loud',
+    /no volume to draw/i.test(missing),
+    missing.slice(0, 200)
+  );
+  check(
+    'and the caption does not mention it',
+    !/volume/i.test(await page.locator('figcaption').first().innerText()),
+    missing.slice(0, 200)
   );
 
   await page.unroute('**/api/voyager');
