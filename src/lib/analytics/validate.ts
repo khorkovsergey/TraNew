@@ -18,8 +18,21 @@ import {
   FORBIDDEN_PROPERTY_NAMES,
   TOKEN_PATTERN,
   type EventDefinition,
+  type EventKind,
   type PropertySpec,
 } from './registry';
+
+/**
+ * Which kinds each entry point may accept.
+ *
+ * Two lists rather than one because they are opposite trust boundaries, not a
+ * setting. A browser may never post a `server` event — it cannot observe what
+ * one describes, so anything claiming to be one is forged. And the server
+ * tracker may never write a `client` event, or a feature could manufacture an
+ * interaction that nobody had.
+ */
+export const CLIENT_KINDS: readonly EventKind[] = ['client'];
+export const SERVER_KINDS: readonly EventKind[] = ['server', 'operational'];
 
 /* ----------------------------------------------------------------- Limits */
 
@@ -105,7 +118,27 @@ export type RawEvent = {
   schemaVersion?: unknown;
 };
 
-export function validateEvent(raw: RawEvent, now: Date): ValidationResult {
+/**
+ * One validator, both directions.
+ *
+ * `allowedKinds` is the only thing that differs between the browser posting an
+ * event and the server recording one. Everything else — the allowlist, the
+ * property contract, the token pattern, the forbidden names, the timestamp
+ * window — is identical, and identical because it is literally the same code.
+ *
+ * That parameter is why this function is shaped this way rather than copied.
+ * The server tracker originally checked only that an event existed and was of a
+ * server kind, and passed its properties through unread; a feature-local call
+ * site could then have written `{ prompt: '…' }` into the table, and the
+ * registry's inability to *declare* free text would not have stopped it,
+ * because nothing was consulting the registry. A second server-side schema
+ * would have had the same failure mode one refactor later.
+ */
+export function validateEvent(
+  raw: RawEvent,
+  now: Date,
+  allowedKinds: readonly EventKind[] = CLIENT_KINDS
+): ValidationResult {
   if (!raw || typeof raw !== 'object') return reject('malformed', 'not an object');
 
   const { name } = raw;
@@ -122,11 +155,13 @@ export function validateEvent(raw: RawEvent, now: Date): ValidationResult {
    */
   if (definition.lifecycle === 'legacy') return reject('legacy_event', name);
 
-  if (definition.kind !== 'client') {
-    // Server and operational events are written by the server helper directly.
-    // Accepting one over HTTP would let a browser forge an outcome the browser
-    // cannot observe.
-    return reject('unknown_event', `${name} is not client-emitted`);
+  if (!allowedKinds.includes(definition.kind)) {
+    /*
+     * Refused in both directions. A browser posting a `server` event would be
+     * forging an outcome it cannot observe; the server tracker writing a
+     * `client` event would be manufacturing an interaction nobody had.
+     */
+    return reject('unknown_event', `${name} is ${definition.kind}, not ${allowedKinds.join('|')}`);
   }
 
   const occurredAt = readTimestamp(raw.occurredAt, now);
@@ -215,6 +250,38 @@ export function validateBatch(rawEvents: unknown, now: Date): BatchResult | Reje
   }
 
   return { accepted, rejected };
+}
+
+/* ------------------------------------------------------- The last line */
+
+/**
+ * Whether a row about to be written matches its declared shape.
+ *
+ * Defence in depth, checked at the point of persistence rather than at either
+ * entry point. Both callers validate before they get here and this should never
+ * fail — which is exactly the argument for having it: the guarantee becomes a
+ * property of the table rather than a property of everybody who ever writes to
+ * it. A call site added in two years' time that assembles a row by hand cannot
+ * put an undeclared field in the database, whatever it forgot to call.
+ *
+ * Deliberately a predicate rather than a sanitiser. Dropping the row loses one
+ * event; silently stripping a field would leave a row that looks complete and
+ * is not, which is worse in a table people will draw conclusions from.
+ */
+export function conformsToRegistry(
+  eventName: string,
+  properties: Record<string, unknown>
+): boolean {
+  const definition = EVENT_BY_NAME.get(eventName);
+  if (!definition) return false;
+
+  for (const [key, value] of Object.entries(properties)) {
+    const spec = definition.properties[key];
+    if (!spec) return false;
+    if (checkProperty(spec, value)) return false;
+  }
+
+  return true;
 }
 
 /* ------------------------------------------------- The registry's own audit */

@@ -152,6 +152,30 @@ four kinds — a closed enum, a bounded token, a bounded integer, a boolean — 
 question, an answer, a note, a brief or a search query, so the privacy rule is
 not a review item.
 
+That is necessary and was briefly not sufficient. The first cut of
+`recordServerEvent` checked that an event existed and was of a server kind, then
+passed its properties through unread — so a call site could have written
+`{ prompt: '…' }` into the table, and the registry's inability to *declare* free
+text would not have stopped it, because nothing on that path was consulting the
+registry. Corrected by the changes below:
+
+- **One validator, both directions.** `validateEvent` takes the allowed event
+  kinds as an argument — `CLIENT_KINDS` for ingest, `SERVER_KINDS` for the
+  tracker — and everything else is the same code. There is no second
+  server-side schema to drift.
+- **The boundary is refused both ways.** A browser cannot post a `server` event
+  (it cannot observe what one describes), and the tracker cannot write a
+  `client` event (it would manufacture an interaction nobody had).
+- **`persistEvents` checks every row against the registry before writing.** Both
+  callers have already validated, so this should never drop anything — which is
+  the argument for it. The guarantee becomes a property of the table rather than
+  of everyone who ever writes to it, and a call site added in two years cannot
+  put an undeclared field in the database whatever it forgot to call.
+- Rejections are dropped, never thrown, and never reported as telemetry — an
+  event about a rejected event recurses the first time the reporting event is
+  itself malformed. In development it prints, because a rejection here is a
+  programming error at a call site.
+
 Second lock: `FORBIDDEN_PROPERTY_NAMES` rejects field names that would be
 well-formed tokens and still wrong — `email` is short, an IP matches the token
 pattern, a ticker is a position somebody may hold. `auditRegistry()` runs over
@@ -232,13 +256,27 @@ construction.
 
 ## Verification
 
-`node scripts/verify-admin-metrics.mjs` — 71 checks, all passing.
-`--unit` runs the 54 that need no server, for the commit gate.
+```
+node scripts/verify-admin-metrics.mjs            71 checks, writes nothing
+node scripts/verify-admin-metrics.mjs --unit     the same, said explicitly
+node scripts/verify-admin-metrics.mjs --live     89 checks, real app and database
+```
 
-The live half runs against a real app and the real database, including a real
-Chromium page load that proves `setAnalyticsSink` is wired, the queue flushes,
-the batch reaches ingest, and the row lands in `product_telemetry_event`.
+**The live half is opt-in, and that is deliberate.** `DATABASE_URL` in every
+worktree of this project points at the production database, so running the
+verification the obvious way must not mutate production telemetry however
+carefully it tidies up. Cleanup in `finally` protects against a failing
+assertion; it does not protect against somebody running a command they believed
+was read-only. The default mode says out loud that the live checks were skipped
+and how to ask for them, so a green run cannot be mistaken for full coverage.
 
-It writes to the production database, because every worktree in this project
-shares it. Its rows go under one sentinel session and are deleted in a `finally`
-block whatever happens. The table was left at zero rows.
+`--live` announces the database host and the sentinel session before it writes
+anything. Its rows go under one fixed sentinel session, exactly that session is
+deleted in a `finally` block, and the deletion is limited to rows the
+verification owns. Last run: 89/89, seven rows cleaned up, table left at zero.
+
+It includes a real Chromium page load that proves `setAnalyticsSink` is wired,
+the queue flushes, the batch reaches ingest, and the row lands in
+`product_telemetry_event` — and a real server event written by the ingest route
+through `recordServerEvent`, read back to confirm it carries exactly its two
+declared properties and nothing else.

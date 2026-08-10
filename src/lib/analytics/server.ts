@@ -1,8 +1,8 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { db, schema } from '@/db';
-import { EVENT_BY_NAME } from './registry';
 import { pseudonymousUserKey, visitorKeyForSession } from './serverIdentity';
+import { conformsToRegistry, SERVER_KINDS, validateEvent } from './validate';
 
 /**
  * Writing telemetry, and the server-side tracker.
@@ -50,11 +50,26 @@ export type TelemetryRow = {
  * only to answer honestly.
  */
 export async function persistEvents(rows: TelemetryRow[]): Promise<number | null> {
-  if (rows.length === 0) return 0;
+  /*
+   * The last line, and the one that makes the privacy contract a property of
+   * the table rather than of every caller. Both entry points validate before
+   * reaching here, so this should never drop anything — which is the point: a
+   * row assembled by hand somewhere else, by somebody who did not know about
+   * the validator, still cannot put an undeclared field in the database.
+   */
+  const conforming = rows.filter((row) => conformsToRegistry(row.eventName, row.properties));
+
+  if (conforming.length !== rows.length && process.env.NODE_ENV !== 'production') {
+    console.warn(
+      `[analytics] dropped ${rows.length - conforming.length} row(s) that did not match the registry`
+    );
+  }
+
+  if (conforming.length === 0) return 0;
 
   try {
     await db.insert(schema.productTelemetryEvent).values(
-      rows.map((row) => ({
+      conforming.map((row) => ({
         id: randomUUID(),
         schemaVersion: row.schemaVersion,
         occurredAt: row.occurredAt,
@@ -74,7 +89,7 @@ export async function persistEvents(rows: TelemetryRow[]): Promise<number | null
       }))
     );
 
-    return rows.length;
+    return conforming.length;
   } catch {
     /*
      * Deliberately silent, and deliberately not rethrown. The ingest route
@@ -127,23 +142,54 @@ export function trackServerEvent(input: ServerEventInput): void {
 /** The awaitable form, for the verification suite and for tests. */
 export async function recordServerEvent(input: ServerEventInput): Promise<number | null> {
   try {
-    const definition = EVENT_BY_NAME.get(input.name);
+    const now = new Date();
 
-    // An unregistered server event is a programming error, not a runtime one.
-    // Dropping it keeps the table describable: every row matches a declared
-    // shape, which is the property the whole registry exists to guarantee.
-    if (!definition) return null;
-    if (definition.kind === 'client') return null;
+    /*
+     * The same validator the browser's events go through, with the only
+     * difference named explicitly: which kinds are acceptable from this
+     * direction.
+     *
+     * This used to check the event name and its kind and then pass
+     * `input.properties` through unread — so a call site could have written
+     * `{ prompt: '…' }` straight into the table. The registry's inability to
+     * *declare* free text was no protection, because nothing was consulting the
+     * registry. A separate server-side schema would have drifted into the same
+     * hole; this cannot, because there is only one contract and both entry
+     * points are the same call.
+     */
+    const result = validateEvent(
+      {
+        name: input.name,
+        occurredAt: (input.occurredAt ?? now).toISOString(),
+        properties: input.properties ?? {},
+      },
+      now,
+      SERVER_KINDS
+    );
+
+    if (!result.ok) {
+      /*
+       * Dropped, never thrown, and never reported as telemetry — an event about
+       * a rejected event would recurse the first time the reporting event was
+       * itself malformed. In development it prints, because a rejection here is
+       * a programming error at a call site and silence would hide it until
+       * somebody noticed a metric that never moved.
+       */
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`[analytics] server event refused: ${input.name} — ${result.reason} (${result.detail})`);
+      }
+      return null;
+    }
 
     const sessionId = input.sessionId ?? `s_${'0'.repeat(32)}`;
 
     return await persistEvents([
       {
-        schemaVersion: definition.schemaVersion,
-        occurredAt: input.occurredAt ?? new Date(),
-        eventName: definition.name,
-        eventKind: definition.kind,
-        surface: input.surface ?? definition.surface,
+        schemaVersion: result.definition.schemaVersion,
+        occurredAt: result.occurredAt,
+        eventName: result.definition.name,
+        eventKind: result.definition.kind,
+        surface: input.surface ?? result.definition.surface,
         routeTemplate: input.routeTemplate ?? null,
         sessionId,
         visitorKeyHash: input.sessionId ? visitorKeyForSession(input.sessionId) : null,
@@ -153,7 +199,10 @@ export async function recordServerEvent(input: ServerEventInput): Promise<number
         acquisitionSource: null,
         deviceClass: null,
         featureState: 'live',
-        properties: input.properties ?? {},
+        // The validator's output, not the caller's input: anything undeclared
+        // was rejected above rather than trimmed, so these are exactly the
+        // properties the registry names.
+        properties: result.properties,
       },
     ]);
   } catch {

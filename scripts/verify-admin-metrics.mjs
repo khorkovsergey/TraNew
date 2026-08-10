@@ -23,23 +23,28 @@ import assert from 'node:assert/strict';
  * back out through the real query. Anything less would be testing a drawing of
  * a pipeline.
  *
- *   node scripts/verify-admin-metrics.mjs --unit     unit only, for the commit gate
- *   node scripts/verify-admin-metrics.mjs            unit + live
+ *   node scripts/verify-admin-metrics.mjs            unit only — writes nothing
+ *   node scripts/verify-admin-metrics.mjs --unit     the same, said explicitly
+ *   node scripts/verify-admin-metrics.mjs --live     adds the real app and database
  *
- * ## What the live half writes, and how it cleans up
+ * ## Why the live half is opt-in
  *
  * Every worktree in this project shares one database, and it is the production
- * one. So the live half writes its rows under a single fixed sentinel session —
- * `s_deadbeef…` — and deletes exactly that session at the end, whatever
- * happened in between. Nothing else is touched, and a real session id is 32
- * random hex characters, so the sentinel cannot collide with one.
+ * one. So the live half is **not** the default: running the verification the
+ * obvious way must never mutate production telemetry, however carefully it
+ * cleans up afterwards. A cleanup in `finally` protects against a failing
+ * assertion; it does not protect against somebody running a command they
+ * thought was read-only.
  *
- * This is disclosed rather than hidden: a verification that writes to a
- * production table should say so where somebody running it will read it.
+ * With `--live`, the rows go under a single fixed sentinel session —
+ * `s_deadbeef…` — and exactly that session is deleted at the end, whatever
+ * happened in between. Nothing else is touched, and a real session id is 32
+ * random hex characters, so the sentinel cannot collide with one. The mode
+ * announces itself before it writes anything.
  */
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3414';
-const UNIT_ONLY = process.argv.includes('--unit');
+const LIVE = process.argv.includes('--live');
 const SENTINEL_SESSION = `s_${'deadbeef'.repeat(4)}`;
 
 /** Kept in step with QUEUE_LIMITS.flushIntervalMs, which the browser test waits out. */
@@ -266,6 +271,139 @@ try {
     );
     assert.equal(result.accepted.length, 2);
     assert.equal(result.rejected.length, 1);
+  });
+
+  /* -------------------------------------------------- Server telemetry path */
+
+  group('Server telemetry obeys the same contract as the browser');
+
+  /*
+   * The gap these close. `recordServerEvent` used to check that an event
+   * existed and was of a server kind, then pass its properties through unread —
+   * so a feature-local call site could have written a prompt, a message or a
+   * provider's error body straight into the table. The registry's inability to
+   * declare free text was no protection, because nothing was consulting the
+   * registry on that path.
+   *
+   * `SERVER_KINDS` is the argument the server tracker passes, so these run the
+   * same function, with the same argument, that persistence now depends on.
+   */
+  const asServer = (raw) => validate.validateEvent(raw, NOW, validate.SERVER_KINDS);
+  const serverEvent = (properties) => ({
+    name: 'telemetry_ingest_rejected',
+    occurredAt: NOW.toISOString(),
+    properties,
+  });
+
+  check('a server event with an unknown property is refused', () => {
+    const result = asServer(serverEvent({ reason: 'malformed', eventName: 'x', extra: 'y' }));
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'unknown_property');
+  });
+
+  for (const [field, value] of [
+    ['prompt', 'what should I do with my pension'],
+    ['message', 'the user said they hold 400 shares'],
+    ['answer', 'sell half'],
+    ['note', 'private'],
+    ['brief', 'retire early'],
+    ['body', 'provider returned: {"error":"context: user asked about TSLA"}'],
+  ]) {
+    check(`a server event carrying "${field}" never reaches persistence`, () => {
+      const result = asServer(serverEvent({ reason: 'malformed', eventName: 'x', [field]: value }));
+      assert.equal(result.ok, false, `${field} was accepted`);
+      assert.equal(result.reason, 'unknown_property');
+    });
+  }
+
+  check('a raw provider error body cannot be squeezed into a declared token', () => {
+    // The realistic mistake: reusing a declared field to carry an error string.
+    const result = asServer(
+      serverEvent({ reason: 'malformed', eventName: 'upstream said: user asked about TSLA' })
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'bad_property_value');
+  });
+
+  check('a server event with a wrong property type is refused', () => {
+    const result = asServer(serverEvent({ reason: 42, eventName: 'x' }));
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'bad_property_value');
+  });
+
+  check('a server event outside its declared enum is refused', () => {
+    const result = asServer(serverEvent({ reason: 'because_i_said_so', eventName: 'x' }));
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'bad_property_value');
+  });
+
+  check('a correctly shaped server event is accepted with exactly its properties', () => {
+    const result = asServer(serverEvent({ reason: 'unknown_event', eventName: 'made_up' }));
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.deepEqual(result.properties, { reason: 'unknown_event', eventName: 'made_up' });
+    assert.equal(result.definition.kind, 'operational');
+  });
+
+  check('an unknown server event is dropped', () => {
+    const result = asServer({ name: 'no_such_server_event', occurredAt: NOW.toISOString(), properties: {} });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'unknown_event');
+  });
+
+  check('a client event cannot be injected through the server tracker', () => {
+    const result = asServer({
+      name: 'voyager_opened',
+      occurredAt: NOW.toISOString(),
+      properties: { source: 'home', hasQuestion: true },
+    });
+    assert.equal(result.ok, false, 'a client event was writable from the server');
+    assert.equal(result.reason, 'unknown_event');
+  });
+
+  check('a server event cannot be posted by a browser either', () => {
+    // The same boundary from the other side, so neither direction is one-way.
+    const result = validate.validateEvent(serverEvent({ reason: 'malformed', eventName: 'x' }), NOW);
+    assert.equal(result.ok, false);
+  });
+
+  check('validation never throws, whatever it is handed', () => {
+    /*
+     * The property that keeps analytics from failing the thing it measures. The
+     * tracker wraps this in a try, but a validator that throws on odd input
+     * would still be a validator nobody could call from a hot path with
+     * confidence.
+     */
+    for (const nonsense of [null, undefined, 42, 'string', [], { name: 42 }, { name: 'x', properties: [] }, { name: 'telemetry_ingest_rejected', properties: null }]) {
+      assert.doesNotThrow(() => asServer(nonsense), `threw on ${JSON.stringify(nonsense)}`);
+    }
+  });
+
+  group('Persistence itself refuses an undeclared row');
+
+  check('a hand-assembled row with an undeclared property does not conform', () => {
+    /*
+     * The last line, checked at the point of writing rather than at either
+     * entry point — so a call site added later, by somebody who never heard of
+     * the validator, still cannot put an undeclared field in the table.
+     */
+    assert.equal(
+      validate.conformsToRegistry('telemetry_ingest_rejected', { reason: 'malformed', eventName: 'x' }),
+      true
+    );
+    assert.equal(
+      validate.conformsToRegistry('telemetry_ingest_rejected', { reason: 'malformed', eventName: 'x', prompt: 'private' }),
+      false
+    );
+    assert.equal(validate.conformsToRegistry('not_an_event', {}), false);
+    assert.equal(validate.conformsToRegistry('telemetry_ingest_rejected', { reason: 'nope', eventName: 'x' }), false);
+  });
+
+  check('persistence consults the registry rather than trusting its caller', () => {
+    // A source assertion, kept to one line: the defence above is only a defence
+    // while `persistEvents` actually calls it.
+    const source = readFileSync('src/lib/analytics/server.ts', 'utf8');
+    assert.match(source, /conformsToRegistry/, 'persistEvents no longer checks rows against the registry');
+    assert.match(source, /validateEvent\(/, 'recordServerEvent no longer validates through the shared validator');
   });
 
   /* -------------------------------------------------------------- Identity */
@@ -515,8 +653,21 @@ try {
 
   /* ------------------------------------------------------------------ Live */
 
-  if (!UNIT_ONLY) {
+  if (!LIVE) {
+    console.log('\nLive checks skipped.');
+    console.log('  They exercise the real app and write to the configured database.');
+    console.log('  Run them deliberately:  node scripts/verify-admin-metrics.mjs --live');
+  } else {
     group(`Live — real transport, real route, real table (${BASE})`);
+
+    /*
+     * Said out loud before anything is written. DATABASE_URL in every worktree
+     * of this project points at the production database, and somebody running
+     * this should see that before the first insert rather than afterwards.
+     */
+    const host = (process.env.DATABASE_URL ?? '').replace(/^.*@/, '').replace(/[:/].*$/, '') || 'unset';
+    console.log(`  NOTICE  this writes to the configured database (${host}).`);
+    console.log(`          Rows go under session ${SENTINEL_SESSION} and that session is deleted at the end.`);
 
     const reachable = await fetch(`${BASE}/api/health`, { signal: AbortSignal.timeout(5000) })
       .then((r) => r.ok)
@@ -613,6 +764,33 @@ try {
             assert.ok(declared.properties[key], `${row.event_name}.${key} was stored and is not declared`);
           }
         }
+      });
+
+      await checkAsync('a real server event is persisted through the real tracker', async () => {
+        /*
+         * The server path, end to end and not in a harness: rejecting a batch
+         * makes the ingest route call `recordServerEvent`, which validates
+         * against the registry and writes. The row proves the whole chain —
+         * that the tracker persists at all, that it stores the operational
+         * kind, and that what lands is exactly the declared property set.
+         */
+        await postBatch([{ name: 'definitely_not_registered', occurredAt: new Date().toISOString(), properties: {} }]);
+
+        // The tracker is fire-and-forget, so the write trails the response.
+        await new Promise((resolve) => setTimeout(resolve, 1_500));
+
+        const rows = await readSentinel();
+        const written = rows.find((row) => row.event_name === 'telemetry_ingest_rejected');
+
+        assert.ok(written, 'the server tracker persisted nothing');
+        assert.equal(written.event_kind, 'operational');
+        assert.deepEqual(
+          Object.keys(written.properties ?? {}).sort(),
+          ['eventName', 'reason'],
+          'the stored server event carried something undeclared'
+        );
+        assert.equal(written.properties.reason, 'unknown_event');
+        assert.equal(written.user_key_hash, null);
       });
 
       await checkAsync('the metrics API refuses an unauthorized request', async () => {
@@ -804,7 +982,8 @@ try {
   failed += 1;
   console.log(`\n  FAIL the run stopped early — ${String(error).split('\n')[0]}`);
 } finally {
-  if (!UNIT_ONLY) await cleanupSentinel();
+  // Only the live mode can have written anything, so only it cleans up.
+  if (LIVE) await cleanupSentinel();
 
   try {
     rmSync(out, { recursive: true, force: true });
