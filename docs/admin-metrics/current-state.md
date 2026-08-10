@@ -10,6 +10,13 @@ Nothing in this document is implemented yet. Phase 0 is the gate: it exists so
 the schema request to the orchestrator is exact, and so no dashboard card is
 built on a number the portal cannot actually produce.
 
+Two companion documents complete Phase 0:
+[`orchestrator-request.md`](./orchestrator-request.md), the exact schema and
+environment contract, and
+[`design-handoff-review.md`](./design-handoff-review.md), which checks the
+Claude Design handoff's stated assumptions against the code and refutes six of
+them — including the anonymous-retention assumption that §7 below rules out.
+
 ## 0. The one finding that changes the plan
 
 **`npm run check:analytics` is red on `main`, and was already red before this
