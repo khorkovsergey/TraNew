@@ -31,6 +31,7 @@ export type VoyagerToolId =
   | 'get_quote'
   | 'get_history'
   | 'compare_assets'
+  | 'chart_edit'
   | 'tradingview_handoff'
   | 'pine_script'
   | 'page_capabilities'
@@ -43,6 +44,7 @@ export const VOYAGER_TOOL_IDS: VoyagerToolId[] = [
   'get_quote',
   'get_history',
   'compare_assets',
+  'chart_edit',
   'tradingview_handoff',
   'pine_script',
   'page_capabilities',
@@ -96,6 +98,20 @@ export type VoyagerToolSuccess<T> = {
    * of this architecture is for.
    */
   summary: string;
+  /**
+   * What the chips should say, when the arguments do not tell the whole story.
+   *
+   * The default chip is built from what the model asked for, which is right for
+   * every tool whose work is its arguments. It is wrong for the two that reuse:
+   * `compare_assets(NVDA, AMD, MSFT)` names three instruments and may have
+   * fetched one, and the difference is exactly what somebody reading the answer
+   * needs to see. So the tool that knows says, and only after the fact.
+   *
+   * A chip here is a claim about what happened. Anything that did not happen
+   * must not appear in it — a decorative "reused" chip over a real fetch would
+   * be the same lie as an invented source.
+   */
+  chips?: string[];
 };
 
 export type VoyagerToolResult<T = unknown> = VoyagerToolSuccess<T> | VoyagerToolFailure;
@@ -122,6 +138,8 @@ export type ToolTraceEntry = {
   ok: boolean;
   code?: ToolErrorCode;
   call: string;
+  /** Set by a tool that reused something, in place of the argument signature. */
+  chips?: string[];
 };
 
 /**
@@ -136,9 +154,16 @@ export const MAX_TOOL_STEPS = 4;
 /** How many tool calls one round may contain, so a single step cannot fan out forever. */
 export const MAX_CALLS_PER_STEP = 6;
 
-/** The chips an answer shows: successful calls, in the order they ran. */
+/**
+ * The chips an answer shows: successful calls, in the order they ran.
+ *
+ * A call that reported what it actually did replaces its own signature — one
+ * comparison that fetched a single missing instrument shows the fetch and the
+ * reuse separately, because "compare(NVDA, AMD, MSFT)" would otherwise read as
+ * three requests to a provider.
+ */
 export function traceChips(trace: ToolTraceEntry[]): string[] {
-  return trace.filter((entry) => entry.ok).map((entry) => entry.call);
+  return trace.filter((entry) => entry.ok).flatMap((entry) => entry.chips ?? [entry.call]);
 }
 
 /**

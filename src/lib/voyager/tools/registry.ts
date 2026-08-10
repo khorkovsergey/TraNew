@@ -17,6 +17,8 @@ import {
   type TradingViewHandoff,
 } from './tradingView';
 import { STUDY_IDS } from '@/lib/studies/registry';
+import { planChartEdit, type ChartArtifact } from '../chart/artifact';
+import { CHART_KINDS, isVoyagerStudyId, VOYAGER_STUDY_IDS, type ChartKind } from '../chart/spec';
 import { describePage } from '../pages';
 import {
   describeSections,
@@ -56,6 +58,14 @@ export type VoyagerToolContext = {
   tier: VoyagerTier;
   /** The actions this request may offer, so navigation cannot exceed them. */
   allowedActions: VoyagerActionId[];
+  /**
+   * The chart this conversation is already looking at, if it still has one.
+   *
+   * Recalled on the server from an identifier the answer issued — never sent by
+   * the browser as data. See `lib/voyager/artifacts.ts` for why that direction
+   * is the only safe one.
+   */
+  artifact?: ChartArtifact;
 };
 
 export type VoyagerToolDefinition = {
@@ -255,13 +265,127 @@ export const VOYAGER_TOOLS: Record<VoyagerToolId, VoyagerToolDefinition> = {
     requiresAccount: false,
     requiresConfirmation: false,
     available: () => true,
-    execute: async (input) => compareAssets(input),
+    /*
+     * The chart already on screen, when there is one. It is what lets a
+     * comparison that grew by one instrument cost one request instead of three
+     * — and the reuse rules live in the comparison tool, which is where the
+     * period and the interval are known.
+     */
+    execute: async (input, context) =>
+      compareAssets(input, context.artifact ? { artifact: context.artifact } : undefined),
     call: (input) => {
       const list = Array.isArray(input.queries)
         ? input.queries.filter((item): item is string => typeof item === 'string')
         : [];
       return `compare(${list.slice(0, MAX_COMPARE_ASSETS).join(',').slice(0, 40) || '?'})`;
     },
+  },
+
+  chart_edit: {
+    id: 'chart_edit',
+    description:
+      'Change the chart that is already on screen, using the data already fetched for it. No ' +
+      'market request is made. Use it whenever a follow-up is about how the existing chart is ' +
+      'drawn rather than about data it does not have: a different chart type, adding or removing ' +
+      'a study, narrowing to a shorter period inside the one shown, or dropping an instrument ' +
+      'from a comparison. The question may be in any language; what decides is whether the ' +
+      'change needs data, not which words were used. If the change needs history that is not ' +
+      'held — an earlier start, another interval, an instrument that is not on the chart — this ' +
+      'says so and names what it does have, and you should then fetch instead.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: {
+          type: 'string',
+          enum: [...CHART_KINDS, 'unchanged'] as unknown as string[],
+          description: 'How to draw it, or "unchanged" to leave the type alone.',
+        },
+        add_studies: {
+          type: 'array',
+          items: { type: 'string', enum: VOYAGER_STUDY_IDS as unknown as string[] },
+          description: 'Studies to put on the chart, at their standard settings. Empty for none.',
+        },
+        remove_studies: {
+          type: 'array',
+          items: { type: 'string', enum: VOYAGER_STUDY_IDS as unknown as string[] },
+          description: 'Studies to take off. Empty for none.',
+        },
+        start: {
+          type: 'string',
+          description:
+            'First day of a narrower period, YYYY-MM-DD, or "" to keep the period. It must be ' +
+            'inside what the chart already covers; an earlier start needs a fetch.',
+        },
+        end: { type: 'string', description: 'Last day, YYYY-MM-DD, or "" to keep the period.' },
+        remove_symbols: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Instruments to drop from a comparison. Empty for none.',
+        },
+      },
+      required: ['kind', 'add_studies', 'remove_studies', 'start', 'end', 'remove_symbols'],
+      additionalProperties: false,
+    },
+    mutates: false,
+    requiresAccount: false,
+    requiresConfirmation: false,
+    // Offered only when there is something to edit, so the planner is never
+    // told about a capability that would fail on arrival.
+    available: (context) => Boolean(context.artifact),
+    execute: async (input, context) => {
+      const artifact = context.artifact;
+      if (!artifact) {
+        return toolFailure(
+          'not_found',
+          'There is no chart on screen to edit. Fetch the data and draw one first.',
+          false
+        );
+      }
+
+      const strings = (value: unknown): string[] =>
+        Array.isArray(value)
+          ? value.filter((item): item is string => typeof item === 'string').slice(0, 8)
+          : [];
+
+      const start = argString(input.start, 10);
+      const end = argString(input.end, 10);
+
+      const edit = {
+        ...(typeof input.kind === 'string' && input.kind !== 'unchanged'
+          ? { kind: input.kind as ChartKind }
+          : {}),
+        /* Standard settings: this tool composes a chart, and a request to
+           change an indicator's length is a different question that goes
+           through the chart field on a fresh answer. */
+        addStudies: strings(input.add_studies)
+          .filter(isVoyagerStudyId)
+          .map((id) => ({ id, params: {} })),
+        removeStudies: strings(input.remove_studies),
+        ...(start && end ? { range: { start, end } } : {}),
+        removeSymbols: strings(input.remove_symbols),
+      };
+
+      const planned = planChartEdit(artifact, edit);
+      if (!planned.ok) return toolFailure(planned.code, planned.message, true);
+
+      return {
+        ok: true,
+        data: planned,
+        summary: planned.summary,
+        /*
+         * Two chips, both true: what changed, and that the bars behind it were
+         * the ones already held. Nothing here claims a fetch, because none
+         * happened — that is the whole observable difference this tool exists
+         * to make.
+         */
+        chips: [
+          `chart-edit(${planned.changes.join(' ').slice(0, 32)})`,
+          `reuse-history(${planned.reused.join(' ').slice(0, 32)})`,
+        ],
+      };
+    },
+    call: (input) =>
+      `chart-edit(${argString(input.kind, 12) ?? 'edit'})`,
   },
 
   page_capabilities: {
@@ -580,6 +704,10 @@ export async function runToolCalls(
           ok: result.ok,
           code: result.ok ? undefined : result.code,
           call: signature,
+          /* What it did, when that differs from what it was asked to do. A
+             comparison that reused two of three instruments says so here; the
+             signature alone would report three fetches that did not happen. */
+          ...(result.ok && result.chips?.length ? { chips: result.chips } : {}),
         },
       };
     })

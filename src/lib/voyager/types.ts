@@ -159,6 +159,15 @@ export type VoyagerAnswer = {
     series: { assetId: string; bars: ChartBar[]; normalized?: (number | null)[] }[];
   };
   /**
+   * The name of the chart this answer drew, so the next question can change it.
+   *
+   * A name and nothing else. The bars stay on the server; the browser holds an
+   * opaque identifier and quotes it back, which is what makes a follow-up cheap
+   * without making it possible for a browser to supply a price series. A
+   * forged or expired one simply misses, and the request runs as it always did.
+   */
+  artifactId?: string;
+  /**
    * Pine, as an artefact rather than as prose in the answer.
    *
    * It carries its own provenance and its own never-executed sentence, both
@@ -184,6 +193,13 @@ export type VoyagerRequest = {
   disabledSources: string[];
   /** Prior turns, oldest first, so follow-ups make sense. */
   history: { role: 'user' | 'assistant'; text: string }[];
+  /**
+   * The chart this conversation is looking at, by the name the server gave it.
+   *
+   * The only artifact state that crosses the wire. Everything a follow-up
+   * redraws comes from the server's own copy — see `lib/voyager/artifacts.ts`.
+   */
+  artifact?: string;
 };
 
 export type VoyagerResponse = {
