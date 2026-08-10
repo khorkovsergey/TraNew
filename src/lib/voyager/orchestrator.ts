@@ -19,6 +19,7 @@ import {
   type ToolTraceEntry,
   type VoyagerToolResult,
 } from './tools/types';
+import { containerParam, nextContainer } from './tools/container';
 import { chartFromComparison, chartFromHistory } from './chart/build';
 import { pineFromModel, type PineArtifact } from './tools/pine';
 import type { ComparisonResult } from './tools/comparison';
@@ -402,6 +403,16 @@ export async function askVoyager(options: {
   const citations: { label: string; detail?: string }[] = [];
   let searches = 0;
   let investment: InvestmentSummary | undefined;
+  /*
+   * The code-execution container this answer is using, if it acquired one.
+   *
+   * A local inside one execution, which is the entire scoping rule: it cannot
+   * outlive this answer, cannot be written anywhere, and cannot be shared with
+   * another question. Web search filters its results inside a container, so a
+   * round that searched leaves pending work that the next round has to name —
+   * and the API rejects the request outright when it does not.
+   */
+  let container: string | undefined;
   let lastHistory: HistoryResult | undefined;
   let lastComparison: ComparisonResult | undefined;
   let code: PineArtifact | undefined;
@@ -421,6 +432,13 @@ export async function askVoyager(options: {
 
       const response = await client.messages.create({
         model: MODEL,
+        /*
+         * Whatever container this answer is already using, on every request
+         * after the one that created it — the tool round, the `pause_turn`
+         * resume, and the final pass alike. Absent until one exists, so a
+         * conversation that never searched sends exactly what it always did.
+         */
+        ...containerParam(container),
         /*
          * A ceiling, not a target.
          *
@@ -465,6 +483,12 @@ export async function askVoyager(options: {
           followUps: [],
         };
       }
+
+      /*
+       * Adopted before anything else looks at the response, so every exit from
+       * here — a tool round, a resume, the answer — carries it.
+       */
+      container = nextContainer(container, response.container);
 
       searches += searchCount(response.content);
       citations.push(...searchCitations(response.content));
@@ -630,6 +654,27 @@ export async function askVoyager(options: {
     // unreachable — the final pass cannot call tools — and handled anyway.
     return incomplete('the answer never settled');
   } catch (error) {
+    /*
+     * Which kind of failure this was, because the two need different work.
+     *
+     * A rejected request is our bug — a body the API refused, marked
+     * non-retryable because sending it again would be refused identically. It
+     * spent a week looking like an outage in the logs, which is where the
+     * container defect above hid. An unreachable API is somebody else's
+     * weather. No retry is added here for either: the first cannot be helped by
+     * one, and the second already has the SDK's.
+     */
+    if (error instanceof Anthropic.APIError && typeof error.status === 'number') {
+      console.error(
+        `[voyager] the API rejected the request — ${error.status} ${error.name}: ${error.message}`
+      );
+      return incomplete(
+        error.status === 400
+          ? 'the request I built was not one the model would accept'
+          : `the model returned ${error.status}`
+      );
+    }
+
     console.error('[voyager] model call failed', error);
     return incomplete('the model could not be reached');
   }
