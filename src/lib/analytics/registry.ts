@@ -135,6 +135,17 @@ export type EventDefinition = {
   meaningful?: boolean;
   /** Counts toward continuation, and whether it leaves the portal. */
   continuation?: 'internal' | 'external';
+  /**
+   * Whether doing it again produces additional value.
+   *
+   * Asking a second question is a second meaningful action; saving the same
+   * event twice is not, and toggling one study on and off repeatedly is not
+   * three. Absent means the action is deduplicated by its identity properties —
+   * see `actionIdentity` — so a metric counting actions per session cannot be
+   * inflated by a component that emits on every render or by somebody clicking
+   * the same control twice.
+   */
+  repeatable?: boolean;
   /** Why an event is here, when the name does not carry it. */
   note?: string;
 };
@@ -208,6 +219,7 @@ export const EVENT_REGISTRY: readonly EventDefinition[] = [
     privacy: 'product_area',
     properties: { action: id(64), area: id(48), ordinal: smallCount },
     meaningful: true,
+    repeatable: true,
     continuation: 'internal',
   },
   {
@@ -218,8 +230,11 @@ export const EVENT_REGISTRY: readonly EventDefinition[] = [
     lifecycle: 'current',
     privacy: 'product_area',
     properties: { destination: id(48), area: id(48) },
+    meaningful: true,
     continuation: 'external',
-    note: 'A TradingView handoff is a product boundary, not a failure. Shown beside internal, never inside it.',
+    repeatable: true,
+    note:
+      'A TradingView handoff is a product boundary, not a failure — so it is meaningful continuation and counts in PMCR. It is decomposed out beside the internal rate rather than hidden inside it, because a session that left is not a session that stayed.',
   },
 
   /* ------------------------------------------------------------ Operational */
@@ -300,7 +315,7 @@ export const EVENT_REGISTRY: readonly EventDefinition[] = [
   { name: 'event_registration_completed', schemaVersion: 1, kind: 'client', surface: 'events', lifecycle: 'current', privacy: 'content_id', properties: { eventId: id(96), waitlisted: bool }, meaningful: true, continuation: 'internal', note: 'Funnel sequencing only. Current registration counts come from event_registration rows, or the two would double-count.' },
   { name: 'event_registration_cancelled', schemaVersion: 1, kind: 'client', surface: 'events', lifecycle: 'current', privacy: 'content_id', properties: { eventId: id(96) } },
   { name: 'event_waitlist_joined', schemaVersion: 1, kind: 'client', surface: 'events', lifecycle: 'current', privacy: 'content_id', properties: { eventId: id(96), position: smallCount } },
-  { name: 'event_external_link_clicked', schemaVersion: 1, kind: 'client', surface: 'events', lifecycle: 'current', privacy: 'content_id', properties: { eventId: id(96), domain: id(96), trusted: bool }, continuation: 'external' },
+  { name: 'event_external_link_clicked', schemaVersion: 1, kind: 'client', surface: 'events', lifecycle: 'current', privacy: 'content_id', properties: { eventId: id(96), domain: id(96), trusted: bool }, meaningful: true, continuation: 'external', note: 'Following an event to its organiser is continuation, and it leaves the portal — so it counts in PMCR and is decomposed out as external.' },
   { name: 'event_calendar_action', schemaVersion: 1, kind: 'client', surface: 'events', lifecycle: 'current', privacy: 'content_id', properties: { eventId: id(96), target: id(24) } },
   { name: 'event_creation_started', schemaVersion: 1, kind: 'client', surface: 'events', lifecycle: 'current', privacy: 'shape', properties: {} },
   { name: 'event_creation_step_completed', schemaVersion: 1, kind: 'client', surface: 'events', lifecycle: 'current', privacy: 'shape', properties: { step: smallCount } },
@@ -310,19 +325,19 @@ export const EVENT_REGISTRY: readonly EventDefinition[] = [
   /* ----------------------------------------------------------- Supercharts */
   { name: 'superchart_opened', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'shape', properties: { interval: id(16), dataStatus: id(24) }, note: 'No symbol: a ticker somebody looks at is a position they may hold.' },
   { name: 'superchart_study_toggled', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'product_area', properties: { studyId: id(48), on: bool }, meaningful: true, continuation: 'internal' },
-  { name: 'superchart_drawing_created', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'product_area', properties: { tool: id(32) }, meaningful: true, continuation: 'internal' },
+  { name: 'superchart_drawing_created', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'product_area', properties: { tool: id(32) }, meaningful: true, repeatable: true, continuation: 'internal' },
   { name: 'superchart_layout_saved', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'shape', properties: { destination: oneOf('browser', 'account') }, meaningful: true, continuation: 'internal' },
   { name: 'superchart_voyager_asked', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'shape', properties: { mode: id(24), contextKb: smallCount, chipsRemoved: smallCount } },
   { name: 'superchart_plan_proposed', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'shape', properties: { steps: smallCount, refusals: smallCount } },
-  { name: 'superchart_plan_applied', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'shape', properties: { steps: smallCount, ofSteps: smallCount }, meaningful: true, continuation: 'internal' },
+  { name: 'superchart_plan_applied', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'shape', properties: { steps: smallCount, ofSteps: smallCount }, meaningful: true, repeatable: true, continuation: 'internal' },
   { name: 'superchart_undo', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'shape', properties: { source: oneOf('keyboard', 'button', 'toast') } },
-  { name: 'superchart_script_generated', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'shape', properties: { studies: smallCount }, meaningful: true, continuation: 'internal' },
+  { name: 'superchart_script_generated', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'shape', properties: { studies: smallCount }, meaningful: true, repeatable: true, continuation: 'internal' },
   { name: 'superchart_script_exported', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'shape', properties: {}, note: 'Generated and exported, never "run" or "backtested" — the product does neither.' },
   { name: 'superchart_preview_run', schemaVersion: 1, kind: 'client', surface: 'supercharts', lifecycle: 'current', privacy: 'shape', properties: { outcome: oneOf('ok', 'failed', 'unavailable'), plots: smallCount } },
 
   /* -------------------------------------------------------------- Voyager */
   { name: 'voyager_opened', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'product_area', properties: { source: id(32), hasQuestion: bool } },
-  { name: 'voyager_question_sent', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'shape', properties: { contextKind: id(24), mode: id(24), turns: smallCount }, meaningful: true, continuation: 'internal' },
+  { name: 'voyager_question_sent', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'shape', properties: { contextKind: id(24), mode: id(24), turns: smallCount }, meaningful: true, repeatable: true, continuation: 'internal' },
   { name: 'voyager_tool_executed', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'shape', properties: { tool: id(48) }, note: 'A tool round is not a question. The quota charges once per intentional question, and this must never be counted as one.' },
   { name: 'voyager_limit_hit', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'shape', properties: { authenticated: bool } },
   { name: 'voyager_auth_gate_shown', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'shape', properties: { askedInDialog: smallCount } },
@@ -332,7 +347,7 @@ export const EVENT_REGISTRY: readonly EventDefinition[] = [
   { name: 'voyager_action_failed', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'shape', properties: { action: id(48), code: id(48) } },
   { name: 'voyager_save_clicked', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'shape', properties: { authenticated: bool } },
   { name: 'voyager_auth_required_for_save', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'shape', properties: {} },
-  { name: 'voyager_chat_saved', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'shape', properties: {}, meaningful: true, continuation: 'internal' },
+  { name: 'voyager_chat_saved', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'shape', properties: {}, meaningful: true, repeatable: true, continuation: 'internal' },
   { name: 'voyager_new_chat', schemaVersion: 1, kind: 'client', surface: 'voyager', lifecycle: 'current', privacy: 'shape', properties: { chatCount: smallCount } },
   { name: 'voyager_message_sent', schemaVersion: 1, kind: 'client', surface: 'experts', lifecycle: 'current', privacy: 'shape', properties: { turns: smallCount }, note: 'The expert-services intake, not the Voyager chat. Named before the two diverged.' },
 
