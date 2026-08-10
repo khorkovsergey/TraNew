@@ -85,6 +85,8 @@ const SECTIONS: Omit<PortalSection, 'status'>[] = [
     label: 'Explore',
     purpose: 'What each asset class is and what it risks, without prices.',
     action: 'open_explore',
+    notToBeConfusedWith:
+      'Compare assets is for named instruments side by side; Explore is for deciding which kind of thing to hold at all.',
   },
   {
     id: 'markets',
@@ -103,8 +105,10 @@ const SECTIONS: Omit<PortalSection, 'status'>[] = [
   {
     id: 'compare',
     label: 'Compare assets',
-    purpose: 'Two to five instruments over one period, rebased so they can be read together.',
-    action: 'open_explore',
+    purpose: 'Two to five instruments side by side over one period, rebased so they read together.',
+    action: 'open_market_compare',
+    notToBeConfusedWith:
+      'Explore compares kinds of investment — what a bond is against what an ETF is. Compare assets puts named instruments next to each other.',
   },
   {
     id: 'news',

@@ -47,6 +47,10 @@ export function routeFor(
       return '/strategy';
     case 'open_explore':
       return '/explore';
+    /* Instruments side by side, which is a different screen from the one that
+       explains what an asset class is. */
+    case 'open_market_compare':
+      return '/markets/compare';
     case 'open_screener':
       return '/research';
     case 'open_wealth':

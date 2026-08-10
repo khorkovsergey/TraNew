@@ -24,6 +24,11 @@ import { toolFailure, type VoyagerToolResult } from './types';
  * Deliberately about intent rather than about screens: a person does not want
  * "the marketplace", they want to find a course. Naming the intent is what the
  * model can do reliably in any language.
+ *
+ * `compare_assets` and `explore_categories` are deliberately two topics rather
+ * than one, because "compare" means two different things here and they have
+ * different screens: putting two instruments side by side, and working out
+ * which kind of thing to invest in at all.
  */
 export const NAV_TOPICS = [
   'learn_free',
@@ -37,6 +42,7 @@ export const NAV_TOPICS = [
   'events',
   'my_events',
   'compare_assets',
+  'explore_categories',
   'watchlist',
   'alerts',
   'research_workspace',
@@ -69,7 +75,17 @@ const DESTINATIONS: Record<NavTopic, VoyagerActionId[]> = {
   economy: ['open_economy', 'open_indicator'],
   events: ['open_events'],
   my_events: ['open_my_events'],
-  compare_assets: ['open_explore', 'open_screener'],
+  /*
+   * Two instruments side by side — "compare Apple and Microsoft", "X vs Y".
+   *
+   * This resolved to Explore, which is where somebody learns what a bond is.
+   * A person asking where to compare assets wants the screen that puts tickers
+   * next to each other, and being handed the teaching section instead is the
+   * kind of near-miss that reads as the assistant not knowing its own product.
+   */
+  compare_assets: ['open_market_compare', 'open_screener'],
+  /* The other reading of "compare": which *kind* of thing to invest in. */
+  explore_categories: ['open_explore'],
   watchlist: ['open_watchlist', 'add_to_watchlist'],
   alerts: ['create_alert'],
   research_workspace: ['open_research'],

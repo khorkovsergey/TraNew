@@ -43,6 +43,7 @@ export type VoyagerActionId =
   | 'open_experts_intake'
   | 'open_strategy'
   | 'open_explore'
+  | 'open_market_compare'
   | 'open_screener'
   | 'open_wealth'
   | 'open_wealth_assets'
@@ -234,6 +235,27 @@ export const VOYAGER_ACTION_SPECS: Record<VoyagerActionId, VoyagerActionSpec> = 
     where: 'Explore',
     undo: 'Nothing to undo — this only navigates.',
     call: 'explore.open',
+  },
+  /*
+   * Comparing instruments, which is not the same act as exploring categories.
+   *
+   * "Where can I compare assets?" was answered with Explore, because Explore
+   * was the nearest thing on the list. Explore is where somebody learns what a
+   * bond is and how asset classes differ; the screen that puts two tickers side
+   * by side is `/markets/compare`, and sending people to the first when they
+   * asked for the second is the kind of near-miss that reads as the assistant
+   * not knowing its own product.
+   */
+  open_market_compare: {
+    id: 'open_market_compare',
+    label: 'Compare these on the market screen',
+    execution: 'navigate',
+    requiresAccount: false,
+    about: 'open the comparison screen',
+    done: 'opened the comparison screen',
+    where: 'Market comparison',
+    undo: 'Nothing to undo — this only navigates.',
+    call: 'compare.open',
   },
   open_screener: {
     id: 'open_screener',
@@ -482,6 +504,7 @@ export function allowedActions(options: {
     'open_experts_intake',
     'open_strategy',
     'open_explore',
+    'open_market_compare',
     'open_screener',
     // Events are public, so finding one is offered at every tier.
     'open_events',
