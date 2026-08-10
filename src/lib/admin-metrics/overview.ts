@@ -1,18 +1,16 @@
 import 'server-only';
-import { gte, inArray, sql } from 'drizzle-orm';
+import { gte, sql } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
-import { MEANINGFUL_EVENT_NAMES } from '@/lib/analytics/registry';
 import {
   count as countMetric,
   featureDisabled,
   notMeasurable,
-  rate,
   sourceNotConnected,
-  withFreshness,
   type MetricProvenance,
   type MetricValue,
 } from '@/lib/analytics/states';
+import { portalMetrics } from './portal';
 
 /**
  * The overview query skeleton.
@@ -30,15 +28,21 @@ import {
  * it narrow the state first.
  */
 
-const FRESHNESS_BUDGET_SECONDS = 15 * 60;
-const DEFAULT_THRESHOLD = 200;
-
 export type Overview = {
   registeredUsers: MetricValue;
   newRegistrations: MetricValue;
   telemetryEvents: MetricValue;
   sessions: MetricValue;
+  eligibleSessions: MetricValue;
+  /** PMCR and its decomposition — the same denominator, narrower numerators. */
   meaningfulContinuation: MetricValue;
+  internalContinuation: MetricValue;
+  externalContinuation: MetricValue;
+  ttfaMedian: MetricValue;
+  ttfaP75: MetricValue;
+  ttfaP90: MetricValue;
+  sessionsWithoutAction: MetricValue;
+  secondActionRate: MetricValue;
   confirmedRevenue: MetricValue;
   alertAdoption: MetricValue;
   anonymousReturn: MetricValue;
@@ -66,36 +70,19 @@ export async function overview(since: Date): Promise<Overview> {
   const [telemetry] = await db
     .select({
       total: sql<number>`count(*)::int`,
-      sessions: sql<number>`count(distinct ${schema.productTelemetryEvent.sessionId})::int`,
-      freshest: sql<Date | null>`max(${schema.productTelemetryEvent.receivedAt})`,
       earliest: sql<Date | null>`min(${schema.productTelemetryEvent.receivedAt})`,
     })
     .from(schema.productTelemetryEvent)
     .where(gte(schema.productTelemetryEvent.occurredAt, since));
 
-  const [continuation] = await db
-    .select({
-      eligible: sql<number>`count(distinct ${schema.productTelemetryEvent.sessionId})::int`,
-      /*
-       * `inArray` rather than `= any(...)`: Drizzle renders a JavaScript array
-       * inside a raw template as a row constructor — `any(($1, $2, …))` — which
-       * is a tuple and not an array, and Postgres refuses it. The operator
-       * renders `in ($1, $2, …)`, which is what was meant.
-       */
-      continued: sql<number>`(count(distinct ${schema.productTelemetryEvent.sessionId}) filter (where ${inArray(schema.productTelemetryEvent.eventName, [...MEANINGFUL_EVENT_NAMES])}))::int`,
-    })
-    .from(schema.productTelemetryEvent)
-    .where(gte(schema.productTelemetryEvent.occurredAt, since));
-
-  const freshest = telemetry?.freshest ? new Date(telemetry.freshest) : null;
-
   /*
-   * Every telemetry-derived figure is `instrumented_going_forward`, not `live`,
-   * for as long as the collection start is inside the window being asked about.
-   * Before this section shipped, production analytics went into a sink that
-   * printed nothing, so a comparison against last month is not a smaller number
-   * — it is no number, and the card has to say which.
+   * The four Phase 2 headline metrics come from one place. `/overview` and
+   * `/journeys` share it rather than each computing PMCR, because two
+   * denominators derived separately eventually disagree and the disagreement
+   * looks like a finding.
    */
+  const portal = await portalMetrics(since);
+
   const collectingSince = telemetry?.earliest ? new Date(telemetry.earliest) : null;
   const partialWindow = !collectingSince || collectingSince > since;
   const telemetryState = partialWindow ? 'instrumented_going_forward' : 'live';
@@ -105,32 +92,25 @@ export async function overview(since: Date): Promise<Overview> {
 
     newRegistrations: countMetric(signups?.total ?? 0, at('new_registrations', 'user')),
 
-    telemetryEvents: withFreshness(
-      countMetric(telemetry?.total ?? 0, at('telemetry_events', 'product_telemetry_event'), telemetryState),
-      freshest,
-      FRESHNESS_BUDGET_SECONDS,
-      queriedAt
+    telemetryEvents: countMetric(
+      telemetry?.total ?? 0,
+      at('telemetry_events', 'product_telemetry_event'),
+      telemetryState
     ),
 
-    sessions: withFreshness(
-      countMetric(telemetry?.sessions ?? 0, at('sessions', 'product_telemetry_event'), telemetryState),
-      freshest,
-      FRESHNESS_BUDGET_SECONDS,
-      queriedAt
-    ),
+    sessions: portal.sessionsSeen,
+    eligibleSessions: portal.eligibleSessions,
 
-    /*
-     * PMCR, in its first form. The full definition adds the three-second
-     * engagement floor and the eligible-surface filter; this is the numerator
-     * and denominator against the same session set, which is the part the
-     * pipeline has to prove it can compute at all.
-     */
-    meaningfulContinuation: rate(
-      continuation?.continued ?? 0,
-      continuation?.eligible ?? 0,
-      at('pmcr', 'product_telemetry_event'),
-      { threshold: DEFAULT_THRESHOLD, state: telemetryState }
-    ),
+    meaningfulContinuation: portal.continuation.overall,
+    internalContinuation: portal.continuation.internal,
+    externalContinuation: portal.continuation.external,
+
+    ttfaMedian: portal.ttfa.median,
+    ttfaP75: portal.ttfa.p75,
+    ttfaP90: portal.ttfa.p90,
+    sessionsWithoutAction: portal.ttfa.withoutAction,
+
+    secondActionRate: portal.secondAction.rate,
 
     /*
      * Not a zero, and not a query. `purchase.status` distinguishes `demo` from
