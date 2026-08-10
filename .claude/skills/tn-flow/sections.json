@@ -95,6 +95,23 @@
       ],
       "smoke": ["/en/markets/global", "/en/market", "/en/economy"]
     },
+    "metrics": {
+      "branch": "feat/metrics",
+      "port": 3414,
+      "$comment": "Monitoring and product metrics: the admin dashboard, the instrumentation that feeds it, and the analytics layer under both. Registered 2026-08-10 from an empty slate — none of these paths existed on main at registration, so nothing was taken from another section. The boundary that matters here: `src/lib/events/analytics.ts` is the shared event vocabulary and stays shared and append-only, so a new event is one appended entry there and the reading of it lives in `src/lib/analytics/`. Anything this section needs in `src/db/schema.ts`, `drizzle/`, `package.json` or `.env.example` — a metrics table, a migration, a tracing dependency, a key — is requested from the orchestrator, never applied in the worktree.",
+      "owns": [
+        "src/app/[locale]/admin_admin_metrics/",
+        "src/app/api/admin-metrics/",
+        "src/components/admin-metrics/",
+        "src/lib/admin-metrics/",
+        "src/lib/analytics/",
+        "src/instrumentation-client.ts",
+        "src/instrumentation.ts",
+        "scripts/verify-admin-metrics.mjs",
+        "docs/admin-metrics/"
+      ],
+      "smoke": ["/en/admin_admin_metrics"]
+    },
     "superchart": {
       "branch": "feat/superchart",
       "port": 3413,
