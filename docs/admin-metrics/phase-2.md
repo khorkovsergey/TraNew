@@ -111,22 +111,74 @@ disagreement looks like a finding.
 
 ### Authenticated D1 / D7 / D30
 
-Cohorts by first UTC day, grouped by the HMAC-derived user key. **Cumulative
-windows, not anniversaries**: DN is the share of a cohort that came back at
-least once on a day in `[1, N]`. Asking whether somebody appeared exactly seven
-days later measures how weekly their habits are, not whether they returned, and
-it moves with the day of the week the cohort started on. Because the windows are
-cumulative, D1 ≤ D7 ≤ D30 always.
+Grouped by the HMAC-derived user key. **Cumulative windows, not anniversaries**:
+DN is the share of a cohort that came back at least once on a day in `[1, N]`.
+Asking whether somebody appeared exactly seven days later measures how weekly
+their habits are, not whether they returned, and it moves with the day of the
+week the cohort started on. Because the windows are cumulative, D1 ≤ D7 ≤ D30
+always.
+
+**Cohort start is the user's first *eligible portal day*** — a UTC day on which
+they viewed a page on a real customer surface. Not their first telemetry row,
+not a server or operational event, not an Observatory visit, not sign-in
+plumbing. A user with no eligible portal day is not in the population at all:
+they have not started a cohort, so they can be neither retained nor lost from
+one.
+
+**A return day is a page view on a real customer surface.** No quantity of
+server or operational telemetry can create one.
+
+**A meaningful return requires a return.** A meaningful action on a day with no
+portal visit counts as neither primary nor meaningful retention — the person was
+not there.
 
 A cohort is only counted once the window has actually elapsed *and* telemetry
 existed for the whole of it. A cohort formed yesterday has not failed D7; it has
 not had the chance. Immature cohorts are reported, never counted as churn.
 
-"Returned" is any eligible day, primary. "Returned and did something" is
-reported beside it, secondary, and the two are never conflated.
-
 **Anonymous retention remains `not_measurable`**, with the reason and the remedy
 on the card. Nothing in this phase reopened that.
+
+#### Why retention-day eligibility is not PMCR eligibility
+
+Deliberately different, in one direction only.
+
+It **keeps** `account` and `wealth`. PMCR excludes them because they are not
+landings — signed-in housekeeping is not a visit whose continuation means
+anything. Retention asks the opposite question, and somebody returning to look
+at their own account has plainly returned. Excluding them would understate
+retention for exactly the people most attached to the product.
+
+It **drops** the three-second engagement floor. A person who came back, acted
+immediately and left has come back; requiring them to linger first would measure
+patience.
+
+It **keeps every exclusion that matters**: the Observatory, auth plumbing and the
+backbone bucket are not customer visits under either rule.
+
+#### Three defects this phase shipped and then fixed
+
+Recorded because two of them were invisible from the outside and the third was
+the reason to look.
+
+1. **Cohort start was the first telemetry row of any kind.** A user with a server
+   event on Monday and a first visit on Tuesday was dated to Monday and then
+   measured as having failed to return on a day they had not yet arrived — churn
+   invented out of bookkeeping.
+2. **A meaningful action could count as a retained return on its own.** The
+   invariant `meaningful return ⇒ eligible return ∧ meaningful action` was not
+   enforced.
+3. **The Observatory was never actually excluded from retention.** The predicate
+   tested `surface <> 'observatory'`, and ingest stamps `surface` from the
+   *event's registry entry* — `portal_page_viewed` is registered under `portal`,
+   so every page view row carries `surface = 'portal'` whatever page it
+   described. The condition was one no row had ever met. The real page is in
+   `properties.area`, and the predicate reads that now.
+
+   The consequence was live: the only authenticated user in production had nine
+   Observatory page views and no customer visit at all, and counted as a
+   returning customer. Under the corrected rule they are absent from the
+   population, which is right.
 
 ## Deduplication
 

@@ -63,6 +63,47 @@ export const ENGAGEMENT_THRESHOLD_SECONDS = 3;
  */
 export const NEVER_ELIGIBLE_SURFACES: readonly string[] = ['observatory', 'auth', 'portal', 'unknown'];
 
+/* ------------------------------------------------- Retention-day eligibility */
+
+/**
+ * Areas that are not a customer portal visit.
+ *
+ * The same four as `NEVER_ELIGIBLE_SURFACES` today, and written separately
+ * because they answer a different question and will diverge. That one is *"is
+ * this a landing whose continuation a product change could improve"*; this is
+ * *"did a customer visit the product"*.
+ *
+ * `portal` is here because it is not a screen — it is the bucket the global
+ * backbone events carry, and a session event is not a visit.
+ */
+export const NON_CUSTOMER_AREAS: readonly string[] = ['observatory', 'auth', 'portal', 'unknown'];
+
+/**
+ * Whether a page view on this area is a genuine customer portal visit.
+ *
+ * **Deliberately different from PMCR eligibility, in one direction only.**
+ *
+ * PMCR excludes `account` and `wealth` because they are not *landings*: signed-in
+ * housekeeping is not a visit whose continuation means anything, and counting it
+ * would put a denominator under a question it cannot answer. Retention asks the
+ * opposite question — *did this person come back* — and somebody returning to
+ * look at their own account plainly did. Excluding them would understate
+ * retention for exactly the people most attached to the product.
+ *
+ * It also drops the three-second engagement floor, on purpose: a person who came
+ * back, did something immediately and left has returned, and requiring them to
+ * linger first would measure patience rather than return.
+ *
+ * What it does not do is soften the exclusions that matter. The Observatory,
+ * sign-in plumbing and the backbone bucket are not customer visits under either
+ * rule, and **no amount of server or operational telemetry can create a return
+ * day** — only a page view on a real customer surface can.
+ */
+export function isCustomerPortalArea(area: string | null | undefined): boolean {
+  if (!area) return false;
+  return !NON_CUSTOMER_AREAS.includes(area);
+}
+
 export type SurfaceEligibility = {
   /** From the surface catalogue: is this a landing whose continuation counts. */
   pmcrEligible: boolean;

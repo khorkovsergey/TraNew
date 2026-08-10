@@ -55,6 +55,17 @@ const SESSION_ELIGIBILITY =
 
 const COMMON_EXCLUSIONS = EXCLUSION_REASONS;
 
+/**
+ * Said in full because "first day" is exactly the ambiguity that made the first
+ * implementation wrong: it dated cohorts from the earliest telemetry row of any
+ * kind.
+ */
+const RETENTION_POPULATION =
+  'Authenticated users only, grouped by the HMAC-derived user key. The cohort starts on the user\'s FIRST ELIGIBLE PORTAL DAY — a UTC day on which they viewed a page on a real customer surface. Not their first telemetry row, not their first server or operational event, not an Observatory visit, and not sign-in plumbing. A user who has never had an eligible portal day is not in the population at all: they have not started a cohort, so they can be neither retained nor lost from one. Anonymous visitors are not measured.';
+
+const RETENTION_VS_PMCR =
+  'Retention-day eligibility is deliberately not PMCR eligibility, in one direction only. It keeps `account` and `wealth`, because somebody returning to look at their own account has plainly returned even though that is not a landing whose continuation means anything; and it drops the three-second engagement floor, because a person who came back, acted immediately and left has still come back. It keeps every exclusion that matters — the Observatory, auth plumbing, and the backbone bucket are not customer visits under either rule.';
+
 const CONTINUATION_SOURCES = [
   'portal_session_started',
   'portal_page_viewed',
@@ -158,25 +169,27 @@ export const METRIC_DICTIONARY: readonly MetricDefinition[] = [
   ...RETENTION_HORIZONS.map((horizon) => ({
     id: `retention_d${horizon}`,
     label: `Authenticated D${horizon} return`,
-    formula: `cohort members with ≥1 eligible session on a UTC day in [1, ${horizon}] ÷ mature cohort members`,
-    numerator: `Signed-in people who came back at least once within ${horizon} day(s) of their first day.`,
-    denominator: `Signed-in people whose first day is at least ${horizon} days ago and falls after telemetry began.`,
-    eligiblePopulation:
-      'Authenticated users only, grouped by the HMAC-derived user key. Anonymous visitors are not measured.',
+    formula: `cohort members with ≥1 eligible portal day in [1, ${horizon}] days after their first eligible portal day ÷ mature cohort members`,
+    numerator: `Signed-in people who had another eligible portal day within ${horizon} day(s) of their first one.`,
+    denominator: `Signed-in people whose first eligible portal day is at least ${horizon} days ago and falls after telemetry began.`,
+    eligiblePopulation: RETENTION_POPULATION,
     exclusions: [
       ...COMMON_EXCLUSIONS,
+      'days with only server or operational telemetry, which are not visits',
+      'users who have never had an eligible portal day, who have not started a cohort at all',
       'cohorts younger than the window, which have not had the chance to return',
       'cohorts formed before telemetry existed, which cannot be shown to have churned over a period nobody was watching',
     ],
     grain: 'user' as const,
-    sourceEvents: CONTINUATION_SOURCES,
+    sourceEvents: ['portal_page_viewed'],
     timeSemantics:
       'UTC calendar days from received_at, the server clock — the one place occurred_at must not be used, because retention compares one client\'s days against another\'s. Windows are cumulative, so D1 ≤ D7 ≤ D30 always.',
     minimumSample: MARKETPLACE_MIN_SAMPLE,
     limitations: [
       NO_HISTORY,
       `Cumulative window, not an anniversary. Asking whether somebody appeared exactly ${horizon} days later measures how weekly their habits are, not whether they came back.`,
-      'A secondary "returned and did something" figure is reported beside it and is never conflated with it.',
+      'A secondary "returned and did something" figure is reported beside it and never conflated with it. A meaningful action on a day with no portal visit counts as neither: the person was not there.',
+      RETENTION_VS_PMCR,
     ],
     owner: 'portal',
   })),

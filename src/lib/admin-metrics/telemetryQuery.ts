@@ -1,11 +1,11 @@
 import 'server-only';
-import { and, gte, inArray, ne, or, sql } from 'drizzle-orm';
+import { and, gte, inArray, notInArray, sql } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { featureStateFor, SURFACE_BY_KEY } from '@/lib/analytics/surfaces';
 import { MEANINGFUL_EVENTS } from './meaningful';
 import { sessionFactsFrom, type SessionFacts, type TelemetryPoint } from './sessions';
-import type { SurfaceEligibility } from './eligibility';
+import { NON_CUSTOMER_AREAS, type SurfaceEligibility } from './eligibility';
 import type { UserDay } from './retention';
 
 /**
@@ -140,30 +140,44 @@ export async function readSessions(since: Date): Promise<SessionRead> {
  * `received_at` because cohorts compare one person's days against another's and
  * only the server clock is comparable across clients.
  *
- * The per-day eligibility predicate is deliberately simpler than full session
- * eligibility: a day counts as a return if it contained a page view outside the
- * Observatory. Requiring the three-second engagement checkpoint on a *return*
- * visit would drop people who came back, did something immediately and left —
- * which is the opposite of what the metric is asking. The difference is stated
- * in the Metric Dictionary rather than left for a reader to discover.
+ * ## Where the area comes from, and the bug that made it matter
+ *
+ * The predicate reads `properties ->> 'area'`, **not the `surface` column**.
+ *
+ * This is not a stylistic choice. Ingest sets `surface` from the event's own
+ * registry entry, and `portal_page_viewed` is registered under `portal` because
+ * it is a backbone event — so *every* page view row in the table has
+ * `surface = 'portal'`, whatever page it described. The earlier predicate
+ * excluded the Observatory by testing `surface <> 'observatory'`, which is a
+ * condition no page view has ever met, so it excluded nothing: a person who
+ * only ever opened the Observatory counted as a returning customer. The real
+ * page is in `properties.area`, which is where the client puts it.
+ *
+ * ## What counts as a return day
+ *
+ * A page view on a real customer surface — see `isCustomerPortalArea`. This is
+ * intentionally not PMCR eligibility: it keeps `account` and `wealth`, because
+ * somebody coming back to look at their own account has returned, and it drops
+ * the engagement floor, because a person who returned and acted immediately has
+ * also returned. It keeps every exclusion that matters, and **no volume of
+ * server or operational telemetry can create a return day** — only a page view
+ * can.
  */
 export async function readUserDays(since: Date): Promise<UserDay[]> {
+  const area = sql`coalesce(${schema.productTelemetryEvent.properties} ->> 'area', '')`;
+
   const rows = await db
     .select({
       userKeyHash: schema.productTelemetryEvent.userKeyHash,
       day: sql<string>`to_char(${schema.productTelemetryEvent.receivedAt}, 'YYYY-MM-DD')`,
-      eligible: sql<boolean>`bool_or(${schema.productTelemetryEvent.eventName} = 'portal_page_viewed' and coalesce(${schema.productTelemetryEvent.surface}, '') <> 'observatory')`,
+      eligible: sql<boolean>`bool_or(${schema.productTelemetryEvent.eventName} = 'portal_page_viewed' and ${notInArray(area, [...NON_CUSTOMER_AREAS])})`,
       meaningful: sql<boolean>`bool_or(${inArray(schema.productTelemetryEvent.eventName, [...MEANINGFUL_EVENTS])})`,
     })
     .from(schema.productTelemetryEvent)
     .where(
       and(
         gte(schema.productTelemetryEvent.receivedAt, since),
-        sql`${schema.productTelemetryEvent.userKeyHash} is not null`,
-        or(
-          ne(schema.productTelemetryEvent.surface, 'observatory'),
-          sql`${schema.productTelemetryEvent.surface} is null`
-        )
+        sql`${schema.productTelemetryEvent.userKeyHash} is not null`
       )
     )
     .groupBy(schema.productTelemetryEvent.userKeyHash, sql`2`);

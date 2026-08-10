@@ -149,7 +149,7 @@ export default async function ObservatoryPage({ params, searchParams }: Props) {
         </div>
         <p className={styles.subtitle}>
           Cumulative windows, not anniversaries · UTC days from received_at ·{' '}
-          {retention.totalAuthenticatedUsers} authenticated users seen ·{' '}
+          {retention.usersWithEligiblePortalDay} users with an eligible portal day ·{' '}
           {retention.horizons.map((h) => `D${h.horizon} excludes ${h.immatureUsers} immature`).join(' · ')}
         </p>
       </section>

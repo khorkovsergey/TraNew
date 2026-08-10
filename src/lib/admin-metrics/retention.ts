@@ -53,7 +53,11 @@ export type UserDay = {
   userKeyHash: string;
   /** `YYYY-MM-DD`, UTC, from `received_at`. */
   day: string;
-  /** The day contained at least one eligible portal session. */
+  /**
+   * The day contained a genuine customer portal visit — a page view on a real
+   * customer surface. Server and operational telemetry never sets this, however
+   * much of it there is.
+   */
   eligible: boolean;
   /** The day contained at least one meaningful action. */
   meaningful: boolean;
@@ -75,7 +79,12 @@ export type RetentionReport = {
   anonymous: MetricValue;
   /** First day telemetry exists at all. Everything before it is unknowable. */
   telemetryStartedOn: string | null;
-  totalAuthenticatedUsers: number;
+  /**
+   * Authenticated users who have had at least one eligible portal day, and so
+   * belong to a cohort at all. Named precisely: it is not every authenticated
+   * user who produced telemetry, and the difference is the whole correction.
+   */
+  usersWithEligiblePortalDay: number;
 };
 
 export function dayKey(at: Date): string {
@@ -108,29 +117,50 @@ export function cohortRetention(
   const { today, telemetryStartedOn, minimumCohort, provenance, state } = options;
   const todayKey = dayKey(today);
 
-  /* One entry per user: their first day, and every day they came back. */
-  const byUser = new Map<string, { firstDay: string; days: Map<string, UserDay> }>();
+  /* One entry per user: every day they produced telemetry. */
+  const collected = new Map<string, Map<string, UserDay>>();
 
   for (const row of userDays) {
     if (!row.userKeyHash) continue;
-    const existing = byUser.get(row.userKeyHash);
 
-    if (!existing) {
-      byUser.set(row.userKeyHash, { firstDay: row.day, days: new Map([[row.day, row]]) });
-      continue;
-    }
-
-    if (row.day < existing.firstDay) existing.firstDay = row.day;
+    const days = collected.get(row.userKeyHash) ?? new Map<string, UserDay>();
+    collected.set(row.userKeyHash, days);
 
     // A day can appear twice if the aggregation was not exact; merging keeps
     // the stronger signal rather than whichever row happened to arrive last.
-    const prior = existing.days.get(row.day);
-    existing.days.set(
+    const prior = days.get(row.day);
+    days.set(
       row.day,
       prior
         ? { ...row, eligible: prior.eligible || row.eligible, meaningful: prior.meaningful || row.meaningful }
         : row
     );
+  }
+
+  /*
+   * The cohort starts on the **first eligible portal day**, not the first row.
+   *
+   * A user can produce authenticated telemetry without having visited the
+   * product: a server event, an operational record, a look at the Observatory,
+   * a bounce through sign-in. Dating a cohort from any of those puts the person
+   * in an earlier cohort than the one they belong to and then measures them as
+   * having failed to return during days when they had not yet arrived — churn
+   * invented out of bookkeeping.
+   *
+   * A user with no eligible portal day at all is not in the population. They
+   * have not started a cohort, so they cannot be retained or lost from one.
+   */
+  const byUser = new Map<string, { firstDay: string; days: Map<string, UserDay> }>();
+
+  for (const [userKeyHash, days] of collected) {
+    const firstEligible = [...days.values()]
+      .filter((row) => row.eligible)
+      .map((row) => row.day)
+      .sort()[0];
+
+    if (!firstEligible) continue;
+
+    byUser.set(userKeyHash, { firstDay: firstEligible, days });
   }
 
   const horizons = RETENTION_HORIZONS.map((horizon) => {
@@ -164,7 +194,17 @@ export function cohortRetention(
       for (const [day, row] of days) {
         const offset = daysBetween(firstDay, day);
         if (offset < 1 || offset > horizon) continue;
-        if (row.eligible) came = true;
+
+        if (!row.eligible) continue;
+
+        /*
+         * The invariant: a meaningful return is a return that was also
+         * meaningful. A meaningful action on a day with no customer portal
+         * visit — a server event, a background job, an operational record —
+         * cannot make somebody a retained user on its own, because they were
+         * not there.
+         */
+        came = true;
         if (row.meaningful) acted = true;
       }
 
@@ -197,6 +237,6 @@ export function cohortRetention(
       provenance('retention_anonymous')
     ),
     telemetryStartedOn,
-    totalAuthenticatedUsers: byUser.size,
+    usersWithEligiblePortalDay: byUser.size,
   };
 }

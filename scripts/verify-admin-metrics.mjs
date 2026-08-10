@@ -1011,7 +1011,7 @@ try {
       userDay('u_a', '2026-08-10'), userDay('u_a', '2026-08-11'),
       userDay('u_b', '2026-08-10'),
     ]);
-    assert.equal(report.totalAuthenticatedUsers, 2);
+    assert.equal(report.usersWithEligiblePortalDay, 2);
     assert.equal(report.horizons[0].returned.value, 0.5);
   });
 
@@ -1046,6 +1046,126 @@ try {
     ]);
     assert.equal(report.horizons[0].returned.value, 1);
     assert.equal(report.horizons[0].returnedMeaningfully.value, 0.5);
+  });
+
+  /*
+   * Cohort membership. Every one of these was wrong in the first
+   * implementation, which dated a cohort from the earliest telemetry row of any
+   * kind — so a person who produced a server event on Monday and first visited
+   * on Tuesday was measured as having failed to return on a day they had not
+   * yet arrived.
+   */
+  check('a cohort starts on the first eligible portal day, not the first row', () => {
+    const report = retentionOf([
+      userDay('u_a', '2026-08-10', { eligible: false, meaningful: true }),
+      userDay('u_a', '2026-08-11'),
+      userDay('u_a', '2026-08-12'),
+    ]);
+    const d1 = report.horizons.find((h) => h.horizon === 1);
+    assert.equal(d1.cohortSize, 1);
+    assert.equal(d1.returned.value, 1, 'the 12th was not counted as a D1 return from the 11th');
+  });
+
+  check('a user who never had an eligible portal day is not in the population', () => {
+    const report = retentionOf([
+      userDay('u_a', '2026-08-10', { eligible: false, meaningful: true }),
+      userDay('u_a', '2026-08-12', { eligible: false, meaningful: true }),
+    ]);
+    assert.equal(report.usersWithEligiblePortalDay, 0, 'a user with no portal visit started a cohort');
+    for (const horizon of report.horizons) assert.equal(horizon.cohortSize, 0);
+  });
+
+  check('an Observatory visit does not start a cohort', () => {
+    // The exclusion is upstream, in the query predicate: an Observatory page
+    // view never sets `eligible`. Here that is the day carrying eligible=false.
+    const report = retentionOf([
+      userDay('u_a', '2026-08-10', { eligible: false }),
+      userDay('u_a', '2026-08-11'),
+      userDay('u_a', '2026-08-12'),
+    ]);
+    assert.equal(report.horizons.find((h) => h.horizon === 1).returned.value, 1);
+  });
+
+  check('sign-in plumbing does not start a cohort', () => {
+    const report = retentionOf([
+      userDay('u_a', '2026-08-09', { eligible: false }),
+      userDay('u_a', '2026-08-11'),
+      userDay('u_a', '2026-08-18'),
+    ]);
+    const byHorizon = Object.fromEntries(report.horizons.map((h) => [h.horizon, h.returned.value]));
+    // Seven days after the 11th, not nine after the 9th.
+    assert.equal(byHorizon[7], 1);
+    assert.equal(byHorizon[1], 0);
+  });
+
+  check('a meaningful event on a non-visit day is neither kind of return', () => {
+    const report = retentionOf([
+      userDay('u_a', '2026-08-10'),
+      userDay('u_a', '2026-08-11', { eligible: false, meaningful: true }),
+    ]);
+    const d1 = report.horizons.find((h) => h.horizon === 1);
+    assert.equal(d1.returned.value, 0, 'a server event counted as a visit');
+    assert.equal(d1.returnedMeaningfully.value, 0, 'a meaningful action without a visit counted as retained');
+  });
+
+  check('an eligible day that is also meaningful counts in both', () => {
+    const report = retentionOf([
+      userDay('u_a', '2026-08-10'),
+      userDay('u_a', '2026-08-11', { eligible: true, meaningful: true }),
+    ]);
+    const d1 = report.horizons.find((h) => h.horizon === 1);
+    assert.equal(d1.returned.value, 1);
+    assert.equal(d1.returnedMeaningfully.value, 1);
+  });
+
+  check('meaningful return can never exceed primary return', () => {
+    const report = retentionOf([
+      userDay('u_a', '2026-08-10'), userDay('u_a', '2026-08-11', { meaningful: true }),
+      userDay('u_b', '2026-08-10'), userDay('u_b', '2026-08-11'),
+      userDay('u_c', '2026-08-10'), userDay('u_c', '2026-08-11', { eligible: false, meaningful: true }),
+    ]);
+    for (const horizon of report.horizons) {
+      assert.ok(
+        horizon.returnedMeaningfully.value <= horizon.returned.value,
+        `D${horizon.horizon}: meaningful ${horizon.returnedMeaningfully.value} > returned ${horizon.returned.value}`
+      );
+    }
+  });
+
+  check('the retention day predicate reads the area, not the surface column', () => {
+    /*
+     * The bug this guards. Ingest stamps `surface` from the event's registry
+     * entry, and `portal_page_viewed` is registered under `portal` — so every
+     * page view row carries `surface = 'portal'` whatever page it described,
+     * and the original `surface <> 'observatory'` test excluded nothing at all.
+     * The page is in `properties.area`.
+     */
+    const source = readFileSync('src/lib/admin-metrics/telemetryQuery.ts', 'utf8');
+    assert.match(source, /->> 'area'/, 'the predicate no longer reads properties.area');
+    assert.equal(
+      /coalesce\(\$\{schema\.productTelemetryEvent\.surface\}[^)]*\) <> 'observatory'/.test(source),
+      false,
+      'the predicate is back to testing the surface column'
+    );
+  });
+
+  check('a customer area is a return and a technical one is not', () => {
+    assert.equal(eligibility.isCustomerPortalArea('home'), true);
+    assert.equal(eligibility.isCustomerPortalArea('account'), true, 'checking your own account is a return');
+    assert.equal(eligibility.isCustomerPortalArea('wealth'), true);
+    assert.equal(eligibility.isCustomerPortalArea('observatory'), false);
+    assert.equal(eligibility.isCustomerPortalArea('auth'), false);
+    assert.equal(eligibility.isCustomerPortalArea('portal'), false);
+    assert.equal(eligibility.isCustomerPortalArea('unknown'), false);
+    assert.equal(eligibility.isCustomerPortalArea(null), false);
+  });
+
+  check('retention and PMCR eligibility differ only where it is intended', () => {
+    // `account` is a return but not a landing. That asymmetry is the whole
+    // documented difference, and it is asserted rather than described.
+    assert.equal(eligibility.isCustomerPortalArea('account'), true);
+    assert.equal(surfaces.SURFACE_BY_KEY.get('account').pmcrEligible, false);
+    assert.equal(dictionary.DICTIONARY_BY_ID.get('retention_d7').eligiblePopulation.includes('FIRST ELIGIBLE PORTAL DAY'), true);
   });
 
   check('anonymous retention is not measurable and says what it would take', () => {
