@@ -1172,3 +1172,69 @@ export const eventDraft = pgTable(
   },
   (table) => [index('event_draft_user_idx').on(table.userId, table.updatedAt)]
 );
+
+/* ------------------------------------------------------------ telemetry */
+
+/**
+ * Product telemetry. Append-only.
+ *
+ * The identity columns are one-way HMACs, never the application user id, so a
+ * row cannot be walked back to a person from this table alone. No raw IP, no
+ * raw user agent, no free text: `properties` is validated per event against the
+ * registry in `src/lib/analytics/registry.ts` before anything is written.
+ *
+ * Deliberately not foreign-keyed to `user`: the pseudonymous key is not a user
+ * id, and a cascade would either fail to match or force the real id in here.
+ */
+export const productTelemetryEvent = pgTable(
+  'product_telemetry_event',
+  {
+    id: text('id').primaryKey(),
+
+    /** Registry schema version for this event name, so a shape change is readable. */
+    schemaVersion: integer('schema_version').notNull().default(1),
+
+    /** Client-reported, clamped server-side to a sane window around receipt. */
+    occurredAt: timestamp('occurred_at').notNull(),
+    /** Server clock. The only timestamp a query may trust for freshness. */
+    receivedAt: timestamp('received_at').$defaultFn(() => new Date()).notNull(),
+
+    eventName: text('event_name').notNull(),
+    /** client | server | operational */
+    eventKind: text('event_kind').notNull(),
+
+    /** Product surface, from the surface registry. */
+    surface: text('surface'),
+    /** Route template such as `/markets/[market]` — never a populated URL. */
+    routeTemplate: text('route_template'),
+
+    /** Session-scoped, rotates on session boundary. Not a cross-session identity. */
+    sessionId: text('session_id').notNull(),
+    /** Session-scoped pseudonymous visitor key. Never IP-derived. */
+    visitorKeyHash: text('visitor_key_hash'),
+    /** HMAC of the authenticated user id. Derived server-side, never sent by a browser. */
+    userKeyHash: text('user_key_hash'),
+
+    /** anonymous | registered */
+    authState: text('auth_state').notNull(),
+    /** Server-derived entitlement at the time of the event. Never client-claimed. */
+    entitlement: text('entitlement'),
+    /** Coarse bucket: direct | organic | referral | social | ai | partner | internal | unknown */
+    acquisitionSource: text('acquisition_source'),
+    /** Coarse bucket: mobile | tablet | desktop | unknown. Never a UA string. */
+    deviceClass: text('device_class'),
+    /** live | disabled | coming_soon | external | legacy | unknown */
+    featureState: text('feature_state').$defaultFn(() => 'unknown').notNull(),
+
+    /** Registry-validated. Rejected outright if it carries an unlisted key. */
+    properties: jsonb('properties').$defaultFn(() => ({})).notNull(),
+  },
+  (table) => [
+    index('telemetry_occurred_idx').on(table.occurredAt),
+    index('telemetry_name_occurred_idx').on(table.eventName, table.occurredAt),
+    index('telemetry_session_occurred_idx').on(table.sessionId, table.occurredAt),
+    index('telemetry_surface_occurred_idx').on(table.surface, table.occurredAt),
+    index('telemetry_user_occurred_idx').on(table.userKeyHash, table.occurredAt),
+    index('telemetry_received_idx').on(table.receivedAt),
+  ]
+);
