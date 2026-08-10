@@ -35,7 +35,18 @@ export type VisibleRange = {
 export type CrosshairContext = {
   barIndex: number;
   bar: Bar | null;
+  /**
+   * The price under the pointer, on the price pane's scale.
+   *
+   * Still the price even when the pointer is over an oscillator, because that
+   * is what every reader of this field has always meant by it. What the pointer
+   * is actually over is `paneId` and `paneValue`.
+   */
   price: number;
+  /** Which pane the pointer is in, or null below the last one. */
+  paneId?: string | null;
+  /** The value under the pointer in that pane's own units — an RSI of 62. */
+  paneValue?: number | null;
   x: number;
   y: number;
 };

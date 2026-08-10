@@ -84,6 +84,16 @@ const INTERVALS: ChartInterval[] = ['1m', '5m', '15m', '1H', '4H', '1D', '1W', '
 const CHART_TYPES: ChartType[] = ['candles', 'bars', 'line', 'area', 'baseline', 'hollow', 'heikin'];
 
 /**
+ * Volume is on when nothing says otherwise.
+ *
+ * It used to be part of the canvas — a strip drawn under the price whether
+ * anybody wanted it or not. Now that it is a study on the shared volume pane it
+ * could be switched off, which is the point; starting it on is what keeps a
+ * chart nobody has configured looking exactly as it did.
+ */
+const DEFAULT_STUDIES: StudyChoice[] = [{ definitionId: 'volume', params: {} }];
+
+/**
  * The engine is handed resolved colours rather than reading the stylesheet.
  *
  * `check-tokens.mjs` fails the build on a token that does not exist, and it
@@ -166,7 +176,9 @@ export function SuperchartWorkspace({
    * effect whenever the bars changed, which is a second copy of the truth and a
    * render cascade to keep it in step.
    */
-  const [studyChoices, setStudyChoices] = useState<StudyChoice[]>(preset?.studies ?? []);
+  const [studyChoices, setStudyChoices] = useState<StudyChoice[]>(
+    preset?.studies ?? DEFAULT_STUDIES
+  );
   const [history, setHistory] = useState<History>(EMPTY_HISTORY);
   const [panelTab, setPanelTab] = useState<'objects' | 'voyager'>('objects');
   /*

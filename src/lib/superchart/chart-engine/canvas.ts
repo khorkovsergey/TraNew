@@ -1,4 +1,4 @@
-import type { IndicatorInstance } from '../indicators';
+import { collectPaneRequests, paneRequestFor, type IndicatorInstance } from '../indicators';
 import {
   hitTest,
   toScreenX,
@@ -6,6 +6,31 @@ import {
   type DrawingInstance,
   type Projection,
 } from '../drawings/types';
+import {
+  barWidth,
+  buildPaneLayout,
+  mainPane,
+  paneAt,
+  timeAxis,
+  valueToY,
+  yToValue,
+  SCALE_WIDTH,
+  type Pane,
+  type PaneInput,
+  type PaneLayout,
+  type TimeAxis,
+} from './panes';
+import {
+  drawPaneBaseline,
+  drawPaneFlags,
+  drawPaneFrame,
+  drawPaneHistogram,
+  drawPaneLine,
+  drawPaneScale,
+  drawPaneTitle,
+  withinPane,
+  type PanePalette,
+} from './paneRenderer';
 import {
   CHART_TYPE_LABEL,
   toHeikinAshi,
@@ -37,25 +62,19 @@ import {
  * on an animation frame. React is told about the crosshair only through the
  * subscription, and the panel that displays it decides how often to listen.
  *
- * The price pane, the volume pane and the scales are drawn on one canvas rather
- * than several: one context, one clear, one paint per frame, and no compositing
- * between layers that always move together.
+ * Every pane and every scale is drawn on one canvas rather than several: one
+ * context, one clear, one paint per frame, and no compositing between layers
+ * that always move together.
+ *
+ * Vertical space is `panes.ts`. The engine asks the studies which panes they
+ * want, hands the list to the layout, and paints whatever comes back — so an
+ * oscillator added next year needs a row in the indicator registry and nothing
+ * here.
  */
 
-type Layout = {
-  width: number;
-  height: number;
-  priceTop: number;
-  priceHeight: number;
-  volumeTop: number;
-  volumeHeight: number;
-  timeHeight: number;
-  scaleWidth: number;
-};
+/** What the geometry of a frame is, computed once and passed down. */
+type Geometry = { layout: PaneLayout; axis: TimeAxis };
 
-const SCALE_WIDTH = 66;
-const VOLUME_HEIGHT = 74;
-const TIME_HEIGHT = 24;
 const MIN_BARS = 20;
 
 export class CanvasChartEngine implements ChartEngineAdapter {
@@ -198,8 +217,8 @@ export class CanvasChartEngine implements ChartEngineAdapter {
 
   /** Which reference is under the pointer, for the hover that runs the other way. */
   highlightAt(x: number): ChartHighlight | null {
-    const layout = this.layout();
-    const step = (layout.width - layout.scaleWidth) / Math.max(1, this.range.to - this.range.from);
+    const { plotWidth } = this.size();
+    const step = plotWidth / Math.max(1, this.range.to - this.range.from);
 
     for (const highlight of this.highlights) {
       const left = (highlight.fromIndex - this.range.from) * step;
@@ -210,6 +229,18 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     return null;
   }
 
+  /**
+   * The panes as they currently stand.
+   *
+   * Read by the tests, and by anything that needs to know what the chart is
+   * showing without taking a picture of it. The rectangles are the engine's
+   * answer to "is the RSI actually drawn somewhere" in a form that can be
+   * asserted.
+   */
+  paneLayout(): PaneLayout {
+    return this.geometry().layout;
+  }
+
   setIndicators(indicators: IndicatorInstance[], palette: string[]): void {
     this.indicators = indicators;
     this.studyPalette = palette;
@@ -218,12 +249,15 @@ export class CanvasChartEngine implements ChartEngineAdapter {
 
   /** The mapping a hit test needs, in the units drawings are stored in. */
   projection(): Projection {
-    const layout = this.layout();
+    const { layout } = this.geometry();
     const { low, high } = this.extremes();
 
     return {
-      plotWidth: layout.width - layout.scaleWidth,
-      plotHeight: layout.priceHeight,
+      plotWidth: layout.plotWidth,
+      // Drawings live on the price pane, so a hit test is against its rectangle
+      // and not the whole canvas — clicking in the volume pane must not resolve
+      // against a trend line that ends above it.
+      plotHeight: mainPane(layout).rect.height,
       fromIndex: this.range.from,
       toIndex: this.range.to,
       low,
@@ -286,8 +320,7 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     const y = event.clientY - rect.top;
 
     if (this.dragging) {
-      const layout = this.layout();
-      const perBar = (layout.width - layout.scaleWidth) / (this.range.to - this.range.from);
+      const perBar = this.size().plotWidth / (this.range.to - this.range.from);
       const shift = (this.dragging.startX - x) / perBar;
 
       this.range = this.clampRange({
@@ -300,11 +333,31 @@ export class CanvasChartEngine implements ChartEngineAdapter {
       return;
     }
 
-    const layout = this.layout();
-    const index = this.indexAt(x, layout);
+    const { layout } = this.geometry();
+    const index = this.indexAt(x, layout.plotWidth);
     const bar = this.bars[index] ?? null;
 
-    this.crosshair = { barIndex: index, bar, price: this.priceAt(y, layout), x, y };
+    /*
+     * The pointer reads against the pane it is in.
+     *
+     * `price` stays the price under the cursor on the price pane, because the
+     * legend and the data window have always meant that by it. What is new is
+     * the pane and the value in that pane's own units — an RSI of 62 rather
+     * than the price the same y would be if the chart had no lower panes,
+     * which is a number that describes nothing.
+     */
+    const pane = paneAt(layout, y);
+    const price = yToValue(mainPane(layout), y);
+
+    this.crosshair = {
+      barIndex: index,
+      bar,
+      price,
+      paneId: pane?.id ?? null,
+      paneValue: pane ? yToValue(pane, y) : null,
+      x,
+      y,
+    };
     this.paint();
     this.emit('crosshair', this.crosshair);
   };
@@ -340,8 +393,7 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     if (!this.canvas || !this.bars.length) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const layout = this.layout();
-    const anchor = this.indexAt(event.clientX - rect.left, layout);
+    const anchor = this.indexAt(event.clientX - rect.left, this.size().plotWidth);
 
     const span = this.range.to - this.range.from;
     const next = span * (event.deltaY > 0 ? 1.12 : 0.89);
@@ -356,21 +408,52 @@ export class CanvasChartEngine implements ChartEngineAdapter {
 
   /* ------------------------------------------------------------ Geometry */
 
-  private layout(): Layout {
+  /** Width and height only, for the callers that do not need the panes. */
+  private size(): { width: number; height: number; plotWidth: number } {
     const width = this.container?.clientWidth ?? 0;
-    const height = this.container?.clientHeight ?? 0;
-    const volumeHeight = VOLUME_HEIGHT;
-    const priceHeight = Math.max(80, height - volumeHeight - TIME_HEIGHT);
-
     return {
       width,
-      height,
-      priceTop: 0,
-      priceHeight,
-      volumeTop: priceHeight,
-      volumeHeight,
-      timeHeight: TIME_HEIGHT,
-      scaleWidth: SCALE_WIDTH,
+      height: this.container?.clientHeight ?? 0,
+      plotWidth: Math.max(0, width - SCALE_WIDTH),
+    };
+  }
+
+  /**
+   * The panes the studies currently on the chart are asking for.
+   *
+   * Series are cut to the visible window before the domain is computed, for the
+   * same reason the price scale is: a volume spike three months off screen
+   * should not flatten the bars somebody is actually looking at.
+   */
+  private paneRequests(): PaneInput[] {
+    const from = Math.floor(this.range.from);
+    const to = from + this.visibleBars().length;
+
+    return collectPaneRequests(this.indicators).map((request) => ({
+      ...request,
+      series: request.series.map((values) => values.slice(from, to)),
+    }));
+  }
+
+  /**
+   * The frame's geometry.
+   *
+   * One call produces the pane rectangles, every pane's domain and the single
+   * time mapping they all share — so nothing downstream can compute an x a
+   * different way and land a volume bar half a candle off.
+   */
+  private geometry(): Geometry {
+    const { width, height, plotWidth } = this.size();
+    const { low, high } = this.extremes();
+
+    return {
+      layout: buildPaneLayout({
+        width,
+        height,
+        price: { min: low, max: high },
+        secondary: this.paneRequests(),
+      }),
+      axis: timeAxis(this.range, plotWidth, this.visibleBars().length),
     };
   }
 
@@ -378,16 +461,9 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     return this.derived.slice(Math.floor(this.range.from), Math.ceil(this.range.to));
   }
 
-  private indexAt(x: number, layout: Layout): number {
-    const plot = layout.width - layout.scaleWidth;
-    const ratio = Math.max(0, Math.min(1, x / plot));
+  private indexAt(x: number, plotWidth: number): number {
+    const ratio = plotWidth > 0 ? Math.max(0, Math.min(1, x / plotWidth)) : 0;
     return Math.floor(this.range.from + ratio * (this.range.to - this.range.from));
-  }
-
-  private priceAt(y: number, layout: Layout): number {
-    const { low, high } = this.extremes();
-    const ratio = 1 - y / layout.priceHeight;
-    return low + ratio * (high - low);
   }
 
   private extremes(): { low: number; high: number } {
@@ -433,7 +509,7 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     const palette = this.palette;
     if (!ctx || !palette) return;
 
-    const layout = this.layout();
+    const { layout, axis } = this.geometry();
     const bars = this.visibleBars();
 
     ctx.clearRect(0, 0, layout.width, layout.height);
@@ -447,25 +523,35 @@ export class CanvasChartEngine implements ChartEngineAdapter {
       return;
     }
 
-    const { low, high } = this.extremes();
-    const plotWidth = layout.width - layout.scaleWidth;
-    const step = plotWidth / bars.length;
-    const bodyWidth = Math.max(1, step * 0.58);
+    const main = mainPane(layout);
+    const { min: low, max: high } = main.domain;
+    const step = axis.step;
+    const bodyWidth = barWidth(axis);
 
-    const toY = (price: number) => layout.priceHeight * (1 - (price - low) / (high - low));
+    const toY = (price: number) => valueToY(main, price);
 
     this.drawGrid(ctx, layout, palette, low, high, toY);
 
-    if (this.chartType === 'line' || this.chartType === 'area' || this.chartType === 'baseline') {
-      this.drawLineSeries(ctx, bars, step, toY, palette, layout);
-    } else {
-      this.drawBarSeries(ctx, bars, step, bodyWidth, toY, palette);
-    }
+    /*
+     * The price pane paints inside its own rectangle.
+     *
+     * Every save has its restore inside `withinPane`, so a clip cannot outlive
+     * the pane that set it — the failure mode being one study leaving the
+     * canvas clipped and every pane below it silently blank.
+     */
+    withinPane(ctx, main, layout.plotWidth, () => {
+      if (this.chartType === 'line' || this.chartType === 'area' || this.chartType === 'baseline') {
+        this.drawLineSeries(ctx, bars, step, toY, palette, main);
+      } else {
+        this.drawBarSeries(ctx, bars, step, bodyWidth, toY, palette);
+      }
 
-    this.drawIndicators(ctx, toY, step);
-    this.drawHighlights(ctx, layout, step);
-    this.drawDrawings(ctx, layout);
-    this.drawVolume(ctx, bars, step, layout, palette);
+      this.drawIndicators(ctx, toY, step);
+      this.drawHighlights(ctx, layout, step);
+      this.drawDrawings(ctx, layout);
+    });
+
+    this.drawSecondaryPanes(ctx, layout, axis, palette, bars);
     this.drawPriceScale(ctx, layout, palette, low, high);
     this.drawTimeScale(ctx, bars, step, layout, palette);
     if (this.crosshair) this.drawCrosshair(ctx, layout, palette);
@@ -473,7 +559,7 @@ export class CanvasChartEngine implements ChartEngineAdapter {
 
   private drawGrid(
     ctx: CanvasRenderingContext2D,
-    layout: Layout,
+    layout: PaneLayout,
     palette: ChartPalette,
     low: number,
     high: number,
@@ -487,9 +573,129 @@ export class CanvasChartEngine implements ChartEngineAdapter {
       const y = Math.round(toY(price)) + 0.5;
       ctx.beginPath();
       ctx.moveTo(0, y);
-      ctx.lineTo(layout.width - layout.scaleWidth, y);
+      ctx.lineTo(layout.plotWidth, y);
       ctx.stroke();
     }
+  }
+
+  /**
+   * The colours a pane renderer is allowed.
+   *
+   * A subset of the chart palette rather than the whole of it, so a pane cannot
+   * reach for a colour the price pane owns and quietly invent a second visual
+   * language halfway down the chart.
+   */
+  private panePalette(palette: ChartPalette): PanePalette {
+    return {
+      grid: palette.grid,
+      border: palette.border,
+      textMuted: palette.textMuted,
+      up: palette.up,
+      down: palette.down,
+    };
+  }
+
+  /**
+   * Every pane below the price, drawn from the studies that asked for one.
+   *
+   * There is no branch here on which study this is. A plot says it is a line, a
+   * histogram or a set of flags; the pane says how tall it is and what its
+   * domain is; this loop joins the two. Adding an oscillator changes the
+   * registry, not this function.
+   */
+  private drawSecondaryPanes(
+    ctx: CanvasRenderingContext2D,
+    layout: PaneLayout,
+    axis: TimeAxis,
+    palette: ChartPalette,
+    bars: Bar[]
+  ): void {
+    if (layout.panes.length < 2) return;
+
+    const panePalette = this.panePalette(palette);
+    const offset = Math.floor(this.range.from);
+
+    for (const pane of layout.panes.slice(1)) {
+      drawPaneFrame(ctx, pane, layout.plotWidth, panePalette, { separator: true });
+
+      // Zero is a line you can see on a pane that has negative values; on one
+      // that starts at zero it is the floor and drawing it is noise.
+      if (pane.scale.kind === 'symmetric') {
+        drawPaneBaseline(ctx, pane, layout.plotWidth, panePalette, 0);
+      }
+
+      for (const instance of this.indicators) {
+        if (paneRequestFor(instance)?.id !== pane.id) continue;
+
+        for (const plot of instance.plots) {
+          const colour =
+            this.studyPalette[plot.colour % this.studyPalette.length] ?? '#7c4dff';
+
+          if (plot.style === 'histogram') {
+            drawPaneHistogram(ctx, pane, axis, plot.values, {
+              // Zero for both a volume column and a MACD bar: one stands on the
+              // floor of its pane and the other hangs from the middle of its
+              // own, and that difference is the domain's, not the bar's.
+              baseline: 0,
+              /*
+               * Bar direction is the chart's existing way of colouring a
+               * column: volume takes it from the candle above, a MACD
+               * histogram from its own sign. Both are "up is up".
+               */
+              colourAt: (index) =>
+                this.histogramColour(pane, plot.values[index], bars[index - offset], palette),
+              plotWidth: layout.plotWidth,
+            });
+            continue;
+          }
+
+          if (plot.style === 'flags') {
+            drawPaneFlags(
+              ctx,
+              pane,
+              axis,
+              plot.values,
+              { colour, dashed: instance.draft },
+              layout.plotWidth
+            );
+            continue;
+          }
+
+          drawPaneLine(
+            ctx,
+            pane,
+            axis,
+            plot.values,
+            { colour, width: 1.6, dashed: instance.draft },
+            layout.plotWidth
+          );
+        }
+      }
+
+      drawPaneTitle(ctx, pane, panePalette, layout.plotWidth);
+      drawPaneScale(ctx, pane, layout, panePalette);
+    }
+  }
+
+  /**
+   * Which way a column points.
+   *
+   * On a pane that starts at zero the bar belongs to its candle — volume on a
+   * day the price fell is a down bar, whatever the volume did. Anywhere else
+   * the sign of the value is the only thing that could mean up or down.
+   */
+  private histogramColour(
+    pane: Pane,
+    value: number | null,
+    bar: Bar | undefined,
+    palette: ChartPalette
+  ): string {
+    if (pane.scale.kind === 'zeroBased') {
+      if (!bar) return palette.volumeUp;
+      return bar.close >= bar.open ? palette.volumeUp : palette.volumeDown;
+    }
+
+    return (value ?? 0) >= 0 ? palette.up : palette.down;
   }
 
   private drawBarSeries(
@@ -540,7 +746,7 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     step: number,
     toY: (price: number) => number,
     palette: ChartPalette,
-    layout: Layout
+    pane: Pane
   ): void {
     const first = bars[0].close;
     const last = bars[bars.length - 1].close;
@@ -561,10 +767,11 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     ctx.stroke();
 
     if (this.chartType === 'area') {
-      ctx.lineTo((bars.length - 1) * step + step / 2, layout.priceHeight);
-      ctx.lineTo(step / 2, layout.priceHeight);
+      const floor = pane.rect.top + pane.rect.height;
+      ctx.lineTo((bars.length - 1) * step + step / 2, floor);
+      ctx.lineTo(step / 2, floor);
       ctx.closePath();
-      const gradient = ctx.createLinearGradient(0, 0, 0, layout.priceHeight);
+      const gradient = ctx.createLinearGradient(0, pane.rect.top, 0, floor);
       gradient.addColorStop(0, `${colour}33`);
       gradient.addColorStop(1, `${colour}00`);
       ctx.fillStyle = gradient;
@@ -575,10 +782,10 @@ export class CanvasChartEngine implements ChartEngineAdapter {
   /**
    * Overlay indicators, on the price pane scale.
    *
-   * Separate-pane studies are not drawn here: they need their own vertical
-   * scale and their own strip of canvas, which is the pane manager's job.
-   * Putting a volume figure of forty million on the price scale would place it
-   * somewhere off the top of the chart.
+   * Separate-pane studies are not drawn here — `drawSecondaryPanes` has them,
+   * each on a scale of its own. Putting a volume figure of forty million on the
+   * price scale would place it somewhere off the top of the chart, which is why
+   * the two paths exist at all.
    */
   private drawIndicators(
     ctx: CanvasRenderingContext2D,
@@ -588,7 +795,9 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     const offset = Math.floor(this.range.from);
 
     for (const indicator of this.indicators) {
-      if (indicator.hidden || indicator.pane !== 'main') continue;
+      // One question, asked in one place: does this study want a pane of its
+      // own? Anything that does not is an overlay, whatever it is called.
+      if (indicator.hidden || paneRequestFor(indicator)) continue;
 
       for (const plot of indicator.plots) {
         /*
@@ -652,17 +861,17 @@ export class CanvasChartEngine implements ChartEngineAdapter {
    * get a minimum width, because one bar at a year of daily candles is under a
    * pixel and would be invisible exactly when it matters most.
    */
-  private drawHighlights(ctx: CanvasRenderingContext2D, layout: Layout, step: number): void {
+  private drawHighlights(ctx: CanvasRenderingContext2D, layout: PaneLayout, step: number): void {
     if (!this.highlights.length) return;
 
-    const plotHeight = layout.priceHeight;
+    const plotHeight = mainPane(layout).rect.height;
 
     for (const highlight of this.highlights) {
       const active = highlight.id === this.activeHighlight;
       const left = (highlight.fromIndex - this.range.from) * step;
       const width = Math.max(6, (highlight.toIndex - highlight.fromIndex + 1) * step);
 
-      if (left + width < 0 || left > layout.width - layout.scaleWidth) continue;
+      if (left + width < 0 || left > layout.plotWidth) continue;
 
       ctx.save();
 
@@ -699,7 +908,7 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     }
   }
 
-  private drawDrawings(ctx: CanvasRenderingContext2D, layout: Layout): void {
+  private drawDrawings(ctx: CanvasRenderingContext2D, layout: PaneLayout): void {
     const projection = this.projection();
 
     for (const drawing of this.drawings) {
@@ -725,12 +934,12 @@ export class CanvasChartEngine implements ChartEngineAdapter {
       } else if (drawing.tool === 'horizontalLine' || drawing.tool === 'priceLabel') {
         ctx.beginPath();
         ctx.moveTo(0, points[0].y);
-        ctx.lineTo(layout.width - layout.scaleWidth, points[0].y);
+        ctx.lineTo(layout.plotWidth, points[0].y);
         ctx.stroke();
       } else if (drawing.tool === 'verticalLine') {
         ctx.beginPath();
         ctx.moveTo(points[0].x, 0);
-        ctx.lineTo(points[0].x, layout.priceHeight);
+        ctx.lineTo(points[0].x, mainPane(layout).rect.height);
         ctx.stroke();
       } else if (drawing.tool === 'rectangle') {
         if (points.length >= 2) {
@@ -766,54 +975,60 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     }
   }
 
-  private drawVolume(
-    ctx: CanvasRenderingContext2D,
-    bars: Bar[],
-    step: number,
-    layout: Layout,
-    palette: ChartPalette
-  ): void {
-    const peak = Math.max(...bars.map((bar) => bar.volume ?? 0));
-    if (!peak) return;
-
-    bars.forEach((bar, index) => {
-      const volume = bar.volume ?? 0;
-      const height = (volume / peak) * (layout.volumeHeight - 10);
-      const x = index * step + step / 2;
-
-      ctx.fillStyle = bar.close >= bar.open ? palette.volumeUp : palette.volumeDown;
-      ctx.fillRect(
-        x - Math.max(1, step * 0.58) / 2,
-        layout.volumeTop + layout.volumeHeight - height,
-        Math.max(1, step * 0.58),
-        height
-      );
-    });
-  }
+  /*
+   * Volume used to be drawn here, as a strip the engine always reserved and
+   * always painted. It is a study now — `INDICATORS.volume`, on the shared
+   * volume pane — which is why there is nothing left in this file that knows
+   * what a volume bar is.
+   */
 
   private drawPriceScale(
     ctx: CanvasRenderingContext2D,
-    layout: Layout,
+    layout: PaneLayout,
     palette: ChartPalette,
     low: number,
     high: number
   ): void {
+    const main = mainPane(layout);
+
+    // Clipped to the price pane's own band of the gutter: the bottom label sits
+    // a few pixels below the value it belongs to, which is enough to land it in
+    // the pane underneath.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(layout.plotWidth, main.rect.top, layout.scaleWidth, main.rect.height);
+    ctx.clip();
+
     ctx.fillStyle = palette.textMuted;
     ctx.font = '10.5px "Plus Jakarta Sans", sans-serif';
     ctx.textAlign = 'left';
 
     for (let i = 0; i <= 4; i += 1) {
       const price = low + ((high - low) * i) / 4;
-      const y = layout.priceHeight * (1 - i / 4);
-      ctx.fillText(price.toFixed(2), layout.width - layout.scaleWidth + 8, Math.min(layout.priceHeight - 2, y + 4));
+      const y = main.rect.height * (1 - i / 4);
+      ctx.fillText(
+        price.toFixed(2),
+        layout.plotWidth + 8,
+        Math.min(main.rect.height - 2, y + 4)
+      );
     }
+
+    ctx.restore();
   }
 
+  /**
+   * One time axis, at the bottom, for every pane.
+   *
+   * The bottom-most pane owns the visible labels — `layout.axisPaneId` names it
+   * — while all of them share the mapping that put the bars where they are. A
+   * second axis between panes would be the same numbers written twice, and two
+   * places for them to disagree.
+   */
   private drawTimeScale(
     ctx: CanvasRenderingContext2D,
     bars: Bar[],
     step: number,
-    layout: Layout,
+    layout: PaneLayout,
     palette: ChartPalette
   ): void {
     ctx.fillStyle = palette.textMuted;
@@ -841,12 +1056,20 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     });
 
     ctx.textAlign = 'left';
-    ctx.fillText('UTC', layout.width - layout.scaleWidth + 8, layout.height - 8);
+    ctx.fillText('UTC', layout.plotWidth + 8, layout.height - 8);
   }
 
+  /**
+   * The crosshair, one line through everything and one inside a pane.
+   *
+   * The vertical runs the full height of the plot, because a moment in time is
+   * the same moment in every pane. The horizontal belongs to whichever pane the
+   * pointer is in and stops at its edges — drawn across the whole chart it
+   * would sit at 62 on the RSI and at nothing in particular everywhere else.
+   */
   private drawCrosshair(
     ctx: CanvasRenderingContext2D,
-    layout: Layout,
+    layout: PaneLayout,
     palette: ChartPalette
   ): void {
     const crosshair = this.crosshair;
@@ -859,10 +1082,17 @@ export class CanvasChartEngine implements ChartEngineAdapter {
 
     ctx.beginPath();
     ctx.moveTo(Math.round(crosshair.x) + 0.5, 0);
-    ctx.lineTo(Math.round(crosshair.x) + 0.5, layout.priceHeight + layout.volumeHeight);
-    ctx.moveTo(0, Math.round(crosshair.y) + 0.5);
-    ctx.lineTo(layout.width - layout.scaleWidth, Math.round(crosshair.y) + 0.5);
+    ctx.lineTo(Math.round(crosshair.x) + 0.5, layout.plotHeight);
     ctx.stroke();
+
+    const pane = paneAt(layout, crosshair.y);
+    if (pane) {
+      ctx.beginPath();
+      ctx.moveTo(0, Math.round(crosshair.y) + 0.5);
+      ctx.lineTo(layout.plotWidth, Math.round(crosshair.y) + 0.5);
+      ctx.stroke();
+    }
+
     ctx.restore();
   }
 
