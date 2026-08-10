@@ -96,64 +96,111 @@ process.on('uncaughtException', (error) => {
 
 /* ------------------------------------------------------------------ Build */
 
-execFileSync(
-  'npx',
-  [
-    'tsc',
-    'src/lib/analytics/states.ts',
-    'src/lib/analytics/registry.ts',
-    'src/lib/analytics/validate.ts',
-    'src/lib/analytics/identity.ts',
-    'src/lib/analytics/surfaces.ts',
-    'src/lib/analytics/queue.ts',
-    '--outDir',
-    out,
-    '--module',
-    'esnext',
-    '--target',
-    'es2022',
-    '--moduleResolution',
-    'bundler',
-    '--skipLibCheck',
-    /*
-     * The project's tsconfig is `strict`, and without it here a discriminated
-     * union does not narrow — `validate.ts` compiled clean under the real build
-     * and failed under this one, which would have meant the harness was
-     * checking a different language from the one that ships.
-     */
-    '--strict',
-  ],
-  { stdio: 'inherit', shell: process.platform === 'win32' }
+/**
+ * The dependency-free modules, compiled and loaded.
+ *
+ * A project tsconfig is written into the temp directory rather than passing
+ * flags, for one reason: these modules use the `@/…` path alias across
+ * directories, as the rest of the codebase does, and `tsc` has no CLI flag for
+ * `paths`. Rewriting the sources to relative imports to suit the harness would
+ * be the test dictating the shape of the code.
+ */
+const PURE_MODULES = [
+  'analytics/states',
+  'analytics/registry',
+  'analytics/validate',
+  'analytics/identity',
+  'analytics/surfaces',
+  'analytics/queue',
+  'admin-metrics/eligibility',
+  'admin-metrics/meaningful',
+  'admin-metrics/sessions',
+  'admin-metrics/retention',
+  'admin-metrics/journeys',
+  'admin-metrics/dictionary',
+  'admin-metrics/range',
+];
+
+const repo = process.cwd();
+const harnessConfig = join(out, 'tsconfig.harness.json');
+
+writeFileSync(
+  harnessConfig,
+  JSON.stringify({
+    compilerOptions: {
+      target: 'es2022',
+      module: 'esnext',
+      moduleResolution: 'bundler',
+      /*
+       * The project's tsconfig is `strict`, and without it a discriminated
+       * union does not narrow — `validate.ts` once compiled clean under the
+       * real build and failed under this one, which would have meant the
+       * harness was checking a different language from the one that ships.
+       */
+      strict: true,
+      skipLibCheck: true,
+      outDir: out,
+      rootDir: join(repo, 'src/lib'),
+      baseUrl: repo,
+      paths: { '@/*': ['src/*'] },
+    },
+    files: PURE_MODULES.map((name) => join(repo, 'src/lib', `${name}.ts`)),
+  })
 );
 
+execFileSync('npx', ['tsc', '-p', harnessConfig], {
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+});
+
 /*
- * `tsc` emits the import specifiers exactly as they were written, and these
- * modules import each other by extensionless relative path — which TypeScript
- * resolves and the Node ESM loader does not. So the emitted tree is made
- * loadable: a `package.json` to declare it as ESM, and `.js` appended to the
- * relative specifiers. `test-events.mjs` never needed this because the modules
- * it compiles are leaves.
+ * `tsc` emits import specifiers exactly as they were written — it resolves
+ * `@/…` and extensionless relative paths, and rewrites neither. The Node ESM
+ * loader accepts neither. So the emitted tree is made loadable: a
+ * `package.json` to declare it as ESM, `@/lib/x` turned into a real relative
+ * path, and `.js` appended. `test-events.mjs` never needed this because the
+ * modules it compiles are leaves in one directory.
  */
 writeFileSync(join(out, 'package.json'), '{"type":"module"}');
 
-for (const file of readdirSync(out).filter((name) => name.endsWith('.js'))) {
-  const path = join(out, file);
-  writeFileSync(
-    path,
-    readFileSync(path, 'utf8').replace(/from '(\.\/[^']+)'/g, (match, specifier) =>
-      specifier.endsWith('.js') ? match : `from '${specifier}.js'`
-    )
+function emitted(dir = out, prefix = '') {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory()
+      ? emitted(join(dir, entry.name), `${prefix}${entry.name}/`)
+      : entry.name.endsWith('.js')
+        ? [`${prefix}${entry.name}`]
+        : []
   );
+}
+
+for (const relative of emitted()) {
+  const path = join(out, relative);
+  const depth = relative.split('/').length - 1;
+  const upToRoot = depth === 0 ? './' : '../'.repeat(depth);
+
+  const source = readFileSync(path, 'utf8')
+    .replace(/from '@\/lib\/([^']+)'/g, (_match, rest) => `from '${upToRoot}${rest}.js'`)
+    .replace(/from '(\.\.?\/[^']+)'/g, (match, specifier) =>
+      specifier.endsWith('.js') ? match : `from '${specifier}.js'`
+    );
+
+  writeFileSync(path, source);
 }
 
 const load = (name) => import(pathToFileURL(join(out, `${name}.js`)).href);
 
-const states = await load('states');
-const registry = await load('registry');
-const validate = await load('validate');
-const identity = await load('identity');
-const surfaces = await load('surfaces');
-const queue = await load('queue');
+const states = await load('analytics/states');
+const registry = await load('analytics/registry');
+const validate = await load('analytics/validate');
+const identity = await load('analytics/identity');
+const surfaces = await load('analytics/surfaces');
+const queue = await load('analytics/queue');
+const eligibility = await load('admin-metrics/eligibility');
+const meaningful = await load('admin-metrics/meaningful');
+const sessionsLib = await load('admin-metrics/sessions');
+const retentionLib = await load('admin-metrics/retention');
+const journeysLib = await load('admin-metrics/journeys');
+const dictionary = await load('admin-metrics/dictionary');
 
 const NOW = new Date('2026-08-10T12:00:00.000Z');
 const at = { source: 'test', metricId: 'test', queriedAt: NOW.toISOString() };
@@ -625,6 +672,511 @@ try {
     assert.equal(registry.MEANINGFUL_EVENT_NAMES.includes('voyager_action_failed'), false);
   });
 
+  /* ================================================== Phase 2 — the metrics */
+
+  /*
+   * Fixtures rather than live data. A metric formula that is only ever checked
+   * against whatever happened to be in the database is not checked at all: the
+   * interesting cases — a bounce, a duplicate, a clock that went backwards, a
+   * cohort too young to have returned — are exactly the ones production has not
+   * produced yet.
+   */
+  const T0 = Date.parse('2026-08-10T10:00:00.000Z');
+  const FLAGS = { superchartEnabled: true, wealthHubEnabled: true, alertsEnabled: false };
+  const lookup = (key) => {
+    const definition = surfaces.SURFACE_BY_KEY.get(key);
+    if (!definition) return null;
+    return {
+      pmcrEligible: definition.pmcrEligible,
+      featureState: surfaces.featureStateFor(key, FLAGS),
+    };
+  };
+
+  const point = (sessionId, eventName, seconds, extra = {}) => ({
+    sessionId,
+    eventName,
+    occurredAt: T0 + seconds * 1000,
+    surface: extra.surface ?? 'home',
+    routeTemplate: extra.route ?? '/',
+    featureState: 'live',
+    authState: extra.authState ?? 'anonymous',
+    userKeyHash: extra.userKeyHash ?? null,
+    acquisitionSource: extra.acquisition ?? 'direct',
+    deviceClass: extra.device ?? 'desktop',
+    entitlement: extra.entitlement ?? null,
+    properties: extra.properties ?? {},
+  });
+
+  /** A landed, engaged session on `area`, plus whatever else is passed. */
+  const session = (id, area = 'home', rest = [], options = {}) => [
+    point(id, 'portal_session_started', 0, { surface: 'portal', ...options }),
+    point(id, 'portal_page_viewed', 0, { surface: 'portal', properties: { route: '/', area }, ...options }),
+    ...(options.bounced
+      ? []
+      : [point(id, 'portal_engagement_checkpoint', 3, { surface: 'portal', properties: { seconds: 3, area }, ...options })]),
+    ...rest,
+  ];
+
+  const provenance = (metricId) => ({ metricId, source: 'test', queriedAt: NOW.toISOString() });
+  const opts = { threshold: 1, state: 'live' };
+  const factsOf = (points) => sessionsLib.sessionFactsFrom(points, lookup);
+
+  const save = (id, seconds, eventId = 'e1') =>
+    point(id, 'event_saved', seconds, {
+      surface: 'events',
+      properties: { eventId, saved: true },
+    });
+
+  const ask = (id, seconds, turns = 1) =>
+    point(id, 'voyager_question_sent', seconds, {
+      surface: 'voyager',
+      properties: { contextKind: 'home', mode: 'chat', turns },
+    });
+
+  group('PMCR — the denominator is a population, not a row count');
+
+  check('an engaged landing with an action continues', () => {
+    const facts = factsOf(session('s1', 'home', [save('s1', 10)]));
+    assert.equal(facts[0].excludedBecause, null);
+    const result = sessionsLib.continuationRate(facts, provenance, opts);
+    assert.equal(result.eligibleSessions, 1);
+    assert.equal(result.overall.value, 1);
+  });
+
+  check('an engaged landing with no action is eligible and did not continue', () => {
+    const result = sessionsLib.continuationRate(factsOf(session('s1')), provenance, opts);
+    assert.equal(result.eligibleSessions, 1);
+    assert.equal(result.overall.value, 0);
+  });
+
+  check('a bounce leaves the denominator rather than failing in it', () => {
+    const facts = factsOf(session('s1', 'home', [], { bounced: true }));
+    assert.equal(facts[0].excludedBecause, 'below_engagement_threshold');
+    assert.equal(sessionsLib.continuationRate(facts, provenance, opts).eligibleSessions, 0);
+  });
+
+  check('a fast action beats the engagement timer and still counts', () => {
+    // Acting is stronger evidence of engagement than a three-second timer, and
+    // a session excluded for succeeding too quickly would be absurd.
+    const facts = factsOf(session('s1', 'home', [save('s1', 1)], { bounced: true }));
+    assert.equal(facts[0].excludedBecause, null);
+  });
+
+  check('the Observatory never enters a product denominator', () => {
+    const facts = factsOf(session('s1', 'observatory', [save('s1', 10)]));
+    assert.equal(facts[0].excludedBecause, 'observatory');
+    assert.equal(sessionsLib.continuationRate(facts, provenance, opts).eligibleSessions, 0);
+  });
+
+  check('sign-in plumbing is not a landing', () => {
+    assert.equal(factsOf(session('s1', 'auth'))[0].excludedBecause, 'auth_plumbing');
+  });
+
+  check('account housekeeping is not a landing', () => {
+    assert.equal(factsOf(session('s1', 'account'))[0].excludedBecause, 'not_a_landing_surface');
+  });
+
+  check('a landing on an unrecognised surface is excluded, not guessed', () => {
+    assert.equal(factsOf(session('s1', 'nonsense'))[0].excludedBecause, 'unknown_surface');
+  });
+
+  check('a landing on a flagged-off surface is excluded rather than counted as a failure', () => {
+    const off = (key) => {
+      const definition = surfaces.SURFACE_BY_KEY.get(key);
+      if (!definition) return null;
+      return {
+        pmcrEligible: definition.pmcrEligible,
+        featureState: surfaces.featureStateFor(key, { ...FLAGS, superchartEnabled: false }),
+      };
+    };
+    const facts = sessionsLib.sessionFactsFrom(session('s1', 'supercharts'), off);
+    assert.equal(facts[0].excludedBecause, 'surface_not_live');
+  });
+
+  check('telemetry with no page view is not a session anybody had', () => {
+    assert.equal(factsOf([point('s1', 'portal_session_started', 0)])[0].excludedBecause, 'no_page_view');
+  });
+
+  check('automated traffic has a named exclusion and is dropped at ingest', () => {
+    assert.equal(eligibility.EXCLUSION_REASONS.includes('automated'), true);
+    assert.equal(identity.looksAutomated('Mozilla/5.0 compatible; Googlebot/2.1'), true);
+  });
+
+  check('external continuation is decomposed, never folded in', () => {
+    const external = point('s2', 'event_external_link_clicked', 12, {
+      surface: 'events',
+      properties: { eventId: 'e1', domain: 'tradingview.com', trusted: true },
+    });
+    const facts = factsOf([...session('s1', 'home', [save('s1', 10)]), ...session('s2', 'events', [external])]);
+    const result = sessionsLib.continuationRate(facts, provenance, opts);
+
+    assert.equal(result.eligibleSessions, 2);
+    assert.equal(result.overall.value, 1, 'both sessions continued');
+    assert.equal(result.internal.value, 0.5);
+    assert.equal(result.external.value, 0.5);
+  });
+
+  check('the decomposition shares the headline denominator', () => {
+    const facts = factsOf(session('s1', 'home', [save('s1', 10)]));
+    const result = sessionsLib.continuationRate(facts, provenance, opts);
+    assert.equal(result.internal.sample, result.overall.sample);
+    assert.equal(result.external.sample, result.overall.sample);
+  });
+
+  check('no eligible sessions is an insufficient sample, not 0%', () => {
+    const result = sessionsLib.continuationRate([], provenance, { threshold: 200, state: 'live' });
+    assert.equal(result.overall.state, 'insufficient_sample');
+    assert.equal('value' in result.overall, false);
+  });
+
+  check('a page view is not continuation, however many there are', () => {
+    const extraViews = [
+      point('s1', 'portal_page_viewed', 5, { surface: 'portal', properties: { route: '/explore', area: 'explore' } }),
+      point('s1', 'portal_navigation_completed', 5, { surface: 'portal', properties: { from: 'home', to: 'explore', hop: 1 } }),
+    ];
+    const result = sessionsLib.continuationRate(factsOf(session('s1', 'home', extraViews)), provenance, opts);
+    assert.equal(result.overall.value, 0, 'navigation manufactured a continuation');
+  });
+
+  group('TTFA — measured only where there is something to measure');
+
+  check('the median is the middle duration', () => {
+    const points = [
+      ...session('a', 'home', [save('a', 10)]),
+      ...session('b', 'home', [save('b', 20)]),
+      ...session('c', 'home', [save('c', 60)]),
+    ];
+    const result = sessionsLib.timeToFirstAction(factsOf(points), provenance, opts);
+    assert.equal(result.median.value, 20);
+    assert.equal(result.sample, 3);
+  });
+
+  check('p75 and p90 are nearest-rank, so every value is one somebody had', () => {
+    const points = Array.from({ length: 10 }, (_, index) =>
+      session(`s${index}`, 'home', [save(`s${index}`, (index + 1) * 10)])
+    ).flat();
+    const result = sessionsLib.timeToFirstAction(factsOf(points), provenance, opts);
+    assert.equal(result.p75.value, 80);
+    assert.equal(result.p90.value, 90);
+  });
+
+  check('a session with no action gets no TTFA and is counted separately', () => {
+    const points = [...session('a', 'home', [save('a', 10)]), ...session('b')];
+    const result = sessionsLib.timeToFirstAction(factsOf(points), provenance, opts);
+    assert.equal(result.sample, 1, 'a session without an action contributed a duration');
+    assert.equal(result.withoutAction.value, 1);
+  });
+
+  check('out-of-order arrival does not change the answer', () => {
+    const forwards = session('s1', 'home', [save('s1', 30), ask('s1', 10)]);
+    const backwards = [...forwards].reverse();
+    const a = sessionsLib.timeToFirstAction(factsOf(forwards), provenance, opts);
+    const b = sessionsLib.timeToFirstAction(factsOf(backwards), provenance, opts);
+    assert.equal(a.median.value, 10);
+    assert.equal(b.median.value, a.median.value);
+  });
+
+  check('a duplicate delivery does not move the first action', () => {
+    const duplicated = session('s1', 'home', [save('s1', 30), save('s1', 10), save('s1', 10)]);
+    const facts = factsOf(duplicated);
+    assert.equal(facts[0].actions.length, 1, 'the same save counted more than once');
+    assert.equal(facts[0].timeToFirstAction, 10_000);
+  });
+
+  check('a clock that went backwards cannot produce a negative duration', () => {
+    const facts = factsOf([
+      point('s1', 'portal_page_viewed', 30, { surface: 'portal', properties: { route: '/', area: 'home' } }),
+      point('s1', 'portal_engagement_checkpoint', 33, { surface: 'portal', properties: { seconds: 3, area: 'home' } }),
+      save('s1', 5),
+    ]);
+    assert.ok(facts[0].timeToFirstAction >= 0, 'a negative duration escaped');
+    assert.equal(facts[0].timeToFirstAction, 0);
+  });
+
+  check('too few durations withholds the percentile', () => {
+    const result = sessionsLib.timeToFirstAction(
+      factsOf(session('a', 'home', [save('a', 10)])),
+      provenance,
+      { threshold: 200, state: 'live' }
+    );
+    assert.equal(result.median.state, 'insufficient_sample');
+  });
+
+  group('Second meaningful action');
+
+  check('no actions is an empty denominator, not 0%', () => {
+    const result = sessionsLib.secondActionRate(factsOf(session('s1')), provenance, { threshold: 1, state: 'live' });
+    assert.equal(result.denominator, 0);
+    assert.equal(result.rate.state, 'insufficient_sample');
+  });
+
+  check('one action is a denominator of one and a numerator of zero', () => {
+    const result = sessionsLib.secondActionRate(factsOf(session('s1', 'home', [save('s1', 10)])), provenance, opts);
+    assert.equal(result.denominator, 1);
+    assert.equal(result.numerator, 0);
+    assert.equal(result.rate.value, 0);
+  });
+
+  check('two distinct actions count as two', () => {
+    const points = session('s1', 'home', [save('s1', 10), ask('s1', 20)]);
+    const result = sessionsLib.secondActionRate(factsOf(points), provenance, opts);
+    assert.equal(result.numerator, 1);
+    assert.equal(result.rate.value, 1);
+  });
+
+  check('the same action twice is one action', () => {
+    const points = session('s1', 'home', [save('s1', 10), save('s1', 20)]);
+    assert.equal(factsOf(points)[0].actions.length, 1);
+    assert.equal(sessionsLib.secondActionRate(factsOf(points), provenance, opts).numerator, 0);
+  });
+
+  check('saving two different events is two actions', () => {
+    const points = session('s1', 'home', [save('s1', 10, 'e1'), save('s1', 20, 'e2')]);
+    assert.equal(factsOf(points)[0].actions.length, 2);
+  });
+
+  check('a repeatable action is not deduplicated', () => {
+    // Two Voyager questions are two questions, whatever their payload looks
+    // like — shapes and counts cannot tell them apart, which is why the
+    // registry marks the event repeatable rather than relying on properties.
+    const points = session('s1', 'home', [ask('s1', 10), ask('s1', 20)]);
+    assert.equal(factsOf(points)[0].actions.length, 2);
+  });
+
+  check('PMCR and the second-action rate share one taxonomy', () => {
+    const points = session('s1', 'home', [save('s1', 10), ask('s1', 20)]);
+    const facts = factsOf(points);
+    const pmcr = sessionsLib.continuationRate(facts, provenance, opts);
+    const second = sessionsLib.secondActionRate(facts, provenance, opts);
+    assert.equal(pmcr.continuedSessions, second.denominator);
+  });
+
+  group('Retention — authenticated, cumulative windows, no invented history');
+
+  const userDay = (userKeyHash, day, extra = {}) => ({
+    userKeyHash,
+    day,
+    eligible: extra.eligible ?? true,
+    meaningful: extra.meaningful ?? false,
+  });
+
+  const retentionOf = (rows, options = {}) =>
+    retentionLib.cohortRetention(rows, {
+      today: new Date(options.today ?? '2026-09-30T00:00:00.000Z'),
+      telemetryStartedOn: options.telemetryStartedOn ?? '2026-08-01',
+      minimumCohort: options.minimumCohort ?? 1,
+      provenance,
+      state: 'instrumented_going_forward',
+    });
+
+  check('a return the next day satisfies D1, D7 and D30', () => {
+    const report = retentionOf([userDay('u_a', '2026-08-10'), userDay('u_a', '2026-08-11')]);
+    for (const horizon of report.horizons) assert.equal(horizon.returned.value, 1, `D${horizon.horizon}`);
+  });
+
+  check('a return on day five satisfies D7 and D30 but not D1', () => {
+    const report = retentionOf([userDay('u_a', '2026-08-10'), userDay('u_a', '2026-08-15')]);
+    const byHorizon = Object.fromEntries(report.horizons.map((h) => [h.horizon, h.returned.value]));
+    assert.equal(byHorizon[1], 0);
+    assert.equal(byHorizon[7], 1);
+    assert.equal(byHorizon[30], 1);
+  });
+
+  check('the window is inclusive at its edge and exclusive past it', () => {
+    const onTheDay = retentionOf([userDay('u_a', '2026-08-10'), userDay('u_a', '2026-08-17')]);
+    const dayAfter = retentionOf([userDay('u_b', '2026-08-10'), userDay('u_b', '2026-08-18')]);
+    assert.equal(onTheDay.horizons.find((h) => h.horizon === 7).returned.value, 1, 'day 7 was excluded');
+    assert.equal(dayAfter.horizons.find((h) => h.horizon === 7).returned.value, 0, 'day 8 was included');
+  });
+
+  check('the first day is not a return', () => {
+    // Otherwise every cohort retains 100% by definition.
+    const report = retentionOf([userDay('u_a', '2026-08-10')]);
+    assert.equal(report.horizons[0].returned.value, 0);
+  });
+
+  check('the windows are cumulative, so D1 never exceeds D7', () => {
+    const rows = [
+      userDay('u_a', '2026-08-10'), userDay('u_a', '2026-08-11'),
+      userDay('u_b', '2026-08-10'), userDay('u_b', '2026-08-16'),
+      userDay('u_c', '2026-08-10'),
+    ];
+    const report = retentionOf(rows);
+    const [d1, d7, d30] = report.horizons.map((h) => h.returned.value);
+    assert.ok(d1 <= d7 && d7 <= d30, `${d1} ${d7} ${d30}`);
+  });
+
+  check('users are grouped by the pseudonymous key, never by anything else', () => {
+    const report = retentionOf([
+      userDay('u_a', '2026-08-10'), userDay('u_a', '2026-08-11'),
+      userDay('u_b', '2026-08-10'),
+    ]);
+    assert.equal(report.totalAuthenticatedUsers, 2);
+    assert.equal(report.horizons[0].returned.value, 0.5);
+  });
+
+  check('a cohort younger than the window is excluded, not counted as churn', () => {
+    const report = retentionOf([userDay('u_a', '2026-09-29')], { today: '2026-09-30T00:00:00.000Z' });
+    const d7 = report.horizons.find((h) => h.horizon === 7);
+    assert.equal(d7.cohortSize, 0, 'an immature cohort was measured');
+    assert.equal(d7.immatureUsers, 1);
+    assert.equal(d7.returned.state, 'insufficient_sample');
+  });
+
+  check('a cohort formed before telemetry existed is not counted as churn', () => {
+    const report = retentionOf([userDay('u_a', '2026-07-01')], { telemetryStartedOn: '2026-08-01' });
+    assert.equal(report.horizons[0].cohortSize, 0, 'a pre-telemetry cohort was measured');
+    assert.equal(report.horizons[0].immatureUsers, 1);
+  });
+
+  check('a cohort under the minimum withholds its rate', () => {
+    const report = retentionOf([userDay('u_a', '2026-08-10'), userDay('u_a', '2026-08-11')], {
+      minimumCohort: 50,
+    });
+    assert.equal(report.horizons[0].returned.state, 'insufficient_sample');
+    assert.equal(report.horizons[0].returned.threshold, 50);
+  });
+
+  check('returning and doing something is reported apart from returning', () => {
+    const report = retentionOf([
+      userDay('u_a', '2026-08-10'),
+      userDay('u_a', '2026-08-11', { meaningful: false }),
+      userDay('u_b', '2026-08-10'),
+      userDay('u_b', '2026-08-11', { meaningful: true }),
+    ]);
+    assert.equal(report.horizons[0].returned.value, 1);
+    assert.equal(report.horizons[0].returnedMeaningfully.value, 0.5);
+  });
+
+  check('anonymous retention is not measurable and says what it would take', () => {
+    const report = retentionOf([]);
+    assert.equal(report.anonymous.state, 'not_measurable');
+    assert.match(report.anonymous.wouldRequire, /consent/);
+    assert.equal('value' in report.anonymous, false);
+  });
+
+  group('Journeys — aggregate only, and small groups withhold their rate');
+
+  check('sessions are grouped by landing surface with their rate', () => {
+    const points = [
+      ...session('a', 'home', [save('a', 10)]),
+      ...session('b', 'home'),
+      ...session('c', 'explore', [save('c', 10)]),
+    ];
+    const report = journeysLib.journeyReport(factsOf(points), {}, 1);
+    const home = report.byLandingSurface.find((row) => row.key === 'home');
+    assert.equal(home.sessions, 2);
+    assert.equal(home.continued, 1);
+    assert.equal(home.rate, 0.5);
+  });
+
+  check('a group below the threshold reports its count and withholds its rate', () => {
+    const report = journeysLib.journeyReport(factsOf(session('a', 'home', [save('a', 10)])), {}, 25);
+    const home = report.byLandingSurface.find((row) => row.key === 'home');
+    assert.equal(home.sessions, 1);
+    assert.equal(home.rate, null, 'a rate over one session was published');
+    assert.equal(home.suppressed, true);
+  });
+
+  check('the first action taken is aggregated, never listed per session', () => {
+    const points = [...session('a', 'home', [save('a', 10)]), ...session('b', 'home', [ask('b', 10)])];
+    const report = journeysLib.journeyReport(factsOf(points), {}, 1);
+    assert.equal(report.firstAction.length, 2);
+    const serialised = JSON.stringify(report);
+    assert.equal(serialised.includes('"a"'), false, 'a session id reached the report');
+    assert.equal(serialised.includes('sessionId'), false);
+  });
+
+  check('internal and external continuation are counted apart', () => {
+    const external = point('b', 'event_external_link_clicked', 12, {
+      surface: 'events',
+      properties: { eventId: 'e1', domain: 'tradingview.com', trusted: true },
+    });
+    const points = [...session('a', 'home', [save('a', 10)]), ...session('b', 'events', [external]), ...session('c')];
+    const report = journeysLib.journeyReport(factsOf(points), {}, 1);
+    assert.deepEqual(report.internalVsExternal, { internalOnly: 1, externalOnly: 1, both: 0, neither: 1 });
+  });
+
+  check('exclusions are reported rather than silently shrinking the denominator', () => {
+    const facts = factsOf([...session('a', 'home', [save('a', 10)]), ...session('b', 'observatory')]);
+    const report = journeysLib.journeyReport(facts, sessionsLib.exclusionBreakdown(facts), 1);
+    assert.equal(report.eligibleSessions, 1);
+    assert.equal(report.exclusions.observatory, 1);
+  });
+
+  group('Navigation cannot manufacture continuation');
+
+  check('a route transition, a page view and a feature event are one continuation', () => {
+    /*
+     * The concrete risk §13 names: one click produces a navigation event, a page
+     * view and the feature's own event. Only the last is meaningful, so the
+     * session continues exactly once however many signals the click emitted.
+     */
+    const click = [
+      point('s1', 'portal_navigation_completed', 10, { surface: 'portal', properties: { from: 'home', to: 'events', hop: 1 } }),
+      point('s1', 'portal_page_viewed', 10, { surface: 'portal', properties: { route: '/events', area: 'events' } }),
+      save('s1', 10),
+    ];
+    const facts = factsOf(session('s1', 'home', click));
+    assert.equal(facts[0].actions.length, 1, 'one click produced more than one action');
+  });
+
+  check('neither backbone navigation event is meaningful', () => {
+    assert.equal(meaningful.isMeaningful('portal_navigation_completed'), false);
+    assert.equal(meaningful.isMeaningful('portal_page_viewed'), false);
+    assert.equal(meaningful.isMeaningful('portal_session_started'), false);
+    assert.equal(meaningful.isMeaningful('portal_engagement_checkpoint'), false);
+  });
+
+  check('a full reload and a client transition are told apart by the client', () => {
+    /*
+     * A hard navigation never reaches the router hook — it re-runs the whole
+     * instrumentation module, which emits its own session start and page view.
+     * The hook is for client-side transitions and the source says so; making a
+     * reload look like an SPA transition would invent a navigation the product
+     * never performed.
+     */
+    const source = readFileSync('src/instrumentation-client.ts', 'utf8');
+    assert.match(source, /export function onRouterTransitionStart\(url: string\)/);
+    assert.match(source, /new URL\(url, location\.origin\)/, 'the hook still reads location instead of its argument');
+    assert.match(source, /if \(route === lastRoute\) return;/, 'a repeated route can emit a second page view');
+  });
+
+  group('The dictionary is the definition, and the code is the same one');
+
+  check('every Phase 2 metric has a dictionary entry', () => {
+    for (const id of ['pmcr', 'pmcr_internal', 'pmcr_external', 'ttfa_median', 'second_action_rate', 'retention_d1', 'retention_d7', 'retention_d30', 'retention_anonymous']) {
+      assert.ok(dictionary.DICTIONARY_BY_ID.get(id), `${id} has no definition`);
+    }
+  });
+
+  check('a definition states its population, exclusions and limitations', () => {
+    for (const entry of dictionary.METRIC_DICTIONARY) {
+      assert.ok(entry.formula, `${entry.id} has no formula`);
+      assert.ok(entry.eligiblePopulation, `${entry.id} has no population`);
+      assert.ok(entry.limitations.length > 0, `${entry.id} claims no limitations`);
+      assert.ok(entry.timeSemantics, `${entry.id} does not say which clock it trusts`);
+    }
+  });
+
+  check('the dictionary quotes the threshold the code applies', () => {
+    assert.match(
+      dictionary.DICTIONARY_BY_ID.get('pmcr').eligiblePopulation,
+      new RegExp(`${eligibility.ENGAGEMENT_THRESHOLD_SECONDS} seconds`)
+    );
+  });
+
+  check('the meaningful taxonomy is derived, not written twice', () => {
+    const declared = registry.EVENT_REGISTRY.filter((e) => e.meaningful && e.lifecycle === 'current').map((e) => e.name);
+    assert.deepEqual([...meaningful.MEANINGFUL_EVENTS].sort(), declared.sort());
+  });
+
+  check('no legacy event can be meaningful', () => {
+    for (const name of meaningful.MEANINGFUL_EVENTS) {
+      assert.equal(registry.EVENT_BY_NAME.get(name).lifecycle, 'current', name);
+    }
+  });
+
   /* ------------------------------------ The checker cannot be self-defeated */
 
   group('The caller checker survives the registry that names every event');
@@ -858,6 +1410,64 @@ try {
         const legacy = body.rows.find((row) => row.event === 'plan_generated');
         assert.equal(legacy.lifecycle, 'legacy');
         assert.equal(legacy.status, 'legacy_silent');
+      });
+
+      await checkAsync('every Phase 2 endpoint authorizes for itself', async () => {
+        for (const endpoint of ['journeys', 'retention', 'dictionary']) {
+          const response = await fetch(`${BASE}/api/admin-metrics/${endpoint}`);
+          assert.equal(response.status, 401, `${endpoint} answered ${response.status} unauthenticated`);
+        }
+      });
+
+      await checkAsync('journeys reports its exclusions rather than a shrunken rate', async () => {
+        const token = await mintToken();
+        const response = await fetch(`${BASE}/api/admin-metrics/journeys`, {
+          headers: { cookie: `tn_metrics_access=${token}` },
+        });
+        const body = await response.json();
+
+        assert.equal(response.status, 200);
+        assert.ok(body.journeys, 'no journey report');
+        assert.equal(typeof body.journeys.exclusions, 'object');
+        assert.equal(body.truncated, false);
+
+        // Aggregate only: nothing in the payload may name a session.
+        const serialised = JSON.stringify(body);
+        assert.equal(serialised.includes('sessionId'), false, 'a session id reached the journey payload');
+        assert.equal(/s_[0-9a-f]{32}/.test(serialised), false, 'a session key reached the journey payload');
+      });
+
+      await checkAsync('retention refuses to invent history it does not have', async () => {
+        const token = await mintToken();
+        const response = await fetch(`${BASE}/api/admin-metrics/retention`, {
+          headers: { cookie: `tn_metrics_access=${token}` },
+        });
+        const body = await response.json();
+
+        assert.equal(response.status, 200);
+        assert.equal(body.anonymous.state, 'not_measurable');
+
+        for (const horizon of body.horizons) {
+          // Telemetry began days ago, so every cohort is either immature or
+          // below the minimum. Neither may be reported as a percentage.
+          assert.equal(
+            ['insufficient_sample', 'instrumented_going_forward'].includes(horizon.returned.state),
+            true,
+            `D${horizon.horizon} claimed ${horizon.returned.state}`
+          );
+        }
+      });
+
+      await checkAsync('the dictionary is served rather than restated in the page', async () => {
+        const token = await mintToken();
+        const response = await fetch(`${BASE}/api/admin-metrics/dictionary`, {
+          headers: { cookie: `tn_metrics_access=${token}` },
+        });
+        const body = await response.json();
+
+        assert.equal(response.status, 200);
+        assert.ok(body.metrics.length >= 9);
+        assert.ok(body.metrics.every((entry) => entry.formula && entry.limitations.length));
       });
 
       await checkAsync('the route is absent from the sitemap', async () => {
