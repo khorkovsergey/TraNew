@@ -5302,7 +5302,10 @@ try {
     const inBranch = emits(branch, 'voyager_request_completed');
     assert.equal(inBranch.length, 1, `${inBranch.length} emits in the refusal branch`);
     assert.match(inBranch[0], /outcome: 'quota_refused'/);
-    assert.match(inBranch[0], /quotaDisposition: 'refused_released'/);
+    assert.match(inBranch[0], /quotaDisposition: settledQuota/);
+    // Settled by the refund itself, so the value cannot claim a refund that
+    // did not come back.
+    assert.match(branch, /releaseQuestion[\s\S]{0,120}settledQuota = 'refused_released'/);
     // Settled, not intended: the release has to have happened first, or the
     // disposition would describe a refund that had not been made.
     assert.ok(
@@ -5342,8 +5345,17 @@ try {
       /real_answer/.test(block)
     );
 
-    assert.match(answered, /decision\.charged \? 'charged' : 'released'/);
-    assert.match(answered, /quota === null\s*\?\s*'unmetered'/);
+    assert.match(answered, /quotaDisposition: settledQuota/);
+    // One variable, updated only once each quota operation has come back.
+    assert.match(routeTelemetry, /quota === null \? 'unmetered' : 'charged'/);
+    assert.match(
+      routeTelemetry,
+      /if \(!decision\.charged\) \{[\s\S]{0,200}releaseQuestion[\s\S]{0,200}settledQuota = 'released'/
+    );
+    // Unmetered stays unmetered: `quotaDelta` returns `charged: false` for a
+    // plan that is not counted, so the release runs and must not read as a
+    // refund of a charge that was never made.
+    assert.equal((routeTelemetry.match(/if \(quota !== null\) settledQuota/g) ?? []).length, 2);
     // Read off the answer, not inferred from the disposition.
     assert.match(answered, /answer\.simulated === true \? 'simulated_fallback' : 'real_answer'/);
     assert.ok(!/simulated[\s\S]{0,80}'released'/.test(answered), 'the disposition was derived from the outcome');
@@ -5354,10 +5366,38 @@ try {
     const failure = emits(routeTelemetry, 'voyager_request_completed').find((block) =>
       /server_failure/.test(block)
     );
-    assert.match(failure, /quotaDisposition: quota === null \? 'unmetered' : 'charged'/);
+    assert.match(failure, /quotaDisposition: settledQuota/);
 
     const after = routeTelemetry.slice(routeTelemetry.indexOf("outcome: 'server_failure'"));
     assert.match(after, /throw error;/);
+  });
+
+  check('a request that succeeds cannot also report a failure', () => {
+    /*
+     * The invariant: one completion row per request. The success event used to
+     * be emitted as soon as the quota settled, with the audit write, the
+     * citation build and the serialisation all still to come — so a throw in
+     * any of them produced a `real_answer` row *and* a `server_failure` row for
+     * the same question, and every rate derived from either was wrong.
+     *
+     * Nothing that can throw may stand between the event and the return.
+     */
+    const answered = routeTelemetry.indexOf("outcome: answer.simulated === true");
+    const serialised = routeTelemetry.indexOf('const json = NextResponse.json(response);');
+
+    assert.ok(serialised > 0, 'the response is not built before the event');
+    assert.ok(serialised < answered, 'the response is still being built after the event');
+
+    // Everything fallible is upstream of the emit.
+    for (const step of ['recordAccess', 'const citations = dedupe(', 'const response: VoyagerResponse']) {
+      assert.ok(routeTelemetry.indexOf(step) < answered, `${step} runs after the event`);
+    }
+
+    // And the only thing left afterwards is handing back what was already made.
+    const after = routeTelemetry.slice(routeTelemetry.indexOf('surface: \'voyager\'', answered));
+    const rest = after.slice(0, after.indexOf('} catch (error) {'));
+    assert.match(rest, /return json;/);
+    assert.ok(!/await |dedupe\(|recordAccess/.test(rest), rest.slice(0, 120));
   });
 
   check('every duration is measured on a clock that cannot go backwards', () => {
@@ -5376,9 +5416,16 @@ try {
     assert.ok(!/Date\.now\(\)[\s\S]{0,40}durationMs/.test(routeTelemetry));
   });
 
-  check('one operational row per call the tool loop handled', () => {
+  check('a tool row means a tool actually ran', () => {
+    /*
+     * The Observatory reads these rows as execution count, success rate and
+     * latency. A name that is not a tool, a tool this request may not use and a
+     * repeat already answered this turn are outcomes of the planning loop, not
+     * of a tool — and a "0 ms failure" that never reached one would drag all
+     * three of those figures somewhere untrue.
+     */
     const helper = toolTelemetry.slice(
-      toolTelemetry.indexOf('function reportTool'),
+      toolTelemetry.indexOf('function reportExecution'),
       toolTelemetry.indexOf('export async function runToolCalls')
     );
 
@@ -5387,10 +5434,27 @@ try {
     assert.match(rows[0], /tool: input\.tool/);
     assert.match(rows[0], /outcome: input\.ok \? 'success' : 'failure'/);
 
-    // Every branch of the loop reports, so the row count matches the trace the
-    // answer carries — which is what `toolSteps` is counted from.
     const loop = toolTelemetry.slice(toolTelemetry.indexOf('export async function runToolCalls'));
-    assert.equal((loop.match(/reportTool\(/g) ?? []).length, 4, 'a branch does not report');
+    assert.equal((loop.match(/reportExecution\(/g) ?? []).length, 1, 'a non-execution reports');
+
+    /* The three that must stay silent, each checked in its own branch. */
+    const between = (from, to) => loop.slice(loop.indexOf(from), loop.indexOf(to));
+
+    const unknown = between('if (!isVoyagerToolId(call.name))', 'const tool = VOYAGER_TOOLS[call.name];');
+    assert.ok(!unknown.includes('reportExecution'), 'an unknown tool reported an execution');
+
+    const notPermitted = between('if (!tool.available(context))', 'const key = callKey(');
+    assert.ok(!notPermitted.includes('reportExecution'), 'a refused tool reported an execution');
+
+    const memo = between('const repeated = seen.get(key);', 'let result: VoyagerToolResult;');
+    assert.ok(!memo.includes('reportExecution'), 'a reused result reported an execution');
+
+    /* And the branch that does reach a tool reports once, with a measured
+       duration — a result that failed and an exception the catch turned into a
+       failure are both real attempts. */
+    const executed = loop.slice(loop.indexOf('let result: VoyagerToolResult;'));
+    assert.equal((executed.match(/reportExecution\(/g) ?? []).length, 1);
+    assert.match(executed, /durationMs: Math\.round\(performance\.now\(\) - ranAt\)/);
   });
 
   check('the tool row cannot name the instrument somebody asked about', () => {
@@ -5400,7 +5464,7 @@ try {
      * telemetry column is for it to have no path into the reporter at all.
      */
     const helper = toolTelemetry.slice(
-      toolTelemetry.indexOf('function reportTool'),
+      toolTelemetry.indexOf('function reportExecution'),
       toolTelemetry.indexOf('export async function runToolCalls')
     );
 
@@ -5408,13 +5472,13 @@ try {
       assert.ok(!helper.includes(forbidden), `${forbidden} reached the tool event`);
     }
 
-    // The unknown-tool branch reports a constant rather than the name the model
-    // wrote, which is free text from a model.
+    // The unknown-tool branch emits nothing at all now, so the name a model
+    // wrote has nowhere to go even by accident.
     const unknown = toolTelemetry.slice(
       toolTelemetry.indexOf('if (!isVoyagerToolId(call.name))'),
       toolTelemetry.indexOf('const tool = VOYAGER_TOOLS[call.name];')
     );
-    assert.match(unknown, /tool: 'unknown'/);
+    assert.ok(!unknown.includes('trackServerEvent'));
     assert.ok(!/tool: call\.name/.test(unknown));
   });
 
@@ -5449,12 +5513,48 @@ try {
     }
   });
 
-  check('the tool count comes from the trace the answer already carried', () => {
-    // §10: real rather than zero, and threaded without changing `askVoyager`.
-    assert.match(routeTelemetry, /toolSteps: answer\.trace\?\.length \?\? 0/);
+  check('and toolSteps counts tools that ran, not requests to run one', () => {
+    /*
+     * `toolSteps > 0` has to mean a tool really ran, or "tool-assisted answer"
+     * counts the ones where the planner asked for something that does not
+     * exist. Derived from the trace the orchestrator already returns — no new
+     * trace architecture, and nothing threaded through `askVoyager`.
+     */
+    assert.match(routeTelemetry, /toolSteps: executionCount\(answer\.trace\)/);
 
     const orchestrator = readFileSync('src/lib/voyager/orchestrator.ts', 'utf8');
     assert.match(orchestrator, /runToolCalls\(calls, toolContext, seen, step\)/);
+
+    assert.equal(toolTypes.executionCount(undefined), 0);
+    assert.equal(toolTypes.executionCount([]), 0);
+
+    // A planner that only asked for things it could not have did not use a tool.
+    assert.equal(
+      toolTypes.executionCount([
+        { id: 'nope', ok: false, code: 'unknown_tool', call: 'nope(?)' },
+        { id: 'investment_analysis', ok: false, code: 'not_permitted', call: 'investment-analysis(TSLA)' },
+      ]),
+      0
+    );
+
+    // One that reached a tool did, whether the tool succeeded or not.
+    assert.equal(
+      toolTypes.executionCount([
+        { id: 'get_history', ok: true, call: 'history(TSLA 1D)' },
+        { id: 'get_quote', ok: false, code: 'no_data', call: 'quote(TSLA)' },
+      ]),
+      2
+    );
+
+    // The same call answered twice from this turn's memo is one execution.
+    assert.equal(
+      toolTypes.executionCount([
+        { id: 'get_history', ok: true, call: 'history(TSLA 1D)' },
+        { id: 'get_history', ok: true, call: 'history(TSLA 1D)' },
+        { id: 'get_history', ok: true, call: 'history(MSFT 1D)' },
+      ]),
+      2
+    );
   });
 
   group('A follow-up works on the chart already drawn');

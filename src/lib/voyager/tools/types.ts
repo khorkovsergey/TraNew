@@ -167,6 +167,42 @@ export function traceChips(trace: ToolTraceEntry[]): string[] {
 }
 
 /**
+ * How many tools actually ran, out of everything the loop handled.
+ *
+ * The trace has one entry per call the loop dealt with, and three of those
+ * kinds never reach a tool: a name that is not a tool, a tool this request is
+ * not entitled to, and a repeat of a call already answered this turn. Counting
+ * the whole trace would report an answer as tool-assisted when the planner
+ * merely asked for something that does not exist.
+ *
+ * So this counts attempts to execute. `unknown_tool` and `not_permitted` are
+ * refusals made before any tool was reached, and a repeat carries the same
+ * signature as the call it repeats, so collapsing on the signature leaves one
+ * entry per distinct call — which is one per execution.
+ *
+ * Conservative where it cannot be exact: two different inputs that truncate to
+ * the same signature collapse into one, so the count can be low by one and can
+ * never claim an execution that did not happen.
+ */
+export function executionCount(
+  /* Structural rather than `ToolTraceEntry[]`: the answer contract widens
+     `code` to a plain string on its way to the browser, and this has to read
+     the trace on either side of that boundary. */
+  trace: readonly { id: string; code?: string; call: string }[] | undefined
+): number {
+  if (!trace?.length) return 0;
+
+  const distinct = new Set<string>();
+
+  for (const entry of trace) {
+    if (entry.code === 'unknown_tool' || entry.code === 'not_permitted') continue;
+    distinct.add(`${entry.id}::${entry.call}`);
+  }
+
+  return distinct.size;
+}
+
+/**
  * What the person is told about a tool that did not work.
  *
  * Shown rather than swallowed. An answer built with one of its three tools

@@ -637,11 +637,21 @@ export type ExecutedCall = {
  * seconds.
  */
 /**
- * One operational row per call this loop handled.
+ * One operational row per tool that actually ran.
  *
- * What it carries is the shape of the call and nothing about its subject: which
- * tool, whether it worked, the failure code from the closed set, how long it
- * took and which round it was.
+ * Executions only, and the boundary is deliberate: a name that is not a tool, a
+ * tool this request may not use, and a repeat already answered this turn are
+ * all outcomes of the planning loop rather than of a tool. Reporting them here
+ * would put three kinds of non-event into the same figure the Observatory reads
+ * as execution count, success rate and latency — and a "0 ms failure" that
+ * never reached a tool would drag every one of those numbers somewhere untrue.
+ *
+ * They keep their trace entry, so the answer still shows what the planner did.
+ * They simply are not executions.
+ *
+ * What this carries is the shape of the call and nothing about its subject:
+ * which tool, whether it worked, the failure code from the closed set, how long
+ * it took and which round it was.
  *
  * **The signature never goes in.** `trace.call` reads `history(TSLA 1D)` — it
  * is what the chip under an answer says, and it names the instrument somebody
@@ -652,10 +662,11 @@ export type ExecutedCall = {
  * Fire-and-forget, like every other tracker: a telemetry write that could delay
  * or fail a tool call would be a worse bug than the one it was measuring.
  */
-function reportTool(input: {
+function reportExecution(input: {
   tool: string;
   ok: boolean;
   code?: string;
+  /** Measured across the call itself, on a monotonic clock. */
   durationMs: number;
   step: number;
 }): void {
@@ -684,10 +695,6 @@ export async function runToolCalls(
     calls.slice(0, MAX_CALLS_PER_STEP).map(async (call): Promise<ExecutedCall> => {
       if (!isVoyagerToolId(call.name)) {
         const result = toolFailure('unknown_tool', `There is no tool called ${call.name}.`, false);
-        /* The literal, not `call.name`: that string is whatever the model
-           wrote, and free text from a model is exactly what must not reach a
-           telemetry column. */
-        reportTool({ tool: 'unknown', ok: false, code: result.code, durationMs: 0, step });
         return {
           toolUseId: call.id,
           result,
@@ -704,9 +711,6 @@ export async function runToolCalls(
           'That is not something this page or this plan can do.',
           false
         );
-        // Nothing ran, so there is no latency to report — zero is the absence
-        // of a measurement here rather than a fast call.
-        reportTool({ tool: tool.id, ok: false, code: result.code, durationMs: 0, step });
         return {
           toolUseId: call.id,
           result,
@@ -717,15 +721,6 @@ export async function runToolCalls(
       const key = callKey(tool.id, call.input);
       const repeated = seen.get(key);
       if (repeated) {
-        // The answer came from this turn's memo rather than from the tool, so
-        // the duration is again an absence rather than a measurement.
-        reportTool({
-          tool: tool.id,
-          ok: repeated.ok,
-          code: repeated.ok ? undefined : repeated.code,
-          durationMs: 0,
-          step,
-        });
         return {
           toolUseId: call.id,
           result: repeated,
@@ -754,8 +749,12 @@ export async function runToolCalls(
 
       seen.set(key, result);
 
-      // The one call that actually ran, so the one with a real duration.
-      reportTool({
+      /*
+       * The one branch that reached a tool. A result that came back failed and
+       * an exception the catch above turned into a failure are both real
+       * execution attempts, and both are reported as failures here.
+       */
+      reportExecution({
         tool: tool.id,
         ok: result.ok,
         code: result.ok ? undefined : result.code,

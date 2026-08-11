@@ -17,6 +17,7 @@ import { quotaDelta } from '@/lib/voyager/quota';
 import { consumeQuestion, peekUsage, releaseQuestion } from '@/lib/voyager/usage';
 import { clampFacts } from '@/lib/voyager/pages';
 import { isVoyagerScreen } from '@/lib/voyager/screens';
+import { executionCount } from '@/lib/voyager/tools/types';
 import type { VoyagerRequest, VoyagerResponse } from '@/lib/voyager/types';
 
 /**
@@ -190,6 +191,23 @@ export async function POST(request: NextRequest) {
    */
   let sourceCount = 0;
 
+  /*
+   * What the counter has actually done, updated only once each operation has
+   * come back.
+   *
+   * The failure path used to assert `charged` for every metered request, which
+   * is wrong the moment a refund has already gone through: a simulated answer
+   * releases the question and *then* something later throws, and reporting that
+   * as charged invents a quota defect that did not happen. This is the settled
+   * value, so the event describes the row rather than the intention.
+   *
+   * An unmetered plan is never counted at all — `quotaDelta` returns
+   * `charged: false` for it and the release below is a no-op — so it stays
+   * `unmetered` rather than being reported as a refund.
+   */
+  let settledQuota: 'charged' | 'released' | 'refused_released' | 'unmetered' =
+    quota === null ? 'unmetered' : 'charged';
+
   try {
     if (usage.quotaReached) {
       /*
@@ -200,6 +218,7 @@ export async function POST(request: NextRequest) {
        * anything.
        */
       usage = await releaseQuestion(user?.id ?? null, quota);
+      if (quota !== null) settledQuota = 'refused_released';
 
       const response: VoyagerResponse = {
         answer: {
@@ -227,7 +246,7 @@ export async function POST(request: NextRequest) {
           screen: context.screen,
           tier,
           outcome: 'quota_refused',
-          quotaDisposition: 'refused_released',
+          quotaDisposition: settledQuota,
           modelConfigured: isModelConfigured(),
           durationMs: Math.round(performance.now() - startedAt),
           sourceCount: 0,
@@ -301,44 +320,10 @@ export async function POST(request: NextRequest) {
 
     if (!decision.charged) {
       usage = await releaseQuestion(user?.id ?? null, quota);
+      // Settled only now that the refund has come back, and only where there
+      // was a charge to give back.
+      if (quota !== null) settledQuota = 'released';
     }
-
-    /*
-     * What happened, once the quota disposition has settled.
-     *
-     * Emitted here rather than beside the response so that a failing audit
-     * write — the next thing this route does — cannot cost the record of an
-     * answer that was produced.
-     *
-     * It describes the request rather than judging it. `simulated_fallback`
-     * with `charged` is a combination this deliberately does not hide: it would
-     * mean somebody paid a question for the scripted layer, and the only way
-     * that is ever noticed is if the two fields are reported independently.
-     *
-     * `toolSteps` is the length of the trace the orchestrator already returns —
-     * one entry per call the tool loop handled, failures included. Nothing was
-     * threaded through `askVoyager` for it.
-     */
-    trackServerEvent({
-      name: 'voyager_request_completed',
-      properties: {
-        screen: context.screen,
-        tier,
-        outcome: answer.simulated === true ? 'simulated_fallback' : 'real_answer',
-        quotaDisposition:
-          quota === null ? 'unmetered' : decision.charged ? 'charged' : 'released',
-        modelConfigured: isModelConfigured(),
-        durationMs: Math.round(performance.now() - startedAt),
-        sourceCount,
-        toolSteps: answer.trace?.length ?? 0,
-        hasChart: Boolean(answer.chart),
-        hasStudy: Boolean(answer.study),
-        actionCount: answer.actions?.length ?? 0,
-      },
-      userId: user?.id ?? null,
-      entitlement: user?.plan ?? null,
-      surface: 'voyager',
-    });
 
     /*
      * A question answered with the wealth record is a read of financial data and is
@@ -385,7 +370,51 @@ export async function POST(request: NextRequest) {
       quotaReached: false,
     };
 
-    return NextResponse.json(response);
+    /*
+     * Serialised before the event, so nothing that can still throw stands
+     * between "this request succeeded" and the row that says so.
+     *
+     * That ordering is the whole invariant: **one completion event per
+     * request**. It used to be emitted as soon as the quota settled, and the
+     * audit write, the citation build and the serialisation all came after it —
+     * so a failure in any of them produced a `real_answer` row and a
+     * `server_failure` row for the same question, and every rate derived from
+     * either was wrong.
+     */
+    const json = NextResponse.json(response);
+
+    /*
+     * What happened, described rather than judged.
+     *
+     * `simulated_fallback` together with `charged` is a combination this
+     * deliberately does not hide: it would mean somebody paid a question for
+     * the scripted layer, and the only way that is ever noticed is if the
+     * outcome and the disposition are reported independently.
+     *
+     * `toolSteps` counts executions rather than everything the loop handled, so
+     * `toolSteps > 0` means a tool really ran — see `executionCount`.
+     */
+    trackServerEvent({
+      name: 'voyager_request_completed',
+      properties: {
+        screen: context.screen,
+        tier,
+        outcome: answer.simulated === true ? 'simulated_fallback' : 'real_answer',
+        quotaDisposition: settledQuota,
+        modelConfigured: isModelConfigured(),
+        durationMs: Math.round(performance.now() - startedAt),
+        sourceCount,
+        toolSteps: executionCount(answer.trace),
+        hasChart: Boolean(answer.chart),
+        hasStudy: Boolean(answer.study),
+        actionCount: answer.actions?.length ?? 0,
+      },
+      userId: user?.id ?? null,
+      entitlement: user?.plan ?? null,
+      surface: 'voyager',
+    });
+
+    return json;
   } catch (error) {
     /*
      * Something escaped orchestration. Not a provider being down and not a
@@ -394,10 +423,12 @@ export async function POST(request: NextRequest) {
      * the unplanned one.
      *
      * Observability only: the throw is re-raised untouched, so the route
-     * behaves exactly as it did before this event existed. The disposition
-     * reported is the one that is actually true — a question was consumed and
-     * nothing here gives it back, so it stayed charged. Making that read
-     * `released` would be a nicer number about a worse product.
+     * behaves exactly as it did before this event existed.
+     *
+     * The disposition is the settled one rather than an assumption. A refund
+     * that had already gone through before the throw is reported as a refund;
+     * a question that was consumed and never given back is reported as charged.
+     * Neither is rewritten to make the metric look healthier.
      */
     trackServerEvent({
       name: 'voyager_request_completed',
@@ -405,7 +436,7 @@ export async function POST(request: NextRequest) {
         screen: context.screen,
         tier,
         outcome: 'server_failure',
-        quotaDisposition: quota === null ? 'unmetered' : 'charged',
+        quotaDisposition: settledQuota,
         modelConfigured: isModelConfigured(),
         durationMs: Math.round(performance.now() - startedAt),
         sourceCount,
