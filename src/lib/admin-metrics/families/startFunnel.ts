@@ -181,20 +181,49 @@ export function startFunnel(points: readonly StartPoint[], minimum: number): Sta
      */
     let previousAt: number | null = null;
 
+    /*
+     * Session-local, and it has to be. An earlier version asked
+     * `reached.recommendation_shown > 0`, which is the count across *every*
+     * session — so once one session had legitimately reached a recommendation,
+     * any other session that emitted a clarification counted too, whether or
+     * not it had walked the chain. A funnel described as sequential within a
+     * session was consulting a global.
+     */
+    const stagesReachedHere = new Set<StartStage>();
+
     for (const stage of START_STAGES) {
       const at = firstAt.get(EVENT_OF_STAGE[stage]);
       if (at === undefined) break;
       if (previousAt !== null && at < previousAt) break;
 
       reached[stage] += 1;
+      stagesReachedHere.add(stage);
       previousAt = at;
     }
 
-    const recommendationAt = firstAt.get('next_step_recommendation_shown');
-
-    if (recommendationAt !== undefined && reached.recommendation_shown > 0) {
+    /*
+     * A clarification counts when this session earned it: it reached the
+     * recommendation through the mandatory chain, and the clarification sits
+     * where the router would have asked it — after the intent it clarifies and
+     * no later than the recommendation it shaped.
+     *
+     * `firstAt` already collapses repeats, so a session that emitted three
+     * clarifications is one clarified session.
+     */
+    if (stagesReachedHere.has('recommendation_shown')) {
       const clarifiedAt = firstAt.get('next_step_clarification_selected');
-      if (clarifiedAt !== undefined && clarifiedAt <= recommendationAt) clarified += 1;
+      const intentAt = firstAt.get('next_step_intent_selected');
+      const recommendationAt = firstAt.get('next_step_recommendation_shown');
+
+      if (
+        clarifiedAt !== undefined &&
+        intentAt !== undefined &&
+        recommendationAt !== undefined &&
+        clarifiedAt >= intentAt &&
+        clarifiedAt <= recommendationAt
+      ) {
+        clarified += 1;
+      }
     }
 
     if (firstAt.has('next_step_restarted')) restarted += 1;
