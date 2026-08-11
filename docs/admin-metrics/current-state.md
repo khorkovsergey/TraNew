@@ -496,3 +496,44 @@ orchestrator has merged, deployed and smoked it.
 are not in `shared`. Plan step 5 is designed to avoid needing either. If a later
 phase genuinely requires one, it becomes an orchestrator request rather than a
 quiet edit.
+
+---
+
+## Phase 5 delta — reliability, market data, Supercharts
+
+Audited at `4753a7e`. Only what changed the plan; the rest of this document
+stands.
+
+**Market client.** `marketDataStatus()` returns `{ quotes, macro }` from the two
+API keys, so **configuration is knowable now without calling a provider** — that
+is what the Observatory shows today. Every fetch function returns `null` on
+failure, and a `null` meaning "no key" is indistinguishable from one meaning
+"the vendor is down" once it leaves the function. The three branches exist
+inside (`if (!configured)`, the `catch`, and the empty-payload path); they are
+simply not distinguished afterwards. Hence the Markets request.
+
+`delayed: true` is set unconditionally on quotes and series — a policy of the
+free tier, not a measurement, and the panel says so.
+
+**Supercharts, two findings that changed the design.**
+
+`superchart_study_toggled` fires at the *top* of `toggleIndicator`, before the
+engine acts. It is intent, not outcome, so a fulfilment rate built on it would
+be a rate of clicks.
+
+**There is no TradingView handoff in Supercharts.** The old brief describes one;
+the current section contains none — the handoff that exists belongs to Voyager.
+No handoff metric was built and the capability enum has no `handoff` value,
+because an outcome nothing can emit becomes a permanent zero that reads as a
+product decision.
+
+What *is* already derivable with no new emitter: overlay versus pane placement,
+from `studyId` against the canonical indicator registry (`sma`/`ema` are `main`;
+`rsi`/`macd`/`volume`/`volume-ma`/`volume-anomaly` are `separate`).
+
+**Web Vitals.** Next exposes them publicly only as `useReportWebVitals`, a React
+hook, which needs a component and therefore a global mount point — and the only
+one is `src/app/[locale]/layout.tsx`, which belongs to no section. The compiled
+module underneath exports plain functions, so `instrumentation-client.ts`
+subscribes to those directly: no new dependency, no foreign file. The cost is an
+internal import path, so it is dynamic and its failure is silent.
