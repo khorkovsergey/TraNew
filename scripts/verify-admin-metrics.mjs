@@ -2329,6 +2329,246 @@ try {
     assert.match(panel, /not backfilled as rendered activity/);
   });
 
+  /* ------------------------------- MetricState is not a colour vocabulary */
+
+  group('Canonical states are not used as a generic UI palette');
+
+  /*
+   * The correction these guard. `MetricState` carries product meaning —
+   * `feature_disabled` says a flag is off, `insufficient_sample` says n is
+   * below the publication threshold — and several panels had reached for one
+   * of them purely to obtain a red or an amber. A separate `StatusBadge`/tone
+   * vocabulary now carries health, outcome, category and operational status,
+   * and these assertions keep the two apart.
+   */
+
+  const OBSERVATORY_DIR = 'src/components/admin-metrics';
+  const observatoryFiles = () =>
+    [
+      ...readdirSync(OBSERVATORY_DIR).map((name) => `${OBSERVATORY_DIR}/${name}`),
+      ...readdirSync(`${OBSERVATORY_DIR}/sections`).map(
+        (name) => `${OBSERVATORY_DIR}/sections/${name}`
+      ),
+    ].filter((path) => path.endsWith('.tsx') || path.endsWith('.ts'));
+
+  const TONES = ['positive', 'info', 'caution', 'negative', 'neutral', 'quiet'];
+
+  check('the tone vocabulary is closed and shares no name with a metric state', () => {
+    const primitives = readFileSync(`${OBSERVATORY_DIR}/primitives.tsx`, 'utf8');
+    const declared = primitives.match(/export type Tone =([^;]+);/);
+    assert.ok(declared, 'the Tone union is missing');
+
+    const values = [...declared[1].matchAll(/'([a-z_]+)'/g)].map((match) => match[1]);
+    assert.deepEqual(values.sort(), [...TONES].sort(), 'the tone union changed');
+
+    for (const tone of values) {
+      assert.equal(
+        states.METRIC_STATES.includes(tone),
+        false,
+        `tone "${tone}" collides with a canonical metric state`
+      );
+    }
+  });
+
+  check('StatusBadge renders a word and never a metric state', () => {
+    const primitives = readFileSync(`${OBSERVATORY_DIR}/primitives.tsx`, 'utf8');
+    const at = primitives.indexOf('export function StatusBadge');
+    assert.ok(at > -1, 'StatusBadge is missing');
+
+    const body = primitives.slice(at, at + 900);
+    assert.match(body, /data-tone=\{tone\}/, 'StatusBadge does not carry a tone');
+    assert.equal(/data-state/.test(body), false, 'StatusBadge emits a metric state');
+    assert.match(body, /\{label\}/, 'StatusBadge does not print its label');
+  });
+
+  check('a tone map never contains a canonical state name', () => {
+    /*
+     * The specific shape of the bug: a lookup table written to pick a colour,
+     * filled with `MetricState` values. Every `*_TONE` map on the page must
+     * contain tones only.
+     */
+    let maps = 0;
+
+    for (const path of observatoryFiles()) {
+      const source = readFileSync(path, 'utf8');
+      for (const match of source.matchAll(/const [A-Z_]*TONE[A-Za-z]*: Record<[^>]+> = \{([^}]+)\}/g)) {
+        maps += 1;
+        for (const value of [...match[1].matchAll(/'([a-z_]+)'/g)].map((hit) => hit[1])) {
+          assert.ok(TONES.includes(value), `${path} maps to "${value}", which is not a tone`);
+        }
+      }
+    }
+
+    assert.ok(maps >= 4, `expected several tone maps, found ${maps}`);
+  });
+
+  group('Supercharts capability outcomes');
+
+  check('the outcome vocabulary matches the registry exactly', () => {
+    /*
+     * The original defect: the component compared `outcome === 'success'`, a
+     * value the enum does not contain, so the equality never held and every
+     * outcome — `fulfilled` included — fell through to a branch that rendered
+     * it as a disabled feature. Pinning the map to the registry means a future
+     * enum change fails here rather than silently mislabelling a success.
+     */
+    const definition = registry.EVENT_BY_NAME.get('superchart_capability_completed');
+    const declared = definition.properties.outcome.values;
+    assert.deepEqual([...declared].sort(), ['failure', 'fulfilled', 'no_data', 'unsupported']);
+
+    const source = readFileSync(`${OBSERVATORY_DIR}/sections/SuperchartsCockpit.tsx`, 'utf8');
+    const map = source.match(/const OUTCOME_TONE: Record<[^>]+> = \{([^}]+)\}/);
+    assert.ok(map, 'OUTCOME_TONE is missing');
+
+    const keys = [...map[1].matchAll(/^\s*([a-z_]+):/gm)].map((hit) => hit[1]);
+    assert.deepEqual([...keys].sort(), [...declared].sort(), 'the tone map and the enum disagree');
+  });
+
+  check('fulfilled is a positive outcome, never a disabled feature', () => {
+    const source = readFileSync(`${OBSERVATORY_DIR}/sections/SuperchartsCockpit.tsx`, 'utf8');
+    assert.match(source, /fulfilled: 'positive'/);
+    assert.match(source, /failure: 'negative'/);
+    assert.match(source, /no_data: 'caution'/);
+
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.equal(/'success'/.test(code), false, 'the component still compares against `success`');
+    assert.equal(
+      /outcome[^\n]*feature_disabled/.test(code),
+      false,
+      'a capability outcome is still rendered as a disabled feature'
+    );
+  });
+
+  check('pane and overlay are categories, not provenance', () => {
+    const source = readFileSync(`${OBSERVATORY_DIR}/sections/SuperchartsCockpit.tsx`, 'utf8');
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '');
+
+    assert.match(source, /const PLACEMENT_TONE/);
+    assert.equal(
+      /placement === 'pane' \? 'derived'|placement === 'overlay' \? 'live'/.test(code),
+      false,
+      'placement is still mapped onto metric states for colour'
+    );
+
+    /* Intent, render and outcome stay three separate things. */
+    assert.match(source, /Requested/);
+    assert.match(source, /Rendered/);
+    assert.match(source, /superchart_study_toggled/);
+    assert.match(source, /superchart_study_applied/);
+  });
+
+  group('Web Vitals health is not a provenance state');
+
+  check('a poor vital is not labelled as a disabled feature', () => {
+    const source = readFileSync(`${OBSERVATORY_DIR}/sections/ReliabilityDataHealth.tsx`, 'utf8');
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '');
+
+    const vitals = code.slice(code.indexOf('vitals.map'), code.indexOf('</Scroller>'));
+    assert.ok(vitals.length > 100, 'the vitals block could not be located');
+
+    assert.equal(/feature_disabled/.test(vitals), false, 'a vital rating still claims a disabled feature');
+    assert.match(source, /poor: 'negative'/);
+    assert.match(source, /good: 'positive'/);
+  });
+
+  check('needs-improvement is a rating, not a small sample', () => {
+    const source = readFileSync(`${OBSERVATORY_DIR}/sections/ReliabilityDataHealth.tsx`, 'utf8');
+    assert.match(source, /'needs improvement': 'caution'/);
+
+    /*
+     * Rating and sample are answered independently: the rating only exists
+     * once the sample is adequate, so it can never be standing in for one.
+     */
+    assert.match(source, /const enough = vital\.p75 !== null/);
+    assert.match(source, /const rating = enough \? ratingOf/);
+  });
+
+  check('an inadequate sample still uses the canonical state', () => {
+    const source = readFileSync(`${OBSERVATORY_DIR}/sections/ReliabilityDataHealth.tsx`, 'utf8');
+    /* The one canonical claim this table is entitled to make. */
+    assert.match(source, /<StateBadge state="insufficient_sample" small \/>/);
+    assert.match(source, /<th scope="col">Rating<\/th>/);
+    assert.match(source, /<th scope="col">Sample<\/th>/);
+  });
+
+  check('the CLS boundary is compared in the unit it is defined in', () => {
+    /* CLS is stored scaled by a thousand; a rating computed on the raw column
+       would call every real score "good". */
+    const source = readFileSync(`${OBSERVATORY_DIR}/sections/ReliabilityDataHealth.tsx`, 'utf8');
+    const at = source.indexOf('function ratingOf');
+    const body = source.slice(at, source.indexOf('}', source.indexOf('return')) + 400);
+    assert.match(body, /unit === 'score' \? stored \/ 1000 : stored/);
+  });
+
+  group('Operational status is not a sample size');
+
+  check('a source that has never been seen does not claim a small sample', () => {
+    for (const path of [
+      `${OBSERVATORY_DIR}/sections/ReliabilityDataHealth.tsx`,
+      `${OBSERVATORY_DIR}/drawers.tsx`,
+    ]) {
+      const source = readFileSync(path, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      assert.equal(
+        /lastSeen \? 'live' : 'insufficient_sample'/.test(source),
+        false,
+        `${path} still reports a silent source as an insufficient sample`
+      );
+      assert.match(source, /Never seen/, `${path} lost the never-seen status`);
+    }
+  });
+
+  check('stale is used only where the freshness logic says so', () => {
+    const source = readFileSync(`${OBSERVATORY_DIR}/sections/ReliabilityDataHealth.tsx`, 'utf8');
+    /* The canonical `stale` badge sits behind `source.stale`, nothing else. */
+    assert.match(source, /source\.stale \? \(\s*<StateBadge state="stale" small \/>/);
+
+    /* And the rule that silence from a request-driven source is not a fault. */
+    assert.match(source, /Only sources with an expected cadence carry a staleness budget/);
+  });
+
+  check('an unused event is not reported as an insufficient sample', () => {
+    /*
+     * `unused` means declared, reachable and nothing arrived. There is no rate
+     * and no n, so it is a finding about users rather than a suppressed rate.
+     */
+    const source = readFileSync(`${OBSERVATORY_DIR}/sections/InstrumentationCoverage.tsx`, 'utf8');
+    assert.match(source, /unused: 'quiet'/);
+    assert.equal(
+      /unused: 'insufficient_sample'/.test(source),
+      false,
+      'coverage still maps unused onto insufficient_sample'
+    );
+
+    /* The one canonical state this section keeps, because it is true. */
+    assert.match(source, /<StateBadge state="feature_disabled" small \/>/);
+  });
+
+  group('Market data copy claims only what the outcome carries');
+
+  check('no_data does not claim an unknown symbol, an outage or a rate limit', () => {
+    /*
+     * Comments stripped first: the card is annotated with the very claims it
+     * refuses to make, and a scan that could not tell prose from markup would
+     * push that reasoning out of the file.
+     */
+    const source = readFileSync(`${OBSERVATORY_DIR}/sections/ReliabilityDataHealth.tsx`, 'utf8')
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    const at = source.indexOf('market.noData');
+    assert.ok(at > -1, 'the no-data card is missing');
+
+    const card = source.slice(Math.max(0, at - 400), at + 300);
+    assert.match(card, /no usable data|No usable result/i);
+
+    for (const overreach of ['symbol', 'provider is down', 'rate limit', 'rate-limited']) {
+      assert.equal(
+        card.toLowerCase().includes(overreach.toLowerCase()),
+        false,
+        `the no-data card claims "${overreach}", which the outcome does not carry`
+      );
+    }
+  });
+
   group('Provenance, and the Voyager scope limitation');
 
   check('a missing cross-section emitter is not zero', () => {

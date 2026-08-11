@@ -152,6 +152,20 @@ try {
     (await page.locator('[class*="VoyagerWidget"], [class*="voyagerWidget"]').count()) === 0
   );
 
+  /*
+   * Exactly one main landmark. The bare route used to wrap the page in a
+   * `<main>` from PortalChrome and then render a second one around the content
+   * column, which is invalid and leaves a screen reader's landmark list
+   * ambiguous about which one is the page.
+   */
+  const mains = await page.locator('main').count();
+  check('exactly one main landmark', mains === 1, `${mains} found`);
+  check(
+    'the main landmark is the content column, not the whole page',
+    (await page.locator('main #s-exec').count()) === 1 &&
+      (await page.locator('main [data-observatory-header]').count()) === 0
+  );
+
   const ground = await page.locator('[data-observatory]').evaluate((node) => {
     const style = getComputedStyle(node);
     return { color: style.color, background: style.backgroundColor + style.backgroundImage };
@@ -242,6 +256,112 @@ try {
   }
 
   /* ------------------------------------------------------- Truthfulness */
+
+  /* ------------------------- Provenance states are not a colour vocabulary */
+
+  console.log('\nCanonical states are not used as a generic palette');
+
+  /*
+   * The rendered half of the correction. A tone badge and a state badge look
+   * alike on purpose, so the guarantee has to be checked in the DOM: nothing
+   * that is merely health, outcome, category or operational status may carry a
+   * `data-state`.
+   */
+  const badgeVocabularies = await page.evaluate(() => {
+    const states = [...document.querySelectorAll('[data-state]')].length;
+    const tones = [...document.querySelectorAll('[data-tone]')].length;
+    return { states, tones };
+  });
+  check('both vocabularies are in use', badgeVocabularies.states > 0 && badgeVocabularies.tones > 0,
+    JSON.stringify(badgeVocabularies));
+
+  check(
+    'every tone badge carries a word',
+    await page.$$eval('[data-tone]', (nodes) =>
+      nodes
+        .filter((node) => node.className.includes('statusBadge'))
+        .every((node) => (node.textContent ?? '').trim().length > 0)
+    )
+  );
+
+  /* Supercharts capability outcomes. */
+  const chartsSection = page.locator('#s-charts');
+  const capabilityStates = await chartsSection.evaluate((section) =>
+    [...section.querySelectorAll('[data-state]')].map((node) => node.dataset.state ?? '')
+  );
+  check(
+    'no Supercharts capability outcome is rendered as a disabled feature',
+    !capabilityStates.includes('feature_disabled'),
+    capabilityStates.join(', ')
+  );
+  check(
+    'pane and overlay are rendered as categories',
+    await chartsSection.evaluate((section) => {
+      const placements = [...section.querySelectorAll('[data-tone]')].filter((node) =>
+        ['pane', 'overlay', 'unknown'].includes((node.textContent ?? '').trim())
+      );
+      /* Present only when a study has been requested or rendered. */
+      return placements.every((node) => !node.hasAttribute('data-state'));
+    })
+  );
+
+  /* Web Vitals. */
+  const vitalsRow = await page.locator('#s-reliability table').first().evaluate((table) => {
+    const header = [...table.querySelectorAll('thead th')].map((cell) => (cell.textContent ?? '').trim());
+    const badges = [...table.querySelectorAll('tbody [data-state], tbody [data-tone]')].map((node) => ({
+      state: node.dataset.state ?? null,
+      tone: node.dataset.tone ?? null,
+      text: (node.textContent ?? '').trim().toLowerCase(),
+    }));
+    return { header, badges };
+  });
+
+  check(
+    'the vitals table separates rating from sample',
+    vitalsRow.header.includes('Rating') && vitalsRow.header.includes('Sample'),
+    vitalsRow.header.join(' | ')
+  );
+  check(
+    'no Web Vital is labelled as a disabled feature',
+    !vitalsRow.badges.some((badge) => badge.state === 'feature_disabled'),
+    vitalsRow.badges.map((badge) => badge.state).filter(Boolean).join(', ')
+  );
+  check(
+    'a rating never borrows the insufficient-sample state',
+    !vitalsRow.badges.some(
+      (badge) =>
+        badge.state === 'insufficient_sample' &&
+        /good|needs improvement|poor/.test(badge.text)
+    )
+  );
+  check(
+    'a genuinely small sample still says insufficient sample',
+    vitalsRow.badges.every((badge) => badge.tone !== null || badge.state !== null)
+  );
+
+  /* Source freshness. */
+  const freshness = await page.locator('#s-reliability').evaluate((section) => {
+    const rows = [...section.querySelectorAll('table')].at(-1)?.querySelectorAll('tbody tr') ?? [];
+    return [...rows].map((row) => {
+      const badge = row.querySelector('[data-state], [data-tone]');
+      return {
+        text: (badge?.textContent ?? '').trim().toLowerCase(),
+        state: badge instanceof HTMLElement ? (badge.dataset.state ?? null) : null,
+      };
+    });
+  });
+  check(
+    'a never-seen source does not claim an insufficient sample',
+    !freshness.some((row) => row.text.includes('never seen') && row.state === 'insufficient_sample'),
+    JSON.stringify(freshness)
+  );
+
+  /* Market copy. */
+  const marketText = await page.locator('#s-reliability').innerText();
+  check(
+    'the no-data card does not claim an unknown symbol',
+    /no usable/i.test(marketText) && !/nothing for the symbol/i.test(marketText)
+  );
 
   console.log('\nUnits and limitations survive the redesign');
   const vitalsText = await page.locator('#s-reliability').innerText();
@@ -484,6 +604,20 @@ try {
   const width = await page.locator('[data-drawer]').evaluate((node) => node.getBoundingClientRect().width);
   check('the drawer is full width on mobile', Math.round(width) >= 388, `${Math.round(width)}px`);
   await page.keyboard.press('Escape');
+
+  /* ------------------------------------------- Customer routes are untouched */
+
+  console.log('\nCustomer routes keep their shell');
+
+  for (const route of ['/en', '/en/voyager', '/en/markets/global', '/en/marketplace/subscriptions']) {
+    const response = await page.request.get(`${BASE}${route}`);
+    const html = await response.text();
+    check(`${route} responds`, response.ok(), String(response.status()));
+    check(`${route} keeps the portal shell`, html.includes('tn-app'));
+  }
+
+  const bare = await (await page.request.get(`${BASE}/en/admin_admin_metrics`)).text();
+  check('the Observatory renders no portal shell', !bare.includes('tn-app'));
 
   /* ---------------------------------------------------------------- Console */
 
