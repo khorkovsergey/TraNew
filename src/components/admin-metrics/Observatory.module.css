@@ -984,6 +984,90 @@
   color: var(--obs-gold);
 }
 
+/* ------------------------------------------------- Non-provenance tones
+ *
+ * A second, deliberately separate vocabulary.
+ *
+ * `data-state` above means one of the eleven canonical `MetricState`s, and
+ * each one is a product claim: `feature_disabled` says a flag is off,
+ * `insufficient_sample` says n is below the publication threshold. Reaching
+ * for one of those because a panel wanted red or amber is how a poor LCP came
+ * to be labelled "not exposed" and a fulfilled chart capability came to be
+ * labelled as a disabled feature.
+ *
+ * So health severity, render placement, outcome and operational status use
+ * `data-tone` instead. Same palette, so the page still reads as one design —
+ * but a tone asserts nothing about provenance, and nothing here can be
+ * mistaken for a metric state by a reader or by a grep.
+ */
+
+.statusBadge {
+  display: inline-block;
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.statusBadge[data-tone='positive'] {
+  background: rgba(46, 230, 168, 0.11);
+  border-color: rgba(46, 230, 168, 0.24);
+  color: var(--obs-mint);
+}
+
+.statusBadge[data-tone='info'] {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.22);
+  color: var(--obs-blue);
+}
+
+.statusBadge[data-tone='caution'] {
+  background: rgba(245, 182, 66, 0.1);
+  border-color: rgba(245, 182, 66, 0.24);
+  color: var(--obs-amber);
+}
+
+.statusBadge[data-tone='negative'] {
+  background: rgba(244, 105, 95, 0.09);
+  border-color: rgba(244, 105, 95, 0.22);
+  color: var(--obs-red-soft);
+}
+
+/* A category label — pane, overlay, a table name. Carries no judgement. */
+.statusBadge[data-tone='neutral'] {
+  background: rgba(107, 127, 147, 0.07);
+  border-color: var(--obs-control);
+  color: var(--obs-text-3);
+}
+
+/* Nothing arrived, and that is not a fault. Dashed, like the absent states. */
+.statusBadge[data-tone='quiet'] {
+  background: rgba(107, 127, 147, 0.05);
+  border-color: var(--obs-dashed);
+  border-style: dashed;
+  color: var(--obs-muted-2);
+}
+
+.toneText[data-tone='positive'] { color: var(--obs-mint); }
+.toneText[data-tone='info'] { color: var(--obs-blue); }
+.toneText[data-tone='caution'] { color: var(--obs-amber); }
+.toneText[data-tone='negative'] { color: var(--obs-red-soft); }
+.toneText[data-tone='neutral'] { color: var(--obs-text); }
+.toneText[data-tone='quiet'] { color: var(--obs-muted-2); }
+
+/* The fill colour for a bar or a column drawn in a tone. */
+.toneFill[data-tone='positive'] { color: var(--obs-mint); }
+.toneFill[data-tone='info'] { color: var(--obs-blue); }
+.toneFill[data-tone='caution'] { color: var(--obs-amber); }
+.toneFill[data-tone='negative'] { color: var(--obs-red); }
+.toneFill[data-tone='neutral'] { color: #2b4256; }
+.toneFill[data-tone='quiet'] { color: #22303f; }
+
 /* The text colour a value takes from its state, without the pill. */
 .stateText[data-state='live'] { color: var(--obs-mint); }
 .stateText[data-state='derived'] { color: var(--obs-blue); }

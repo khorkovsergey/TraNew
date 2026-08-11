@@ -56,6 +56,51 @@ export function StateBadge({
   );
 }
 
+/* ============================================================ StatusBadge */
+
+/**
+ * Health, outcome, category and operational status — everything that is *not*
+ * provenance.
+ *
+ * The reason it exists is a bug it would have prevented. A chart capability
+ * that reported `fulfilled` was being rendered with `feature_disabled`, because
+ * the outcome check compared against a value the enum does not contain and the
+ * fallback branch had been chosen for its red. A poor LCP wore the same badge.
+ * Neither had anything to do with a feature flag.
+ *
+ * `StateBadge` makes a claim about where a number came from and whether it can
+ * be believed. `StatusBadge` makes a claim about the thing the number
+ * describes. Sharing one component meant a colour choice in one panel silently
+ * became a provenance assertion, and the palette is close enough that nobody
+ * reading the page would catch it.
+ *
+ * The two are visually of a piece and semantically disjoint, and `tone` is a
+ * closed set that cannot be widened into `MetricState` by accident.
+ */
+export type Tone = 'positive' | 'info' | 'caution' | 'negative' | 'neutral' | 'quiet';
+
+export function StatusBadge({
+  tone,
+  label,
+  title,
+  small,
+}: {
+  tone: Tone;
+  label: string;
+  title?: string;
+  small?: boolean;
+}) {
+  return (
+    <span
+      className={`${styles.statusBadge}${small ? ` ${styles.badgeSmall}` : ''}`}
+      data-tone={tone}
+      title={title}
+    >
+      {label}
+    </span>
+  );
+}
+
 /* ================================================================ Layout */
 
 export function Panel({
@@ -226,22 +271,28 @@ export function MiniCard({
   );
 }
 
-/** A plain figure with no provenance of its own — a component of one above it. */
+/**
+ * A plain figure with no provenance of its own — a component of one above it.
+ *
+ * Takes a `tone`, not a state. A tile is a decomposition of a metric that has
+ * already declared its provenance on the card above, so colouring one with a
+ * `MetricState` would restate a claim it is not making.
+ */
 export function Tile({
   label,
   value,
   sub,
-  state,
+  tone = 'neutral',
 }: {
   label: string;
   value: string;
   sub?: string;
-  state?: MetricState;
+  tone?: Tone;
 }) {
   return (
     <div className={styles.tile}>
       <div className={styles.tileLabel}>{label}</div>
-      <div className={`${styles.tileValue} ${styles.stateText}`} data-state={state ?? 'live'}>
+      <div className={`${styles.tileValue} ${styles.toneText}`} data-tone={tone}>
         {value}
       </div>
       {sub ? <div className={styles.tileSub}>{sub}</div> : null}
@@ -254,22 +305,22 @@ export function Tile({
 /**
  * The inline bar that sits beside a rate in a table cell.
  *
- * Coloured from `.accent` rather than `.stateText`. The two mappings agree
- * everywhere except `instrumented_going_forward`, where text is near-white so a
- * collecting figure stays readable — and a near-white *bar* would read as the
- * strongest thing on the panel rather than as the amber "no history yet" it is.
+ * A bar is a shape, not a claim, so it takes a tone. It used to take a
+ * `MetricState` purely to reach a colour, which meant a row wanting an amber
+ * bar had to assert `insufficient_sample` about data that was nothing of the
+ * kind.
  */
 export function CellBar({
   value,
   total,
-  state = 'derived',
+  tone = 'info',
 }: {
   value: number;
   total: number;
-  state?: MetricState;
+  tone?: Tone;
 }) {
   return (
-    <div className={`${styles.barTrack} ${styles.barCell} ${styles.accent}`} data-state={state}>
+    <div className={`${styles.barTrack} ${styles.barCell} ${styles.toneFill}`} data-tone={tone}>
       <span className={styles.barFill} style={{ width: widthOf(value, total) }} aria-hidden="true" />
     </div>
   );
@@ -280,13 +331,13 @@ export function Meter({
   label,
   value,
   total,
-  state = 'derived',
+  tone = 'info',
   caption,
 }: {
   label: string;
   value: number;
   total: number;
-  state?: MetricState;
+  tone?: Tone;
   caption?: string;
 }) {
   return (
@@ -300,51 +351,9 @@ export function Meter({
           </span>
         </span>
       </div>
-      <div className={`${styles.meterTrack} ${styles.accent}`} data-state={state}>
+      <div className={`${styles.meterTrack} ${styles.toneFill}`} data-tone={tone}>
         <span className={styles.meterFill} style={{ width: widthOf(value, total) }} aria-hidden="true" />
       </div>
-    </div>
-  );
-}
-
-/* ============================================================ Key/values */
-
-export function KeyValue({
-  label,
-  value,
-  state,
-}: {
-  label: string;
-  value: string;
-  state?: MetricState;
-}) {
-  return (
-    <div className={styles.kv}>
-      <span className={styles.kvLabel}>{label}</span>
-      <span className={`${styles.kvValue} ${styles.stateText}`} data-state={state ?? 'live'}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-/** A metric as a key/value row, so a table can carry provenance too. */
-export function MetricRow({
-  label,
-  metric,
-  format = 'count',
-}: {
-  label: string;
-  metric: MetricValue;
-  format?: ValueFormat;
-}) {
-  const shown = display(metric, format);
-  return (
-    <div className={styles.kv}>
-      <span className={styles.kvLabel}>{label}</span>
-      <span className={`${styles.kvValue} ${styles.stateText}`} data-state={shown.state}>
-        {shown.text}
-      </span>
     </div>
   );
 }
