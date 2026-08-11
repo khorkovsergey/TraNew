@@ -5,12 +5,14 @@ import { Breakdown } from '@/components/admin-metrics/Breakdown';
 import { MetricCard } from '@/components/admin-metrics/MetricCard';
 import { ProductArea } from '@/components/admin-metrics/ProductArea';
 import { StageTable } from '@/components/admin-metrics/StageTable';
+import { VoyagerPanel } from '@/components/admin-metrics/VoyagerPanel';
 import styles from '@/components/admin-metrics/Observatory.module.css';
 import type { Locale } from '@/i18n/routing';
 import { authorizeMetrics, directLinkEnabled } from '@/lib/admin-metrics/access';
 import { instrumentationCoverage } from '@/lib/admin-metrics/coverage';
 import { MARKETPLACE_MIN_SAMPLE } from '@/lib/admin-metrics/dictionary';
 import { productFamilies } from '@/lib/admin-metrics/families';
+import { voyagerReport } from '@/lib/admin-metrics/families/voyager';
 import { overview } from '@/lib/admin-metrics/overview';
 import { portalMetrics } from '@/lib/admin-metrics/portal';
 import { rangeFrom } from '@/lib/admin-metrics/range';
@@ -77,12 +79,13 @@ export default async function ObservatoryPage({ params, searchParams }: Props) {
   const window = rangeFrom(range ?? null) ?? rangeFrom(null)!;
   const now = new Date();
 
-  const [numbers, portal, coverage, userDays, families] = await Promise.all([
+  const [numbers, portal, coverage, userDays, families, voyager] = await Promise.all([
     overview(window.since),
     portalMetrics(window.since),
     instrumentationCoverage(window.since),
     readUserDays(window.since),
     productFamilies(window.since),
+    voyagerReport(window.since),
   ]);
 
   const retention = cohortRetention(userDays, {
@@ -195,6 +198,39 @@ export default async function ObservatoryPage({ params, searchParams }: Props) {
                 </tr>
               ))
             )}
+          </tbody>
+        </table>
+      </section>
+
+      <VoyagerPanel report={voyager} />
+
+      <section>
+        <h2 className={styles.sectionTitle}>Voyager instrumentation, by layer</h2>
+        <p className={styles.subtitle}>
+          A zero on Voyager can mean four different things, and one number cannot say which.
+          Client behaviour has been collected since Phase 1; server truth and tool operations wait
+          on the Voyager section.
+        </p>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Status</th>
+              <th>Observed</th>
+              <th>What it answers</th>
+            </tr>
+          </thead>
+          <tbody>
+            {coverage.voyagerLayers.map((layer) => (
+              <tr key={layer.layer}>
+                <td>{layer.layer.replace(/_/g, ' ')}</td>
+                <td>{layer.status.replace(/_/g, ' ')}</td>
+                <td>
+                  {layer.observed} / {layer.events.length}
+                </td>
+                <td>{layer.note}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </section>

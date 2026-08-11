@@ -104,6 +104,23 @@ export type CoverageReport = {
   };
   kpis: KpiReadiness[];
   families: FamilyCoverage[];
+  /**
+   * Voyager reported as three layers rather than one.
+   *
+   * A zero on this family can mean four different things — nobody used it, the
+   * emitter has not landed, it landed and nothing has arrived yet, or the
+   * sample is too small — and a single "observed / declared" pair cannot say
+   * which. Client behaviour, server truth and tool operations are counted
+   * apart, because the first has been instrumented since Phase 1 and the other
+   * two wait on another section.
+   */
+  voyagerLayers: Array<{
+    layer: 'client_behaviour' | 'server_truth' | 'tool_operations';
+    events: string[];
+    observed: number;
+    status: 'observed' | 'awaiting_emitter' | 'awaiting_first_event';
+    note: string;
+  }>;
   /** True until the first row ever lands. Every "unused" is meaningless before then. */
   collectingSince: string | null;
   queriedAt: string;
@@ -119,6 +136,7 @@ export type CoverageReport = {
  */
 const FAMILY_SOURCES: ReadonlyArray<{ family: string; surfaces: string[]; durable: string[] }> = [
   { family: 'start', surfaces: ['start'], durable: [] },
+  { family: 'voyager', surfaces: ['voyager', 'voyager_research'], durable: [] },
   { family: 'events', surfaces: ['events'], durable: ['event_registration', 'event'] },
   { family: 'academy', surfaces: ['academy'], durable: ['academy_progress'] },
   { family: 'experts', surfaces: ['experts'], durable: ['expert_booking'] },
@@ -223,9 +241,53 @@ export async function instrumentationCoverage(since: Date): Promise<CoverageRepo
     },
     kpis: KPI_INPUTS.map((kpi) => readinessOf(kpi, byEvent)),
     families: FAMILY_SOURCES.map((family) => familyCoverage(family, rows)),
+    voyagerLayers: voyagerLayers(rows),
     collectingSince: collectingSince ? new Date(collectingSince).toISOString() : null,
     queriedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * The Voyager layers, told apart.
+ *
+ * `awaiting_emitter` is not `unused`. The server events are declared and no
+ * code emits them yet, so silence is the expected state of an unfinished
+ * hand-off rather than evidence about people — and a dashboard that reported
+ * them as unused would be inviting somebody to conclude the AI is not being
+ * asked anything.
+ */
+function voyagerLayers(rows: readonly CoverageRow[]): CoverageReport['voyagerLayers'] {
+  const layers = [
+    {
+      layer: 'client_behaviour' as const,
+      events: rows
+        .filter((row) => row.surface === 'voyager' && row.kind === 'client' && row.lifecycle === 'current')
+        .map((row) => row.event),
+      note: 'What the browser saw: opened, question submitted, action clicked, chat saved. Instrumented since Phase 1.',
+    },
+    {
+      layer: 'server_truth' as const,
+      events: ['voyager_request_completed'],
+      note: 'What Voyager actually did: a model answered, the scripted layer stood in, or the quota refused. Only the server can know this.',
+    },
+    {
+      layer: 'tool_operations' as const,
+      events: ['voyager_tool_completed'],
+      note: 'Which tools ran and whether they worked. Emitted inside the orchestrator tool loop.',
+    },
+  ];
+
+  return layers.map((layer) => {
+    const own = rows.filter((row) => layer.events.includes(row.event));
+    const observed = own.filter((row) => row.status === 'observed').length;
+    const emitterMissing = layer.layer !== 'client_behaviour' && observed === 0;
+
+    return {
+      ...layer,
+      observed,
+      status: observed > 0 ? 'observed' : emitterMissing ? 'awaiting_emitter' : 'awaiting_first_event',
+    };
+  });
 }
 
 function familyCoverage(
