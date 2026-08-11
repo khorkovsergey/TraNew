@@ -137,6 +137,7 @@ const PURE_MODULES = [
   'admin-metrics/range',
   'admin-metrics/families/startFunnel',
   'admin-metrics/families/semantics',
+  'admin-metrics/families/voyagerMetrics',
 ];
 
 const repo = process.cwd();
@@ -221,6 +222,7 @@ const journeysLib = await load('admin-metrics/journeys');
 const dictionary = await load('admin-metrics/dictionary');
 const startLib = await load('admin-metrics/families/startFunnel');
 const semantics = await load('admin-metrics/families/semantics');
+const voyagerLib = await load('admin-metrics/families/voyagerMetrics');
 
 const NOW = new Date('2026-08-10T12:00:00.000Z');
 const at = { source: 'test', metricId: 'test', queriedAt: NOW.toISOString() };
@@ -1775,6 +1777,207 @@ try {
     for (const legacy of registry.LEGACY_EVENT_NAMES) {
       assert.equal(serialised.includes(legacy), false, `${legacy} is cited by a live metric`);
     }
+  });
+
+  /* ============================================ Phase 4 — Voyager operations */
+
+  group('A scripted fallback is not a model answer');
+
+  const request = (overrides = {}) => ({
+    outcome: 'real_answer',
+    quotaDisposition: 'charged',
+    modelConfigured: true,
+    durationMs: 1_000,
+    screen: 'generic',
+    tier: 'basic',
+    sourceCount: 1,
+    toolSteps: 0,
+    hasChart: false,
+    hasStudy: false,
+    actionCount: 0,
+    ...overrides,
+  });
+
+  const refused = request({ outcome: 'quota_refused', quotaDisposition: 'refused_released', durationMs: 20 });
+  const fallback = request({ outcome: 'simulated_fallback', quotaDisposition: 'released', durationMs: 5_000 });
+
+  check('the three outcomes are counted apart', () => {
+    const counts = voyagerLib.countRequests([request(), fallback, refused]);
+    assert.equal(counts.realAnswers, 1);
+    assert.equal(counts.simulatedFallbacks, 1);
+    assert.equal(counts.quotaRefusals, 1);
+    assert.equal(counts.requests, 3);
+  });
+
+  check('a refusal never reached the model and leaves the executed population', () => {
+    /*
+     * Otherwise the real-answer rate falls as more people hit their daily
+     * limit, which says nothing at all about whether the AI is working.
+     */
+    const counts = voyagerLib.countRequests([request(), fallback, refused, refused]);
+    assert.equal(counts.executed, 2);
+  });
+
+  check('a fallback is never counted as a real answer', () => {
+    const counts = voyagerLib.countRequests([fallback, fallback]);
+    assert.equal(counts.realAnswers, 0, 'a scripted fallback was counted as a model answer');
+    assert.equal(counts.simulatedFallbacks, 2);
+  });
+
+  check('a fallback while a model was configured is separable', () => {
+    const counts = voyagerLib.countRequests([
+      fallback,
+      request({ outcome: 'simulated_fallback', quotaDisposition: 'released', modelConfigured: false }),
+    ]);
+    assert.equal(counts.fallbacksWithModel, 1, 'the two kinds of fallback were merged');
+  });
+
+  group('Quota integrity is a check, not a rate');
+
+  check('the contract-honouring shapes pass', () => {
+    const report = voyagerLib.quotaIntegrity([request(), fallback, refused]);
+    assert.equal(report.violations, 0, JSON.stringify(report.detail));
+    assert.equal(report.checked, 3);
+  });
+
+  check('a simulated fallback that stayed charged is flagged', () => {
+    /*
+     * The refund did not run, so somebody paid for an answer they never
+     * received. Reported with its shape rather than averaged into anything.
+     */
+    const report = voyagerLib.quotaIntegrity([
+      request({ outcome: 'simulated_fallback', quotaDisposition: 'charged' }),
+    ]);
+    assert.equal(report.violations, 1);
+    assert.equal(report.detail[0].outcome, 'simulated_fallback');
+    assert.equal(report.detail[0].disposition, 'charged');
+  });
+
+  check('a real answer that was not charged is also a violation', () => {
+    assert.equal(voyagerLib.quotaIntegrity([request({ quotaDisposition: 'released' })]).violations, 1);
+  });
+
+  check('an unmetered plan is not a violation', () => {
+    // A Premium question is not counted at all; reporting it as a refund would
+    // make every unmetered answer look like a broken charge.
+    assert.equal(voyagerLib.quotaIntegrity([request({ quotaDisposition: 'unmetered' })]).violations, 0);
+  });
+
+  group('Latency measures answers, not rejections');
+
+  check('quota refusals are excluded from the latency population', () => {
+    const rows = [request({ durationMs: 1000 }), request({ durationMs: 3000 }), refused];
+    const summary = voyagerLib.latency(voyagerLib.executedRequests(rows), 1);
+    assert.equal(summary.sample, 2, 'a refusal reached the latency population');
+    // Nearest-rank over two values takes the lower, which is the documented
+    // method: every reported figure is a duration somebody actually had.
+    assert.equal(summary.median, 1000);
+    assert.equal(summary.p90, 3000);
+  });
+
+  check('percentiles are nearest-rank over a deterministic fixture', () => {
+    const rows = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].map((durationMs) =>
+      request({ durationMs })
+    );
+    const summary = voyagerLib.latency(rows, 1);
+    assert.equal(summary.median, 500);
+    assert.equal(summary.p75, 800);
+    assert.equal(summary.p90, 900);
+  });
+
+  check('a small sample withholds the percentile rather than guessing', () => {
+    assert.equal(voyagerLib.latency([request()], 50).median, null);
+  });
+
+  group('Tools report capability, never content');
+
+  const toolRow = (overrides = {}) => ({
+    tool: 'market_data',
+    outcome: 'success',
+    code: '',
+    durationMs: 100,
+    ...overrides,
+  });
+
+  check('successes and failures aggregate per tool', () => {
+    const summary = voyagerLib.summariseTools(
+      [toolRow(), toolRow({ outcome: 'failure', code: 'not_permitted' }), toolRow({ tool: 'navigation' })],
+      1
+    );
+    assert.equal(summary.executions, 3);
+    assert.equal(summary.successes, 2);
+    assert.equal(summary.failures, 1);
+    assert.equal(summary.byTool[0].tool, 'market_data');
+    assert.equal(summary.byTool[0].failures, 1);
+    assert.equal(summary.topFailureCodes[0].code, 'not_permitted');
+  });
+
+  check('the tool telemetry shape has nowhere to put input or output', () => {
+    const definition = registry.EVENT_BY_NAME.get('voyager_tool_completed');
+    assert.deepEqual(Object.keys(definition.properties).sort(), ['code', 'durationMs', 'outcome', 'step', 'tool']);
+    assert.equal(definition.kind, 'server');
+  });
+
+  group('The Voyager contract cannot carry a question');
+
+  check('neither Voyager server event declares a free-text property', () => {
+    for (const name of ['voyager_request_completed', 'voyager_tool_completed']) {
+      const definition = registry.EVENT_BY_NAME.get(name);
+      assert.ok(definition, `${name} is not registered`);
+      for (const [key, spec] of Object.entries(definition.properties)) {
+        assert.ok(['enum', 'token', 'integer', 'boolean'].includes(spec.kind), `${name}.${key} is ${spec.kind}`);
+      }
+    }
+  });
+
+  for (const forbidden of ['question', 'answer', 'prompt', 'message', 'history', 'query', 'ticker', 'symbol', 'holdings', 'note', 'citations', 'url', 'input', 'output']) {
+    check(`the Voyager contract has no "${forbidden}" property`, () => {
+      for (const name of ['voyager_request_completed', 'voyager_tool_completed']) {
+        const keys = Object.keys(registry.EVENT_BY_NAME.get(name).properties).map((key) => key.toLowerCase());
+        assert.equal(keys.includes(forbidden), false, `${name} declares ${forbidden}`);
+      }
+    });
+  }
+
+  check('a Voyager event carrying a question is refused by the validator', () => {
+    const result = validate.validateEvent(
+      {
+        name: 'voyager_request_completed',
+        occurredAt: NOW.toISOString(),
+        properties: { screen: 'chart', question: 'should I sell TSLA' },
+      },
+      NOW,
+      validate.SERVER_KINDS
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'unknown_property');
+  });
+
+  check('a browser cannot forge a Voyager server outcome', () => {
+    const result = validate.validateEvent(
+      { name: 'voyager_request_completed', occurredAt: NOW.toISOString(), properties: {} },
+      NOW
+    );
+    assert.equal(result.ok, false, 'a client could claim the model answered');
+  });
+
+  check('the dictionary refuses to call a fallback a success', () => {
+    const entry = dictionary.DICTIONARY_BY_ID.get('voyager_fallback_rate');
+    assert.ok(entry, 'no definition for the fallback rate');
+    assert.match([entry.formula, ...entry.limitations].join(' '), /NOT a success/);
+    assert.equal(entry.sourceType, 'telemetry');
+  });
+
+  check('an absent emitter is not zero usage', () => {
+    /*
+     * The demo-critical distinction. Before the Voyager section ships the
+     * emitters there is no mechanism, not an absence of usage — and a card
+     * reading "0 requests" would assert that nobody uses the product's headline
+     * feature.
+     */
+    const source = readFileSync('src/lib/admin-metrics/families/voyager.ts', 'utf8');
+    assert.match(source, /awaitingEmitter/);
+    assert.match(source, /this is not an absence of usage/);
   });
 
   /* ------------------------------------ The checker cannot be self-defeated */
