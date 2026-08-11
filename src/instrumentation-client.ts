@@ -1,6 +1,8 @@
 import { setAnalyticsSink } from '@/lib/events/analytics';
 import { HttpAnalyticsSink } from '@/lib/analytics/sink';
 import { routeTemplateFor, surfaceForRoute } from '@/lib/analytics/surfaces';
+import { deviceClass } from '@/lib/analytics/identity';
+import { isWebVital, rate, toStoredValue } from '@/lib/admin-metrics/webVitals';
 
 /**
  * Client instrumentation: where the portal gets a session, a page view, and a
@@ -115,8 +117,143 @@ try {
 
   sink.enqueue('portal_page_viewed', { route, area });
   armEngagement(area);
+  watchFailures();
+  watchWebVitals();
 } catch {
   /* A portal that cannot measure itself is still a portal. */
+}
+
+/* ------------------------------------------------------- Web Vitals (Phase 5) */
+
+const NAVIGATION_TYPES = ['navigate', 'reload', 'back_forward', 'prerender', 'restore'];
+
+/**
+ * Records one Core Web Vital.
+ *
+ * What travels is the metric, its bucket, an integer value, the product area
+ * and a coarse device class. Not the URL, not the element that was slow, not
+ * the user agent, not the navigation timing origin.
+ */
+function reportWebVital(metric: { name: string; value: number; navigationType?: string }): void {
+  try {
+    if (!sink) return;
+
+    const name = metric.name.toLowerCase();
+    if (!isWebVital(name)) return;
+
+    const { area } = here();
+    const navigationType =
+      metric.navigationType && NAVIGATION_TYPES.includes(metric.navigationType)
+        ? metric.navigationType
+        : 'unknown';
+
+    sink.enqueue('web_vital_measured', {
+      metric: name,
+      rating: rate(name, metric.value),
+      /* Scaled once, in `webVitals.ts`. CLS would otherwise round to zero. */
+      value: toStoredValue(name, metric.value),
+      area,
+      navigationType,
+      device: deviceClass(typeof innerWidth === 'number' ? innerWidth : 0),
+    });
+  } catch {
+    /* A page that cannot measure itself is still a page. */
+  }
+}
+
+
+/**
+ * Subscribes to the browser's own vitals reporting.
+ *
+ * ## Why this import path, and what it costs
+ *
+ * Next ships `web-vitals` inside itself and exposes it publicly only as
+ * `useReportWebVitals`, a **React hook**. A hook needs a component, a component
+ * needs a global mount point, and the only global mount point is
+ * `src/app/[locale]/layout.tsx` — which belongs to no section. Editing an
+ * unowned file quietly is the thing this project's protocol exists to prevent,
+ * and requesting ownership of it would have blocked reliability entirely.
+ *
+ * The compiled module underneath exports plain functions rather than hooks, so
+ * it can be called from here: no new dependency, no bundle duplication, no
+ * foreign file. The cost is that `next/dist/compiled/*` is an internal path and
+ * a future Next may move it — so the import is dynamic and failure is silent.
+ * If it ever disappears the portal keeps working and Web Vitals stop arriving,
+ * which the coverage table reports as an unobserved event rather than as a
+ * healthy zero.
+ *
+ * INP is included precisely because it is the one nobody should reimplement:
+ * measuring interaction latency correctly is subtle, and a hand-rolled
+ * approximation would be a number that looks like INP and is not.
+ */
+type VitalReporter = (report: (metric: { name: string; value: number; navigationType?: string }) => void) => void;
+
+function watchWebVitals(): void {
+  /*
+   * Typed locally because the compiled module ships no declarations. The shape
+   * is asserted rather than trusted — each subscriber is called only if it is
+   * actually a function, so a moved or renamed export degrades to no vitals
+   * instead of a TypeError during hydration.
+   */
+  void (
+    // @ts-expect-error — the compiled module ships no declarations. Suppressed
+    // here, locally, rather than adding a .d.ts outside this section's owned
+    // paths; the shape is checked at runtime just below.
+    import('next/dist/compiled/web-vitals') as Promise<Record<string, VitalReporter | undefined>>
+  )
+    .then((vitals) => {
+      for (const subscribe of [vitals.onLCP, vitals.onINP, vitals.onCLS, vitals.onFCP, vitals.onTTFB]) {
+        if (typeof subscribe === 'function') subscribe(reportWebVital);
+      }
+    })
+    .catch(() => {
+      /* Measuring the page must never be able to break it. */
+    });
+}
+
+/* ------------------------------------------------- Runtime failures (Phase 5) */
+
+/**
+ * Failure *classes*, and nothing else.
+ *
+ * Two native listeners, no monkeypatching: `fetch` is left alone, `console` is
+ * left alone, no component is wrapped and no SDK is installed. The browser
+ * already tells us that something threw; everything beyond that — the message,
+ * the stack, the URL — is written by whoever threw it and routinely carries an
+ * id, a ticker or a fragment of somebody's input. There is no dependable way to
+ * sanitise arbitrary error text, so none is collected.
+ *
+ * A count by class and surface is what a reliability page can act on anyway:
+ * it says *where* things break, and the fix is found by reproducing it rather
+ * than by reading a truncated stack in a dashboard.
+ */
+function watchFailures(): void {
+  const report = (failureClass: 'unhandled_error' | 'unhandled_rejection' | 'resource') => {
+    try {
+      sink?.enqueue('client_runtime_failure', {
+        class: failureClass,
+        phase: document.readyState === 'complete' ? 'runtime' : 'bootstrap',
+        area: here().area,
+      });
+    } catch {
+      /* ignore */
+    }
+  };
+
+  addEventListener(
+    'error',
+    (event) => {
+      /*
+       * A failed image or script fires `error` on the element rather than on
+       * the window, and `event.error` is absent — that is the only reliable way
+       * the browser distinguishes the two, so it is the only distinction drawn.
+       */
+      report(event instanceof ErrorEvent && event.error ? 'unhandled_error' : 'resource');
+    },
+    true
+  );
+
+  addEventListener('unhandledrejection', () => report('unhandled_rejection'));
 }
 
 /**
