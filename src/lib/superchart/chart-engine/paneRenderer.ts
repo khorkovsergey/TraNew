@@ -22,6 +22,12 @@ import {
  * Nothing here knows what an RSI is. It draws a line, a histogram or a set of
  * marks in a rectangle, against a domain somebody else computed, and the study
  * that wanted it is a row in a registry.
+ *
+ * The three series functions return **how many points they actually drew**. That
+ * number is what lets the engine record which studies are on the canvas rather
+ * than which were handed to it — a series that is entirely null in the visible
+ * window returns zero, and the outcome telemetry reports it as data missing
+ * instead of claiming the study rendered.
  */
 
 /**
@@ -149,7 +155,9 @@ export function drawPaneLine(
   values: (number | null)[],
   style: SeriesStyle,
   plotWidth: number
-): void {
+): number {
+  let drawn = 0;
+
   withinPane(ctx, pane, plotWidth, () => {
     ctx.beginPath();
     ctx.strokeStyle = style.colour;
@@ -173,11 +181,15 @@ export function drawPaneLine(
         ctx.moveTo(x, y);
         started = true;
       }
+
+      drawn += 1;
     }
 
     ctx.stroke();
     ctx.setLineDash([]);
   });
+
+  return drawn;
 }
 
 /**
@@ -199,9 +211,10 @@ export function drawPaneHistogram(
     colourAt?: (index: number) => string;
     plotWidth: number;
   }
-): void {
+): number {
   const width = barWidth(axis);
   const zero = valueToY(pane, options.baseline);
+  let drawn = 0;
 
   withinPane(ctx, pane, options.plotWidth, () => {
     ctx.setLineDash([]);
@@ -218,8 +231,11 @@ export function drawPaneHistogram(
 
       ctx.fillStyle = options.colourAt ? options.colourAt(index) : (options.colour ?? '#888888');
       ctx.fillRect(xForIndex(axis, index) - width / 2, top, width, height);
+      drawn += 1;
     }
   });
+
+  return drawn;
 }
 
 /** Individual bars picked out, drawn as rings so the series stays readable. */
@@ -230,7 +246,9 @@ export function drawPaneFlags(
   values: (number | null)[],
   style: SeriesStyle,
   plotWidth: number
-): void {
+): number {
+  let drawn = 0;
+
   withinPane(ctx, pane, plotWidth, () => {
     ctx.strokeStyle = style.colour;
     ctx.lineWidth = style.width ?? 2;
@@ -243,10 +261,13 @@ export function drawPaneFlags(
       ctx.beginPath();
       ctx.arc(xForIndex(axis, index), valueToY(pane, value), 4.5, 0, Math.PI * 2);
       ctx.stroke();
+      drawn += 1;
     }
 
     ctx.setLineDash([]);
   });
+
+  return drawn;
 }
 
 /** The zero rule a MACD hangs from, drawn solid so the sign is unambiguous. */

@@ -14,6 +14,7 @@ import {
   timeAxis,
   valueToY,
   yToValue,
+  MAIN_PANE,
   SCALE_WIDTH,
   type Pane,
   type PaneInput,
@@ -45,6 +46,7 @@ import {
   type ChartTheme,
   type CrosshairContext,
   type EngineOptions,
+  type PaintedFrame,
   type SerializedChartLayout,
   type UnsubscribeFunction,
   type VisibleRange,
@@ -109,6 +111,17 @@ export class CanvasChartEngine implements ChartEngineAdapter {
   private indicators: IndicatorInstance[] = [];
   private studyPalette: string[] = [];
   private selectedId: string | null = null;
+
+  /**
+   * What the last completed frame contains.
+   *
+   * Written at the end of `draw()` and nowhere else, so it describes a paint that
+   * finished. A frame that threw halfway leaves the previous one in place, which
+   * is what makes "the study is not in the painted frame" a usable signal rather
+   * than a race — and it is the only evidence the outcome telemetry accepts that
+   * a study actually rendered.
+   */
+  private painted: PaintedFrame | null = null;
 
   async initialize(container: HTMLElement, options: EngineOptions): Promise<void> {
     this.container = container;
@@ -520,6 +533,8 @@ export class CanvasChartEngine implements ChartEngineAdapter {
       ctx.fillStyle = palette.textMuted;
       ctx.font = '12px "Plus Jakarta Sans", sans-serif';
       ctx.fillText('No data for this range', 16, 24);
+      // A frame that said "no data" is a completed frame, and it drew no study.
+      this.painted = { paneIds: [MAIN_PANE], studyIds: [] };
       return;
     }
 
@@ -529,6 +544,14 @@ export class CanvasChartEngine implements ChartEngineAdapter {
     const bodyWidth = barWidth(axis);
 
     const toY = (price: number) => valueToY(main, price);
+
+    /*
+     * Which studies put something on the canvas this frame.
+     *
+     * Collected while drawing rather than inferred afterwards, because the only
+     * honest answer to "did the RSI render" is "a coordinate was issued for it".
+     */
+    const drew = new Set<string>();
 
     this.drawGrid(ctx, layout, palette, low, high, toY);
 
@@ -546,15 +569,33 @@ export class CanvasChartEngine implements ChartEngineAdapter {
         this.drawBarSeries(ctx, bars, step, bodyWidth, toY, palette);
       }
 
-      this.drawIndicators(ctx, toY, step);
+      this.drawIndicators(ctx, toY, step, drew);
       this.drawHighlights(ctx, layout, step);
       this.drawDrawings(ctx, layout);
     });
 
-    this.drawSecondaryPanes(ctx, layout, axis, palette, bars);
+    this.drawSecondaryPanes(ctx, layout, axis, palette, bars, drew);
     this.drawPriceScale(ctx, layout, palette, low, high);
     this.drawTimeScale(ctx, bars, step, layout, palette);
     if (this.crosshair) this.drawCrosshair(ctx, layout, palette);
+
+    // Last, so a frame that threw on the way here leaves the previous record
+    // standing rather than claiming this one finished.
+    this.painted = { paneIds: layout.panes.map((pane) => pane.id), studyIds: [...drew] };
+  }
+
+  /**
+   * What the engine last actually painted.
+   *
+   * Copied on the way out: a caller holding a reference to the engine's own
+   * arrays could not tell one frame from the next.
+   */
+  paintedFrame(): PaintedFrame | null {
+    if (!this.painted) return null;
+    return {
+      paneIds: [...this.painted.paneIds],
+      studyIds: [...this.painted.studyIds],
+    };
   }
 
   private drawGrid(
@@ -602,13 +643,17 @@ export class CanvasChartEngine implements ChartEngineAdapter {
    * histogram or a set of flags; the pane says how tall it is and what its
    * domain is; this loop joins the two. Adding an oscillator changes the
    * registry, not this function.
+   *
+   * `drew` collects the studies that produced at least one coordinate, which is
+   * what the outcome telemetry means by rendered.
    */
   private drawSecondaryPanes(
     ctx: CanvasRenderingContext2D,
     layout: PaneLayout,
     axis: TimeAxis,
     palette: ChartPalette,
-    bars: Bar[]
+    bars: Bar[],
+    drew: Set<string>
   ): void {
     if (layout.panes.length < 2) return;
 
@@ -627,12 +672,14 @@ export class CanvasChartEngine implements ChartEngineAdapter {
       for (const instance of this.indicators) {
         if (paneRequestFor(instance)?.id !== pane.id) continue;
 
+        let points = 0;
+
         for (const plot of instance.plots) {
           const colour =
             this.studyPalette[plot.colour % this.studyPalette.length] ?? '#7c4dff';
 
           if (plot.style === 'histogram') {
-            drawPaneHistogram(ctx, pane, axis, plot.values, {
+            points += drawPaneHistogram(ctx, pane, axis, plot.values, {
               // Zero for both a volume column and a MACD bar: one stands on the
               // floor of its pane and the other hangs from the middle of its
               // own, and that difference is the domain's, not the bar's.
@@ -650,7 +697,7 @@ export class CanvasChartEngine implements ChartEngineAdapter {
           }
 
           if (plot.style === 'flags') {
-            drawPaneFlags(
+            points += drawPaneFlags(
               ctx,
               pane,
               axis,
@@ -661,7 +708,7 @@ export class CanvasChartEngine implements ChartEngineAdapter {
             continue;
           }
 
-          drawPaneLine(
+          points += drawPaneLine(
             ctx,
             pane,
             axis,
@@ -670,6 +717,8 @@ export class CanvasChartEngine implements ChartEngineAdapter {
             layout.plotWidth
           );
         }
+
+        if (points > 0) drew.add(instance.definitionId);
       }
 
       drawPaneTitle(ctx, pane, panePalette, layout.plotWidth);
@@ -790,7 +839,8 @@ export class CanvasChartEngine implements ChartEngineAdapter {
   private drawIndicators(
     ctx: CanvasRenderingContext2D,
     toY: (price: number) => number,
-    step: number
+    step: number,
+    drew: Set<string>
   ): void {
     const offset = Math.floor(this.range.from);
 
@@ -798,6 +848,8 @@ export class CanvasChartEngine implements ChartEngineAdapter {
       // One question, asked in one place: does this study want a pane of its
       // own? Anything that does not is an overlay, whatever it is called.
       if (indicator.hidden || paneRequestFor(indicator)) continue;
+
+      let points = 0;
 
       for (const plot of indicator.plots) {
         /*
@@ -818,6 +870,7 @@ export class CanvasChartEngine implements ChartEngineAdapter {
             ctx.beginPath();
             ctx.arc(i * step + step / 2, toY(value), 4.5, 0, Math.PI * 2);
             ctx.stroke();
+            points += 1;
           }
 
           ctx.restore();
@@ -845,11 +898,15 @@ export class CanvasChartEngine implements ChartEngineAdapter {
             ctx.moveTo(x, y);
             started = true;
           }
+
+          points += 1;
         }
 
         ctx.stroke();
         ctx.setLineDash([]);
       }
+
+      if (points > 0) drew.add(indicator.definitionId);
     }
   }
 

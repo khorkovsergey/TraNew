@@ -58,6 +58,27 @@ export type ChartSelection = {
 };
 
 /**
+ * What the last completed paint contains.
+ *
+ * The engine's own account of what it drew, recorded at the end of `draw()` and
+ * therefore only present when the frame finished. It exists because a state
+ * setter returning is not evidence that anything rendered: `setIndicators` puts
+ * a list on the engine and schedules a frame, and everything that could still go
+ * wrong happens after it returns.
+ *
+ * `studyIds` are the studies that put at least one value on the canvas — not the
+ * studies that were handed in. A study whose series is entirely null in the
+ * visible window is in the list of indicators and not in this one, which is the
+ * distinction the outcome telemetry is built on.
+ */
+export type PaintedFrame = {
+  /** Pane ids of the painted frame, main first. */
+  paneIds: string[];
+  /** Definition ids that actually drew something. */
+  studyIds: string[];
+};
+
+/**
  * A range of bars an answer points at.
  *
  * Stored in bar indices rather than pixels, like everything else the engine
