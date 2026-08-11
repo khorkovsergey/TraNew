@@ -68,6 +68,31 @@ export type KpiReadiness = {
   verdict: 'trustworthy' | 'partial' | 'awaiting_data' | 'not_instrumented';
 };
 
+/**
+ * What each product family is measurable *from*.
+ *
+ * The distinction Phase 3 turns on, made inspectable: a durable table with rows
+ * does not prove the behavioural funnel is instrumented, and a telemetry event
+ * does not prove the business outcome happened. Both are reported
+ * independently, so a family with a full registration table and no funnel
+ * events reads as exactly that rather than as "measured".
+ */
+export type FamilyCoverage = {
+  family: string;
+  /** Declared behavioural events for this family, and how many have arrived. */
+  telemetryEvents: number;
+  telemetryObserved: number;
+  /** The durable tables read, if any. */
+  durableSources: string[];
+  verdict:
+    | 'behaviour_and_facts'
+    | 'facts_only'
+    | 'behaviour_only'
+    | 'awaiting_data'
+    | 'not_instrumented';
+  note: string;
+};
+
 export type CoverageReport = {
   rows: CoverageRow[];
   totals: {
@@ -78,10 +103,30 @@ export type CoverageReport = {
     legacy: number;
   };
   kpis: KpiReadiness[];
+  families: FamilyCoverage[];
   /** True until the first row ever lands. Every "unused" is meaningless before then. */
   collectingSince: string | null;
   queriedAt: string;
 };
+
+/**
+ * Which surfaces and which tables belong to each product family.
+ *
+ * The durable side is written down rather than derived, because there is
+ * nothing to derive it from: a table does not know which product it serves.
+ * The behavioural side comes from the registry's own `surface` field, so
+ * adding an event to a family is a registry edit and not two.
+ */
+const FAMILY_SOURCES: ReadonlyArray<{ family: string; surfaces: string[]; durable: string[] }> = [
+  { family: 'start', surfaces: ['start'], durable: [] },
+  { family: 'events', surfaces: ['events'], durable: ['event_registration', 'event', 'event_metric'] },
+  { family: 'academy', surfaces: ['academy'], durable: ['academy_progress'] },
+  { family: 'experts', surfaces: ['experts'], durable: ['expert_booking'] },
+  { family: 'saves', surfaces: [], durable: ['saved_object', 'collection', 'collection_item'] },
+  { family: 'wealth', surfaces: ['wealth'], durable: ['wealth_asset', 'wealth_liability', 'wealth_goal', 'consent'] },
+  { family: 'commerce', surfaces: ['subscriptions'], durable: ['purchase', 'subscription', 'user'] },
+  { family: 'accounts', surfaces: [], durable: ['user'] },
+];
 
 /**
  * What each Phase 2 KPI actually needs on the wire.
@@ -177,8 +222,52 @@ export async function instrumentationCoverage(since: Date): Promise<CoverageRepo
       legacy: rows.filter((row) => row.lifecycle === 'legacy').length,
     },
     kpis: KPI_INPUTS.map((kpi) => readinessOf(kpi, byEvent)),
+    families: FAMILY_SOURCES.map((family) => familyCoverage(family, rows)),
     collectingSince: collectingSince ? new Date(collectingSince).toISOString() : null,
     queriedAt: new Date().toISOString(),
+  };
+}
+
+function familyCoverage(
+  family: { family: string; surfaces: string[]; durable: string[] },
+  rows: readonly CoverageRow[]
+): FamilyCoverage {
+  const own = rows.filter(
+    (row) => family.surfaces.includes(row.surface) && row.lifecycle === 'current'
+  );
+  const observed = own.filter((row) => row.status === 'observed').length;
+
+  const hasFacts = family.durable.length > 0;
+  const hasEvents = own.length > 0;
+
+  const verdict: FamilyCoverage['verdict'] = !hasFacts && !hasEvents
+    ? 'not_instrumented'
+    : hasFacts && observed > 0
+      ? 'behaviour_and_facts'
+      : hasFacts
+        ? 'facts_only'
+        : observed > 0
+          ? 'behaviour_only'
+          : 'awaiting_data';
+
+  const note =
+    verdict === 'facts_only'
+      ? 'Durable records exist and the behavioural funnel has produced nothing yet. The table is not evidence that the funnel is instrumented.'
+      : verdict === 'behaviour_only'
+        ? 'Behaviour is being collected and there is no durable table behind it. Events are not evidence that an outcome occurred.'
+        : verdict === 'awaiting_data'
+          ? 'Declared and reachable, and nothing has arrived. Telemetry began at the Phase 1 deployment.'
+          : verdict === 'not_instrumented'
+            ? 'Neither behavioural events nor a durable source. Nothing about this family is measurable.'
+            : 'Behaviour and durable facts are both available, and they are reported separately.';
+
+  return {
+    family: family.family,
+    telemetryEvents: own.length,
+    telemetryObserved: observed,
+    durableSources: family.durable,
+    verdict,
+    note,
   };
 }
 

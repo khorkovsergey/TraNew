@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authorizeMetrics } from '@/lib/admin-metrics/access';
-import { METRIC_DICTIONARY } from '@/lib/admin-metrics/dictionary';
+import { METRIC_DICTIONARY_ALL } from '@/lib/admin-metrics/dictionary';
 
 /**
  * The Metric Dictionary, served rather than restated.
@@ -17,5 +17,5 @@ export async function GET() {
   const auth = await authorizeMetrics();
   if (!auth.authorized) return NextResponse.json({ error: 'not authorized' }, { status: 401 });
 
-  return NextResponse.json({ metrics: METRIC_DICTIONARY });
+  return NextResponse.json({ metrics: METRIC_DICTIONARY_ALL });
 }
