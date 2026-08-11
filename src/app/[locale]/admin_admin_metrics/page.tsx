@@ -92,6 +92,7 @@ export default async function ObservatoryPage({ params, searchParams }: Props) {
     provenance: (metricId) => ({
       metricId,
       source: 'product_telemetry_event',
+      sourceType: 'derived' as const,
       queriedAt: now.toISOString(),
     }),
     state: 'instrumented_going_forward',

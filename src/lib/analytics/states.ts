@@ -90,8 +90,15 @@ export type SourceType = (typeof SOURCE_TYPES)[number];
 export type MetricProvenance = {
   /** The exact table or stream — `event_registration`, not "the database". */
   source: string;
-  /** Behaviour, business fact, or neither. */
-  sourceType?: SourceType;
+  /**
+   * Behaviour, business fact, or neither.
+   *
+   * Required, not optional. An optional field would have made the rule a
+   * convention, and the compiler is the only reviewer that reads every call
+   * site: a metric cannot now reach the Observatory without saying what kind of
+   * evidence produced it.
+   */
+  sourceType: SourceType;
   /** The id in the metric dictionary, so the formula is one lookup away. */
   metricId: string;
   /** Server clock at query time. */
@@ -154,6 +161,33 @@ export function count(
   return { state, value: n, sample: n, ...provenance };
 }
 
+/**
+ * A signed difference between two comparable quantities.
+ *
+ * Separate from `count` because the two disagree about what `sample` means. A
+ * count's sample *is* its value — five rows, five observations. A difference of
+ * −5 has no population of −5 behind it; its evidence is the number of records
+ * that were compared, and passing the delta through `count` produced
+ * `{ value: -5, sample: -5 }`, which claims a negative observation count.
+ *
+ * `evidence` is therefore taken separately and floored at zero, and it must be
+ * the comparable population — how many records the two sides were computed over
+ * — so a reader can tell a discrepancy of −5 against 6 records from one against
+ * six thousand.
+ */
+export function delta(
+  difference: number,
+  evidence: number,
+  provenance: MetricProvenance
+): MetricValue {
+  return {
+    state: 'derived',
+    value: difference,
+    sample: Math.max(0, Math.trunc(evidence)),
+    ...provenance,
+  };
+}
+
 export function notMeasurable(
   reason: string,
   wouldRequire: string,
@@ -196,6 +230,7 @@ export function withFreshness(
     freshestAt: freshestAt.toISOString(),
     budgetSeconds,
     source: metric.source,
+    sourceType: metric.sourceType,
     metricId: metric.metricId,
     queriedAt: metric.queriedAt,
   };
