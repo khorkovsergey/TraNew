@@ -675,7 +675,11 @@ function reportExecution(input: {
     properties: {
       tool: input.tool,
       outcome: input.ok ? 'success' : 'failure',
-      code: input.code ?? '',
+      /* A token rather than an empty string: the registry declares this
+         property as required and refuses a blank one, so every successful row
+         would have been dropped after integration. `ok` is metadata about the
+         call, not anything a person or a model wrote. */
+      code: input.code ?? 'ok',
       durationMs: input.durationMs,
       step: input.step,
     },
