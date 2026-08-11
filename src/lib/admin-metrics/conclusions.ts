@@ -99,20 +99,22 @@ export function voyagerConclusion(input: {
 
 export function superchartsConclusion(input: {
   opens: number;
-  sessionsWithStudy: number;
-  paneActivations: number;
+  /** Sessions where the engine reported painting a study. Never the toggle. */
+  sessionsRenderingStudy: number;
+  /** Separate-pane renders, from `superchart_study_applied`. */
+  paneRenders: number;
+  /** Toggles pressed. Stated beside the renders and never added to them. */
+  studyRequests: number;
   awaitingCapabilityEmitter: boolean;
-  renderedStudies: number;
 }): string {
-  const use = input.opens === 0
-    ? 'No chart opened in this period.'
-    : `${plural(input.opens, 'chart open')}, ${plural(input.sessionsWithStudy, 'session')} with a study and ${plural(input.paneActivations, 'activation')} on a separate pane.`;
+  if (input.opens === 0) return 'No chart opened in this period.';
 
-  if (input.awaitingCapabilityEmitter && input.renderedStudies === 0) {
-    return `${use} Study figures are what people asked for; rendered outcomes are instrumented going forward.`;
-  }
+  const use = `${plural(input.opens, 'chart open')}, ${plural(input.sessionsRenderingStudy, 'session')} where a study rendered and ${plural(input.paneRenders, 'render')} on a separate pane.`;
+  const intent = ` ${plural(input.studyRequests, 'study request')} counted separately — a toggle is not a render.`;
 
-  return `${use} Rendered outcomes are now recorded separately from intent.`;
+  return input.awaitingCapabilityEmitter
+    ? `${use}${intent} Capability outcomes are instrumented going forward.`
+    : `${use}${intent}`;
 }
 
 /* ------------------------------------------------------------ Market data */
@@ -174,9 +176,14 @@ export function monetizationConclusion(input: {
   const demo = isNumeric(input.demoRecords) ? input.demoRecords.value : 0;
   const reconciled = isNumeric(input.reconciled) ? input.reconciled.value : 0;
 
+  /*
+   * `plural` appends an "s" to the noun it is given, so the second clause has to
+   * pluralise a noun rather than a phrase: `plural(16, 'reconciled against a
+   * provider')` produced "16 reconciled against a providers".
+   */
   return reconciled === 0
     ? `${plural(paid, 'paid-status record')} and ${plural(demo, 'demo entitlement')}. Nothing has been reconciled against a payment provider, so confirmed revenue has no source.`
-    : `${plural(paid, 'paid-status record')}, ${plural(reconciled, 'reconciled against a provider')}.`;
+    : `${plural(paid, 'paid-status record')} and ${plural(demo, 'demo entitlement')}, of which ${plural(reconciled, 'record')} reconciled against a payment provider.`;
 }
 
 /* ------------------------------------------------------- Measurement gaps */

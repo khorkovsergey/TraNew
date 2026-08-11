@@ -154,36 +154,49 @@ export function SuperchartsBlock({ report }: { report: ReliabilityReport }) {
           }}
         />
         <MetricCard
-          label="Sessions using a study"
+          label="Sessions rendering a study"
           metric={{
             state: 'instrumented_going_forward',
             value: charts.sessionsWithStudy,
             sample: charts.sessionsWithStudy,
             metricId: 'supercharts_study_sessions',
-            source: 'product_telemetry_event · superchart_study_toggled',
+            source: 'product_telemetry_event · superchart_study_applied',
             sourceType: 'telemetry',
             queriedAt: report.queriedAt,
           }}
         />
         <MetricCard
-          label="Separate-pane activations"
+          label="Separate-pane renders"
           metric={{
             state: 'instrumented_going_forward',
             value: charts.paneActivations,
             sample: charts.paneActivations,
             metricId: 'supercharts_pane_activations',
-            source: 'product_telemetry_event · superchart_study_toggled',
+            source: 'product_telemetry_event · superchart_study_applied',
             sourceType: 'telemetry',
             queriedAt: report.queriedAt,
           }}
         />
         <MetricCard
-          label="Overlay activations"
+          label="Overlay renders"
           metric={{
             state: 'instrumented_going_forward',
             value: charts.overlayActivations,
             sample: charts.overlayActivations,
             metricId: 'supercharts_overlay_activations',
+            source: 'product_telemetry_event · superchart_study_applied',
+            sourceType: 'telemetry',
+            queriedAt: report.queriedAt,
+          }}
+        />
+
+        <MetricCard
+          label="Study requests"
+          metric={{
+            state: 'instrumented_going_forward',
+            value: charts.studyRequests,
+            sample: charts.studyRequests,
+            metricId: 'supercharts_study_requests',
             source: 'product_telemetry_event · superchart_study_toggled',
             sourceType: 'telemetry',
             queriedAt: report.queriedAt,
@@ -192,10 +205,17 @@ export function SuperchartsBlock({ report }: { report: ReliabilityReport }) {
       </div>
 
       <p className={styles.note}>
-        <strong>Intent and outcome are different rows.</strong>{' '}
+        <strong>Intent and outcome are different rows and are never added.</strong> A study request
+        is the toggle being pressed; a render is the engine reporting that it painted the study.
+        They come from different events, and each card names the one it used.
         {charts.awaitingCapabilityEmitter
-          ? 'The figures above come from the toggle, which fires before the engine acts — so they are what people asked for. Rendered outcomes and capability results are instrumented going forward and appear here automatically once the first event arrives.'
-          : 'Rendered outcomes are recorded separately from the toggle, so a click is never reported as a render.'}
+          ? ' Capability outcomes are instrumented going forward and appear here once the first one arrives.'
+          : ' Capability outcomes are recorded separately again, so a render is never read as a fulfilled request.'}
+      </p>
+      <p className={styles.note}>
+        Renders are instrumented going forward. Toggle telemetry that predates the applied emitter
+        is not backfilled as rendered activity, so an older period may show requests without the
+        renders they produced — a measurement gap rather than a failed chart.
       </p>
     </>
   );
@@ -209,7 +229,7 @@ export function SuperchartsDetail({ report }: { report: ReliabilityReport }) {
       <div className={styles.scroller}>
         <table className={styles.table}>
           <caption className={styles.tableCaption}>
-            Study mix. Placement comes from the canonical indicator registry.
+            Rendered study mix, from superchart_study_applied. Placement is the engine reported one.
           </caption>
           <thead>
             <tr>
@@ -261,9 +281,43 @@ export function SuperchartsDetail({ report }: { report: ReliabilityReport }) {
         </p>
       ) : null}
 
+      <div className={styles.scroller}>
+        <table className={styles.table}>
+          <caption className={styles.tableCaption}>
+            Requested study mix, from superchart_study_toggled. What people asked for, which is not
+            the same population as what rendered.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Study</th>
+              <th scope="col">Placement</th>
+              <th scope="col">Requests</th>
+            </tr>
+          </thead>
+          <tbody>
+            {charts.requestedStudyMix.length === 0 ? (
+              <tr>
+                <td colSpan={3}>No study requested in this period.</td>
+              </tr>
+            ) : (
+              charts.requestedStudyMix.map((row) => (
+                <tr key={row.study}>
+                  <th scope="row">
+                    <code>{row.study}</code>
+                  </th>
+                  <td>{row.placement}</td>
+                  <td>{row.requests}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
       <p className={styles.note}>
-        {charts.drawings} drawings · {charts.layoutsSaved} layouts saved · {charts.scriptsGenerated}{' '}
-        scripts generated, {charts.scriptsExported} exported.
+        {charts.sessionsRequestingStudy} sessions requested a study · {charts.drawings} drawings ·{' '}
+        {charts.layoutsSaved} layouts saved · {charts.scriptsGenerated} scripts generated,{' '}
+        {charts.scriptsExported} exported.
       </p>
     </>
   );

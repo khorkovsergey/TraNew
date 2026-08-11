@@ -55,19 +55,34 @@ export type SuperchartEvent = {
 
 export type SuperchartsSummary = {
   opens: number;
+
+  /* ------------------------------------------------------------ Intent
+   *
+   * From `superchart_study_toggled`, which fires as the toggle is pressed.
+   * Somebody asked for a study. Whether the engine painted it is a different
+   * event and a different set of numbers below.
+   */
+  studyRequests: number;
+  sessionsRequestingStudy: number;
+  requestedStudyMix: Array<{ study: string; placement: 'overlay' | 'pane' | 'unknown'; requests: number }>;
+
+  /* ---------------------------------------------------------- Rendered
+   *
+   * From `superchart_study_applied` only. These are the product metrics: a
+   * study that actually appeared, on the pane the engine actually used.
+   */
   sessionsWithStudy: number;
   sessionsWithPaneStudy: number;
-  drawings: number;
-  layoutsSaved: number;
-  scriptsGenerated: number;
-  scriptsExported: number;
-  /** By id, so the mix is visible rather than a single "studies used" number. */
   studyMix: Array<{ study: string; placement: 'overlay' | 'pane' | 'unknown'; activations: number }>;
   overlayActivations: number;
   paneActivations: number;
   nativePaneMix: Array<{ study: string; activations: number }>;
+
+  drawings: number;
+  layoutsSaved: number;
+  scriptsGenerated: number;
+  scriptsExported: number;
   previewOutcomes: Array<{ outcome: string; count: number }>;
-  /** Present only once the capability emitter lands. */
   capability: Array<{ outcome: string; count: number }>;
   sessionsSeen: number;
 };
@@ -75,15 +90,35 @@ export type SuperchartsSummary = {
 /**
  * Aggregates whatever Supercharts telemetry exists.
  *
+ * **Intent and rendered are never added.** An earlier version wrote both the
+ * toggle and the applied event into one set of counters, so a single study that
+ * was requested and then painted arrived as two activations — six applied rows
+ * became seven. That is not a rounding problem: it silently converted a click
+ * into evidence that the engine had drawn something.
+ *
  * Study activations count only `on: true`. A toggle-off is somebody removing a
  * study, and counting it as use would make a person who tried RSI and disliked
  * it look like two RSI users.
+ *
+ * Rendered placement comes from the applied event's own `placement`, which is
+ * what the engine did, falling back to the catalogue only when the property is
+ * absent. They should agree; where they do not, the engine is the truth.
  */
 export function summariseSupercharts(events: readonly SuperchartEvent[]): SuperchartsSummary {
   const sessions = new Set<string>();
-  const withStudy = new Set<string>();
-  const withPaneStudy = new Set<string>();
-  const studies = new Map<string, number>();
+
+  /* Intent. */
+  const requestedSessions = new Set<string>();
+  const requested = new Map<string, number>();
+  let studyRequests = 0;
+
+  /* Rendered — a separate set of counters, deliberately. */
+  const renderedSessions = new Set<string>();
+  const renderedPaneSessions = new Set<string>();
+  const rendered = new Map<string, number>();
+  let overlayActivations = 0;
+  let paneActivations = 0;
+
   const previews = new Map<string, number>();
   const capability = new Map<string, number>();
 
@@ -92,8 +127,6 @@ export function summariseSupercharts(events: readonly SuperchartEvent[]): Superc
   let layoutsSaved = 0;
   let scriptsGenerated = 0;
   let scriptsExported = 0;
-  let overlayActivations = 0;
-  let paneActivations = 0;
 
   for (const event of events) {
     sessions.add(event.sessionId);
@@ -107,28 +140,25 @@ export function summariseSupercharts(events: readonly SuperchartEvent[]): Superc
         if (event.properties.on !== true) break;
 
         const study = String(event.properties.studyId ?? 'unknown');
-        studies.set(study, (studies.get(study) ?? 0) + 1);
-        withStudy.add(event.sessionId);
-
-        const placement = placementOf(study);
-        if (placement === 'pane') {
-          paneActivations += 1;
-          withPaneStudy.add(event.sessionId);
-        } else if (placement === 'overlay') {
-          overlayActivations += 1;
-        }
+        studyRequests += 1;
+        requested.set(study, (requested.get(study) ?? 0) + 1);
+        requestedSessions.add(event.sessionId);
         break;
       }
 
       case 'superchart_study_applied': {
-        /* The outcome event, once the Superchart section emits it. */
         const study = String(event.properties.study ?? 'unknown');
-        studies.set(study, (studies.get(study) ?? 0) + 1);
-        withStudy.add(event.sessionId);
-        if (event.properties.placement === 'pane') {
+        rendered.set(study, (rendered.get(study) ?? 0) + 1);
+        renderedSessions.add(event.sessionId);
+
+        const placement = event.properties.placement === 'pane' || event.properties.placement === 'overlay'
+          ? event.properties.placement
+          : placementOf(study);
+
+        if (placement === 'pane') {
           paneActivations += 1;
-          withPaneStudy.add(event.sessionId);
-        } else {
+          renderedPaneSessions.add(event.sessionId);
+        } else if (placement === 'overlay') {
           overlayActivations += 1;
         }
         break;
@@ -161,25 +191,31 @@ export function summariseSupercharts(events: readonly SuperchartEvent[]): Superc
     }
   }
 
-  const studyMix = [...studies.entries()]
-    .map(([study, activations]) => ({ study, placement: placementOf(study), activations }))
-    .sort((a, b) => b.activations - a.activations);
-
   return {
     opens,
-    sessionsWithStudy: withStudy.size,
-    sessionsWithPaneStudy: withPaneStudy.size,
-    drawings,
-    layoutsSaved,
-    scriptsGenerated,
-    scriptsExported,
-    studyMix,
+
+    studyRequests,
+    sessionsRequestingStudy: requestedSessions.size,
+    requestedStudyMix: [...requested.entries()]
+      .map(([study, requests]) => ({ study, placement: placementOf(study), requests }))
+      .sort((a, b) => b.requests - a.requests),
+
+    sessionsWithStudy: renderedSessions.size,
+    sessionsWithPaneStudy: renderedPaneSessions.size,
+    studyMix: [...rendered.entries()]
+      .map(([study, activations]) => ({ study, placement: placementOf(study), activations }))
+      .sort((a, b) => b.activations - a.activations),
     overlayActivations,
     paneActivations,
     nativePaneMix: NATIVE_PANE_STUDIES.map((study) => ({
       study,
-      activations: studies.get(study) ?? 0,
+      activations: rendered.get(study) ?? 0,
     })),
+
+    drawings,
+    layoutsSaved,
+    scriptsGenerated,
+    scriptsExported,
     previewOutcomes: [...previews.entries()]
       .map(([outcome, count]) => ({ outcome, count }))
       .sort((a, b) => b.count - a.count),
