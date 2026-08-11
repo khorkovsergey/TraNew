@@ -141,6 +141,7 @@ const PURE_MODULES = [
   'admin-metrics/families/supercharts',
   'admin-metrics/freshness',
   'admin-metrics/webVitals',
+  'admin-metrics/conclusions',
 ];
 
 const repo = process.cwd();
@@ -229,6 +230,7 @@ const voyagerLib = await load('admin-metrics/families/voyagerMetrics');
 const charts = await load('admin-metrics/families/supercharts');
 const fresh = await load('admin-metrics/freshness');
 const vitals = await load('admin-metrics/webVitals');
+const conclusions = await load('admin-metrics/conclusions');
 
 const NOW = new Date('2026-08-10T12:00:00.000Z');
 const at = { source: 'test', metricId: 'test', queriedAt: NOW.toISOString() };
@@ -2358,6 +2360,268 @@ try {
       readFileSync('docs/admin-metrics/supercharts-instrumentation-request.md', 'utf8'),
       /do not edit either\s*\n?file/,
       'the Supercharts request does not say to leave the Metrics files alone'
+    );
+  });
+
+  /* ================================== Phase 6 — presentation, not new numbers */
+
+  group('Conclusions restate a number and never explain it');
+
+  check('the pulse line says what happened, with the rate when there is one', () => {
+    const line = conclusions.pulseConclusion({
+      eligibleSessions: { state: 'live', value: 412, sample: 412 },
+      pmcr: { state: 'derived', value: 0.184, sample: 412 },
+      collectingSince: '2026-08-10T00:00:00.000Z',
+    });
+    assert.match(line, /412 eligible sessions/);
+    assert.match(line, /18\.4%/);
+  });
+
+  check('a below-threshold rate produces a count and an explanation, never 0%', () => {
+    const line = conclusions.pulseConclusion({
+      eligibleSessions: { state: 'live', value: 6, sample: 6 },
+      pmcr: { state: 'insufficient_sample', sample: 6 },
+      collectingSince: '2026-08-10T00:00:00.000Z',
+    });
+    assert.match(line, /below the threshold/);
+    assert.equal(line.includes('0%'), false, 'an insufficient sample was rendered as a percentage');
+  });
+
+  check('no telemetry at all says so rather than reporting nothing', () => {
+    const line = conclusions.pulseConclusion({
+      eligibleSessions: { state: 'live', value: 0, sample: 0 },
+      pmcr: { state: 'insufficient_sample', sample: 0 },
+      collectingSince: null,
+    });
+    assert.match(line, /No telemetry has arrived yet/);
+  });
+
+  check('a missing Voyager emitter reads as an unfinished hand-off, not an unused feature', () => {
+    const line = conclusions.voyagerConclusion({
+      awaitingEmitter: true,
+      requests: { state: 'not_measurable' },
+      realAnswerRate: { state: 'not_measurable' },
+      realAnswers: { state: 'not_measurable' },
+      simulatedFallbacks: { state: 'not_measurable' },
+      integrityViolations: 0,
+    });
+    assert.match(line, /not an unused feature/);
+  });
+
+  check('a quota integrity failure outranks every other Voyager sentence', () => {
+    const line = conclusions.voyagerConclusion({
+      awaitingEmitter: false,
+      requests: { state: 'live', value: 100, sample: 100 },
+      realAnswerRate: { state: 'derived', value: 0.9, sample: 100 },
+      realAnswers: { state: 'live', value: 90, sample: 90 },
+      simulatedFallbacks: { state: 'live', value: 10, sample: 10 },
+      integrityViolations: 3,
+    });
+    assert.match(line, /Quota integrity failure/);
+    assert.equal(line.includes('90.0%'), false, 'a rate was published above a contract violation');
+  });
+
+  check('the market line never claims an upstream request count', () => {
+    const line = conclusions.marketConclusion({
+      quotesConfigured: true,
+      macroConfigured: true,
+      awaitingEmitter: false,
+      requests: { state: 'live', value: 40, sample: 40 },
+      providerErrors: { state: 'live', value: 2, sample: 2 },
+    });
+    assert.match(line, /40 resolutions/);
+    for (const forbidden of ['network request', 'provider request', 'upstream request']) {
+      assert.equal(line.includes(forbidden), false, `the conclusion says "${forbidden}"`);
+    }
+  });
+
+  check('Supercharts says intent is intent until the outcome emitter lands', () => {
+    const awaiting = conclusions.superchartsConclusion({
+      opens: 12,
+      sessionsWithStudy: 4,
+      paneActivations: 3,
+      awaitingCapabilityEmitter: true,
+      renderedStudies: 0,
+    });
+    assert.match(awaiting, /what people asked for/);
+
+    const landed = conclusions.superchartsConclusion({
+      opens: 12,
+      sessionsWithStudy: 4,
+      paneActivations: 3,
+      awaitingCapabilityEmitter: false,
+      renderedStudies: 2,
+    });
+    assert.match(landed, /recorded separately from intent/);
+  });
+
+  check('monetization never calls a paid row revenue', () => {
+    const line = conclusions.monetizationConclusion({
+      paidRecords: { state: 'live', value: 7, sample: 7 },
+      demoRecords: { state: 'live', value: 21, sample: 21 },
+      reconciled: { state: 'live', value: 0, sample: 0 },
+    });
+    assert.match(line, /confirmed revenue has no source/);
+    assert.match(line, /7 paid-status records/);
+  });
+
+  check('the coverage line distinguishes a bad number from no measurement', () => {
+    const line = conclusions.coverageConclusion([
+      { state: 'not_measurable', metrics: 3 },
+      { state: 'insufficient_sample', metrics: 5 },
+      { state: 'live', metrics: 9 },
+    ]);
+    assert.match(line, /3 not measurable/);
+    assert.match(line, /5 below sample threshold/);
+    assert.match(line, /None of these is a zero/);
+  });
+
+  check('a section with nothing to say says nothing', () => {
+    assert.equal(conclusions.coverageConclusion([{ state: 'live', metrics: 9 }]), null);
+    assert.equal(conclusions.journeyConclusion({ byLandingSurface: [], exclusions: {}, eligibleSessions: 0 }), null);
+  });
+
+  check('no conclusion speculates about a cause', () => {
+    /*
+     * The line this file is not allowed to cross. Every sentence restates a
+     * number; none of them explains one.
+     */
+    const lines = [
+      conclusions.pulseConclusion({
+        eligibleSessions: { state: 'live', value: 412, sample: 412 },
+        pmcr: { state: 'derived', value: 0.184, sample: 412 },
+        collectingSince: '2026-08-10T00:00:00.000Z',
+      }),
+      conclusions.voyagerConclusion({
+        awaitingEmitter: false,
+        requests: { state: 'live', value: 100, sample: 100 },
+        realAnswerRate: { state: 'derived', value: 0.72, sample: 100 },
+        realAnswers: { state: 'live', value: 72, sample: 72 },
+        simulatedFallbacks: { state: 'live', value: 28, sample: 28 },
+        integrityViolations: 0,
+      }),
+      conclusions.marketConclusion({
+        quotesConfigured: true,
+        macroConfigured: false,
+        awaitingEmitter: true,
+        requests: { state: 'not_measurable' },
+        providerErrors: { state: 'not_measurable' },
+      }),
+    ].join(' ');
+
+    for (const speculation of ['because', 'suggests', 'likely', 'probably', 'users love', 'improved', 'due to']) {
+      assert.equal(lines.toLowerCase().includes(speculation), false, `a conclusion says "${speculation}"`);
+    }
+  });
+
+  group('Presentation mode is a lens, not a second dashboard');
+
+  check('the shell toggles an attribute and never touches a value', () => {
+    const shell = readFileSync('src/components/admin-metrics/ObservatoryShell.tsx', 'utf8');
+    assert.match(shell, /data-mode=\{presenting \? 'presentation' : 'detail'\}/);
+    // A lens with no access to the numbers cannot flatter them.
+    assert.equal(/metric/i.test(shell.replace(/\/\*[\s\S]*?\*\//g, '')), false, 'the shell reads metric values');
+  });
+
+  check('presentation mode is keyboard-exitable', () => {
+    const shell = readFileSync('src/components/admin-metrics/ObservatoryShell.tsx', 'utf8');
+    assert.match(shell, /event\.key === 'Escape'/);
+    assert.match(shell, /aria-pressed=\{presenting\}/);
+  });
+
+  check('presentation mode hides detail without hiding a limitation', () => {
+    const css = readFileSync('src/components/admin-metrics/Observatory.module.css', 'utf8');
+    assert.match(css, /\.shell\[data-mode='presentation'\] \.detail \{\s*display: none/);
+    // The reason a number is absent must survive at full size.
+    assert.match(css, /\.shell\[data-mode='presentation'\] \.cardAbsent/);
+    assert.equal(
+      /\.shell\[data-mode='presentation'\] \.cardAbsent \{\s*display: none/.test(css),
+      false,
+      'presentation mode hides the reason a metric is missing'
+    );
+  });
+
+  check('there is one dashboard, not two', () => {
+    // A presentation variant that re-queried would eventually disagree with the
+    // detail view about the same number.
+    const page = readFileSync('src/app/[locale]/admin_admin_metrics/page.tsx', 'utf8');
+    assert.equal((page.match(/await Promise\.all\(/g) ?? []).length, 1, 'the page fetches more than once');
+    assert.match(page, /<ObservatoryShell/);
+  });
+
+  group('The page tells a product story before a database story');
+
+  check('sections appear in the agreed order', () => {
+    const page = readFileSync('src/app/[locale]/admin_admin_metrics/page.tsx', 'utf8');
+    const order = ['"pulse"', '"journeys"', '"surfaces"', '"voyager"', '"supercharts"', '"market-data"', '"reliability"', '"monetization"', '"coverage"'];
+    let cursor = 0;
+    for (const id of order) {
+      const at = page.indexOf(`id=${id}`, cursor);
+      assert.ok(at > -1, `section ${id} is missing`);
+      cursor = at;
+    }
+  });
+
+  check('the headline row carries no metric whose source is unconnected', () => {
+    const page = readFileSync('src/app/[locale]/admin_admin_metrics/page.tsx', 'utf8');
+    const headline = page.slice(page.indexOf('styles.headline'), page.indexOf('</Section>'));
+    assert.equal(headline.includes('confirmedRevenue'), false, 'revenue reached the headline without a source');
+  });
+
+  check('every rate on the page names its denominator', () => {
+    const page = readFileSync('src/app/[locale]/admin_admin_metrics/page.tsx', 'utf8');
+    for (const [start, end] of [...page.matchAll(/<MetricCard[\s\S]*?\/>/g)].map((m) => [m.index, m.index + m[0].length])) {
+      const card = page.slice(start, end);
+      if (!card.includes('format="percent"')) continue;
+      assert.match(card, /\bof=/, `a percentage card has no denominator: ${card.slice(0, 80)}`);
+    }
+  });
+
+  check('no decorative period-over-period delta was invented', () => {
+    const page = readFileSync('src/app/[locale]/admin_admin_metrics/page.tsx', 'utf8');
+    const shell = readFileSync('src/components/admin-metrics/ObservatoryShell.tsx', 'utf8');
+    assert.match(shell, /no previous-period comparison exists/);
+    for (const fake of ['vs previous', 'vs last', '+12%', 'trend up', 'trendUp']) {
+      assert.equal(page.includes(fake), false, `the page shows "${fake}"`);
+    }
+  });
+
+  check('the obsolete five-plan vocabulary appears nowhere', () => {
+    /*
+     * The subscriptions lineup is Free / Plus / Pro / Private now, and the
+     * Observatory reads entitlements from the server model at runtime rather
+     * than naming any of them.
+     */
+    for (const path of [
+      'src/app/[locale]/admin_admin_metrics/page.tsx',
+      'src/components/admin-metrics/ReliabilityPanel.tsx',
+      'src/components/admin-metrics/VoyagerPanel.tsx',
+      'src/lib/admin-metrics/conclusions.ts',
+    ]) {
+      const source = readFileSync(path, 'utf8');
+      for (const stale of ['Essential', 'Ultimate', 'Voyager Private plan']) {
+        assert.equal(source.includes(stale), false, `${path} mentions ${stale}`);
+      }
+    }
+  });
+
+  check('cards state their meaning in words, not by colour alone', () => {
+    const card = readFileSync('src/components/admin-metrics/MetricCard.tsx', 'utf8');
+    assert.match(card, /metric\.state\.replace/, 'the state is not spelled out on the card');
+    const css = readFileSync('src/components/admin-metrics/Observatory.module.css', 'utf8');
+    // Absent states also differ by border style, so colour is never the only cue.
+    assert.match(css, /border-style: dashed/);
+  });
+
+  check('the Voyager scope limitation survives into presentation mode', () => {
+    const panel = readFileSync('src/components/admin-metrics/VoyagerPanel.tsx', 'utf8');
+    assert.match(panel, /voyager\/research/);
+    // It is a note, and notes are quieted rather than hidden.
+    const css = readFileSync('src/components/admin-metrics/Observatory.module.css', 'utf8');
+    assert.equal(
+      /\.shell\[data-mode='presentation'\] \.note \{[^}]*display: none/.test(css),
+      false,
+      'presentation mode hides section notes'
     );
   });
 

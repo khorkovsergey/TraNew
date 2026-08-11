@@ -18,9 +18,7 @@ const ms = (value: number | null) => (value === null ? '—' : `${(value / 1000)
  */
 export function VoyagerPanel({ report }: { report: VoyagerReport }) {
   return (
-    <section>
-      <h2 className={styles.sectionTitle}>Voyager — what the server actually did</h2>
-
+    <>
       {report.awaitingEmitter ? (
         <p className={styles.notice}>
           <strong>Contract ready, emitter awaited.</strong> The two server events are declared,
@@ -32,7 +30,7 @@ export function VoyagerPanel({ report }: { report: VoyagerReport }) {
         </p>
       ) : null}
 
-      <p className={styles.subtitle}>
+      <p className={styles.note}>
         <strong>Scope.</strong> Server requests counts questions that reach{' '}
         <code>POST /api/voyager</code>. The <code>/voyager/research</code> workspace answers some
         scripted scenarios locally and those never reach the route, so this is not a count of every
@@ -53,7 +51,7 @@ export function VoyagerPanel({ report }: { report: VoyagerReport }) {
         <MetricCard label="Server failures" metric={report.headline.serverFailures} />
       </div>
 
-      <h3 className={styles.sectionTitle}>Quota and latency</h3>
+      <h3 className={styles.subHeading}>Quota and latency</h3>
       <div className={styles.grid}>
         <MetricCard label="Charged" metric={report.quota.charged} />
         <MetricCard label="Released" metric={report.quota.released} />
@@ -111,9 +109,9 @@ export function VoyagerPanel({ report }: { report: VoyagerReport }) {
         )}
       </p>
 
-      <h3 className={styles.sectionTitle}>Tools</h3>
+      <h3 className={styles.subHeading}>Tools</h3>
       {report.tools.executions === 0 ? (
-        <p className={styles.subtitle}>
+        <p className={styles.note}>
           No tool execution recorded{report.awaitingEmitter ? ' — the emitter has not landed' : ' in this window'}.
         </p>
       ) : (
@@ -155,24 +153,24 @@ export function VoyagerPanel({ report }: { report: VoyagerReport }) {
             </tbody>
           </table>
           {report.tools.topFailureCodes.length ? (
-            <p className={styles.subtitle}>
+            <p className={styles.note}>
               Failure codes: {report.tools.topFailureCodes.map((row) => `${row.code} (${row.count})`).join(' · ')}
             </p>
           ) : null}
         </>
       )}
 
-      <h3 className={styles.sectionTitle}>Capability mix</h3>
+      <h3 className={styles.subHeading}>Capability mix</h3>
       <div className={styles.grid}>
         <MetricCard label="Answers with a chart" metric={report.capability.answersWithChart} />
         <MetricCard label="Answers with a study" metric={report.capability.answersWithStudy} />
         <MetricCard label="Answers offering actions" metric={report.capability.answersWithActions} />
         <MetricCard label="Tool-assisted answers" metric={report.capability.toolAssistedAnswers} />
       </div>
-      <p className={styles.subtitle}>
+      <p className={styles.note}>
         A mix, not a fulfilment rate. Not every question asks for a chart, so this says how often
         Voyager draws — not how often it succeeds at drawing.
       </p>
-    </section>
+    </>
   );
 }

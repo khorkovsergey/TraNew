@@ -253,3 +253,263 @@
 .funnel {
   margin-top: 12px;
 }
+
+/* ========================================================== Phase 6 — the shell
+ *
+ * Presentation mode is one attribute on the wrapper and a handful of rules
+ * below. It changes emphasis and nothing else: it has no access to a value, so
+ * it cannot make a bad number look good or an absent one look present.
+ */
+
+.shell {
+  max-width: var(--tn-page-max);
+  margin: 0 auto;
+  padding: 24px var(--tn-page-pad) 96px;
+  color: var(--tn-text);
+}
+
+.topBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--tn-border-hairline);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rangeGroup {
+  display: flex;
+  border: 1px solid var(--tn-border-control);
+  border-radius: var(--tn-radius-pill-sm);
+  overflow: hidden;
+}
+
+.rangeOption {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--tn-text-muted);
+  text-decoration: none;
+  border-right: 1px solid var(--tn-border-inner);
+}
+
+.rangeOption:last-child {
+  border-right: 0;
+}
+
+/* Selection is a background *and* a weight, never colour alone. */
+.rangeOption[aria-current='page'] {
+  background: var(--tn-chip-bg);
+  color: var(--tn-text);
+  font-weight: 600;
+}
+
+.rangeOption:focus-visible,
+.modeButton:focus-visible,
+.detail > summary:focus-visible,
+.definition > summary:focus-visible {
+  outline: 2px solid var(--tn-border-focus);
+  outline-offset: 2px;
+}
+
+.modeButton {
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--tn-cta-text);
+  background: var(--tn-cta);
+  border: 0;
+  border-radius: var(--tn-radius-pill-sm);
+  cursor: pointer;
+}
+
+.modeHint {
+  border: 1px solid var(--tn-border-inner);
+  border-radius: var(--tn-radius-card);
+  background: var(--tn-surface-inner);
+  color: var(--tn-text-secondary);
+  padding: 8px 14px;
+  font-size: 13px;
+  margin: 0 0 20px;
+}
+
+.modeHint kbd {
+  font-family: ui-monospace, monospace;
+  border: 1px solid var(--tn-border-inner);
+  border-radius: var(--tn-radius-chip-sm);
+  padding: 0 4px;
+}
+
+/* ----------------------------------------------------------------- Sections */
+
+.section {
+  margin-bottom: 40px;
+}
+
+.sectionHead {
+  margin-bottom: 14px;
+}
+
+.sectionHeading {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+
+/* The answer, directly under the question. Deliberately the widest thing in
+   the section so it is read before the numbers. */
+.conclusion {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--tn-text-body);
+  max-width: 72ch;
+}
+
+.detail {
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+.detail > summary {
+  cursor: pointer;
+  color: var(--tn-text-secondary);
+  padding: 4px 0;
+}
+
+.detailBody {
+  padding-top: 12px;
+}
+
+/* A table is the one thing that may scroll sideways, and only inside itself. */
+.scroller {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* ------------------------------------------------------------- Headline grid */
+
+.headline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.cardEmphasis .cardValue {
+  font-size: 34px;
+}
+
+.cardDenominator {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--tn-text-muted);
+  margin-left: 6px;
+}
+
+/* --------------------------------------------------------- Presentation mode */
+
+/* Detail collapses. It is still there, still one click away. */
+.shell[data-mode='presentation'] .detail {
+  display: none;
+}
+
+/* Definitions stay reachable but stop competing with the number. */
+.shell[data-mode='presentation'] .definition {
+  display: none;
+}
+
+/* Implementation metadata is quieted rather than removed: the state is the
+   part that must survive, so the source string goes and the state stays. */
+.shell[data-mode='presentation'] .source {
+  display: none;
+}
+
+.shell[data-mode='presentation'] .headline {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.shell[data-mode='presentation'] .cardValue {
+  font-size: 40px;
+}
+
+.shell[data-mode='presentation'] .cardEmphasis .cardValue {
+  font-size: 52px;
+}
+
+.shell[data-mode='presentation'] .conclusion {
+  font-size: 16px;
+  max-width: 90ch;
+}
+
+.shell[data-mode='presentation'] .sectionHeading {
+  font-size: 22px;
+}
+
+.shell[data-mode='presentation'] .section {
+  margin-bottom: 56px;
+}
+
+/*
+ * What presentation mode must never do. An absent metric keeps its dashed
+ * border and its sentence at full size — compressing the reason a number is
+ * missing would turn a measurement gap into an empty card, which is the one
+ * thing a presenter must not be able to do by accident.
+ */
+.shell[data-mode='presentation'] .cardAbsent {
+  font-size: 14px;
+}
+
+@media (max-width: 720px) {
+  .topBar {
+    align-items: flex-start;
+  }
+
+  .controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Secondary prose inside a section or a detail drawer. */
+.note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tn-text-muted);
+  max-width: 78ch;
+}
+
+.tableCaption {
+  caption-side: top;
+  text-align: left;
+  font-size: 12px;
+  color: var(--tn-text-muted);
+  padding-bottom: 8px;
+}
+
+/* Presentation mode quiets the prose without removing a limitation. */
+.shell[data-mode='presentation'] .note {
+  font-size: 14px;
+  color: var(--tn-text-secondary);
+}
+
+.subHeading {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 22px 0 10px;
+  color: var(--tn-text-secondary);
+}
+
+.shell[data-mode='presentation'] .subHeading {
+  font-size: 16px;
+}
