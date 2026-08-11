@@ -1,4 +1,6 @@
 import 'server-only';
+import { freshnessOf, type DataKind } from '@/lib/admin-metrics/freshness';
+import { trackServerEvent } from '@/lib/analytics/server';
 
 /**
  * Market and macro data.
@@ -78,6 +80,60 @@ export function marketDataStatus() {
   return { quotes: quotesConfigured(), macro: macroConfigured() };
 }
 
+/* -------------------------------------------------------------- Observation */
+
+/**
+ * Every function below returns `null` when anything goes wrong, and a `null`
+ * that means "no key" is indistinguishable from one that means "the vendor is
+ * down" the moment it leaves the function. This says which it was, and nothing
+ * else — see `docs/admin-metrics/market-data-instrumentation-request.md`.
+ *
+ * Two things it deliberately does not claim:
+ *
+ * It is **not** a count of upstream requests. The fetches below go through
+ * `next: { revalidate }`, and cache resolution is transparent at this layer, so
+ * a success may have been served from cache and nothing here can tell. For the
+ * same reason `durationMs` is this call site's resolution latency, not the
+ * provider's.
+ *
+ * It never carries the subject. No symbol, no series id, no query, no URL, no
+ * response body, no vendor message — the registry declares no property that
+ * could hold one, so a slip is refused rather than written.
+ */
+type MarketDataOutcome = 'success' | 'not_configured' | 'no_data' | 'provider_error';
+
+function emitMarketData(fields: {
+  source: 'twelve_data' | 'fred';
+  kind: DataKind;
+  outcome: MarketDataOutcome;
+  /** From `performance.now()`, so a clock adjustment cannot make this negative. */
+  startedAt: number;
+  /** The observation the product actually got, or null when there was none. */
+  asOf?: Date | null;
+  delayed?: boolean;
+  hasVolume?: boolean;
+}): void {
+  trackServerEvent({
+    name: 'market_data_request_completed',
+    properties: {
+      source: fields.source,
+      kind: fields.kind,
+      outcome: fields.outcome,
+      delayed: fields.delayed ?? false,
+      durationMs: Math.round(performance.now() - fields.startedAt),
+      hasVolume: fields.hasVolume ?? false,
+      /*
+       * Never computed here. "Is Friday's close stale on Sunday" is source-aware
+       * and lives in one place; a second copy would drift the week somebody
+       * fixed one of them. A resolution with no observation passes null and is
+       * reported `unknown` rather than being given an invented `asOf`.
+       */
+      freshnessBucket: freshnessOf(fields.kind, fields.asOf ?? null, new Date()),
+    },
+    surface: 'markets',
+  });
+}
+
 /**
  * Fetches a quote, or null.
  *
@@ -86,7 +142,21 @@ export function marketDataStatus() {
  * keeps the page working. Throwing would take a whole page down over a price.
  */
 export async function getQuote(symbol: string): Promise<Quote | null> {
-  if (!quotesConfigured()) return null;
+  const startedAt = performance.now();
+  const emit = (outcome: MarketDataOutcome, quote?: Quote) =>
+    emitMarketData({
+      source: 'twelve_data',
+      kind: 'quote',
+      outcome,
+      startedAt,
+      asOf: quote ? new Date(quote.asOf) : null,
+      delayed: quote?.delayed ?? false,
+    });
+
+  if (!quotesConfigured()) {
+    emit('not_configured');
+    return null;
+  }
 
   try {
     const url = new URL(`${TWELVE_DATA}/quote`);
@@ -94,17 +164,23 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
     url.searchParams.set('apikey', process.env.TWELVE_DATA_API_KEY!);
 
     const response = await fetch(url, { next: { revalidate: QUOTE_TTL } });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      emit('provider_error');
+      return null;
+    }
 
     const data = await response.json();
     // The vendor reports rate limits and unknown symbols as 200 with a status
     // field, so the HTTP code alone does not tell you whether this worked.
+    // Which of the two it was would mean reading `data.message`, so the event
+    // says only that nothing usable came back.
     if (data?.status === 'error' || !data?.close) {
       console.warn(`[market] quote for ${symbol} unavailable: ${data?.message ?? 'no data'}`);
+      emit('no_data');
       return null;
     }
 
-    return {
+    const quote: Quote = {
       symbol: data.symbol ?? symbol,
       name: data.name ?? symbol,
       price: Number(data.close),
@@ -115,8 +191,12 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
       asOf: data.datetime ?? new Date().toISOString().slice(0, 10),
       delayed: true,
     };
+
+    emit('success', quote);
+    return quote;
   } catch (error) {
     console.warn(`[market] quote for ${symbol} failed`, error);
+    emit('provider_error');
     return null;
   }
 }
@@ -132,7 +212,21 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
  * corrected here rather than in each caller.
  */
 export async function getSeries(symbol: string, outputsize = 260): Promise<Series | null> {
-  if (!quotesConfigured()) return null;
+  const startedAt = performance.now();
+  const emit = (outcome: MarketDataOutcome, series?: Series) =>
+    emitMarketData({
+      source: 'twelve_data',
+      kind: 'series',
+      outcome,
+      startedAt,
+      asOf: series ? new Date(series.asOf) : null,
+      delayed: series?.delayed ?? false,
+    });
+
+  if (!quotesConfigured()) {
+    emit('not_configured');
+    return null;
+  }
 
   try {
     const url = new URL(`${TWELVE_DATA}/time_series`);
@@ -142,13 +236,17 @@ export async function getSeries(symbol: string, outputsize = 260): Promise<Serie
     url.searchParams.set('apikey', process.env.TWELVE_DATA_API_KEY!);
 
     const response = await fetch(url, { next: { revalidate: SERIES_TTL } });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      emit('provider_error');
+      return null;
+    }
 
     const data = await response.json();
     // Rate limits and unknown symbols come back as 200 with a status field, so
     // the HTTP code alone does not say whether this worked.
     if (data?.status === 'error' || !Array.isArray(data?.values)) {
       console.warn(`[market] series for ${symbol} unavailable: ${data?.message ?? 'no data'}`);
+      emit('no_data');
       return null;
     }
 
@@ -165,9 +263,14 @@ export async function getSeries(symbol: string, outputsize = 260): Promise<Serie
 
     // A handful of bars is worse than none: every study would be null and the
     // chart would claim to be real while showing almost nothing.
-    if (closes.length < 30) return null;
+    // The response arrived and parsed, but nothing usable came out of it, which
+    // is the same answer to the caller and the same bucket as `status: error`.
+    if (closes.length < 30) {
+      emit('no_data');
+      return null;
+    }
 
-    return {
+    const series: Series = {
       symbol: data.meta?.symbol ?? symbol,
       interval: '1day',
       closes,
@@ -175,8 +278,12 @@ export async function getSeries(symbol: string, outputsize = 260): Promise<Serie
       asOf: dates[dates.length - 1],
       delayed: true,
     };
+
+    emit('success', series);
+    return series;
   } catch (error) {
     console.warn(`[market] series for ${symbol} failed`, error);
+    emit('provider_error');
     return null;
   }
 }
@@ -188,7 +295,53 @@ export async function getSeries(symbol: string, outputsize = 260): Promise<Serie
  * with six tickers from using most of a minute's allowance.
  */
 export async function getQuotes(symbols: string[]): Promise<Record<string, Quote>> {
-  if (!quotesConfigured() || symbols.length === 0) return {};
+  const startedAt = performance.now();
+
+  /*
+   * Once per call, never once per symbol. The batch is the operation being
+   * observed; a row per instrument would multiply the count by however many
+   * tickers a page happened to render and turn one provider call into six.
+   *
+   * The batch is only as fresh as its stalest member, so freshness is taken
+   * from the oldest observation in the map rather than the newest — one
+   * instrument lagging is a thing worth seeing, not worth hiding behind five
+   * current ones. Nothing about which instrument it was leaves this function.
+   */
+  const emit = (outcome: MarketDataOutcome, quotes?: Record<string, Quote>) => {
+    const values = Object.values(quotes ?? {});
+    const oldest = values.reduce<number | null>((worst, quote) => {
+      const at = new Date(quote.asOf).getTime();
+      if (Number.isNaN(at)) return worst;
+      return worst === null || at < worst ? at : worst;
+    }, null);
+
+    emitMarketData({
+      source: 'twelve_data',
+      kind: 'quotes_batch',
+      outcome,
+      startedAt,
+      asOf: oldest === null ? null : new Date(oldest),
+      delayed: values.some((quote) => quote.delayed),
+    });
+  };
+
+  if (!quotesConfigured()) {
+    emit('not_configured');
+    return {};
+  }
+
+  /*
+   * Split out of the guard above, which read `!quotesConfigured() || symbols
+   * .length === 0`, so the two can be told apart — same return, same order, no
+   * change to what a caller sees.
+   *
+   * Nothing is emitted for an empty list, and that is the one place this file
+   * does not emit per invocation. No provider resolution happened: it is not
+   * `no_data`, which the Observatory reads as the vendor returning nothing
+   * usable, and it is certainly not `not_configured`. A silent row here would
+   * be a fault on a dashboard where nobody had asked for anything.
+   */
+  if (symbols.length === 0) return {};
 
   try {
     const url = new URL(`${TWELVE_DATA}/quote`);
@@ -196,11 +349,15 @@ export async function getQuotes(symbols: string[]): Promise<Record<string, Quote
     url.searchParams.set('apikey', process.env.TWELVE_DATA_API_KEY!);
 
     const response = await fetch(url, { next: { revalidate: QUOTE_TTL } });
-    if (!response.ok) return {};
+    if (!response.ok) {
+      emit('provider_error');
+      return {};
+    }
 
     const data = await response.json();
     if (data?.status === 'error') {
       console.warn(`[market] batch quote unavailable: ${data.message}`);
+      emit('no_data');
       return {};
     }
 
@@ -223,16 +380,45 @@ export async function getQuotes(symbols: string[]): Promise<Record<string, Quote
       };
     }
 
+    // Success even when the map came back partly empty: the call resolved and
+    // the product got the answer the vendor gave. Individual symbols the vendor
+    // skipped are not separable here without naming them.
+    emit('success', quotes);
     return quotes;
   } catch (error) {
     console.warn('[market] batch quote failed', error);
+    emit('provider_error');
     return {};
   }
 }
 
 /** A FRED series with its two most recent observations, so a change can be shown. */
 export async function getMacroSeries(seriesId: string): Promise<MacroSeries | null> {
-  if (!macroConfigured()) return null;
+  const startedAt = performance.now();
+
+  /*
+   * `seriesId` is as much a subject as a ticker is, and never travels — the
+   * argument is read by the request below and by nothing here.
+   *
+   * The observation date is passed rather than `asOf`, which carries FRED's
+   * `last_updated` publication stamp in a format that does not always parse.
+   * The helper answers `not_applicable` for macro either way; a date it cannot
+   * read would have downgraded that to `unknown` and made a monthly series look
+   * unmeasured rather than deliberately unjudged.
+   */
+  const emit = (outcome: MarketDataOutcome, observedAt?: string) =>
+    emitMarketData({
+      source: 'fred',
+      kind: 'macro',
+      outcome,
+      startedAt,
+      asOf: observedAt ? new Date(observedAt) : null,
+    });
+
+  if (!macroConfigured()) {
+    emit('not_configured');
+    return null;
+  }
 
   try {
     const key = process.env.FRED_API_KEY!;
@@ -258,7 +444,10 @@ export async function getMacroSeries(seriesId: string): Promise<MacroSeries | nu
       fetch(metaUrl, { next: { revalidate: MACRO_TTL } }),
     ]);
 
-    if (!observationsResponse.ok || !metaResponse.ok) return null;
+    if (!observationsResponse.ok || !metaResponse.ok) {
+      emit('provider_error');
+      return null;
+    }
 
     const observations = await observationsResponse.json();
     const meta = await metaResponse.json();
@@ -266,7 +455,10 @@ export async function getMacroSeries(seriesId: string): Promise<MacroSeries | nu
     const rows = (observations?.observations ?? []).filter(
       (row: { value: string }) => row.value !== '.'
     );
-    if (rows.length === 0) return null;
+    if (rows.length === 0) {
+      emit('no_data');
+      return null;
+    }
 
     const series = meta?.seriess?.[0];
 
@@ -295,7 +487,7 @@ export async function getMacroSeries(seriesId: string): Promise<MacroSeries | nu
     // Within 45 days of the target, or the comparison is not a year-over-year one.
     if (bestGap > 45 * 86_400_000) yearAgo = null;
 
-    return {
+    const macro: MacroSeries = {
       seriesId,
       title: series?.title ?? seriesId,
       latest: { date: rows[0].date, value: latest },
@@ -305,8 +497,12 @@ export async function getMacroSeries(seriesId: string): Promise<MacroSeries | nu
       units: series?.units_short ?? '',
       asOf: series?.last_updated ?? rows[0].date,
     };
+
+    emit('success', macro.latest.date);
+    return macro;
   } catch (error) {
     console.warn(`[market] macro series ${seriesId} failed`, error);
+    emit('provider_error');
     return null;
   }
 }
@@ -334,7 +530,32 @@ export type DailyBar = {
  * chart that admits it has no data.
  */
 export async function getBars(symbol: string, outputsize = 260): Promise<DailyBar[] | null> {
-  if (!quotesConfigured()) return null;
+  const startedAt = performance.now();
+
+  /*
+   * `hasVolume` answers whether the chart could draw a volume pane — a real
+   * product question, and one that needs no symbol to answer. `false` on a
+   * failure means "no volume was returned", not "the request failed"; the
+   * outcome says that.
+   */
+  const emit = (outcome: MarketDataOutcome, bars?: DailyBar[]) => {
+    const last = bars?.[bars.length - 1];
+    emitMarketData({
+      source: 'twelve_data',
+      kind: 'bars',
+      outcome,
+      startedAt,
+      asOf: last ? new Date(last.time * 1000) : null,
+      // Daily candles on the free tier carry the same delay the quotes do.
+      delayed: Boolean(bars),
+      hasVolume: bars?.some((bar) => typeof bar.volume === 'number') ?? false,
+    });
+  };
+
+  if (!quotesConfigured()) {
+    emit('not_configured');
+    return null;
+  }
 
   try {
     const url = new URL(`${TWELVE_DATA}/time_series`);
@@ -344,13 +565,17 @@ export async function getBars(symbol: string, outputsize = 260): Promise<DailyBa
     url.searchParams.set('apikey', process.env.TWELVE_DATA_API_KEY!);
 
     const response = await fetch(url, { next: { revalidate: SERIES_TTL } });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      emit('provider_error');
+      return null;
+    }
 
     const data = await response.json();
     // Rate limits and unknown symbols arrive as 200 with a status field, so the
     // HTTP code alone does not say whether this worked.
     if (data?.status === 'error' || !Array.isArray(data?.values)) {
       console.warn(`[market] bars for ${symbol} unavailable: ${data?.message ?? 'no data'}`);
+      emit('no_data');
       return null;
     }
 
@@ -375,9 +600,19 @@ export async function getBars(symbol: string, outputsize = 260): Promise<DailyBa
       });
     }
 
-    return bars.length >= 30 ? bars : null;
+    // Same reasoning as `getSeries`: the response parsed but produced nothing a
+    // chart could honestly draw, which is `no_data` rather than a success that
+    // happens to return null.
+    if (bars.length < 30) {
+      emit('no_data');
+      return null;
+    }
+
+    emit('success', bars);
+    return bars;
   } catch (error) {
     console.warn('[market] bars request failed', error);
+    emit('provider_error');
     return null;
   }
 }
