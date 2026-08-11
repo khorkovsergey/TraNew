@@ -5,7 +5,7 @@ import { DICTIONARY_BY_ID, METRIC_DICTIONARY_ALL } from '@/lib/admin-metrics/dic
 import type { MetricValue } from '@/lib/analytics/states';
 import { Drawer, DrawerBlock } from './Drawer';
 import { STATE_LABEL, STATE_MEANING, ago, display, formatCount, humanize, utcClock } from './format';
-import { StateBadge } from './primitives';
+import { StateBadge, StatusBadge } from './primitives';
 import { buildProductAreas } from './sections/productAreaModel';
 import styles from './Observatory.module.css';
 import type { DrawerRequest, ObservatoryData } from './types';
@@ -302,10 +302,17 @@ export function SourceDrawer({ data, onClose }: { data: ObservatoryData; onClose
               </span>
               <span className={styles.kvValue}>
                 {ago(source.lastSeen, data.queriedAtMs)}{' '}
-                <StateBadge
-                  state={source.stale ? 'stale' : source.lastSeen ? 'live' : 'insufficient_sample'}
-                  small
-                />
+                {/* `stale` only where the freshness budget actually overran.
+                    Never-seen is operational status, not a small sample. */}
+                {source.stale ? (
+                  <StateBadge state="stale" small />
+                ) : (
+                  <StatusBadge
+                    tone={source.lastSeen ? 'positive' : 'quiet'}
+                    small
+                    label={source.lastSeen ? 'Seen' : 'Never seen'}
+                  />
+                )}
               </span>
             </div>
           ))}
@@ -480,7 +487,18 @@ export function AreaDrawer({
               <div key={event.event} className={styles.kv}>
                 <span className={`${styles.kvLabel} ${styles.mono}`}>{event.event}</span>
                 <span className={styles.kvValue}>
-                  {formatCount(event.count)} <StateBadge state={event.status === 'observed' ? 'live' : event.status === 'unexposed' ? 'feature_disabled' : 'instrumented_going_forward'} small />
+                  {formatCount(event.count)}{' '}
+                  {/* Coverage status, matching section 13 — a tone, except
+                      where a flag genuinely makes the event unreachable. */}
+                  {event.status === 'unexposed' ? (
+                    <StateBadge state="feature_disabled" small />
+                  ) : (
+                    <StatusBadge
+                      tone={event.status === 'observed' ? 'positive' : 'caution'}
+                      small
+                      label={humanize(event.status)}
+                    />
+                  )}
                 </span>
               </div>
             ))}

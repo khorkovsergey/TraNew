@@ -110,8 +110,8 @@ export function ProductAreas({
                   <div key={stat.label} className={styles.areaStat}>
                     <span className={styles.areaStatLabel}>{stat.label}</span>
                     <span
-                      className={`${styles.areaStatValue} ${styles.stateText}`}
-                      data-state={stat.state}
+                      className={`${styles.areaStatValue} ${styles.toneText}`}
+                      data-tone={stat.tone}
                     >
                       {stat.value}
                     </span>

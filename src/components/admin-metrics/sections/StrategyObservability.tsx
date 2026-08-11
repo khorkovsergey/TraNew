@@ -1,6 +1,6 @@
-import { type MetricState, type MetricValue } from '@/lib/analytics/states';
+import { type MetricValue } from '@/lib/analytics/states';
 import { display, type ValueFormat } from '../format';
-import { Panel, Section, StateBadge, Scroller } from '../primitives';
+import { Panel, Scroller, Section, StatusBadge, type Tone } from '../primitives';
 import styles from '../Observatory.module.css';
 import type { ObservatoryData } from '../types';
 
@@ -33,24 +33,47 @@ type Row = {
   format?: ValueFormat;
 };
 
-/** The instrumentation verdict for a row, from the real coverage report. */
+/**
+ * The instrumentation verdict for a row, from the real coverage report.
+ *
+ * A coverage ratio, so a tone rather than a `MetricState`. The provenance of
+ * the number itself is in the Current signal column beside it, which renders
+ * the real `MetricValue` and its canonical state — so an unreachable surface
+ * still reads "Not exposed" there, from the metric rather than from a colour
+ * chosen here.
+ */
 function instrumentation(
   data: ObservatoryData,
   surfaces: readonly string[]
-): { label: string; state: MetricState } {
+): { label: string; tone: Tone; title: string } {
   const rows = data.coverage.rows.filter(
     (row) => surfaces.includes(row.surface) && row.lifecycle === 'current'
   );
 
-  if (rows.length === 0) return { label: 'No events declared', state: 'not_measurable' };
+  if (rows.length === 0) {
+    return {
+      label: 'None declared',
+      tone: 'quiet',
+      title: 'No behavioural event is declared for this surface',
+    };
+  }
 
   const observed = rows.filter((row) => row.status === 'observed').length;
   const unexposed = rows.filter((row) => row.status === 'unexposed').length;
 
-  if (unexposed === rows.length) return { label: `${rows.length} unreachable`, state: 'feature_disabled' };
-  if (observed === 0) return { label: `0 / ${rows.length} seen`, state: 'instrumented_going_forward' };
-  if (observed < rows.length) return { label: `${observed} / ${rows.length} seen`, state: 'derived' };
-  return { label: `${observed} / ${rows.length} seen`, state: 'live' };
+  if (unexposed === rows.length) {
+    return {
+      label: `${rows.length} unreachable`,
+      tone: 'negative',
+      title: 'Every declared event is behind a feature flag that is off',
+    };
+  }
+
+  return {
+    label: `${observed} / ${rows.length} seen`,
+    tone: observed === rows.length ? 'positive' : observed > 0 ? 'info' : 'caution',
+    title: 'Declared current events for this surface, and how many have arrived',
+  };
 }
 
 function rowsFor(data: ObservatoryData): Row[] {
@@ -214,7 +237,7 @@ export function StrategyObservability({ data }: { data: ObservatoryData }) {
                     </th>
                     <td>{row.surface}</td>
                     <td>
-                      <StateBadge state={status.state} small label={status.label} />
+                      <StatusBadge tone={status.tone} small label={status.label} title={status.title} />
                     </td>
                     <td className={styles.strong} style={{ fontWeight: 500 }}>
                       {row.metric}

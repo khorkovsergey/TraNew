@@ -48,8 +48,8 @@ function Path({
           return (
             <div
               key={hop.label}
-              className={`${styles.hop} ${reached ? styles.stateText : styles.hopEmpty}`}
-              data-state={reached ? 'derived' : 'insufficient_sample'}
+              className={`${styles.hop} ${reached ? styles.toneFill : styles.hopEmpty}`}
+              data-tone={reached ? 'info' : undefined}
               style={{ flex: `0 1 ${width}%`, minWidth: 44 }}
               title={`${hop.label} — ${formatCount(hop.value)}${
                 index > 0 && base > 0 ? ` · ${share(hop.value, base)} of the first hop` : ''
@@ -141,8 +141,9 @@ export function ContinuationJourneys({ data }: { data: ObservatoryData }) {
                           <CellBar value={row.continued} total={row.sessions} />
                         )}
                         <span
-                          className={`${styles.barValue} ${styles.stateText}`}
-                          data-state={row.rate === null ? 'insufficient_sample' : 'derived'}
+                          className={`${styles.barValue} ${row.rate === null ? styles.stateText : styles.toneText}`}
+                          data-state={row.rate === null ? 'insufficient_sample' : undefined}
+                          data-tone={row.rate === null ? undefined : 'info'}
                         >
                           {row.rate === null ? 'low n' : share(row.continued, row.sessions)}
                         </span>
@@ -223,8 +224,8 @@ export function ContinuationJourneys({ data }: { data: ObservatoryData }) {
                       </div>
                     </div>
                     <span
-                      className={`${styles.rankValue} ${styles.stateText}`}
-                      data-state="derived"
+                      className={`${styles.rankValue} ${styles.toneText}`}
+                      data-tone="caution"
                     >
                       {share(row.sessions - row.continued, row.sessions)}
                     </span>
@@ -239,17 +240,17 @@ export function ContinuationJourneys({ data }: { data: ObservatoryData }) {
             <div>
               {(
                 [
-                  ['Stayed in the portal', split.internalOnly, 'derived'],
-                  ['Continued outward only', split.externalOnly, 'external'],
-                  ['Both', split.both, 'derived'],
-                  ['Neither', split.neither, 'insufficient_sample'],
+                  ['Stayed in the portal', split.internalOnly, 'positive'],
+                  ['Continued outward only', split.externalOnly, 'info'],
+                  ['Both', split.both, 'neutral'],
+                  ['Neither', split.neither, 'quiet'],
                 ] as const
-              ).map(([label, value, state]) => (
+              ).map(([label, value, tone]) => (
                 <div key={label} className={styles.kv}>
                   <span className={styles.kvLabel}>{label}</span>
                   <span className={styles.kvValue}>
                     <span className={styles.mono}>{formatCount(value)}</span>{' '}
-                    <span className={`${styles.stateText}`} data-state={state}>
+                    <span className={styles.toneText} data-tone={tone}>
                       {share(value, journeys.eligibleSessions)}
                     </span>
                   </span>
@@ -291,7 +292,7 @@ export function ContinuationJourneys({ data }: { data: ObservatoryData }) {
                         <td className={styles.num}>{formatCount(count)}</td>
                         <td className={styles.num}>{share(count, total)}</td>
                         <td>
-                          <div className={`${styles.barTrack} ${styles.stateText}`} data-state="derived">
+                          <div className={`${styles.barTrack} ${styles.toneFill}`} data-tone="info">
                             <span
                               className={styles.barFill}
                               style={{ width: widthOf(count, total) }}

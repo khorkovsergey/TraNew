@@ -1,5 +1,5 @@
 import { formatNumber, formatCount, humanize, share } from '../format';
-import { EmptyRow, Meter, MiniCard, Panel, Scroller, Section, StateBadge, Tile } from '../primitives';
+import { EmptyRow, Meter, MiniCard, Panel, Scroller, Section, StatusBadge, Tile } from '../primitives';
 import styles from '../Observatory.module.css';
 import type { ObservatoryData } from '../types';
 
@@ -100,31 +100,31 @@ export function VoyagerCockpit({ data }: { data: ObservatoryData }) {
           lede="Every server request, by what actually happened to it"
         >
           <div className={styles.stackTight}>
-            <Meter label="Requests" value={counts.requests} total={counts.requests} state="derived" caption="100%" />
+            <Meter label="Requests" value={counts.requests} total={counts.requests} tone="neutral" caption="100%" />
             <Meter
               label="Reached the model (executed)"
               value={counts.executed}
               total={counts.requests}
-              state="derived"
+              tone="info"
             />
-            <Meter label="Real model answer" value={counts.realAnswers} total={counts.requests} state="live" />
+            <Meter label="Real model answer" value={counts.realAnswers} total={counts.requests} tone="positive" />
             <Meter
               label="Simulated fallback"
               value={counts.simulatedFallbacks}
               total={counts.requests}
-              state="insufficient_sample"
+              tone="caution"
             />
             <Meter
               label="Refused over the daily limit"
               value={counts.quotaRefusals}
               total={counts.requests}
-              state="feature_disabled"
+              tone="quiet"
             />
             <Meter
               label="Server failure"
               value={counts.serverFailures}
               total={counts.requests}
-              state="feature_disabled"
+              tone="negative"
             />
           </div>
 
@@ -140,13 +140,19 @@ export function VoyagerCockpit({ data }: { data: ObservatoryData }) {
           <Panel
             title="Quota integrity"
             lede="One intentional question moves the counter by one; a refusal and an answerless attempt are refunded"
-            aside={<StateBadge state={integrity.healthy ? 'live' : 'feature_disabled'} label={integrity.healthy ? 'Consistent' : 'Violations'} />}
+            aside={
+              <StatusBadge
+                tone={integrity.healthy ? 'positive' : 'negative'}
+                label={integrity.healthy ? 'Consistent' : 'Violations'}
+                title="Whether the recorded quota disposition matches the product contract"
+              />
+            }
           >
             <div className={styles.fourGrid}>
-              <Tile label="Charged" value={formatCount(counts.charged)} state="derived" />
-              <Tile label="Released" value={formatCount(counts.released)} state="derived" />
-              <Tile label="Refused &amp; released" value={formatCount(counts.refusedReleased)} state="derived" />
-              <Tile label="Unmetered" value={formatCount(counts.unmetered)} state="derived" />
+              <Tile label="Charged" value={formatCount(counts.charged)} tone="neutral" />
+              <Tile label="Released" value={formatCount(counts.released)} tone="neutral" />
+              <Tile label="Refused &amp; released" value={formatCount(counts.refusedReleased)} tone="neutral" />
+              <Tile label="Unmetered" value={formatCount(counts.unmetered)} tone="neutral" />
             </div>
 
             {integrity.violations > 0 ? (
@@ -157,7 +163,7 @@ export function VoyagerCockpit({ data }: { data: ObservatoryData }) {
                     <span className={styles.kvLabel}>
                       {humanize(row.outcome)} that stayed {humanize(row.disposition)}
                     </span>
-                    <span className={`${styles.kvValue} ${styles.stateText}`} data-state="feature_disabled">
+                    <span className={`${styles.kvValue} ${styles.toneText}`} data-tone="negative">
                       {formatCount(row.rows)}
                     </span>
                   </div>
@@ -217,12 +223,12 @@ export function VoyagerCockpit({ data }: { data: ObservatoryData }) {
       <div className={`${styles.twoGridWide} ${styles.gapTop}`}>
         <Panel title="Tool operations" lede="Which tools ran inside the orchestrator loop, and whether they worked">
           <div className={styles.threeGrid} style={{ marginBottom: 11 }}>
-            <Tile label="Executions" value={formatCount(tools.executions)} state="derived" />
-            <Tile label="Successes" value={formatCount(tools.successes)} state="live" />
+            <Tile label="Executions" value={formatCount(tools.executions)} tone="neutral" />
+            <Tile label="Successes" value={formatCount(tools.successes)} tone="positive" />
             <Tile
               label="Failures"
               value={formatCount(tools.failures)}
-              state={tools.failures > 0 ? 'feature_disabled' : 'derived'}
+              tone={tools.failures > 0 ? 'negative' : 'neutral'}
             />
           </div>
 

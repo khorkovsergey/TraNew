@@ -1,4 +1,5 @@
 import type { MetricState, MetricValue } from '@/lib/analytics/states';
+import type { Tone } from '../primitives';
 import { SURFACE_REGISTRY, featureStateFor } from '@/lib/analytics/surfaces';
 import type { FamilyFacts } from '@/lib/admin-metrics/families/durable';
 import type { ObservatoryData } from '../types';
@@ -32,8 +33,15 @@ export type ProductArea = {
   declared: number;
   observed: number;
   lastSeen: string | null;
-  /** Two or three headline figures, already formatted for the card. */
-  stats: Array<{ label: string; value: string; state: MetricState }>;
+  /**
+   * Two or three headline figures, already formatted for the card.
+   *
+   * Toned rather than stated. The card's own badge carries the canonical
+   * availability state; these three lines are just figures about it, and
+   * giving each one a `MetricState` would make three more provenance claims
+   * the row is not entitled to make.
+   */
+  stats: Array<{ label: string; value: string; tone: Tone }>;
   /** The durable family behind it, when there is one. */
   family?: FamilyFacts;
   /** Every metric the family carries, for the drawer. */
@@ -115,19 +123,20 @@ export function buildProductAreas(data: ObservatoryData): ProductArea[] {
         {
           label: 'Events declared',
           value: rows.length === 0 ? 'none' : `${observedRows.length} / ${rows.length} seen`,
-          state: rows.length === 0 ? 'not_measurable' : observedRows.length > 0 ? 'live' : 'instrumented_going_forward',
+          tone: rows.length === 0 ? 'quiet' : observedRows.length > 0 ? 'positive' : 'caution',
         },
         {
           label: 'Rows in window',
-          value: rows.length === 0 ? '—' : new Intl.NumberFormat('en-US').format(
-            rows.reduce((sum, row) => sum + row.count, 0)
-          ),
-          state: rows.length === 0 ? 'not_measurable' : 'live',
+          value:
+            rows.length === 0
+              ? '—'
+              : new Intl.NumberFormat('en-US').format(rows.reduce((sum, row) => sum + row.count, 0)),
+          tone: rows.length === 0 ? 'quiet' : 'neutral',
         },
         {
           label: 'Durable source',
           value: family ? family.sources.join(', ') : 'none',
-          state: family ? 'live' : 'not_measurable',
+          tone: family ? 'positive' : 'quiet',
         },
       ];
 

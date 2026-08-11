@@ -1,5 +1,5 @@
 import { formatCount, titleize } from '../format';
-import { EmptyRow, MiniCard, Panel, Scroller, Section, StateBadge } from '../primitives';
+import { EmptyRow, MiniCard, Panel, Scroller, Section, StateBadge, StatusBadge } from '../primitives';
 import styles from '../Observatory.module.css';
 import type { DrawerRequest, ObservatoryData } from '../types';
 
@@ -59,7 +59,7 @@ export function MonetizationSection({
               small
             />
           </div>
-          <span className={`${styles.miniValue} ${styles.stateText}`} data-state="live">
+          <span className={`${styles.miniValue} ${styles.toneText}`} data-tone="neutral">
             {formatCount(offerViews)}
           </span>
           <span className={styles.miniSub}>
@@ -119,7 +119,9 @@ export function MonetizationSection({
                       <th scope="row">{titleize(row.key)}</th>
                       <td className={styles.num}>{formatCount(row.count)}</td>
                       <td>
-                        <StateBadge state="live" small label="user.plan" />
+                        {/* The table the count came from, not a provenance
+                            claim about it. */}
+                        <StatusBadge tone="neutral" small label="user.plan" />
                       </td>
                     </tr>
                   ))
@@ -152,10 +154,21 @@ export function MonetizationSection({
                       <th scope="row">{titleize(row.key)}</th>
                       <td className={styles.num}>{formatCount(row.count)}</td>
                       <td>
-                        <StateBadge
-                          state={row.key === 'demo' ? 'legacy' : 'source_not_connected'}
+                        {/*
+                          A demo entitlement is not a retired flow and an
+                          unconfirmed paid row is not a disconnected source —
+                          both were reaching for a colour. These are commercial
+                          categories, so they are tones.
+                        */}
+                        <StatusBadge
+                          tone={row.key === 'demo' ? 'quiet' : 'caution'}
                           small
                           label={row.key === 'demo' ? 'Granted without money' : 'Unconfirmed'}
+                          title={
+                            row.key === 'demo'
+                              ? 'An entitlement granted without money. Never revenue.'
+                              : 'An application record with no provider-confirmed transaction behind it.'
+                          }
                         />
                       </td>
                     </tr>

@@ -1,7 +1,16 @@
 import { SURFACE_BY_KEY } from '@/lib/analytics/surfaces';
-import type { MetricState } from '@/lib/analytics/states';
 import { ago, formatCount, humanize, share } from '../format';
-import { CellBar, EmptyRow, Panel, Scroller, Section, StateBadge, Tile } from '../primitives';
+import {
+  CellBar,
+  EmptyRow,
+  Panel,
+  Scroller,
+  Section,
+  StateBadge,
+  StatusBadge,
+  Tile,
+  type Tone,
+} from '../primitives';
 import styles from '../Observatory.module.css';
 import type { ObservatoryData } from '../types';
 
@@ -20,15 +29,41 @@ import type { ObservatoryData } from '../types';
  * Coverage percentages exclude unexposed events from the denominator. An event
  * behind a flag that is off cannot arrive, and counting it as a miss would make
  * every flagged surface look under-instrumented rather than switched off.
+ *
+ * ## Why these are tones and not MetricStates
+ *
+ * Coverage status, KPI readiness and layer status are three vocabularies
+ * belonging to this section, and none of them is a metric's provenance.
+ * Mapping them onto `MetricState` to reach a colour produced a false claim
+ * immediately: `unused` — declared, reachable and nothing arrived — was being
+ * rendered as `insufficient_sample`, which says a rate was withheld because n
+ * was too small. There is no rate and no n. It is a finding about users.
+ *
+ * `feature_disabled` survives as a canonical state in exactly one place: a
+ * surface where every declared event sits behind a flag that is off. That is
+ * genuinely what the state means.
  */
 
-const STATUS_STATE: Record<string, MetricState> = {
-  observed: 'live',
-  awaiting_first_event: 'instrumented_going_forward',
-  unexposed: 'feature_disabled',
-  unused: 'insufficient_sample',
-  legacy_silent: 'legacy',
-  legacy_still_emitting: 'legacy',
+const COVERAGE_TONE: Record<string, Tone> = {
+  observed: 'positive',
+  awaiting_first_event: 'caution',
+  unexposed: 'negative',
+  unused: 'quiet',
+  legacy_silent: 'neutral',
+  legacy_still_emitting: 'negative',
+};
+
+const VERDICT_TONE: Record<string, Tone> = {
+  trustworthy: 'positive',
+  partial: 'caution',
+  awaiting_data: 'caution',
+  not_instrumented: 'quiet',
+};
+
+const LAYER_TONE: Record<string, Tone> = {
+  observed: 'positive',
+  awaiting_emitter: 'quiet',
+  awaiting_first_event: 'caution',
 };
 
 export function InstrumentationCoverage({ data }: { data: ObservatoryData }) {
@@ -76,12 +111,12 @@ export function InstrumentationCoverage({ data }: { data: ObservatoryData }) {
     })
     .sort((a, b) => (b.coverage ?? -1) - (a.coverage ?? -1) || b.expected - a.expected);
 
-  const legend: Array<[string, MetricState]> = [
-    ['Observed', 'live'],
-    ['Awaiting first event', 'instrumented_going_forward'],
-    ['Unused', 'insufficient_sample'],
-    ['Unexposed', 'feature_disabled'],
-    ['Legacy', 'legacy'],
+  const legend: Array<[string, Tone]> = [
+    ['Observed', 'positive'],
+    ['Awaiting first event', 'caution'],
+    ['Unused', 'quiet'],
+    ['Unexposed', 'negative'],
+    ['Legacy', 'neutral'],
   ];
 
   return (
@@ -92,36 +127,36 @@ export function InstrumentationCoverage({ data }: { data: ObservatoryData }) {
       lede="No usage, not instrumented, not exposed and legacy are four different things"
     >
       <div className={styles.sixGrid}>
-        <Tile label="Events declared" value={formatCount(coverage.totals.declared)} sub="in the registry" state="live" />
+        <Tile label="Events declared" value={formatCount(coverage.totals.declared)} sub="in the registry" tone="neutral" />
         <Tile
           label="Observed"
           value={formatCount(coverage.totals.observed)}
           sub={`${share(coverage.totals.observed, coverage.totals.declared)} of declared`}
-          state="live"
+          tone="positive"
         />
         <Tile
           label="Unexposed"
           value={formatCount(coverage.totals.unexposed)}
           sub="behind a flag that is off"
-          state="feature_disabled"
+          tone="negative"
         />
         <Tile
           label="Unused"
           value={formatCount(coverage.totals.unused)}
           sub="reachable and nothing arrived"
-          state="insufficient_sample"
+          tone="quiet"
         />
         <Tile
           label="Legacy"
           value={formatCount(coverage.totals.legacy)}
           sub="retired, never in a current funnel"
-          state="legacy"
+          tone="neutral"
         />
         <Tile
           label="Collecting since"
           value={coverage.collectingSince ? coverage.collectingSince.slice(0, 10) : 'never'}
           sub="the first row ever received"
-          state={coverage.collectingSince ? 'live' : 'instrumented_going_forward'}
+          tone={coverage.collectingSince ? 'positive' : 'caution'}
         />
       </div>
 
@@ -131,8 +166,8 @@ export function InstrumentationCoverage({ data }: { data: ObservatoryData }) {
           lede="Expected against observed, per surface · unexposed events are excluded from the denominator"
           aside={
             <div className={styles.chips}>
-              {legend.map(([label, state]) => (
-                <StateBadge key={label} state={state} small label={label} />
+              {legend.map(([label, tone]) => (
+                <StatusBadge key={label} tone={tone} small label={label} />
               ))}
             </div>
           }
@@ -152,14 +187,20 @@ export function InstrumentationCoverage({ data }: { data: ObservatoryData }) {
               </thead>
               <tbody>
                 {surfaces.map((surface) => {
-                  const state: MetricState =
-                    surface.reachable === 0
-                      ? 'feature_disabled'
-                      : surface.coverage === 1
-                        ? 'live'
-                        : surface.observed > 0
-                          ? 'derived'
-                          : 'instrumented_going_forward';
+                  /*
+                   * A surface whose every declared event sits behind a flag
+                   * that is off really is `feature_disabled` — the canonical
+                   * state, used because it is true. Everything else here is a
+                   * coverage ratio and takes a tone.
+                   */
+                  const unreachable = surface.reachable === 0;
+                  const tone: Tone = unreachable
+                    ? 'negative'
+                    : surface.coverage === 1
+                      ? 'positive'
+                      : surface.observed > 0
+                        ? 'info'
+                        : 'caution';
 
                   return (
                     <tr key={surface.key}>
@@ -173,8 +214,8 @@ export function InstrumentationCoverage({ data }: { data: ObservatoryData }) {
                       <td className={styles.num}>{surface.observed}</td>
                       <td>
                         <div className={styles.barRow}>
-                          <CellBar value={surface.observed} total={Math.max(1, surface.reachable)} state={state} />
-                          <span className={`${styles.barValue} ${styles.stateText}`} data-state={state}>
+                          <CellBar value={surface.observed} total={Math.max(1, surface.reachable)} tone={tone} />
+                          <span className={`${styles.barValue} ${styles.toneText}`} data-tone={tone}>
                             {surface.coverage === null ? 'n/a' : `${Math.round(surface.coverage * 100)}%`}
                           </span>
                         </div>
@@ -182,7 +223,21 @@ export function InstrumentationCoverage({ data }: { data: ObservatoryData }) {
                       <td className={styles.num}>{formatCount(surface.rows)}</td>
                       <td className={styles.num}>{ago(surface.lastSeen, data.queriedAtMs)}</td>
                       <td>
-                        <StateBadge state={state} small />
+                        {unreachable ? (
+                          <StateBadge state="feature_disabled" small />
+                        ) : (
+                          <StatusBadge
+                            tone={tone}
+                            small
+                            label={
+                              surface.coverage === 1
+                                ? 'full'
+                                : surface.observed > 0
+                                  ? 'partial'
+                                  : 'none yet'
+                            }
+                          />
+                        )}
                       </td>
                     </tr>
                   );
@@ -231,16 +286,10 @@ export function InstrumentationCoverage({ data }: { data: ObservatoryData }) {
                       </div>
                     </td>
                     <td>
-                      <StateBadge
-                        state={
-                          kpi.verdict === 'trustworthy'
-                            ? 'live'
-                            : kpi.verdict === 'partial'
-                              ? 'feature_disabled'
-                              : kpi.verdict === 'awaiting_data'
-                                ? 'instrumented_going_forward'
-                                : 'not_measurable'
-                        }
+                      {/* A trust verdict over a metric's inputs. Its own
+                          vocabulary, so its own tones. */}
+                      <StatusBadge
+                        tone={VERDICT_TONE[kpi.verdict] ?? 'quiet'}
                         small
                         label={humanize(kpi.verdict)}
                       />
@@ -276,14 +325,8 @@ export function InstrumentationCoverage({ data }: { data: ObservatoryData }) {
                       {layer.observed} / {layer.events.length}
                     </td>
                     <td>
-                      <StateBadge
-                        state={
-                          layer.status === 'observed'
-                            ? 'live'
-                            : layer.status === 'awaiting_emitter'
-                              ? 'not_measurable'
-                              : 'instrumented_going_forward'
-                        }
+                      <StatusBadge
+                        tone={LAYER_TONE[layer.status] ?? 'quiet'}
                         small
                         label={humanize(layer.status)}
                       />
@@ -329,8 +372,8 @@ export function InstrumentationCoverage({ data }: { data: ObservatoryData }) {
                       <td className={styles.num}>{formatCount(row.count)}</td>
                       <td className={styles.num}>{ago(row.lastSeen, data.queriedAtMs)}</td>
                       <td>
-                        <StateBadge
-                          state={STATUS_STATE[row.status] ?? 'not_measurable'}
+                        <StatusBadge
+                          tone={COVERAGE_TONE[row.status] ?? 'quiet'}
                           small
                           label={humanize(row.status)}
                         />

@@ -1,5 +1,5 @@
 import { formatCount, share, titleize } from '../format';
-import { EmptyRow, Meter, Panel, Scroller, Section, StateBadge, Tile } from '../primitives';
+import { EmptyRow, Meter, Panel, Scroller, Section, StateBadge, StatusBadge, Tile } from '../primitives';
 import styles from '../Observatory.module.css';
 import type { ObservatoryData } from '../types';
 
@@ -36,10 +36,16 @@ export function NextStepSection({ data }: { data: ObservatoryData }) {
       lede="Current router funnel at /start — level → intent → optional clarification → recommendation → destination"
     >
       <div className={styles.twoGridWide}>
+        {/*
+          Collecting either way. No router session inside the window is an
+          absence of traffic, not a sample too small to publish a rate over —
+          the funnel is declared, reachable and emitting, and the note under the
+          meters says which of the two a reader is looking at.
+        */}
         <Panel
           title="Router funnel"
           lede="Sequential within a session: a stage counts only where the stage before it happened earlier in the same session"
-          aside={<StateBadge state={opened > 0 ? 'instrumented_going_forward' : 'insufficient_sample'} />}
+          aside={<StateBadge state="instrumented_going_forward" />}
         >
           <div className={styles.stackTight}>
             {funnel.stages.map((stage) => (
@@ -48,7 +54,7 @@ export function NextStepSection({ data }: { data: ObservatoryData }) {
                 label={titleize(stage.stage)}
                 value={stage.sessions}
                 total={opened}
-                state="derived"
+                tone="info"
                 caption={
                   stage.ofPrevious === null
                     ? opened === 0
@@ -78,7 +84,7 @@ export function NextStepSection({ data }: { data: ObservatoryData }) {
                   ? 'share withheld — low n'
                   : `${(funnel.clarificationShare * 100).toFixed(1)}% of sessions that reached a recommendation`
               }
-              state="derived"
+              tone="neutral"
             />
             <Tile
               label="Restarted"
@@ -88,19 +94,19 @@ export function NextStepSection({ data }: { data: ObservatoryData }) {
                   ? 'share withheld — low n'
                   : `${(funnel.restartShare * 100).toFixed(1)}% of sessions that opened the router`
               }
-              state="derived"
+              tone="caution"
             />
             <Tile
               label="Internal destination clicks"
               value={formatCount(funnel.internalClicks)}
               sub="kept the person in the portal"
-              state="derived"
+              tone="positive"
             />
             <Tile
               label="External destination clicks"
               value={formatCount(funnel.externalClicks)}
               sub="continuation, counted apart"
-              state="external"
+              tone="info"
             />
           </div>
 
@@ -174,11 +180,27 @@ export function NextStepSection({ data }: { data: ObservatoryData }) {
                       <td>{row.surface}</td>
                       <td className={styles.num}>{formatCount(row.count)}</td>
                       <td>
-                        <StateBadge
-                          state="legacy"
-                          small
-                          label={row.status === 'legacy_still_emitting' ? 'Still emitting' : 'Silent'}
-                        />
+                        {/*
+                          Two facts, two badges. Every row here is genuinely
+                          `legacy`, so that badge stays canonical — and whether
+                          it is still arriving is an operational finding beside
+                          it, not a different provenance. Overloading the one
+                          badge lost the word "Legacy" from the row that needed
+                          it most.
+                        */}
+                        <span style={{ display: 'inline-flex', gap: 5, flexWrap: 'wrap' }}>
+                          <StateBadge state="legacy" small />
+                          <StatusBadge
+                            tone={row.status === 'legacy_still_emitting' ? 'negative' : 'quiet'}
+                            small
+                            label={row.status === 'legacy_still_emitting' ? 'Still emitting' : 'Silent'}
+                            title={
+                              row.status === 'legacy_still_emitting'
+                                ? 'Ingest refuses legacy events, so a row can only exist if it was written before the event was reclassified'
+                                : 'No row for this retired event, which is the expected state'
+                            }
+                          />
+                        </span>
                       </td>
                     </tr>
                   ))

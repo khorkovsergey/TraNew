@@ -84,8 +84,9 @@ export function AcquisitionSection({ data }: { data: ObservatoryData }) {
                         <div className={styles.barRowEnd}>
                           {row.rate === null ? null : <CellBar value={row.continued} total={row.sessions} />}
                           <span
-                            className={`${styles.barValue} ${styles.stateText}`}
-                            data-state={row.rate === null ? 'insufficient_sample' : 'derived'}
+                            className={`${styles.barValue} ${row.rate === null ? styles.stateText : styles.toneText}`}
+                            data-state={row.rate === null ? 'insufficient_sample' : undefined}
+                            data-tone={row.rate === null ? undefined : 'info'}
                           >
                             {row.rate === null ? 'low n' : share(row.continued, row.sessions)}
                           </span>
@@ -119,8 +120,9 @@ export function AcquisitionSection({ data }: { data: ObservatoryData }) {
                   <span className={styles.kvValue}>
                     <span className={styles.mono}>{formatCount(row.sessions)}</span>{' '}
                     <span
-                      className={styles.stateText}
-                      data-state={row.rate === null ? 'insufficient_sample' : 'derived'}
+                      className={row.rate === null ? styles.stateText : styles.toneText}
+                      data-state={row.rate === null ? 'insufficient_sample' : undefined}
+                      data-tone={row.rate === null ? undefined : 'info'}
                     >
                       {row.rate === null ? 'low n' : share(row.continued, row.sessions)}
                     </span>
@@ -140,8 +142,9 @@ export function AcquisitionSection({ data }: { data: ObservatoryData }) {
                   <span className={styles.kvValue}>
                     <span className={styles.mono}>{formatCount(row.sessions)}</span>{' '}
                     <span
-                      className={styles.stateText}
-                      data-state={row.rate === null ? 'insufficient_sample' : 'derived'}
+                      className={row.rate === null ? styles.stateText : styles.toneText}
+                      data-state={row.rate === null ? 'insufficient_sample' : undefined}
+                      data-tone={row.rate === null ? undefined : 'info'}
                     >
                       {row.rate === null ? 'low n' : share(row.continued, row.sessions)}
                     </span>
