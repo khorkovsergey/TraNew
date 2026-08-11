@@ -3,11 +3,14 @@ import { setRequestLocale } from 'next-intl/server';
 import { AccessBootstrap } from '@/components/admin-metrics/AccessBootstrap';
 import { Breakdown } from '@/components/admin-metrics/Breakdown';
 import { MetricCard } from '@/components/admin-metrics/MetricCard';
+import { ProductArea } from '@/components/admin-metrics/ProductArea';
+import { StageTable } from '@/components/admin-metrics/StageTable';
 import styles from '@/components/admin-metrics/Observatory.module.css';
 import type { Locale } from '@/i18n/routing';
 import { authorizeMetrics, directLinkEnabled } from '@/lib/admin-metrics/access';
 import { instrumentationCoverage } from '@/lib/admin-metrics/coverage';
 import { MARKETPLACE_MIN_SAMPLE } from '@/lib/admin-metrics/dictionary';
+import { productFamilies } from '@/lib/admin-metrics/families';
 import { overview } from '@/lib/admin-metrics/overview';
 import { portalMetrics } from '@/lib/admin-metrics/portal';
 import { rangeFrom } from '@/lib/admin-metrics/range';
@@ -74,11 +77,12 @@ export default async function ObservatoryPage({ params, searchParams }: Props) {
   const window = rangeFrom(range ?? null) ?? rangeFrom(null)!;
   const now = new Date();
 
-  const [numbers, portal, coverage, userDays] = await Promise.all([
+  const [numbers, portal, coverage, userDays, families] = await Promise.all([
     overview(window.since),
     portalMetrics(window.since),
     instrumentationCoverage(window.since),
     readUserDays(window.since),
+    productFamilies(window.since),
   ]);
 
   const retention = cohortRetention(userDays, {
@@ -195,7 +199,88 @@ export default async function ObservatoryPage({ params, searchParams }: Props) {
       </section>
 
       <section>
+        <h2 className={styles.sectionTitle}>Product areas</h2>
+        <p className={styles.subtitle}>
+          Behaviour and durable facts are reported side by side and never merged. A telemetry
+          funnel says a flow reported success; a table row says an outcome exists. They are
+          different evidence about the same product, and adding them would count one thing twice.
+        </p>
+
+        <section className={styles.family}>
+          <header className={styles.familyHead}>
+            <h3 className={styles.sectionTitle}>Find my next step</h3>
+            <p className={styles.subtitle}>
+              <span className={styles.state}>behaviour funnel</span>{' '}
+              <code className={styles.source}>product_telemetry_event</code> · sequential within a
+              session · {families.start.funnel.sessionsSeen} sessions touched Start
+            </p>
+          </header>
+          <StageTable
+            stages={families.start.funnel.stages.map((stage) => ({
+              stage: stage.stage,
+              sessions: stage.sessions,
+              ofPrevious: stage.ofPrevious,
+            }))}
+          />
+          <p className={styles.subtitle}>
+            Clarification asked in {families.start.funnel.clarifiedSessions} of the sessions that
+            reached a recommendation (optional, never a denominator) · restarted{' '}
+            {families.start.funnel.restartedSessions} · destination clicks{' '}
+            {families.start.funnel.internalClicks} internal / {families.start.funnel.externalClicks} external
+          </p>
+          <ul className={styles.limitations}>
+            {families.start.limitations.map((limitation) => (
+              <li key={limitation}>{limitation}</li>
+            ))}
+          </ul>
+        </section>
+
+        <ProductArea title="Events" facts={families.events}>
+          <div className={styles.funnel}>
+            <h4 className={styles.sectionTitle}>Discovery funnel — behaviour, not seats</h4>
+            <StageTable
+              stages={families.events.funnel.stages.map((stage) => ({
+                stage: stage.stage,
+                sessions: stage.sessions,
+                ofPrevious: stage.ofPrevious,
+              }))}
+            />
+          </div>
+        </ProductArea>
+
+        <ProductArea title="Academy — current state" facts={families.academy} />
+        <ProductArea title="Expert services — current pipeline" facts={families.experts} />
+        <ProductArea title="Saves & collections" facts={families.saves} />
+        <ProductArea title="Wealth Hub — adoption only" facts={families.wealth} />
+        <ProductArea title="Subscriptions & purchases" facts={families.commerce} />
+        <ProductArea title="Accounts" facts={families.accounts} />
+      </section>
+
+      <section>
         <h2 className={styles.sectionTitle}>Can these numbers be trusted?</h2>
+
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Family</th>
+              <th>Verdict</th>
+              <th>Telemetry observed</th>
+              <th>Durable sources</th>
+            </tr>
+          </thead>
+          <tbody>
+            {coverage.families.map((family) => (
+              <tr key={family.family}>
+                <td>{family.family}</td>
+                <td title={family.note}>{family.verdict.replace(/_/g, ' ')}</td>
+                <td>
+                  {family.telemetryObserved} / {family.telemetryEvents}
+                </td>
+                <td>{family.durableSources.join(', ') || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
         <table className={styles.table}>
           <thead>
             <tr>
