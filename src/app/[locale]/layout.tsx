@@ -3,6 +3,7 @@ import { Manrope, Plus_Jakarta_Sans } from 'next/font/google';
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { PortalChrome } from '@/components/admin-metrics/ObservatoryChrome';
 import { Footer } from '@/components/shell/Footer';
 import { Header } from '@/components/shell/Header';
 import { LoginModalProvider } from '@/components/shell/LoginModalProvider';
@@ -73,15 +74,21 @@ export default async function LocaleLayout(props: {
             {/* Voyager sits at layout level so it survives navigation; each page
                 announces its own context through VoyagerPageContext. */}
             <VoyagerProvider>
-              <a className="tn-skip-link" href="#main">
-                {t('skipToContent')}
-              </a>
-              <div className="tn-app">
-                <Header />
-                <main id="main">{props.children}</main>
-                <Footer />
-              </div>
-              <VoyagerWidget chartWorkspaceLive={FEATURE_FLAGS.superchartEnabled} />
+              {/* The Observatory owns its whole viewport and renders none of
+                  the customer chrome; every other route is unchanged. See
+                  components/admin-metrics/ObservatoryChrome.tsx. */}
+              <PortalChrome
+                skipLink={
+                  <a className="tn-skip-link" href="#main">
+                    {t('skipToContent')}
+                  </a>
+                }
+                header={<Header />}
+                footer={<Footer />}
+                widget={<VoyagerWidget chartWorkspaceLive={FEATURE_FLAGS.superchartEnabled} />}
+              >
+                {props.children}
+              </PortalChrome>
             </VoyagerProvider>
           </LoginModalProvider>
         </NextIntlClientProvider>
