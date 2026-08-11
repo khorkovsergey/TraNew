@@ -369,10 +369,10 @@ export default async function ObservatoryPage({ params, searchParams }: Props) {
           title="Supercharts"
           conclusion={superchartsConclusion({
             opens: reliability.supercharts.opens,
-            sessionsWithStudy: reliability.supercharts.sessionsWithStudy,
-            paneActivations: reliability.supercharts.paneActivations,
+            sessionsRenderingStudy: reliability.supercharts.sessionsWithStudy,
+            paneRenders: reliability.supercharts.paneActivations,
+            studyRequests: reliability.supercharts.studyRequests,
             awaitingCapabilityEmitter: reliability.supercharts.awaitingCapabilityEmitter,
-            renderedStudies: reliability.supercharts.capability.length,
           })}
           detailLabel="Study mix, capability outcomes and Pine"
           detail={<SuperchartsDetail report={reliability} />}

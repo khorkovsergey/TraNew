@@ -2183,15 +2183,19 @@ try {
     assert.equal(byOutcome.unsupported, 2);
   });
 
-  check('activations count switching a study on, not off', () => {
+  check('requests count switching a study on, not off', () => {
     const summary = charts.summariseSupercharts([
       { sessionId: 'a', eventName: 'superchart_study_toggled', properties: { studyId: 'rsi', on: true } },
       { sessionId: 'a', eventName: 'superchart_study_toggled', properties: { studyId: 'rsi', on: false } },
       { sessionId: 'a', eventName: 'superchart_study_toggled', properties: { studyId: 'sma', on: true } },
     ]);
-    assert.equal(summary.paneActivations, 1, 'a toggle-off counted as use');
-    assert.equal(summary.overlayActivations, 1);
-    assert.equal(summary.sessionsWithPaneStudy, 1);
+    assert.equal(summary.studyRequests, 2, 'a toggle-off counted as a request');
+    assert.equal(summary.sessionsRequestingStudy, 1);
+
+    // And none of it is a render: the engine has not reported painting anything.
+    assert.equal(summary.paneActivations, 0, 'a toggle produced a render');
+    assert.equal(summary.overlayActivations, 0);
+    assert.equal(summary.sessionsWithStudy, 0);
   });
 
   check('Pine is generated, exported and previewed — never executed', () => {
@@ -2200,6 +2204,114 @@ try {
     for (const forbidden of ['scriptsRun', 'backtested:', 'scriptsExecuted']) {
       assert.equal(source.includes(forbidden), false, `the panel claims Pine is ${forbidden}`);
     }
+  });
+
+  group('Supercharts intent is never added to rendered');
+
+  const chartEvent = (eventName, properties, sessionId = 'a') => ({ sessionId, eventName, properties });
+
+  check('one toggle plus one applied is one request and one render', () => {
+    /*
+     * The defect this replaces: both events were written into the same
+     * counters, so a study that was requested and then painted arrived as two
+     * activations. Six applied rows became seven.
+     */
+    const summary = charts.summariseSupercharts([
+      chartEvent('superchart_study_toggled', { studyId: 'rsi', on: true }),
+      chartEvent('superchart_study_applied', { study: 'rsi', placement: 'pane', paneCount: 2 }),
+    ]);
+
+    assert.equal(summary.studyRequests, 1);
+    assert.equal(summary.paneActivations, 1, 'a toggle was counted as a render');
+    assert.equal(summary.overlayActivations, 0);
+    assert.equal(summary.studyMix.reduce((sum, row) => sum + row.activations, 0), 1);
+  });
+
+  check('six applied rows are six renders, whatever the toggles did', () => {
+    const events = [];
+    for (let index = 0; index < 6; index += 1) {
+      events.push(chartEvent('superchart_study_toggled', { studyId: 'rsi', on: true }, `s${index}`));
+      events.push(chartEvent('superchart_study_applied', { study: 'rsi', placement: 'pane', paneCount: 2 }, `s${index}`));
+    }
+    events.push(chartEvent('superchart_study_toggled', { studyId: 'macd', on: true }, 's6'));
+
+    const summary = charts.summariseSupercharts(events);
+    assert.equal(summary.paneActivations, 6, 'renders did not equal applied rows');
+    assert.equal(summary.studyRequests, 7, 'requests lost or gained a toggle');
+  });
+
+  check('sessions rendering a study come from the applied event alone', () => {
+    const summary = charts.summariseSupercharts([
+      chartEvent('superchart_study_toggled', { studyId: 'rsi', on: true }, 'asked-only'),
+      chartEvent('superchart_study_applied', { study: 'sma', placement: 'overlay', paneCount: 1 }, 'rendered'),
+    ]);
+
+    assert.equal(summary.sessionsWithStudy, 1, 'a session that only asked counted as rendering');
+    assert.equal(summary.sessionsRequestingStudy, 1);
+    assert.equal(summary.overlayActivations, 1);
+    assert.equal(summary.paneActivations, 0);
+  });
+
+  check('a toggle-off is neither a request nor a render', () => {
+    const summary = charts.summariseSupercharts([
+      chartEvent('superchart_study_toggled', { studyId: 'rsi', on: false }),
+    ]);
+    assert.equal(summary.studyRequests, 0);
+    assert.equal(summary.sessionsWithStudy, 0);
+  });
+
+  check('intent stays observable in its own mix', () => {
+    const summary = charts.summariseSupercharts([
+      chartEvent('superchart_study_toggled', { studyId: 'macd', on: true }),
+      chartEvent('superchart_study_toggled', { studyId: 'macd', on: true }),
+      chartEvent('superchart_study_applied', { study: 'macd', placement: 'pane', paneCount: 2 }),
+    ]);
+    assert.deepEqual(summary.requestedStudyMix, [{ study: 'macd', placement: 'pane', requests: 2 }]);
+    assert.deepEqual(summary.studyMix, [{ study: 'macd', placement: 'pane', activations: 1 }]);
+  });
+
+  check('the engine placement wins over the catalogue', () => {
+    // They should agree; where they do not, what the engine painted is the truth.
+    const summary = charts.summariseSupercharts([
+      chartEvent('superchart_study_applied', { study: 'rsi', placement: 'overlay', paneCount: 1 }),
+    ]);
+    assert.equal(summary.overlayActivations, 1);
+    assert.equal(summary.paneActivations, 0);
+  });
+
+  check('the rendered cards cite the applied event', () => {
+    const panel = readFileSync('src/components/admin-metrics/ReliabilityPanel.tsx', 'utf8');
+    for (const metricId of ['supercharts_study_sessions', 'supercharts_pane_activations', 'supercharts_overlay_activations']) {
+      const at = panel.indexOf(`metricId: '${metricId}'`);
+      assert.ok(at > -1, `${metricId} is missing`);
+      const card = panel.slice(at, panel.indexOf('}}', at));
+      assert.match(card, /superchart_study_applied/, `${metricId} still cites the toggle`);
+    }
+
+    const requestCard = panel.slice(
+      panel.indexOf("metricId: 'supercharts_study_requests'"),
+      panel.indexOf('}}', panel.indexOf("metricId: 'supercharts_study_requests'"))
+    );
+    assert.match(requestCard, /superchart_study_toggled/, 'the intent card lost its own source');
+  });
+
+  check('the conclusion talks about renders and states intent beside them', () => {
+    const line = conclusions.superchartsConclusion({
+      opens: 9,
+      sessionsRenderingStudy: 4,
+      paneRenders: 6,
+      studyRequests: 7,
+      awaitingCapabilityEmitter: false,
+    });
+    assert.match(line, /4 sessions where a study rendered/);
+    assert.match(line, /6 renders on a separate pane/);
+    assert.match(line, /7 study requests counted separately/);
+    assert.match(line, /a toggle is not a render/);
+  });
+
+  check('renders are not backfilled from historical toggles', () => {
+    const panel = readFileSync('src/components/admin-metrics/ReliabilityPanel.tsx', 'utf8');
+    assert.match(panel, /not backfilled as rendered activity/);
   });
 
   group('Provenance, and the Voyager scope limitation');
@@ -2270,12 +2382,15 @@ try {
     }
   });
 
-  check('the checker can see them, rather than missing them on formatting', () => {
+  check('the checker sees both declarations and no longer calls them orphans', () => {
     /*
-     * The regex matches `| { name: '…'` on one line, so a multi-line union
-     * member is invisible to it — both of these were, until they were written
-     * on one line like the other fifty-nine. Benefiting from that blind spot
-     * would have been the same failure as the registry one, in a new place.
+     * The regex matches a union member on one line, so a multi-line one is
+     * invisible to it — both of these were, until they were written on one line
+     * like the rest. That part still matters and is still asserted.
+     *
+     * What changed is the expected result: the Supercharts emitter branch has
+     * landed, so the two events now have real callers. Only the seven inherited
+     * Start declarations remain.
      */
     let output = '';
     try {
@@ -2283,9 +2398,15 @@ try {
     } catch (error) {
       output = `${error.stdout ?? ''}${error.stderr ?? ''}`;
     }
-    assert.match(output, /61 events declared/, 'the checker is not seeing the two new declarations');
-    assert.match(output, /superchart_study_applied/, 'the checker does not report the awaiting emitter');
-    assert.match(output, /superchart_capability_completed/);
+
+    assert.match(output, /61 events declared/, 'the checker is not seeing the two declarations');
+
+    const newBlock = output.split('NEW')[1] ?? '';
+    for (const name of ['superchart_study_applied', 'superchart_capability_completed']) {
+      assert.equal(newBlock.includes(name), false, `${name} is still reported as unemitted`);
+    }
+
+    assert.match(output, /7 inherited/, 'the inherited baseline changed');
   });
 
   check('the reading layer is not counted as an emitter', () => {
@@ -2435,24 +2556,44 @@ try {
     }
   });
 
-  check('Supercharts says intent is intent until the outcome emitter lands', () => {
+  check('Supercharts never describes a toggle as a render', () => {
     const awaiting = conclusions.superchartsConclusion({
       opens: 12,
-      sessionsWithStudy: 4,
-      paneActivations: 3,
+      sessionsRenderingStudy: 4,
+      paneRenders: 3,
+      studyRequests: 5,
       awaitingCapabilityEmitter: true,
-      renderedStudies: 0,
     });
-    assert.match(awaiting, /what people asked for/);
+    assert.match(awaiting, /a toggle is not a render/);
+    assert.match(awaiting, /Capability outcomes are instrumented going forward/);
 
     const landed = conclusions.superchartsConclusion({
       opens: 12,
-      sessionsWithStudy: 4,
-      paneActivations: 3,
+      sessionsRenderingStudy: 4,
+      paneRenders: 3,
+      studyRequests: 5,
       awaitingCapabilityEmitter: false,
-      renderedStudies: 2,
     });
-    assert.match(landed, /recorded separately from intent/);
+    assert.match(landed, /4 sessions where a study rendered/);
+    assert.equal(landed.includes('Capability outcomes'), false);
+  });
+
+  check('the monetization line pluralises a noun, not a phrase', () => {
+    const many = conclusions.monetizationConclusion({
+      paidRecords: { state: 'live', value: 20, sample: 20 },
+      demoRecords: { state: 'live', value: 4, sample: 4 },
+      reconciled: { state: 'live', value: 16, sample: 16 },
+    });
+    assert.equal(many.includes('a providers'), false, `ungrammatical: ${many}`);
+    assert.match(many, /16 records reconciled against a payment provider/);
+
+    const one = conclusions.monetizationConclusion({
+      paidRecords: { state: 'live', value: 1, sample: 1 },
+      demoRecords: { state: 'live', value: 1, sample: 1 },
+      reconciled: { state: 'live', value: 1, sample: 1 },
+    });
+    assert.match(one, /1 record reconciled against a payment provider/);
+    assert.equal(one.includes('1 records'), false);
   });
 
   check('monetization never calls a paid row revenue', () => {
