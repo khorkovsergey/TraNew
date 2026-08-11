@@ -5264,6 +5264,199 @@ try {
     assert.ok(portalKnowledge.portalSection('Expert Services', MENU));
   });
 
+  group('The server says what happened, and nothing about what was asked');
+
+  /*
+   * Metrics Phase 4. Two server events, and the whole risk of them is that a
+   * telemetry column is a place where a question, a ticker or a prompt can end
+   * up by accident and stay for as long as the table does.
+   *
+   * These are contract assertions on the source rather than a persistence
+   * suite, deliberately: the event definitions live on the Metrics branch and
+   * are not on main yet, so anything that tried to write a row here would be
+   * refused by the registry for a reason that has nothing to do with whether
+   * the call sites are right.
+   */
+
+  const routeTelemetry = readFileSync('src/app/api/voyager/route.ts', 'utf8');
+  const toolTelemetry = readFileSync('src/lib/voyager/tools/registry.ts', 'utf8');
+
+  /** One emit block, from the event name to the closing call. */
+  const emits = (source, name) => {
+    const found = [];
+    let at = source.indexOf(`name: '${name}'`);
+    while (at !== -1) {
+      found.push(source.slice(at, source.indexOf('});', at) + 3));
+      at = source.indexOf(`name: '${name}'`, at + 1);
+    }
+    return found;
+  };
+
+  check('the refusal reports itself once, after the charge is given back', () => {
+    const opens = routeTelemetry.indexOf('if (usage.quotaReached) {');
+    const branch = routeTelemetry.slice(
+      opens,
+      routeTelemetry.indexOf('return NextResponse.json(response);', opens)
+    );
+
+    const inBranch = emits(branch, 'voyager_request_completed');
+    assert.equal(inBranch.length, 1, `${inBranch.length} emits in the refusal branch`);
+    assert.match(inBranch[0], /outcome: 'quota_refused'/);
+    assert.match(inBranch[0], /quotaDisposition: 'refused_released'/);
+    // Settled, not intended: the release has to have happened first, or the
+    // disposition would describe a refund that had not been made.
+    assert.ok(
+      branch.indexOf('releaseQuestion') < branch.indexOf("name: 'voyager_request_completed'"),
+      'the refusal is reported before the refund'
+    );
+    // Nothing had been resolved yet, so nothing is claimed.
+    assert.match(inBranch[0], /sourceCount: 0/);
+  });
+
+  check('an answer reports itself exactly once, whichever layer produced it', () => {
+    const all = emits(routeTelemetry, 'voyager_request_completed');
+    // Three exits worth reporting: refused, answered, and the one nobody planned.
+    assert.equal(all.length, 3, `${all.length} completion emits`);
+
+    const outcomes = all.flatMap((block) => [...block.matchAll(/outcome: ([^,\n]+)/g)].map((m) => m[1].trim()));
+    assert.equal(outcomes.length, 3);
+    assert.ok(outcomes.includes("'quota_refused'"));
+    assert.ok(outcomes.includes("'server_failure'"));
+    // The answered one is a conditional rather than a literal, because which of
+    // the two it is depends on whether a model actually answered.
+    assert.ok(
+      outcomes.some((value) => /simulated_fallback/.test(value) && /real_answer/.test(value)),
+      outcomes.join(' | ')
+    );
+  });
+
+  check('and the quota disposition it reports is the one that really happened', () => {
+    /*
+     * The invariant this protects: `simulated_fallback` together with `charged`
+     * means somebody paid a question for the scripted layer. It is supposed to
+     * be visible. Deriving the disposition from the outcome — "it was
+     * simulated, so say released" — would make the metric green and the defect
+     * permanent.
+     */
+    const answered = emits(routeTelemetry, 'voyager_request_completed').find((block) =>
+      /real_answer/.test(block)
+    );
+
+    assert.match(answered, /decision\.charged \? 'charged' : 'released'/);
+    assert.match(answered, /quota === null\s*\?\s*'unmetered'/);
+    // Read off the answer, not inferred from the disposition.
+    assert.match(answered, /answer\.simulated === true \? 'simulated_fallback' : 'real_answer'/);
+    assert.ok(!/simulated[\s\S]{0,80}'released'/.test(answered), 'the disposition was derived from the outcome');
+  });
+
+  check('an unplanned failure is reported without being rescued', () => {
+    // Observability only: no new quota semantic, and the throw carries on.
+    const failure = emits(routeTelemetry, 'voyager_request_completed').find((block) =>
+      /server_failure/.test(block)
+    );
+    assert.match(failure, /quotaDisposition: quota === null \? 'unmetered' : 'charged'/);
+
+    const after = routeTelemetry.slice(routeTelemetry.indexOf("outcome: 'server_failure'"));
+    assert.match(after, /throw error;/);
+  });
+
+  check('every duration is measured on a clock that cannot go backwards', () => {
+    for (const source of [routeTelemetry, toolTelemetry]) {
+      const durations = [...source.matchAll(/durationMs: ([^,\n]+)/g)]
+        .map((m) => m[1].trim())
+        // The field's own type declaration is not a call site.
+        .filter((value) => !value.endsWith(';'));
+      for (const value of durations) {
+        assert.ok(
+          /performance\.now\(\)/.test(value) || value === '0' || value === 'input.durationMs',
+          value
+        );
+      }
+    }
+    assert.ok(!/Date\.now\(\)[\s\S]{0,40}durationMs/.test(routeTelemetry));
+  });
+
+  check('one operational row per call the tool loop handled', () => {
+    const helper = toolTelemetry.slice(
+      toolTelemetry.indexOf('function reportTool'),
+      toolTelemetry.indexOf('export async function runToolCalls')
+    );
+
+    const rows = emits(helper, 'voyager_tool_completed');
+    assert.equal(rows.length, 1, 'the tool event is emitted from one place');
+    assert.match(rows[0], /tool: input\.tool/);
+    assert.match(rows[0], /outcome: input\.ok \? 'success' : 'failure'/);
+
+    // Every branch of the loop reports, so the row count matches the trace the
+    // answer carries — which is what `toolSteps` is counted from.
+    const loop = toolTelemetry.slice(toolTelemetry.indexOf('export async function runToolCalls'));
+    assert.equal((loop.match(/reportTool\(/g) ?? []).length, 4, 'a branch does not report');
+  });
+
+  check('the tool row cannot name the instrument somebody asked about', () => {
+    /*
+     * `trace.call` reads `history(TSLA 1D)`. It is the chip under an answer and
+     * it names the subject, so the shortest way to be sure it never reaches a
+     * telemetry column is for it to have no path into the reporter at all.
+     */
+    const helper = toolTelemetry.slice(
+      toolTelemetry.indexOf('function reportTool'),
+      toolTelemetry.indexOf('export async function runToolCalls')
+    );
+
+    for (const forbidden of ['trace.call', 'signature', 'call.input', 'input.query', 'subject', 'message']) {
+      assert.ok(!helper.includes(forbidden), `${forbidden} reached the tool event`);
+    }
+
+    // The unknown-tool branch reports a constant rather than the name the model
+    // wrote, which is free text from a model.
+    const unknown = toolTelemetry.slice(
+      toolTelemetry.indexOf('if (!isVoyagerToolId(call.name))'),
+      toolTelemetry.indexOf('const tool = VOYAGER_TOOLS[call.name];')
+    );
+    assert.match(unknown, /tool: 'unknown'/);
+    assert.ok(!/tool: call\.name/.test(unknown));
+  });
+
+  check('and the request row carries counts, never content', () => {
+    for (const block of emits(routeTelemetry, 'voyager_request_completed')) {
+      for (const forbidden of [
+        'question',
+        'answer.text',
+        'history',
+        'citation',
+        'subject',
+        'ticker',
+        'symbol',
+        'prompt',
+        'body.',
+      ]) {
+        assert.ok(!block.includes(forbidden), `${forbidden} reached the completion event`);
+      }
+      // Identity is the application id, which the helper hashes. Never the
+      // quota subject, which is a different thing that only looks like one.
+      assert.match(block, /userId: user\?\.id \?\? null/);
+      assert.ok(!/subjectKey|visitor|ip/i.test(block));
+    }
+  });
+
+  check('telemetry is fire-and-forget everywhere it is used', () => {
+    // A tracker that could be awaited is a tracker that can delay an answer,
+    // and one that could reject is one that can fail it.
+    for (const source of [routeTelemetry, toolTelemetry]) {
+      assert.ok(!/await trackServerEvent/.test(source));
+      assert.ok(!/trackServerEvent\([\s\S]*?\)\.then/.test(source));
+    }
+  });
+
+  check('the tool count comes from the trace the answer already carried', () => {
+    // §10: real rather than zero, and threaded without changing `askVoyager`.
+    assert.match(routeTelemetry, /toolSteps: answer\.trace\?\.length \?\? 0/);
+
+    const orchestrator = readFileSync('src/lib/voyager/orchestrator.ts', 'utf8');
+    assert.match(orchestrator, /runToolCalls\(calls, toolContext, seen, step\)/);
+  });
+
   group('A follow-up works on the chart already drawn');
 
   /*

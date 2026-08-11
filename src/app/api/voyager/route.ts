@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { trackServerEvent } from '@/lib/analytics/server';
 import { recordAccess } from '@/lib/audit';
 import { getConsent } from '@/lib/consent';
 import { getSession, type AuthedUser, type PlanId } from '@/lib/session';
@@ -116,6 +117,20 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  /*
+   * The clock for this request.
+   *
+   * Monotonic, so a wall-clock correction landing mid-request cannot produce a
+   * negative duration that nobody can explain afterwards. Started before
+   * anything else, because what is worth reporting is the time this route
+   * actually took rather than the part of it somebody remembered to measure.
+   *
+   * A request that never gets past validation reports nothing at all: a
+   * malformed body is not a Voyager answer that failed, and counting it as one
+   * would put the client's bugs in the same figure as ours.
+   */
+  const startedAt = performance.now();
+
   let body: VoyagerRequest;
   try {
     body = (await request.json()) as VoyagerRequest;
@@ -165,132 +180,245 @@ export async function POST(request: NextRequest) {
   const quota = quotaFor(user);
   let usage = await consumeQuestion(user?.id ?? null, quota);
 
-  if (usage.quotaReached) {
+  /*
+   * A question has now been spent, so every way out of here is worth one
+   * completion event — including the way nobody planned for.
+   *
+   * The sources this request was given, counted rather than named. It is
+   * declared out here so the failure path can report what had been resolved by
+   * the time it fell over, rather than reporting a confident zero.
+   */
+  let sourceCount = 0;
+
+  try {
+    if (usage.quotaReached) {
+      /*
+       * Refused, so refunded. The increment is the check — it has to be, or two
+       * requests arriving together would both read the same count and both pass
+       * — but a refusal that keeps the charge makes the row climb for as long as
+       * somebody keeps asking, and the counter they are shown stops meaning
+       * anything.
+       */
+      usage = await releaseQuestion(user?.id ?? null, quota);
+
+      const response: VoyagerResponse = {
+        answer: {
+          ...quotaAnswer(),
+          upgrade: upgradeFor(tier, context, true, Boolean(user)),
+        },
+        tier,
+        remaining: 0,
+        used: usage.used,
+        total: usage.total,
+        quotaReached: true,
+      };
+
+      /*
+       * The refusal, after the charge has been given back, so the disposition
+       * reported is the settled one rather than the intent.
+       *
+       * `sourceCount` is zero because nothing has been resolved yet: this
+       * request stopped at the counter, and reporting the sources it *would*
+       * have been given would describe an answer that was never assembled.
+       */
+      trackServerEvent({
+        name: 'voyager_request_completed',
+        properties: {
+          screen: context.screen,
+          tier,
+          outcome: 'quota_refused',
+          quotaDisposition: 'refused_released',
+          modelConfigured: isModelConfigured(),
+          durationMs: Math.round(performance.now() - startedAt),
+          sourceCount: 0,
+          toolSteps: 0,
+          hasChart: false,
+          hasStudy: false,
+          actionCount: 0,
+        },
+        userId: user?.id ?? null,
+        entitlement: user?.plan ?? null,
+        surface: 'voyager',
+      });
+
+      return NextResponse.json(response);
+    }
+
+    // Personalization is a stored decision, not a widget toggle: if it was never
+    // granted, the profile source is simply absent from what the model is shown.
+    const personalization = user ? (await getConsent(user.id, 'ai_processing')).granted : false;
+
+    const available = await sourcesFor(context, tier, user, personalization);
+    const disabled = Array.isArray(body.disabledSources) ? body.disabledSources : [];
+    const active = available.filter((source) => !disabled.includes(source.id));
+    sourceCount = active.length;
+
+    const history = Array.isArray(body.history)
+      ? body.history
+          .filter(
+            (turn): turn is { role: 'user' | 'assistant'; text: string } =>
+              !!turn &&
+              (turn.role === 'user' || turn.role === 'assistant') &&
+              typeof turn.text === 'string'
+          )
+          .slice(-8)
+      : [];
+
     /*
-     * Refused, so refunded. The increment is the check — it has to be, or two
-     * requests arriving together would both read the same count and both pass
-     * — but a refusal that keeps the charge makes the row climb for as long as
-     * somebody keeps asking, and the counter they are shown stops meaning
-     * anything.
+     * The chart the last answer drew, by name.
+     *
+     * Passed through unvalidated on purpose: `recallChart` is the gate, and it
+     * accepts nothing but an identifier this process minted. There is no shape a
+     * browser can send here that becomes data — the worst case is a lookup that
+     * misses and a question answered by fetching, which is what every question
+     * did before artifacts existed.
      */
-    usage = await releaseQuestion(user?.id ?? null, quota);
+    const answer = await askVoyager({
+      question,
+      context,
+      tier,
+      sources: active,
+      history,
+      artifact: body.artifact,
+    });
+
+    /*
+     * Nothing was answered, so nothing is charged.
+     *
+     * `simulated` is set only by the scripted layer, which speaks in exactly two
+     * situations: no model is configured here, and the model call failed. Either
+     * way the person did not get an answer to their question — they got this
+     * platform's written background, labelled as such — and the outage card next
+     * to it invites them to press *Retry now*. Charging each of those attempts is
+     * how one question becomes five, and it is the likeliest reading of a live
+     * counter that moved by five while the client sent one request.
+     */
+    const decision = quotaDelta({
+      before: usage.used - 1,
+      quota,
+      answered: answer.simulated !== true,
+    });
+
+    if (!decision.charged) {
+      usage = await releaseQuestion(user?.id ?? null, quota);
+    }
+
+    /*
+     * What happened, once the quota disposition has settled.
+     *
+     * Emitted here rather than beside the response so that a failing audit
+     * write — the next thing this route does — cannot cost the record of an
+     * answer that was produced.
+     *
+     * It describes the request rather than judging it. `simulated_fallback`
+     * with `charged` is a combination this deliberately does not hide: it would
+     * mean somebody paid a question for the scripted layer, and the only way
+     * that is ever noticed is if the two fields are reported independently.
+     *
+     * `toolSteps` is the length of the trace the orchestrator already returns —
+     * one entry per call the tool loop handled, failures included. Nothing was
+     * threaded through `askVoyager` for it.
+     */
+    trackServerEvent({
+      name: 'voyager_request_completed',
+      properties: {
+        screen: context.screen,
+        tier,
+        outcome: answer.simulated === true ? 'simulated_fallback' : 'real_answer',
+        quotaDisposition:
+          quota === null ? 'unmetered' : decision.charged ? 'charged' : 'released',
+        modelConfigured: isModelConfigured(),
+        durationMs: Math.round(performance.now() - startedAt),
+        sourceCount,
+        toolSteps: answer.trace?.length ?? 0,
+        hasChart: Boolean(answer.chart),
+        hasStudy: Boolean(answer.study),
+        actionCount: answer.actions?.length ?? 0,
+      },
+      userId: user?.id ?? null,
+      entitlement: user?.plan ?? null,
+      surface: 'voyager',
+    });
+
+    /*
+     * A question answered with the wealth record is a read of financial data and is
+     * logged as one — the log records that it happened and which sources were in
+     * play, never the question text or any figure from the answer.
+     */
+    if (user && active.some((source) => source.id === 'wealth')) {
+      await recordAccess({
+        userId: user.id,
+        action: 'read',
+        resource: 'wealth_overview',
+        actor: 'voyager',
+        context: { screen: context.screen, sources: active.map((s) => s.id).join(',') },
+      });
+    }
+
+    /*
+     * The chips under an answer, built from what this request was actually given.
+     *
+     * The model writes a prose `sources` line and it is kept, but it is the
+     * model's account of itself. These come from the policy layer — the sources
+     * the server put in front of it — and from the search results, which are a
+     * record rather than a claim. The prose line goes last, labelled as the
+     * model's own note.
+     */
+    const citations = dedupe([
+      ...active.map((source) => ({ label: source.label })),
+      ...(answer.citations ?? []),
+      ...(answer.sources && answer.sources !== 'General knowledge'
+        ? [{ label: answer.sources, detail: 'Stated by Voyager' }]
+        : []),
+    ]).slice(0, 6);
 
     const response: VoyagerResponse = {
       answer: {
-        ...quotaAnswer(),
-        upgrade: upgradeFor(tier, context, true, Boolean(user)),
+        ...answer,
+        citations,
+        upgrade: upgradeFor(tier, context, false, Boolean(user)),
       },
       tier,
-      remaining: 0,
+      remaining: usage.remaining,
       used: usage.used,
       total: usage.total,
-      quotaReached: true,
+      quotaReached: false,
     };
+
     return NextResponse.json(response);
-  }
-
-  // Personalization is a stored decision, not a widget toggle: if it was never
-  // granted, the profile source is simply absent from what the model is shown.
-  const personalization = user ? (await getConsent(user.id, 'ai_processing')).granted : false;
-
-  const available = await sourcesFor(context, tier, user, personalization);
-  const disabled = Array.isArray(body.disabledSources) ? body.disabledSources : [];
-  const active = available.filter((source) => !disabled.includes(source.id));
-
-  const history = Array.isArray(body.history)
-    ? body.history
-        .filter(
-          (turn): turn is { role: 'user' | 'assistant'; text: string } =>
-            !!turn &&
-            (turn.role === 'user' || turn.role === 'assistant') &&
-            typeof turn.text === 'string'
-        )
-        .slice(-8)
-    : [];
-
-  /*
-   * The chart the last answer drew, by name.
-   *
-   * Passed through unvalidated on purpose: `recallChart` is the gate, and it
-   * accepts nothing but an identifier this process minted. There is no shape a
-   * browser can send here that becomes data — the worst case is a lookup that
-   * misses and a question answered by fetching, which is what every question
-   * did before artifacts existed.
-   */
-  const answer = await askVoyager({
-    question,
-    context,
-    tier,
-    sources: active,
-    history,
-    artifact: body.artifact,
-  });
-
-  /*
-   * Nothing was answered, so nothing is charged.
-   *
-   * `simulated` is set only by the scripted layer, which speaks in exactly two
-   * situations: no model is configured here, and the model call failed. Either
-   * way the person did not get an answer to their question — they got this
-   * platform's written background, labelled as such — and the outage card next
-   * to it invites them to press *Retry now*. Charging each of those attempts is
-   * how one question becomes five, and it is the likeliest reading of a live
-   * counter that moved by five while the client sent one request.
-   */
-  const decision = quotaDelta({
-    before: usage.used - 1,
-    quota,
-    answered: answer.simulated !== true,
-  });
-
-  if (!decision.charged) {
-    usage = await releaseQuestion(user?.id ?? null, quota);
-  }
-
-  /*
-   * A question answered with the wealth record is a read of financial data and is
-   * logged as one — the log records that it happened and which sources were in
-   * play, never the question text or any figure from the answer.
-   */
-  if (user && active.some((source) => source.id === 'wealth')) {
-    await recordAccess({
-      userId: user.id,
-      action: 'read',
-      resource: 'wealth_overview',
-      actor: 'voyager',
-      context: { screen: context.screen, sources: active.map((s) => s.id).join(',') },
+  } catch (error) {
+    /*
+     * Something escaped orchestration. Not a provider being down and not a
+     * model refusing — `askVoyager` turns both of those into an answer marked
+     * `simulated`, and they are reported as `simulated_fallback` above. This is
+     * the unplanned one.
+     *
+     * Observability only: the throw is re-raised untouched, so the route
+     * behaves exactly as it did before this event existed. The disposition
+     * reported is the one that is actually true — a question was consumed and
+     * nothing here gives it back, so it stayed charged. Making that read
+     * `released` would be a nicer number about a worse product.
+     */
+    trackServerEvent({
+      name: 'voyager_request_completed',
+      properties: {
+        screen: context.screen,
+        tier,
+        outcome: 'server_failure',
+        quotaDisposition: quota === null ? 'unmetered' : 'charged',
+        modelConfigured: isModelConfigured(),
+        durationMs: Math.round(performance.now() - startedAt),
+        sourceCount,
+        toolSteps: 0,
+        hasChart: false,
+        hasStudy: false,
+        actionCount: 0,
+      },
+      userId: user?.id ?? null,
+      entitlement: user?.plan ?? null,
+      surface: 'voyager',
     });
+
+    throw error;
   }
-
-  /*
-   * The chips under an answer, built from what this request was actually given.
-   *
-   * The model writes a prose `sources` line and it is kept, but it is the
-   * model's account of itself. These come from the policy layer — the sources
-   * the server put in front of it — and from the search results, which are a
-   * record rather than a claim. The prose line goes last, labelled as the
-   * model's own note.
-   */
-  const citations = dedupe([
-    ...active.map((source) => ({ label: source.label })),
-    ...(answer.citations ?? []),
-    ...(answer.sources && answer.sources !== 'General knowledge'
-      ? [{ label: answer.sources, detail: 'Stated by Voyager' }]
-      : []),
-  ]).slice(0, 6);
-
-  const response: VoyagerResponse = {
-    answer: {
-      ...answer,
-      citations,
-      upgrade: upgradeFor(tier, context, false, Boolean(user)),
-    },
-    tier,
-    remaining: usage.remaining,
-    used: usage.used,
-    total: usage.total,
-    quotaReached: false,
-  };
-
-  return NextResponse.json(response);
 }
