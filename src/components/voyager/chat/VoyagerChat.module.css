@@ -12,6 +12,38 @@
  * noticing.
  */
 
+/* --------------------------------------------------------------- Typeface */
+
+/*
+ * One family for everything Voyager says.
+ *
+ * The portal's stack leads with Plus Jakarta Sans and falls back to Manrope.
+ * Jakarta is loaded without Cyrillic, so a Russian answer is resolved *per
+ * glyph*: the Cyrillic comes from Manrope and the tickers, indicators and
+ * numbers in the same sentence come from Jakarta. "Добавь RSI для QQQ" is then
+ * literally two typefaces in one line, and it reads as the softer, heavier
+ * text people have been noticing.
+ *
+ * Manrope carries latin, cyrillic and cyrillic-ext, so naming it first makes
+ * every script in an answer come from the same file. Nothing global changes —
+ * this is the two roots of the Voyager page, and every control below already
+ * says `font-family: inherit`, so the whole surface follows without a
+ * declaration per selector.
+ *
+ * Two selectors rather than one because the page is a fragment: the status
+ * strip is full-bleed under the app header and the columns are centred inside
+ * it, and they are siblings.
+ */
+.statusBar,
+.page {
+  font-family:
+    var(--font-manrope),
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
 /* ------------------------------------------------------------ status strip */
 
 .statusBar {

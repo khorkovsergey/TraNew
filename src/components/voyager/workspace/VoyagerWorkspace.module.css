@@ -347,6 +347,22 @@
   flex-direction: column;
   height: calc(100vh - 64px);
   background: var(--tn-surface);
+  /*
+   * One family for everything Voyager says — see the note in
+   * `chat/VoyagerChat.module.css`. Plus Jakarta Sans has no Cyrillic, so the
+   * portal's stack resolves a Russian sentence per glyph and mixes two
+   * typefaces inside one line. Manrope has latin and both Cyrillic ranges.
+   *
+   * Declared on the shell, which is the whole workspace: the sidebar, the
+   * modules, the composer and the inspector are all inside it, and every
+   * control below already inherits.
+   */
+  font-family:
+    var(--font-manrope),
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
 }
 
 .topBar {
