@@ -133,6 +133,46 @@ export async function readSessions(since: Date): Promise<SessionRead> {
 }
 
 /**
+ * The behavioural events a product-family funnel needs.
+ *
+ * A separate, narrower read than `readSessions`, because most of these are not
+ * meaningful actions and so are not in the session projection: a level
+ * selection is a funnel step, not value. Only the four columns a funnel reads
+ * are selected, and the caller names the events, so an unbounded fetch is not
+ * expressible here.
+ */
+export async function readFunnelEvents(
+  since: Date,
+  eventNames: readonly string[]
+): Promise<Array<{ sessionId: string; eventName: string; occurredAt: number; properties: Record<string, unknown> }>> {
+  if (eventNames.length === 0) return [];
+
+  const rows = await db
+    .select({
+      sessionId: schema.productTelemetryEvent.sessionId,
+      eventName: schema.productTelemetryEvent.eventName,
+      occurredAt: schema.productTelemetryEvent.occurredAt,
+      properties: schema.productTelemetryEvent.properties,
+    })
+    .from(schema.productTelemetryEvent)
+    .where(
+      and(
+        gte(schema.productTelemetryEvent.occurredAt, since),
+        inArray(schema.productTelemetryEvent.eventName, [...eventNames])
+      )
+    )
+    .orderBy(schema.productTelemetryEvent.occurredAt)
+    .limit(MAX_PROJECTION_ROWS);
+
+  return rows.map((row) => ({
+    sessionId: row.sessionId,
+    eventName: row.eventName,
+    occurredAt: new Date(row.occurredAt).getTime(),
+    properties: (row.properties ?? {}) as Record<string, unknown>,
+  }));
+}
+
+/**
  * One row per authenticated user per UTC day.
  *
  * Grouped in the database and never materialised as events: retention needs no

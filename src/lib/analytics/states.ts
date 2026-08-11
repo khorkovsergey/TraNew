@@ -65,10 +65,33 @@ export type NumericState = (typeof NUMERIC_STATES)[number];
 
 /* ---------------------------------------------------------- The metric value */
 
+/**
+ * What kind of thing produced a number.
+ *
+ * The distinction the Observatory turns on, and the one a single "source"
+ * string cannot carry: **telemetry describes behaviour, a durable table
+ * describes a business fact, and the two are different evidence about the same
+ * flow rather than two measurements of it.** A registration event says a UI
+ * reported success; an `event_registration` row says a seat exists. Adding them
+ * would count one registration twice, and reading either as the other is how a
+ * dashboard ends up asserting something nobody measured.
+ */
+export const SOURCE_TYPES = [
+  'telemetry',
+  'durable_fact',
+  'derived',
+  'external',
+  'source_not_connected',
+] as const;
+
+export type SourceType = (typeof SOURCE_TYPES)[number];
+
 /** Where a number came from, so a reviewer can ask and get an answer. */
 export type MetricProvenance = {
-  /** `product_telemetry_event`, `purchase`, `academy_progress`, … */
+  /** The exact table or stream — `event_registration`, not "the database". */
   source: string;
+  /** Behaviour, business fact, or neither. */
+  sourceType?: SourceType;
   /** The id in the metric dictionary, so the formula is one lookup away. */
   metricId: string;
   /** Server clock at query time. */
