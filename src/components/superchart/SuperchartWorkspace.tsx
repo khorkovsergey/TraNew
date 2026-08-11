@@ -54,6 +54,14 @@ import {
 import { saveLayoutAction } from '@/app/actions/superchart';
 import { buildChartContext, type ContextChipId } from '@/lib/superchart/context';
 import {
+  intervalReport,
+  paneCountOf,
+  seriesHasVolume,
+  studyReports,
+  unreportedOutcomes,
+  type CapabilityOutcome,
+} from '@/lib/superchart/telemetry/outcomes';
+import {
   applyCommands,
   selectedCommands,
   type CommandPlan,
@@ -244,16 +252,72 @@ export function SuperchartWorkspace({
 
       const step = INTERVAL_SECONDS[interval];
       const to = Math.floor(Date.now() / 1000);
-      const response = await feed.getBars({
-        symbolId: found.id,
-        interval,
-        from: to - step * 5000,
-        to,
-      });
+
+      /*
+       * The adapter's answer is the decision point for the interval.
+       *
+       * It is the one place that knows all three of the things the dashboard has
+       * to keep apart: whether this provider serves the interval at all, whether
+       * it had bars for the window, and whether the request itself came apart.
+       * From outside, all three look like an empty chart.
+       */
+      let response;
+      try {
+        response = await feed.getBars({
+          symbolId: found.id,
+          interval,
+          from: to - step * 5000,
+          to,
+        });
+      } catch {
+        if (!cancelled) {
+          const report = intervalReport({
+            interval,
+            supportedIntervals: found.supportedIntervals,
+            bars: 0,
+            threw: true,
+          });
+          if (report) {
+            track({
+              name: 'superchart_capability_completed',
+              capability: report.capability,
+              outcome: report.outcome,
+              hasVolume: false,
+              paneCount: paneCountOf(engineRef.current?.paintedFrame() ?? null),
+            });
+          }
+        }
+        return;
+      }
+
+      const superseded = response.note === 'superseded';
+
+      // Reported before the early return, because a refusal is exactly the case
+      // that returns no bars and would otherwise leave no trace. A superseded
+      // response is not reported at all: it is not a decision about the request,
+      // it is a newer request having replaced it.
+      if (!cancelled) {
+        const report = intervalReport({
+          interval,
+          supportedIntervals: found.supportedIntervals,
+          bars: response.bars.length,
+          superseded,
+        });
+
+        if (report) {
+          track({
+            name: 'superchart_capability_completed',
+            capability: report.capability,
+            outcome: report.outcome,
+            hasVolume: seriesHasVolume(response.bars),
+            paneCount: paneCountOf(engineRef.current?.paintedFrame() ?? null),
+          });
+        }
+      }
 
       // A superseded response carries no bars; applying it would replace what
       // the person is looking at with what they left.
-      if (cancelled || response.note === 'superseded') return;
+      if (cancelled || superseded) return;
 
       setBars(response.bars);
       setNote(response.note ?? null);
@@ -420,9 +484,77 @@ export function SuperchartWorkspace({
     ];
   }, [indicators, scriptPlots]);
 
+  /**
+   * Which outcome each study last reported.
+   *
+   * Keyed by the id that was asked for, so one successful application produces
+   * one pair of events however many times the chart repaints — panning, zooming,
+   * switching interval and resizing all recompute the studies, and none of them
+   * is a new attempt. An entry is dropped when its study leaves the chart,
+   * because adding it again is.
+   *
+   * Storing the outcome rather than a flag lets a genuine change through: a
+   * volume study that read `no_data` on a series without volume and renders
+   * after a switch to one that has it has actually completed, and the dashboard
+   * should see that.
+   */
+  const reportedStudies = useRef(new Map<string, CapabilityOutcome>());
+
   useEffect(() => {
     engineRef.current?.setIndicators(withScriptPreview, studyPalette);
-  }, [withScriptPreview, studyPalette]);
+
+    const engine = engineRef.current;
+    // No bars means nothing has been attempted yet: every series is null before
+    // the first load, and reporting here would file an untried chart as missing
+    // data.
+    if (!engine || !bars.length) return;
+
+    /*
+     * One frame later, deliberately.
+     *
+     * `setIndicators` stores the list and schedules a paint; everything that
+     * could still go wrong happens after it returns. Our callback is registered
+     * after the engine's, so it runs after that paint in the same frame and
+     * reads what the paint actually produced — which is the difference between
+     * this event and the toggle event above it.
+     */
+    const handle = requestAnimationFrame(() => {
+      const frame = engine.paintedFrame();
+      const reports = studyReports({
+        // The committed studies, not the previewed ones: a proposal drawn dashed
+        // on the chart is not on the chart.
+        choices: studyChoices,
+        instances: indicators.filter((instance) => !instance.draft),
+        frame,
+      });
+
+      const paneCount = paneCountOf(frame);
+      const hasVolume = seriesHasVolume(bars);
+
+      for (const report of unreportedOutcomes(reports, reportedStudies.current)) {
+        // The study rendered. Placement is where the engine put it, read off the
+        // painted frame rather than predicted from the registry.
+        if (report.outcome === 'fulfilled' && report.placement) {
+          track({
+            name: 'superchart_study_applied',
+            study: report.study,
+            placement: report.placement,
+            paneCount,
+          });
+        }
+
+        track({
+          name: 'superchart_capability_completed',
+          capability: report.capability,
+          outcome: report.outcome,
+          hasVolume,
+          paneCount,
+        });
+      }
+    });
+
+    return () => cancelAnimationFrame(handle);
+  }, [withScriptPreview, studyPalette, bars, indicators, studyChoices]);
 
   useEffect(() => {
     engineRef.current?.setDrawings(shownState.drawings, selectedId);
