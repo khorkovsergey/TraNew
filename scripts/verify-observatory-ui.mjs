@@ -5,11 +5,22 @@ import { join } from 'node:path';
 /**
  * The Observatory, in a browser.
  *
- * Deliberately small. The metric suite already proves the numbers; this proves
- * the things only a rendered page can answer — that both modes render, that no
- * canonical state comes out looking like a zero, that a table scrolls inside
- * itself rather than pushing the page sideways, and that somebody who enters
- * presentation mode on a keyboard can leave it.
+ * The metric suite already proves the numbers. This proves the things only a
+ * rendered page can answer, and after the design-handoff rebuild that is two
+ * sets of claims rather than one.
+ *
+ * **Truthfulness** — unchanged from the previous revision, and deliberately so.
+ * No canonical absent state may come out looking like a zero, CLS stays a
+ * score, the Voyager server-request scope stays on the page, market wording
+ * stays "resolutions", and Supercharts keeps intent and render apart. These
+ * assertions encode product semantics, not layout, so the redesign was not
+ * allowed to weaken them.
+ *
+ * **Structure** — new, and encoding the supplied design rather than the Phase 6
+ * page it replaced: a standalone dark console with no customer chrome, fourteen
+ * numbered sections, a sticky rail that hides on narrow viewports, right-side
+ * drawers with real dialog semantics, and a presentation mode that changes
+ * emphasis without changing a value.
  *
  *   node scripts/verify-observatory-ui.mjs
  *
@@ -21,10 +32,42 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:3414';
 const SECRET = process.env.METRICS_ACCESS_SECRET;
 const SHOTS = process.env.OBSERVATORY_SHOTS ?? '';
 
-const WIDTHS = [
-  { name: 'presentation', width: 1920, height: 1080 },
+/** The design's own preview size first, then the two the brief asks about. */
+const VIEWPORTS = [
+  { name: 'design', width: 1600, height: 1100 },
   { name: 'laptop', width: 1440, height: 900 },
-  { name: 'narrow', width: 390, height: 844 },
+  { name: 'tablet', width: 1024, height: 800 },
+  { name: 'mobile', width: 390, height: 844 },
+];
+
+/** The fourteen sections, in the order the rail numbers them. */
+const SECTIONS = [
+  's-exec',
+  's-strategy',
+  's-lifecycle',
+  's-continuation',
+  's-start',
+  's-retention',
+  's-areas',
+  's-voyager',
+  's-charts',
+  's-money',
+  's-acq',
+  's-reliability',
+  's-coverage',
+  's-states',
+];
+
+/** Every state that is NOT a number. None of them may render as one. */
+const ABSENT_STATES = [
+  'insufficient_sample',
+  'source_not_connected',
+  'feature_disabled',
+  'coming_soon',
+  'external',
+  'legacy',
+  'stale',
+  'not_measurable',
 ];
 
 let passed = 0;
@@ -49,7 +92,7 @@ const browser = await chromium.launch();
 
 try {
   const context = await browser.newContext({
-    viewport: WIDTHS[1],
+    viewport: VIEWPORTS[0],
     /* A headless UA is dropped by ingest, and this run must not write anyway. */
     userAgent:
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
@@ -57,9 +100,19 @@ try {
 
   const page = await context.newPage();
 
+  const consoleErrors = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+
+  /* ------------------------------------------------------------- Access */
+
   console.log('\nAccess');
   await page.goto(`${BASE}/en/admin_admin_metrics`, { waitUntil: 'domcontentloaded' });
-  check('the unauthorized shell renders nothing', !(await page.getByText('Product pulse').count()));
+  check(
+    'the unauthorized shell renders no section',
+    (await page.locator('#s-exec').count()) === 0
+  );
 
   const exchange = await page.request.post(`${BASE}/api/admin-metrics/access`, {
     data: { secret: SECRET },
@@ -68,108 +121,375 @@ try {
 
   await page.goto(`${BASE}/en/admin_admin_metrics`, { waitUntil: 'networkidle' });
 
-  console.log('\nInformation architecture');
-  const sections = ['pulse', 'journeys', 'surfaces', 'voyager', 'supercharts', 'market-data', 'reliability', 'monetization', 'coverage'];
-  for (const id of sections) {
+  /* --------------------------------------------------- Standalone shell */
+
+  console.log('\nStandalone Observatory shell');
+  check('the Observatory root is present', (await page.locator('[data-observatory]').count()) === 1);
+  check(
+    'the sticky Observatory header is present',
+    (await page.locator('[data-observatory-header]').count()) === 1
+  );
+  check(
+    'the header is sticky',
+    (await page.locator('[data-observatory-header]').evaluate((node) => getComputedStyle(node).position)) ===
+      'sticky'
+  );
+
+  /*
+   * The customer chrome must be absent, not merely hidden. A CSS-hidden header
+   * still ships its markup, its focus targets and its network prefetches.
+   */
+  check('no customer portal wrapper', (await page.locator('.tn-app').count()) === 0);
+  check('no customer header', (await page.locator('header[class*="Header"]').count()) === 0);
+  check('no customer footer', (await page.locator('footer[class*="Footer"]').count()) === 0);
+  /*
+   * Matched on the widget's own markup rather than on the word "Voyager": the
+   * Observatory has a Voyager cockpit and a Voyager product-area card, and a
+   * text match would fail on the page's own legitimate content.
+   */
+  check(
+    'no floating Voyager widget',
+    (await page.locator('[class*="VoyagerWidget"], [class*="voyagerWidget"]').count()) === 0
+  );
+
+  const ground = await page.locator('[data-observatory]').evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { color: style.color, background: style.backgroundColor + style.backgroundImage };
+  });
+  check(
+    'the Observatory paints its own dark ground',
+    /rgb\(4,\s*7,\s*12\)|#04070c/.test(ground.background),
+    ground.background.slice(0, 80)
+  );
+
+  /* ------------------------------------------- Information architecture */
+
+  console.log('\nFourteen-section architecture');
+  for (const id of SECTIONS) {
     check(`section ${id} renders`, (await page.locator(`#${id}`).count()) === 1);
   }
 
-  const order = await page.$$eval('section[id]', (nodes) => nodes.map((node) => node.id));
+  const order = await page.$$eval('section[id^="s-"]', (nodes) => nodes.map((node) => node.id));
   check(
-    'sections appear outcome → journey → product → AI → reliability → measurement',
-    sections.every((id, index) => order.indexOf(id) >= (index === 0 ? 0 : order.indexOf(sections[index - 1]))),
+    'the sections appear in the design order',
+    SECTIONS.every((id, index) => order.indexOf(id) === index),
     order.join(' → ')
   );
 
+  /* ------------------------------------------------------ Section rail */
+
+  console.log('\nSection rail');
+  const rail = page.locator('nav[aria-label="Sections"]');
+  check('the rail exists', (await rail.count()) === 1);
+  check('the rail is visible at desktop width', await rail.isVisible());
+  check(
+    'the rail links to every section',
+    (await rail.locator('a[href^="#s-"]').count()) === SECTIONS.length
+  );
+  check(
+    'the rail is sticky',
+    (await rail.evaluate((node) => getComputedStyle(node).position)) === 'sticky'
+  );
+  check(
+    'the rail carries the provenance legend',
+    (await rail.getByText('Provenance states').count()) === 1
+  );
+  check(
+    'the rail offers the metric dictionary',
+    (await rail.getByRole('button', { name: 'Metric dictionary' }).count()) === 1
+  );
+
+  /* ------------------------------------------ States never look like zero */
+
   console.log('\nData states never look like zero');
-  const absent = await page.$$eval('[data-state]', (nodes) =>
+  const absent = await page.$$eval('[data-state]', (nodes, states) =>
     nodes
-      .filter((node) => !['live', 'derived', 'instrumented_going_forward'].includes(node.dataset.state ?? ''))
-      .map((node) => ({ state: node.dataset.state, text: (node.textContent ?? '').trim() }))
+      .filter((node) => states.includes(node.dataset.state ?? ''))
+      .filter((node) => node.matches('button, [class*="Card"], [class*="card"]'))
+      .map((node) => ({ state: node.dataset.state, text: (node.textContent ?? '').trim() })),
+    ABSENT_STATES
   );
 
   check('at least one non-numeric state is on the page', absent.length > 0, `${absent.length} found`);
   check(
-    'no absent metric renders a bare 0 or 0%',
-    absent.every((card) => !/(^|\s)0(\.0)?%?(\s|$)/.test(card.text.split('\n')[1] ?? '')),
+    'every absent card says a word rather than a figure',
+    absent.every((card) => /[A-Za-z]{3}/.test(card.text)),
+    absent
+      .filter((card) => !/[A-Za-z]{3}/.test(card.text))
+      .map((card) => card.state)
+      .join(', ')
+  );
+  check(
+    'no absent card leads with a bare 0 or 0%',
+    absent.every((card) => !/^0(\.0)?%?$/.test(card.text.split('\n')[0]?.trim() ?? '')),
     absent.map((card) => card.state).join(', ')
   );
 
-  const notMeasurable = absent.filter((card) => card.state === 'not_measurable');
-  check(
-    'a not-measurable card explains itself',
-    notMeasurable.length === 0 || notMeasurable.every((card) => card.text.length > 40)
+  /* Every state badge carries its word, so nothing means anything by hue alone. */
+  const badges = await page.$$eval('[data-state]', (nodes) =>
+    nodes
+      .filter((node) => node.className.includes('badge'))
+      .map((node) => (node.textContent ?? '').trim())
   );
+  check('every state badge is labelled in words', badges.length > 0 && badges.every(Boolean));
 
-  console.log('\nUnits');
-  const vitalsText = await page.locator('#reliability').innerText();
-  check('CLS is labelled a score, not a time', /CLS\s*\(score\)/.test(vitalsText), vitalsText.slice(0, 80));
+  console.log('\nCanonical states the redesign must not have dropped');
+  /* Lower-cased: the state tags carry `text-transform: uppercase`, so innerText
+     returns them shouted and a case-sensitive match would test the CSS. */
+  const statesText = (await page.locator('#s-states').innerText()).toLowerCase();
+  for (const label of ['collecting', 'not measurable', 'delayed', 'legacy', 'coming soon', 'no source']) {
+    check(`the state kit names "${label}"`, statesText.includes(label));
+  }
+
+  /* ------------------------------------------------------- Truthfulness */
+
+  console.log('\nUnits and limitations survive the redesign');
+  const vitalsText = await page.locator('#s-reliability').innerText();
+  check('CLS is labelled a score, not a time', /CLS\s*\(score\)/.test(vitalsText));
   check('the time vitals are labelled as time', /LCP\s*\(time\)/.test(vitalsText));
   check(
     'client failures keep their stated denominator',
-    vitalsText.includes('per 1,000') || (await page.getByText('Failures per 1,000 page views').count()) > 0
-  );
-
-  console.log('\nLimitations survive');
-  check(
-    'the Voyager server-request scope is on the page',
-    (await page.getByText(/voyager\/research/).count()) > 0
+    /per 1,000 page views/.test(vitalsText)
   );
   check(
     'market wording says resolutions rather than provider requests',
-    (await page.getByText('Market data resolutions').count()) > 0 &&
-      (await page.getByText('Provider network requests').count()) === 0
+    /Market data resolutions/.test(vitalsText) && !/Provider network requests/.test(vitalsText)
   );
+  /* A sentence saying no uptime is claimed must not itself trip this. What is
+     forbidden is a figure presented as one. */
+  check(
+    'no provider uptime figure is claimed',
+    !/\d+(\.\d+)?\s*%\s*uptime|uptime[:\s]+\d/i.test(vitalsText)
+  );
+
+  const voyagerText = await page.locator('#s-voyager').innerText();
+  check('the Voyager server-request scope is on the page', /voyager\/research/.test(voyagerText));
+  check(
+    'a simulated fallback is not called a success',
+    /not a success/.test(voyagerText) || /never merged/.test(voyagerText)
+  );
+  /*
+   * Checked against the section rather than a card, deliberately. A card whose
+   * metric is absent renders its absence reason in the subline slot, so the
+   * denominator rule has to live in prose that survives every data state.
+   */
+  check(
+    'the quota refusal denominator is stated',
+    /refusals excluded/.test(voyagerText) && /over\s+every request/i.test(voyagerText)
+  );
+
+  const chartsText = await page.locator('#s-charts').innerText();
   check(
     'Supercharts separates intent from rendered outcome',
-    (await page.getByText(/Intent and outcome are different rows/).count()) > 0
+    /Intent and outcome are different rows/.test(chartsText)
+  );
+  check('Supercharts names the intent event', /superchart_study_toggled/.test(chartsText));
+  check('Supercharts names the render event', /superchart_study_applied/.test(chartsText));
+  check(
+    'no TradingView handoff KPI is reintroduced',
+    !/native vs tradingview/i.test(chartsText) || /not reintroduced/.test(chartsText)
   );
 
-  console.log('\nPresentation mode');
-  const toggle = page.getByRole('button', { name: /Presentation mode/ });
-  check('the toggle is a real button', (await toggle.count()) === 1);
-
-  const beforeText = await page.locator('#pulse').innerText();
-  await toggle.click();
-  await page.waitForTimeout(200);
-
-  check('the shell switches mode', (await page.locator('[data-mode="presentation"]').count()) === 1);
-  check('values are unchanged by the mode', (await page.locator('#pulse').innerText()).includes(beforeText.split('\n')[2] ?? ''));
-  check('detail drawers collapse', (await page.locator('details[class*="detail"]:visible').count()) === 0);
+  const moneyText = await page.locator('#s-money').innerText();
+  check('confirmed revenue is absent rather than zero', /Source not connected/.test(moneyText));
   check(
-    'a limitation is still visible',
-    (await page.getByText(/no payment provider is\s+connected|Confirmed revenue/).count()) > 0
+    'the four commercial facts are kept apart',
+    /Offer exposure/.test(moneyText) &&
+      /Entitlement/.test(moneyText) &&
+      /Purchase record/.test(moneyText) &&
+      /Provider-confirmed transaction/.test(moneyText)
+  );
+  check(
+    'the retired five-plan lineup is not restored',
+    !/(Essential|Premium|Ultimate)/.test(moneyText),
+    moneyText.slice(0, 120)
+  );
+
+  const retentionText = await page.locator('#s-retention').innerText();
+  check(
+    'anonymous return stays not measurable',
+    /Not measurable/.test(retentionText) && /authenticated/i.test(retentionText)
+  );
+
+  console.log('\nNo invented comparison or trend');
+  const bodyText = await page.locator('[data-observatory]').innerText();
+  check(
+    'no decorative "vs previous period" delta',
+    !/[+−-]\s*\d+(\.\d+)?\s*(%|pp)\s*(vs|versus)/i.test(bodyText)
+  );
+  check(
+    'the comparison control is disabled rather than fake',
+    await page.locator('select[aria-label^="Comparison basis"]').isDisabled()
+  );
+  check(
+    'the North Star panel says the series is unavailable',
+    /Historical trend not available/.test(await page.locator('#s-exec').innerText())
+  );
+
+  /* ------------------------------------------------------------ Drawers */
+
+  console.log('\nMetric drill-down drawer');
+  await page.locator('#s-exec button').first().click();
+  await page.waitForTimeout(250);
+
+  const drawer = page.locator('[data-drawer]');
+  check('a drawer opens on a KPI click', (await drawer.count()) === 1);
+  check('the drawer is a modal dialog', (await drawer.getAttribute('aria-modal')) === 'true');
+  check('the drawer sits on the right', (await drawer.evaluate((node) => getComputedStyle(node).right)) === '0px');
+  const drawerText = (await drawer.innerText()).toLowerCase();
+  check(
+    'the drawer explains the metric rather than dumping rows',
+    drawerText.includes('provenance') && drawerText.includes('privacy')
+  );
+  check(
+    'the drawer states that no comparison exists',
+    /No previous-period comparison exists/.test(await drawer.innerText())
   );
 
   await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  check('Escape closes the drawer', (await page.locator('[data-drawer]').count()) === 0);
+
+  console.log('\nMetric dictionary drawer');
+  await page.getByRole('button', { name: 'Metric dictionary' }).first().click();
+  await page.waitForTimeout(250);
+  check('the dictionary opens', (await page.locator('[data-drawer]').count()) === 1);
+  check(
+    'the dictionary lists real definitions',
+    /Portal Meaningful Continuation Rate/.test(await page.locator('[data-drawer]').innerText())
+  );
+  await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
+
+  console.log('\nData sources drawer');
+  await page.getByRole('button', { name: /Data sources/ }).click();
+  await page.waitForTimeout(250);
+  const sources = await page.locator('[data-drawer]').innerText();
+  check('the sources drawer opens', (await page.locator('[data-drawer]').count()) === 1);
+  check('it names what is not connected', /not connected/i.test(sources));
+  check('it shows source state rather than raw events', !/session_id|user_id/.test(sources));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+
+  /* -------------------------------------------------- Presentation mode */
+
+  console.log('\nPresentation mode');
+  const toggle = page.getByRole('button', { name: 'Presentation' });
+  check('the toggle is a real button', (await toggle.count()) === 1);
+  check('it is not pressed to begin with', (await toggle.getAttribute('aria-pressed')) === 'false');
+
+  const execBefore = await page.locator('#s-exec').innerText();
+  await toggle.click();
+  await page.waitForTimeout(250);
+
+  check('the shell switches mode', (await page.locator('[data-mode="presentation"]').count()) === 1);
+  check('aria-pressed follows the mode', (await toggle.getAttribute('aria-pressed')) === 'true');
+  check('values are unchanged by the mode', (await page.locator('#s-exec').innerText()) === execBefore);
+  check('the filter chip strip is hidden', !(await page.locator('#s-areas').isVisible()));
+  check(
+    'the presenter sections stay visible',
+    (await page.locator('#s-exec').isVisible()) &&
+      (await page.locator('#s-strategy').isVisible()) &&
+      (await page.locator('#s-lifecycle').isVisible()) &&
+      (await page.locator('#s-voyager').isVisible()) &&
+      (await page.locator('#s-reliability').isVisible())
+  );
+  check(
+    'caveats for the visible metrics stay accessible',
+    /Confirmed revenue has no source/.test(await page.locator('[data-observatory]').innerText())
+  );
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
   check('Escape leaves presentation mode', (await page.locator('[data-mode="detail"]').count()) === 1);
 
+  /* -------------------------------------------------------- Accessibility */
+
   console.log('\nAccessibility');
-  await page.keyboard.press('Tab');
-  const focusTag = await page.evaluate(() => document.activeElement?.tagName ?? '');
-  check('something focusable exists', ['A', 'BUTTON', 'SUMMARY'].includes(focusTag), focusTag);
   check(
     'the period control marks the current option',
     (await page.locator('[aria-current="page"]').count()) === 1
   );
-  check('tables carry captions or headers', (await page.locator('table th[scope]').count()) > 0);
+  check('tables carry scoped headers', (await page.locator('table th[scope]').count()) > 0);
+  check(
+    'every section is labelled by its heading',
+    (await page.locator('section[aria-labelledby]').count()) === SECTIONS.length
+  );
+
+  /* ------------------------------------------------------------ Responsive */
 
   console.log('\nResponsive');
-  for (const size of WIDTHS) {
+  for (const size of VIEWPORTS) {
     await page.setViewportSize({ width: size.width, height: size.height });
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(300);
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
     );
     check(`no page-level horizontal overflow at ${size.name} (${size.width}px)`, !overflow);
 
+    if (size.width <= 1240) {
+      check(`the rail is hidden at ${size.name}`, !(await rail.isVisible()));
+    } else {
+      check(`the rail is visible at ${size.name}`, await rail.isVisible());
+      check(
+        `the inline chip strip is visible at ${size.name}`,
+        await page.locator('[data-filter-strip]').isVisible()
+      );
+    }
+
+    if (size.width <= 1024) {
+      const filterButton = page.getByRole('button', { name: /^Filters/ });
+      check(`the Filters button appears at ${size.name}`, await filterButton.isVisible());
+      check(
+        `the inline chip strip is hidden at ${size.name}`,
+        !(await page.locator('[data-filter-strip]').isVisible())
+      );
+    }
+
     if (SHOTS) {
       mkdirSync(SHOTS, { recursive: true });
       await page.screenshot({ path: join(SHOTS, `observatory-${size.name}.png`), fullPage: false });
     }
   }
+
+  /* ------------------------------------------------------- Filters drawer */
+
+  console.log('\nFilters drawer');
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await page.waitForTimeout(250);
+  await page.getByRole('button', { name: /^Filters/ }).click();
+  await page.waitForTimeout(250);
+
+  const filters = page.locator('[data-drawer]');
+  check('the filters drawer opens', (await filters.count()) === 1);
+  check('it is a modal dialog', (await filters.getAttribute('aria-modal')) === 'true');
+  check(
+    'unsupported segmentation is disabled rather than fake',
+    (await filters.locator('button[disabled]').count()) > 0
+  );
+  check(
+    'it says why a dimension is unavailable',
+    /not available|precomputed|No geography/.test(await filters.innerText())
+  );
+  check('it offers a reset', (await filters.getByRole('button', { name: /Reset/ }).count()) > 0);
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(250);
+  await page.getByRole('button', { name: /^Filters/ }).click();
+  await page.waitForTimeout(250);
+  const width = await page.locator('[data-drawer]').evaluate((node) => node.getBoundingClientRect().width);
+  check('the drawer is full width on mobile', Math.round(width) >= 388, `${Math.round(width)}px`);
+  await page.keyboard.press('Escape');
+
+  /* ---------------------------------------------------------------- Console */
+
+  console.log('\nConsole');
+  const real = consoleErrors.filter((message) => !/favicon|Download the React DevTools/i.test(message));
+  check('no console errors', real.length === 0, real.slice(0, 3).join(' | '));
 } catch (error) {
   failed += 1;
   console.log(`\n  FAIL the run stopped early — ${String(error).split('\n')[0]}`);

@@ -2199,7 +2199,7 @@ try {
   });
 
   check('Pine is generated, exported and previewed — never executed', () => {
-    const source = readFileSync('src/components/admin-metrics/ReliabilityPanel.tsx', 'utf8');
+    const source = readFileSync('src/components/admin-metrics/sections/SuperchartsCockpit.tsx', 'utf8');
     assert.match(source, /never executed or backtested/);
     for (const forbidden of ['scriptsRun', 'backtested:', 'scriptsExecuted']) {
       assert.equal(source.includes(forbidden), false, `the panel claims Pine is ${forbidden}`);
@@ -2280,19 +2280,34 @@ try {
   });
 
   check('the rendered cards cite the applied event', () => {
-    const panel = readFileSync('src/components/admin-metrics/ReliabilityPanel.tsx', 'utf8');
-    for (const metricId of ['supercharts_study_sessions', 'supercharts_pane_activations', 'supercharts_overlay_activations']) {
-      const at = panel.indexOf(`metricId: '${metricId}'`);
-      assert.ok(at > -1, `${metricId} is missing`);
-      const card = panel.slice(at, panel.indexOf('}}', at));
-      assert.match(card, /superchart_study_applied/, `${metricId} still cites the toggle`);
+    /*
+     * Re-pointed at the redesigned cockpit. The claim is unchanged and is the
+     * one that matters: a card reporting a render names the applied event as
+     * its source, and the intent card names the toggle — so a reader can see
+     * from the card itself which of the two it was counted from.
+     */
+    const panel = readFileSync('src/components/admin-metrics/sections/SuperchartsCockpit.tsx', 'utf8');
+
+    for (const rendered of ['charts.sessionsWithStudy', 'charts.sessionsWithPaneStudy']) {
+      const at = panel.indexOf(rendered);
+      assert.ok(at > -1, `${rendered} is missing from the cockpit`);
+      const card = panel.slice(at, at + 260);
+      assert.match(card, /superchart_study_applied|own axis/, `${rendered} does not cite the applied event`);
+      assert.equal(/superchart_study_toggled/.test(card), false, `${rendered} cites the toggle`);
     }
 
-    const requestCard = panel.slice(
-      panel.indexOf("metricId: 'supercharts_study_requests'"),
-      panel.indexOf('}}', panel.indexOf("metricId: 'supercharts_study_requests'"))
+    const intentAt = panel.indexOf('charts.studyRequests');
+    assert.ok(intentAt > -1, 'the intent card is missing');
+    assert.match(
+      panel.slice(intentAt, intentAt + 260),
+      /superchart_study_toggled/,
+      'the intent card lost its own source'
     );
-    assert.match(requestCard, /superchart_study_toggled/, 'the intent card lost its own source');
+
+    /* Requested and rendered are separate columns, never summed into one. */
+    assert.match(panel, /Requested/);
+    assert.match(panel, /Rendered/);
+    assert.match(panel, /never summed|never added/);
   });
 
   check('the conclusion talks about renders and states intent beside them', () => {
@@ -2310,7 +2325,7 @@ try {
   });
 
   check('renders are not backfilled from historical toggles', () => {
-    const panel = readFileSync('src/components/admin-metrics/ReliabilityPanel.tsx', 'utf8');
+    const panel = readFileSync('src/components/admin-metrics/sections/SuperchartsCockpit.tsx', 'utf8');
     assert.match(panel, /not backfilled as rendered activity/);
   });
 
@@ -2337,7 +2352,7 @@ try {
   });
 
   check('the Voyager panel says it on the page, not only in the dictionary', () => {
-    const source = readFileSync('src/components/admin-metrics/VoyagerPanel.tsx', 'utf8');
+    const source = readFileSync('src/components/admin-metrics/sections/VoyagerCockpit.tsx', 'utf8');
     assert.match(source, /voyager\/research/);
     assert.match(source, /not a count of every/);
   });
@@ -2438,7 +2453,7 @@ try {
      * machine. An earlier draft told Markets not to emit on a cache hit, which
      * was impossible to implement.
      */
-    const panel = readFileSync('src/components/admin-metrics/ReliabilityPanel.tsx', 'utf8');
+    const panel = readFileSync('src/components/admin-metrics/sections/ReliabilityDataHealth.tsx', 'utf8');
     assert.match(panel, /Market data resolutions/);
     assert.match(panel, /Successful resolutions/);
     assert.equal(/label="Provider requests"/.test(panel), false, 'the panel still claims provider requests');
@@ -2658,28 +2673,44 @@ try {
   group('Presentation mode is a lens, not a second dashboard');
 
   check('the shell toggles an attribute and never touches a value', () => {
-    const shell = readFileSync('src/components/admin-metrics/ObservatoryShell.tsx', 'utf8');
+    const shell = readFileSync('src/components/admin-metrics/Observatory.tsx', 'utf8');
     assert.match(shell, /data-mode=\{presenting \? 'presentation' : 'detail'\}/);
-    // A lens with no access to the numbers cannot flatter them.
-    assert.equal(/metric/i.test(shell.replace(/\/\*[\s\S]*?\*\//g, '')), false, 'the shell reads metric values');
+
+    /*
+     * A lens with no access to the numbers cannot flatter them. The shell now
+     * carries the whole payload, so the test is narrower than "does the word
+     * metric appear": it must never read a `.value` off one and never format
+     * one. Either would mean presentation mode could change a figure.
+     */
+    const code = shell.replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.equal(/metric\.value|\.metrics\[|\.metrics\./.test(code), false, 'the shell reads a metric value');
+    assert.equal(/formatNumber|formatCount|\bdisplay\(/.test(code), false, 'the shell formats a metric');
   });
 
   check('presentation mode is keyboard-exitable', () => {
-    const shell = readFileSync('src/components/admin-metrics/ObservatoryShell.tsx', 'utf8');
+    const shell = readFileSync('src/components/admin-metrics/Observatory.tsx', 'utf8');
     assert.match(shell, /event\.key === 'Escape'/);
     assert.match(shell, /aria-pressed=\{presenting\}/);
   });
 
   check('presentation mode hides detail without hiding a limitation', () => {
     const css = readFileSync('src/components/admin-metrics/Observatory.module.css', 'utf8');
-    assert.match(css, /\.shell\[data-mode='presentation'\] \.detail \{\s*display: none/);
-    // The reason a number is absent must survive at full size.
-    assert.match(css, /\.shell\[data-mode='presentation'\] \.cardAbsent/);
-    assert.equal(
-      /\.shell\[data-mode='presentation'\] \.cardAbsent \{\s*display: none/.test(css),
-      false,
-      'presentation mode hides the reason a metric is missing'
-    );
+
+    /* It hides whole non-presenter sections, and nothing finer. */
+    assert.match(css, /\.root\[data-mode='presentation'\] \.presentationHidden \{\s*display: none/);
+
+    /* The reason a number is absent must survive at full size, in both modes. */
+    for (const survives of ['note', 'kpiAbsent', 'miniAbsent', 'badge', 'stateBody']) {
+      assert.equal(
+        new RegExp(`\\.root\\[data-mode='presentation'\\][^{]*\\.${survives}\\s*\\{[^}]*display:\\s*none`).test(css),
+        false,
+        `presentation mode hides .${survives}, which carries why a metric is missing`
+      );
+    }
+
+    /* And the shell restates the caveats for whatever stays on screen. */
+    const shell = readFileSync('src/components/admin-metrics/Observatory.tsx', 'utf8');
+    assert.match(shell, /Caveats for what is on screen/);
   });
 
   check('there is one dashboard, not two', () => {
@@ -2687,43 +2718,124 @@ try {
     // detail view about the same number.
     const page = readFileSync('src/app/[locale]/admin_admin_metrics/page.tsx', 'utf8');
     assert.equal((page.match(/await Promise\.all\(/g) ?? []).length, 1, 'the page fetches more than once');
-    assert.match(page, /<ObservatoryShell/);
+    assert.match(page, /<Observatory data=\{data\} \/>/);
+
+    /* The client shell cannot open a second one: it has no fetch of its own. */
+    const shell = readFileSync('src/components/admin-metrics/Observatory.tsx', 'utf8');
+    assert.equal(/fetch\(|useSWR|useQuery/.test(shell), false, 'the shell queries on its own');
   });
 
   group('The page tells a product story before a database story');
 
   check('sections appear in the agreed order', () => {
-    const page = readFileSync('src/app/[locale]/admin_admin_metrics/page.tsx', 'utf8');
-    const order = ['"pulse"', '"journeys"', '"surfaces"', '"voyager"', '"supercharts"', '"market-data"', '"reliability"', '"monetization"', '"coverage"'];
+    /*
+     * The design handoff's fourteen-section architecture, in its numbering.
+     * The nine-section Phase 6 order this replaces encoded the old visual
+     * structure; the ordering *claim* survives, pointed at the new list.
+     */
+    const shell = readFileSync('src/components/admin-metrics/Observatory.tsx', 'utf8');
+    const order = [
+      's-exec', 's-strategy', 's-lifecycle', 's-continuation', 's-start', 's-retention',
+      's-areas', 's-voyager', 's-charts', 's-money', 's-acq', 's-reliability',
+      's-coverage', 's-states',
+    ];
+
     let cursor = 0;
     for (const id of order) {
-      const at = page.indexOf(`id=${id}`, cursor);
-      assert.ok(at > -1, `section ${id} is missing`);
+      const at = shell.indexOf(`'${id}'`, cursor);
+      assert.ok(at > -1, `section ${id} is out of order or missing from the rail`);
       cursor = at;
+    }
+
+    /* Every rail entry has a section component that renders that anchor. */
+    const anchors = readdirSync('src/components/admin-metrics/sections')
+      .filter((name) => name.endsWith('.tsx'))
+      .flatMap((name) => [
+        ...readFileSync(`src/components/admin-metrics/sections/${name}`, 'utf8').matchAll(/id="(s-[a-z]+)"/g),
+      ])
+      .map((match) => match[1]);
+
+    for (const id of order) {
+      assert.ok(anchors.includes(id), `no section component renders ${id}`);
     }
   });
 
-  check('the headline row carries no metric whose source is unconnected', () => {
-    const page = readFileSync('src/app/[locale]/admin_admin_metrics/page.tsx', 'utf8');
-    const headline = page.slice(page.indexOf('styles.headline'), page.indexOf('</Section>'));
-    assert.equal(headline.includes('confirmedRevenue'), false, 'revenue reached the headline without a source');
+  check('an unconnected source is labelled rather than silently zeroed', () => {
+    /*
+     * Changed in shape, not in strictness. The design puts confirmed revenue in
+     * the executive grid, so the old "keep it out of the headline" rule no
+     * longer applies — what must hold is that it can only be rendered through
+     * the state machinery, which has no numeric branch for
+     * `source_not_connected`, and that the query still returns that state.
+     */
+    const exec = readFileSync('src/components/admin-metrics/sections/ExecutiveOverview.tsx', 'utf8');
+    const at = exec.indexOf('overview.confirmedRevenue');
+    assert.ok(at > -1, 'confirmed revenue is missing from the executive grid');
+
+    const card = exec.slice(Math.max(0, at - 300), at + 200);
+    assert.match(card, /<KpiCard/, 'revenue is rendered outside the state-aware card');
+    assert.equal(/format="/.test(card), false, 'revenue was given a numeric format');
+
+    const query = readFileSync('src/lib/admin-metrics/overview.ts', 'utf8');
+    assert.match(query, /confirmedRevenue: sourceNotConnected\('payment provider'/);
   });
 
   check('every rate on the page names its denominator', () => {
-    const page = readFileSync('src/app/[locale]/admin_admin_metrics/page.tsx', 'utf8');
-    for (const [start, end] of [...page.matchAll(/<MetricCard[\s\S]*?\/>/g)].map((m) => [m.index, m.index + m[0].length])) {
-      const card = page.slice(start, end);
-      if (!card.includes('format="percent"')) continue;
-      assert.match(card, /\bof=/, `a percentage card has no denominator: ${card.slice(0, 80)}`);
+    /*
+     * Same claim, new components. A `KpiCard` showing a percentage must carry a
+     * `denominator` and a `MiniCard` a `sub`; both print under the figure, and
+     * a rate whose population is not stated is a rate a reader cannot check.
+     */
+    for (const name of readdirSync('src/components/admin-metrics/sections').filter((file) => file.endsWith('.tsx'))) {
+      const source = readFileSync(`src/components/admin-metrics/sections/${name}`, 'utf8');
+
+      for (const [component, slot] of [['KpiCard', 'denominator'], ['MiniCard', 'sub']]) {
+        for (const match of source.matchAll(new RegExp(`<${component}[\\s\\S]*?/>`, 'g'))) {
+          if (!match[0].includes('format="percent"')) continue;
+          assert.match(
+            match[0],
+            new RegExp(`\\b${slot}=`),
+            `a percentage ${component} in ${name} has no denominator: ${match[0].slice(0, 90)}`
+          );
+        }
+      }
     }
   });
 
   check('no decorative period-over-period delta was invented', () => {
-    const page = readFileSync('src/app/[locale]/admin_admin_metrics/page.tsx', 'utf8');
-    const shell = readFileSync('src/components/admin-metrics/ObservatoryShell.tsx', 'utf8');
+    const shell = readFileSync('src/components/admin-metrics/Observatory.tsx', 'utf8');
     assert.match(shell, /no previous-period comparison exists/);
-    for (const fake of ['vs previous', 'vs last', '+12%', 'trend up', 'trendUp']) {
-      assert.equal(page.includes(fake), false, `the page shows "${fake}"`);
+
+    /*
+     * The design's Compare control is kept for visual parity and must stay
+     * inert: a selectable "Previous week" promises a delta nothing can compute.
+     */
+    assert.match(shell, /disabled/, 'the comparison control is selectable');
+    for (const stale of ['Previous period', 'Previous week', 'Previous month']) {
+      assert.equal(shell.includes(`value="${stale}"`), false, `the shell offers ${stale}`);
+    }
+
+    /* And no sparkline anywhere: no daily series exists to draw one from. */
+    const files = ['src/app/[locale]/admin_admin_metrics/page.tsx'].concat(
+      readdirSync('src/components/admin-metrics/sections')
+        .filter((name) => name.endsWith('.tsx'))
+        .map((name) => `src/components/admin-metrics/sections/${name}`)
+    );
+
+    for (const path of files) {
+      /*
+       * Comments stripped first. Several of these files explain why a delta is
+       * absent by quoting the thing they refuse to render, and a scan that
+       * could not tell prose from markup would push that reasoning off the page
+       * — which is the opposite of what this check is for.
+       */
+      const source = readFileSync(path, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+
+      for (const fake of ['vs previous', 'vs last', '+12%', 'trend up', 'trendUp', 'spark']) {
+        assert.equal(source.includes(fake), false, `${path} shows "${fake}"`);
+      }
     }
   });
 
@@ -2735,9 +2847,11 @@ try {
      */
     for (const path of [
       'src/app/[locale]/admin_admin_metrics/page.tsx',
-      'src/components/admin-metrics/ReliabilityPanel.tsx',
-      'src/components/admin-metrics/VoyagerPanel.tsx',
+      'src/components/admin-metrics/Observatory.tsx',
       'src/lib/admin-metrics/conclusions.ts',
+      ...readdirSync('src/components/admin-metrics/sections')
+        .filter((name) => name.endsWith('.tsx'))
+        .map((name) => `src/components/admin-metrics/sections/${name}`),
     ]) {
       const source = readFileSync(path, 'utf8');
       for (const stale of ['Essential', 'Ultimate', 'Voyager Private plan']) {
@@ -2747,20 +2861,42 @@ try {
   });
 
   check('cards state their meaning in words, not by colour alone', () => {
-    const card = readFileSync('src/components/admin-metrics/MetricCard.tsx', 'utf8');
-    assert.match(card, /metric\.state\.replace/, 'the state is not spelled out on the card');
+    /*
+     * The redesign routed every badge through one component, which makes the
+     * rule easier to hold rather than weaker: a `StateBadge` always prints a
+     * word and always carries the meaning as a title.
+     */
+    const primitives = readFileSync('src/components/admin-metrics/primitives.tsx', 'utf8');
+    assert.match(primitives, /STATE_LABEL\[state\]/, 'the badge does not spell the state out');
+    assert.match(primitives, /title=\{STATE_MEANING\[state\]\}/, 'the badge carries no meaning');
+
+    const format = readFileSync('src/components/admin-metrics/format.ts', 'utf8');
+    for (const state of states.METRIC_STATES) {
+      assert.ok(format.includes(`${state}:`), `no label for the ${state} state`);
+    }
+
     const css = readFileSync('src/components/admin-metrics/Observatory.module.css', 'utf8');
     // Absent states also differ by border style, so colour is never the only cue.
     assert.match(css, /border-style: dashed/);
   });
 
   check('the Voyager scope limitation survives into presentation mode', () => {
-    const panel = readFileSync('src/components/admin-metrics/VoyagerPanel.tsx', 'utf8');
+    const panel = readFileSync('src/components/admin-metrics/sections/VoyagerCockpit.tsx', 'utf8');
     assert.match(panel, /voyager\/research/);
-    // It is a note, and notes are quieted rather than hidden.
+
+    /* Voyager is one of the five presenter sections, so the note stays visible. */
+    const shell = readFileSync('src/components/admin-metrics/Observatory.tsx', 'utf8');
+    const rail = shell.slice(shell.indexOf('const SECTIONS'), shell.indexOf('] as const'));
+    for (const presenter of ['s-exec', 's-strategy', 's-lifecycle', 's-voyager', 's-reliability']) {
+      const line = rail.split('\n').find((row) => row.includes(`'${presenter}'`));
+      assert.match(line, /presenter: true/, `${presenter} is not a presenter section`);
+    }
+    assert.match(shell, /<VoyagerCockpit data=\{data\} \/>/);
+
+    /* And notes are never display:none in presentation mode. */
     const css = readFileSync('src/components/admin-metrics/Observatory.module.css', 'utf8');
     assert.equal(
-      /\.shell\[data-mode='presentation'\] \.note \{[^}]*display: none/.test(css),
+      /\.root\[data-mode='presentation'\][^{]*\.note\s*\{[^}]*display:\s*none/.test(css),
       false,
       'presentation mode hides section notes'
     );
