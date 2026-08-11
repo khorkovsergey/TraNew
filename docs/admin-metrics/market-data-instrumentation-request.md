@@ -12,14 +12,31 @@ succeeding: every one of `getQuote`, `getQuotes`, `getSeries`, `getBars` and
 indistinguishable from one that means "the vendor is down" once it leaves the
 function.
 
-That distinction is the whole point. A dashboard reporting "0 provider errors"
-today would be claiming the provider has never failed, when in fact nothing is
+That distinction is the whole point. A dashboard reporting "0 failures" today
+would be claiming nothing has ever gone wrong, when in fact nothing is
 watching.
 
 **Do not change caching, fallbacks, return types, error handling or copy.** Add
 observation, nothing else.
 
 ---
+
+## Sequencing — start only after Metrics Phase 5 is on `main`
+
+This request depends on two things that exist only on the `feat/metrics`
+branch today: the `market_data_request_completed` registry entry, and
+`freshnessOf` in `src/lib/admin-metrics/freshness.ts`.
+
+**Do not merge `feat/metrics` into your branch**, and do not copy the freshness
+logic across — a second implementation of "is Friday's close stale on Sunday"
+would drift from the first the week somebody fixed one of them.
+
+The order is:
+
+1. the orchestrator merges and deploys Metrics Phase 5;
+2. you sync the new `main`;
+3. this work and the Supercharts request proceed in parallel;
+4. a second orchestrator cycle merges the two small branches.
 
 ## Before you start
 
@@ -45,6 +62,22 @@ telemetry failure must not affect a price.
 
 ---
 
+## What the event means
+
+`market_data_request_completed` records **one completed invocation of a
+market-data client function, reporting the result the product saw.**
+
+It is deliberately *not* a count of upstream network calls, and the name is
+kept only because renaming a declared event costs more than it is worth. The
+client fetches through `next: { revalidate }`, and cache resolution is
+transparent at that layer — the function cannot tell whether a value came from
+the vendor or from the cache, so neither can the telemetry. Claiming otherwise
+would put a number on a dashboard that nobody could verify.
+
+`durationMs` therefore means **client resolution latency at this call site**,
+not upstream provider latency. A cached success will be fast, and that is a true
+statement about what the product experienced.
+
 ## The event
 
 `market_data_request_completed`
@@ -68,23 +101,37 @@ const startedAt = performance.now();
 at the top of each function, and `durationMs: Math.round(performance.now() - startedAt)`
 at each emit. Monotonic, so a clock adjustment cannot produce a negative.
 
-### Classifying the outcome
+### Classifying the outcome — per function, from the branches that exist
 
-The three branches already exist in the code; they just are not distinguished
-after the return.
+Every branch below is one the code already takes. **Do not add a condition to
+make a bucket fit**, and do not describe one that is not there.
 
-- **`not_configured`** — the `if (!quotesConfigured()) return null` / `if
-  (!macroConfigured())` guard at the top. This is a deployment fact, not a
-  failure.
-- **`provider_error`** — the `catch`, and any non-OK HTTP response.
-- **`no_data`** — the request succeeded and the payload had nothing usable: an
-  empty `values` array, a missing `datetime`, a response the parser rejects.
-- **`success`** — anything that returns a non-null result.
+| Function | `not_configured` | `provider_error` | `no_data` | `success` |
+| --- | --- | --- | --- | --- |
+| `getQuote` | `!quotesConfigured()` | `!response.ok`, or the `catch` | `data?.status === 'error' \|\| !data?.close` | returns the quote |
+| `getSeries` | `!quotesConfigured()` | `!response.ok`, or the `catch` | `data?.status === 'error' \|\| !Array.isArray(data?.values)` | returns the series |
+| `getBars` | `!quotesConfigured()` | `!response.ok`, or the `catch` | `data?.status === 'error' \|\| !Array.isArray(data?.values)` | returns the bars |
+| `getQuotes` | `!quotesConfigured()` | `!response.ok`, or the `catch` | `data?.status === 'error'` | returns the map, even if partly empty |
+| `getMacroSeries` | `!macroConfigured()` | `!observationsResponse.ok \|\| !metaResponse.ok`, or the `catch` | `rows.length === 0` | returns the series |
 
-**Do not invent `rate_limited`.** Twelve Data signals throttling in ways this
-code does not currently parse, and a bucket that is sometimes right is worse
-than one honest `provider_error`. If you later add real rate-limit detection,
-tell me and I will extend the enum.
+Two things a previous draft of this document got wrong, corrected here:
+
+**`asOf` is never missing.** `getQuote` writes
+`asOf: data.datetime ?? new Date().toISOString().slice(0, 10)` — there is a
+fallback, so "a missing datetime" is not a `no_data` condition and never was.
+Use the branches in the table.
+
+**`status === 'error'` is not only "no data".** The code's own comment says the
+vendor reports rate limits *and* unknown symbols as HTTP 200 with a status
+field, so this branch bundles the two. Classify it `no_data`, and read that
+bucket as *nothing usable came back* rather than as *the symbol does not exist*.
+
+**Do not invent `rate_limited`.** Telling it apart would mean parsing
+`data.message`, which is a provider body and must not be read or sent. A bucket
+that is sometimes right is worse than one honest classification.
+
+For `getQuotes`, note the return type is `Record<string, Quote>` and the
+failure paths return `{}` rather than `null`.
 
 ### Deriving `freshnessBucket`
 
@@ -139,8 +186,14 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
   }
 
   try {
-    // … existing code, unchanged …
-    if (!data?.close) {
+    const response = await fetch(url, { next: { revalidate: QUOTE_TTL } });
+    if (!response.ok) {
+      emit('provider_error');
+      return null;
+    }
+
+    const data = await response.json();
+    if (data?.status === 'error' || !data?.close) {
       emit('no_data');
       return null;
     }
@@ -159,9 +212,9 @@ The same shape for `getQuotes` (`kind: 'quotes_batch'`), `getSeries`
 (`'series'`), `getBars` (`'bars'`, with `hasVolume`) and `getMacroSeries`
 (`source: 'fred'`, `kind: 'macro'`).
 
-For `getQuotes`, emit **once per batch**, not once per symbol — the batch is the
-provider request, and per-symbol rows would multiply the count by whatever the
-page happened to ask for.
+For `getQuotes`, emit **once per invocation**, not once per symbol — the call is
+the unit being observed, and per-symbol rows would multiply the count by whatever
+the page happened to ask for.
 
 ---
 
@@ -181,11 +234,13 @@ looks harmless. It is still a subject, and it is still not sent.
 
 ## Cache
 
-If a cached value is returned without a provider call, **do not emit**. The
-event is about provider requests, and counting cache hits would make the success
-rate a measure of cache warmth. If it is easier to emit with an added
-`outcome: 'success'` for cache hits, do not — tell me and I will add a `cached`
-boolean to the contract.
+**Emit once per invocation, always.** An earlier draft of this document asked
+you to skip cached values; that was wrong and is withdrawn — the client has no
+way to know. Next resolves the cache inside `fetch`, and nothing at this layer
+distinguishes a served-from-cache success from a fresh one.
+
+Do not add a `cached` flag either. It would have to be a guess, and a guessed
+dimension is worse than an absent one.
 
 ---
 

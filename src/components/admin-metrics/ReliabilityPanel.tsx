@@ -82,16 +82,16 @@ export function ReliabilityPanel({ report }: { report: ReliabilityReport }) {
       </p>
       {report.market.awaitingEmitter ? (
         <p className={styles.notice}>
-          <strong>Provider outcomes await the Markets emitter.</strong> Configuration above is
-          known; request outcomes are not, and the cards say so rather than showing zero provider
-          errors — which would claim the provider has never failed.
+          <strong>Resolution outcomes await the Markets emitter.</strong> Configuration above is
+          known; outcomes are not, and the cards say so rather than showing zero failures — which
+          would claim nothing has ever gone wrong.
         </p>
       ) : null}
       <div className={styles.grid}>
-        <MetricCard label="Provider requests" metric={report.market.requests} />
-        <MetricCard label="Successful" metric={report.market.successes} />
+        <MetricCard label="Market data resolutions" metric={report.market.requests} />
+        <MetricCard label="Successful resolutions" metric={report.market.successes} />
         <MetricCard label="No data returned" metric={report.market.noData} />
-        <MetricCard label="Provider errors" metric={report.market.providerErrors} />
+        <MetricCard label="Provider/configuration failures seen by the client" metric={report.market.providerErrors} />
       </div>
       {report.market.freshness.length ? (
         <p className={styles.subtitle}>

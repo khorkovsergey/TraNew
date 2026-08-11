@@ -2204,7 +2204,7 @@ try {
 
   check('a missing cross-section emitter is not zero', () => {
     for (const [path, marker] of [
-      ['src/lib/admin-metrics/families/reliability.ts', /this is not an absence of provider errors/],
+      ['src/lib/admin-metrics/families/reliability.ts', /this is not an absence of failures/],
       ['src/lib/admin-metrics/families/voyager.ts', /this is not an absence of usage/],
     ]) {
       assert.match(readFileSync(path, 'utf8'), marker, `${path} lost its awaiting-emitter wording`);
@@ -2252,6 +2252,114 @@ try {
       }
     });
   }
+
+  group('The two cross-section contracts are complete and honest');
+
+  check('both Supercharts outcome events are in the shared typed union', () => {
+    /*
+     * A track() call cannot be written type-safely against a union member that
+     * does not exist, so these are declared before their emitters — which is
+     * why check:analytics reports them as callerless until the Superchart
+     * branch lands.
+     */
+    const union = readFileSync('src/lib/events/analytics.ts', 'utf8');
+    for (const name of ['superchart_study_applied', 'superchart_capability_completed']) {
+      assert.match(union, new RegExp(`name: '${name}'`), `${name} is missing from AnalyticsEvent`);
+    }
+  });
+
+  check('the checker can see them, rather than missing them on formatting', () => {
+    /*
+     * The regex matches `| { name: '…'` on one line, so a multi-line union
+     * member is invisible to it — both of these were, until they were written
+     * on one line like the other fifty-nine. Benefiting from that blind spot
+     * would have been the same failure as the registry one, in a new place.
+     */
+    let output = '';
+    try {
+      output = execFileSync('node', ['scripts/check-analytics.mjs'], { encoding: 'utf8', shell: process.platform === 'win32' });
+    } catch (error) {
+      output = `${error.stdout ?? ''}${error.stderr ?? ''}`;
+    }
+    assert.match(output, /61 events declared/, 'the checker is not seeing the two new declarations');
+    assert.match(output, /superchart_study_applied/, 'the checker does not report the awaiting emitter');
+    assert.match(output, /superchart_capability_completed/);
+  });
+
+  check('the reading layer is not counted as an emitter', () => {
+    // The Observatory aggregates by name — `case 'superchart_study_applied':` —
+    // and those case labels were satisfying the caller check.
+    const script = readFileSync('scripts/check-analytics.mjs', 'utf8');
+    assert.match(script, /admin-metrics/, 'the reading layer is still counted as a caller');
+  });
+
+  check('the union payload and the registry shape agree', () => {
+    for (const [name, expected] of [
+      ['superchart_study_applied', ['paneCount', 'placement', 'study']],
+      ['superchart_capability_completed', ['capability', 'hasVolume', 'outcome', 'paneCount']],
+    ]) {
+      const definition = registry.EVENT_BY_NAME.get(name);
+      assert.ok(definition, `${name} is not registered`);
+      assert.deepEqual(Object.keys(definition.properties).sort(), expected, name);
+    }
+
+    const union = readFileSync('src/lib/events/analytics.ts', 'utf8');
+    assert.match(union, /'fulfilled' \| 'no_data' \| 'unsupported' \| 'failure'/);
+    assert.equal(union.includes("'handoff'"), false, 'a handoff outcome reappeared in the union');
+  });
+
+  check('market copy claims a resolution, never an upstream request count', () => {
+    /*
+     * The client fetches through Next's data cache and cache resolution is
+     * transparent at that layer, so it cannot know whether anything left the
+     * machine. An earlier draft told Markets not to emit on a cache hit, which
+     * was impossible to implement.
+     */
+    const panel = readFileSync('src/components/admin-metrics/ReliabilityPanel.tsx', 'utf8');
+    assert.match(panel, /Market data resolutions/);
+    assert.match(panel, /Successful resolutions/);
+    assert.equal(/label="Provider requests"/.test(panel), false, 'the panel still claims provider requests');
+
+    const definition = registry.EVENT_BY_NAME.get('market_data_request_completed');
+    assert.match(definition.note, /NOT proof that a request reached the provider/);
+  });
+
+  check('the Markets request documents the transparent cache and withdraws the old rule', () => {
+    const request = readFileSync('docs/admin-metrics/market-data-instrumentation-request.md', 'utf8');
+    assert.match(request, /Emit once per invocation, always/);
+    assert.match(request, /cache resolution is\s*\n?transparent/);
+    assert.equal(
+      request.includes('If a cached value is returned without a provider call, **do not emit**'),
+      false,
+      'the impossible cache requirement is still in the document'
+    );
+    assert.match(request, /client resolution latency at this call site/);
+  });
+
+  check('the Markets request follows the code rather than an idealised parser', () => {
+    const request = readFileSync('docs/admin-metrics/market-data-instrumentation-request.md', 'utf8');
+    // asOf has a fallback, so a missing datetime was never a no-data condition.
+    assert.match(request, /`asOf` is never missing/);
+    assert.match(request, /data\?\.status === 'error'/);
+    assert.equal(request.includes('a missing `datetime`, a response the parser rejects'), false);
+    assert.match(request, /Do not invent `rate_limited`/);
+  });
+
+  check('both requests state the sequencing rather than creating a branch dependency', () => {
+    for (const path of [
+      'docs/admin-metrics/market-data-instrumentation-request.md',
+      'docs/admin-metrics/supercharts-instrumentation-request.md',
+    ]) {
+      const request = readFileSync(path, 'utf8');
+      assert.match(request, /only after Metrics Phase 5 is on `main`/, `${path} has no sequencing`);
+      assert.match(request, /Do not merge `feat\/metrics` into your branch/, `${path} invites a cross-branch merge`);
+    }
+    assert.match(
+      readFileSync('docs/admin-metrics/supercharts-instrumentation-request.md', 'utf8'),
+      /do not edit either\s*\n?file/,
+      'the Supercharts request does not say to leave the Metrics files alone'
+    );
+  });
 
   /* ------------------------------------ The checker cannot be self-defeated */
 

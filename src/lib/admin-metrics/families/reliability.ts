@@ -139,7 +139,7 @@ export async function reliabilityReport(since: Date): Promise<ReliabilityReport>
 
   const marketPending = (metricId: string) =>
     notMeasurable(
-      'the Markets section has not yet shipped the provider emitter, so no request outcome has ever been recorded — this is not an absence of provider errors',
+      'the Markets section has not yet shipped the emitter, so no market-data resolution has ever been recorded — this is not an absence of failures',
       `the \`${MARKET_EVENT}\` emitter — see docs/admin-metrics/market-data-instrumentation-request.md`,
       at(metricId, MARKET_EVENT)
     );
@@ -201,7 +201,7 @@ export async function reliabilityReport(since: Date): Promise<ReliabilityReport>
       freshness: tally(marketRows, 'freshnessBucket'),
       withVolume: marketCount((p) => p.hasVolume === true, 'market_with_volume'),
       delayedPolicy:
-        'The free tier is delayed by policy — the market client sets `delayed: true` on every quote and series. A delayed price is the product working as designed, not a fault.',
+        'The free tier is delayed by policy — the market client sets `delayed: true` on every quote and series. A delayed price is the product working as designed, not a fault. Counts here are client resolutions, not upstream requests: the Next data cache is transparent at that layer, so a success may have been served from cache.',
     },
 
     supercharts: {

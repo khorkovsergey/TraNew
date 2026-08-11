@@ -41,6 +41,30 @@ here, tell me and I will extend the enum first.
 
 ---
 
+## Sequencing — start only after Metrics Phase 5 is on `main`
+
+Both events exist only on the `feat/metrics` branch today, in two places:
+
+- `src/lib/analytics/registry.ts` — the validation contract;
+- `src/lib/events/analytics.ts` — the typed `AnalyticsEvent` union, so your
+  `track()` calls compile.
+
+**Do not merge `feat/metrics` into your branch**, and **do not edit either
+file** — the union member and the registry entry are already written to match.
+Adding your own would create two definitions of the same event.
+
+The order is:
+
+1. the orchestrator merges and deploys Metrics Phase 5;
+2. you sync the new `main`;
+3. this work and the Markets request proceed in parallel;
+4. a second orchestrator cycle merges the two small branches.
+
+Until step 1 lands, `npm run check:analytics` reports both events as declared
+with no caller. That is this sequencing, not a regression — and it is the
+reason the events were declared ahead of their emitters, since a `track()` call
+cannot be written type-safely against a union member that does not exist.
+
 ## Before you start
 
 ```bash
@@ -48,8 +72,8 @@ cd ../worktrees/superchart
 git fetch origin && git merge origin/main
 ```
 
-Both events are already declared in `src/lib/analytics/registry.ts` on `main`.
-Copy the property names exactly.
+Copy the property names exactly. An undeclared property is refused by ingest and
+the row is dropped.
 
 ---
 

@@ -317,7 +317,8 @@ export const EVENT_REGISTRY: readonly EventDefinition[] = [
        */
       freshnessBucket: oneOf('current', 'delayed_expected', 'stale_1d', 'stale_3d', 'stale_7d_plus', 'not_applicable', 'unknown'),
     },
-    note: 'Never the symbol, the query or the provider URL. The source is a product fact; the instrument is a position somebody may hold.',
+    note:
+      'One completed invocation of a market-data client operation, reporting the result the product saw. NOT proof that a request reached the provider: the client fetches through the Next data cache, which is transparent at that layer, so a success may have been served from cache. Never the symbol, the query or the provider URL.',
   },
 
   /* --------------------------- Supercharts capability — awaiting Superchart
