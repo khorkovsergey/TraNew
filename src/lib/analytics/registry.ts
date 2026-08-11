@@ -270,6 +270,71 @@ export const EVENT_REGISTRY: readonly EventDefinition[] = [
     properties: { endpoint: id(48), code: id(48) },
   },
 
+  /* ------------------------------------------- Voyager — the server's account
+   *
+   * Two events, not twenty. A client click says somebody tried; only the server
+   * knows whether a model answered, whether the scripted layer stood in for
+   * one, whether the quota charge was kept, and how long any of it took. None
+   * of that is observable from a browser, and inferring it from a button press
+   * is how a dashboard reports an outage as engagement.
+   *
+   * Emitted by the `voyager` section — see
+   * `docs/admin-metrics/voyager-instrumentation-request.md`. Until that lands
+   * these are declared and silent, and the Observatory says so rather than
+   * showing zero requests.
+   */
+  {
+    name: 'voyager_request_completed',
+    schemaVersion: 1,
+    kind: 'server',
+    surface: 'voyager',
+    lifecycle: 'current',
+    privacy: 'shape',
+    properties: {
+      screen: id(24),
+      tier: oneOf('basic', 'personal', 'private'),
+      /*
+       * The distinction the whole family exists for. A scripted fallback is
+       * graceful degradation and it is not a model answer — merging the two
+       * under "answered" would hide an outage behind a healthy-looking rate.
+       */
+      outcome: oneOf('real_answer', 'simulated_fallback', 'quota_refused', 'server_failure'),
+      /*
+       * What happened to the counter. The product charges once before the model
+       * and gives it back when nothing was answered, so `simulated_fallback`
+       * with `charged` is a contract violation rather than a data point.
+       */
+      quotaDisposition: oneOf('charged', 'released', 'refused_released', 'unmetered'),
+      modelConfigured: bool,
+      /** Server elapsed time. A client clock cannot measure model latency. */
+      durationMs: { kind: 'integer', min: 0, max: 600_000 },
+      sourceCount: smallCount,
+      toolSteps: smallCount,
+      hasChart: bool,
+      hasStudy: bool,
+      actionCount: smallCount,
+    },
+    note: 'One row per intentional question that reached the quota layer. Never the question, the answer, the subject or a citation.',
+  },
+  {
+    name: 'voyager_tool_completed',
+    schemaVersion: 1,
+    kind: 'server',
+    surface: 'voyager',
+    lifecycle: 'current',
+    privacy: 'shape',
+    properties: {
+      tool: id(48),
+      outcome: oneOf('success', 'failure'),
+      /** The bounded failure code the tool registry already produces. */
+      code: id(48),
+      durationMs: { kind: 'integer', min: 0, max: 600_000 },
+      step: smallCount,
+    },
+    note:
+      'One row per tool execution. The tool id describes a product capability; its input and output describe somebody\'s money, and neither travels — the registry\'s own call signature carries a ticker and is deliberately not sent.',
+  },
+
   /* ------------------------------------------------------------------ Home */
   {
     name: 'intent_selected',

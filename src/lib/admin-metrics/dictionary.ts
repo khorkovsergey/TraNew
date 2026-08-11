@@ -398,9 +398,152 @@ const FAMILY_METRICS: readonly MetricDefinition[] = [
   },
 ];
 
+/* --------------------------------------------- Phase 4 — Voyager operations */
+
+const VOYAGER_TELEMETRY_START =
+  'Server telemetry for Voyager begins when the `voyager` section ships the emitter. Until then every figure here is not measurable rather than zero — a zero would assert that nobody uses the product\'s headline feature.';
+
+const REAL_VS_SIMULATED =
+  'A simulated fallback is the scripted layer standing in when no model is configured or a model call failed. It is valuable graceful degradation and it is NOT a success, a real AI response or a model answer. The two are never merged, because merging them turns a provider outage into a healthy engagement number.';
+
+const VOYAGER_QUOTA =
+  'The product charges one unit before the model runs and gives it back in the two cases where nothing was bought: a refusal over the daily limit, and an attempt that produced no answer. A tool loop of six calls costs the same as none.';
+
+const VOYAGER_METRICS: readonly MetricDefinition[] = [
+  {
+    id: 'voyager_real_answer_rate',
+    label: 'Real AI answer rate',
+    sourceType: 'telemetry',
+    formula: 'requests with outcome `real_answer` ÷ executed requests',
+    numerator: 'Requests where the model produced an answer.',
+    denominator:
+      'Requests that reached the model — every request except quota refusals. A refusal never got that far, so including it would make this fall as more people hit their daily limit, which says nothing about whether the AI works.',
+    eligiblePopulation: 'Intentional Voyager questions that reached the quota layer.',
+    exclusions: ['quota refusals', 'requests rejected as malformed before execution'],
+    grain: 'event',
+    sourceEvents: ['voyager_request_completed'],
+    timeSemantics: 'Server clock. A client cannot observe whether a model answered.',
+    minimumSample: MARKETPLACE_MIN_SAMPLE,
+    limitations: [VOYAGER_TELEMETRY_START, REAL_VS_SIMULATED],
+    owner: 'voyager',
+  },
+  {
+    id: 'voyager_fallback_rate',
+    label: 'Simulated fallback rate',
+    sourceType: 'telemetry',
+    formula: 'requests with outcome `simulated_fallback` ÷ executed requests',
+    numerator: 'Requests answered by the scripted layer rather than a model.',
+    denominator: 'Requests that reached the model — the same denominator as the real answer rate.',
+    eligiblePopulation: 'Intentional Voyager questions that reached the quota layer.',
+    exclusions: ['quota refusals'],
+    grain: 'event',
+    sourceEvents: ['voyager_request_completed'],
+    timeSemantics: 'Server clock.',
+    minimumSample: MARKETPLACE_MIN_SAMPLE,
+    limitations: [
+      VOYAGER_TELEMETRY_START,
+      REAL_VS_SIMULATED,
+      'Reported beside `fallbacksDespiteConfiguredModel`, which separates "no model was configured" from "a model was configured and still did not answer". The server knows the first; it does not know why the second happened and does not guess.',
+    ],
+    owner: 'voyager',
+  },
+  {
+    id: 'voyager_refusal_rate',
+    label: 'Quota refusal rate',
+    sourceType: 'telemetry',
+    formula: 'requests with outcome `quota_refused` ÷ all server requests',
+    numerator: 'Requests refused for being over the daily limit.',
+    denominator: 'Every request that reached the quota layer, refusals included — a refusal is a thing that happened to a request.',
+    eligiblePopulation: 'Intentional Voyager questions that reached the quota layer.',
+    exclusions: [],
+    grain: 'event',
+    sourceEvents: ['voyager_request_completed'],
+    timeSemantics: 'Server clock.',
+    minimumSample: MARKETPLACE_MIN_SAMPLE,
+    limitations: [VOYAGER_TELEMETRY_START, VOYAGER_QUOTA],
+    owner: 'voyager',
+  },
+  {
+    id: 'voyager_quota_integrity',
+    label: 'Quota integrity',
+    sourceType: 'derived',
+    formula: 'requests whose outcome and quota disposition contradict the product contract',
+    numerator: 'Rows such as a simulated fallback that stayed charged.',
+    denominator: '—',
+    eligiblePopulation: 'All recorded Voyager requests.',
+    exclusions: ['unmetered plans, where the counter is not used at all'],
+    grain: 'event',
+    sourceEvents: ['voyager_request_completed'],
+    timeSemantics: 'Server clock.',
+    minimumSample: 0,
+    limitations: [
+      VOYAGER_QUOTA,
+      'A violation is a data-health failure, not a rate. A simulated fallback that stayed charged means the refund did not run and somebody paid for an answer they never received — it is reported with its shape and never averaged into anything.',
+    ],
+    owner: 'voyager',
+  },
+  {
+    id: 'voyager_latency',
+    label: 'Voyager answer latency',
+    sourceType: 'telemetry',
+    formula: 'nearest-rank percentiles of server elapsed time over executed requests',
+    numerator: '—',
+    denominator: '—',
+    eligiblePopulation: 'Requests that reached the model. Real-answer and simulated latency are also reported apart.',
+    exclusions: ['quota refusals, which are a database round trip and would report the product getting faster as more people hit their limit'],
+    grain: 'event',
+    sourceEvents: ['voyager_request_completed'],
+    timeSemantics:
+      'Server elapsed time measured on the server. A client timestamp cannot measure model latency — it includes the network and the browser, and it is a clock we do not control.',
+    minimumSample: MARKETPLACE_MIN_SAMPLE,
+    limitations: [VOYAGER_TELEMETRY_START],
+    owner: 'voyager',
+  },
+  {
+    id: 'voyager_chart_mix',
+    label: 'Answers that drew a chart',
+    sourceType: 'telemetry',
+    formula: 'executed requests with a chart ÷ executed requests',
+    numerator: 'Answers that produced a chart.',
+    denominator: 'Requests that reached the model.',
+    eligiblePopulation: 'Requests that reached the model.',
+    exclusions: ['quota refusals'],
+    grain: 'event',
+    sourceEvents: ['voyager_request_completed'],
+    timeSemantics: 'Server clock.',
+    minimumSample: MARKETPLACE_MIN_SAMPLE,
+    limitations: [
+      VOYAGER_TELEMETRY_START,
+      'A mix, not a fulfilment rate. Not every question asks for a chart, so this says how often Voyager draws — not how often it succeeds at drawing. The denominator that would make it a fulfilment rate is questions that wanted one, and that is not observable.',
+    ],
+    owner: 'voyager',
+  },
+  {
+    id: 'voyager_tool_success_rate',
+    label: 'Tool success rate',
+    sourceType: 'telemetry',
+    formula: 'tool executions with outcome `success` ÷ tool executions',
+    numerator: 'Tool calls the registry reported as successful.',
+    denominator: 'Tool calls executed.',
+    eligiblePopulation: 'Tool executions inside answered Voyager requests.',
+    exclusions: [],
+    grain: 'event',
+    sourceEvents: ['voyager_tool_completed'],
+    timeSemantics: 'Server clock.',
+    minimumSample: MARKETPLACE_MIN_SAMPLE,
+    limitations: [
+      VOYAGER_TELEMETRY_START,
+      'Tool id and failure code only. The registry\'s own call signature carries a ticker, and neither tool input nor output ever travels.',
+      'A tool round is not a question. The quota charges once per intentional question however many tools ran.',
+    ],
+    owner: 'voyager',
+  },
+];
+
 export const METRIC_DICTIONARY_ALL: readonly MetricDefinition[] = [
   ...METRIC_DICTIONARY,
   ...FAMILY_METRICS,
+  ...VOYAGER_METRICS,
 ];
 
 export const DICTIONARY_BY_ID: ReadonlyMap<string, MetricDefinition> = new Map(
