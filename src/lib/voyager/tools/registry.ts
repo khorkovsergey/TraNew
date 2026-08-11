@@ -16,6 +16,7 @@ import {
   pineHandoff,
   type TradingViewHandoff,
 } from './tradingView';
+import { trackServerEvent } from '@/lib/analytics/server';
 import { STUDY_IDS } from '@/lib/studies/registry';
 import { planChartEdit, type ChartArtifact } from '../chart/artifact';
 import { CHART_KINDS, isVoyagerStudyId, VOYAGER_STUDY_IDS, type ChartKind } from '../chart/spec';
@@ -635,10 +636,64 @@ export type ExecutedCall = {
  * argument will retry it until the step cap, and the person pays for that in
  * seconds.
  */
+/**
+ * One operational row per tool that actually ran.
+ *
+ * Executions only, and the boundary is deliberate: a name that is not a tool, a
+ * tool this request may not use, and a repeat already answered this turn are
+ * all outcomes of the planning loop rather than of a tool. Reporting them here
+ * would put three kinds of non-event into the same figure the Observatory reads
+ * as execution count, success rate and latency — and a "0 ms failure" that
+ * never reached a tool would drag every one of those numbers somewhere untrue.
+ *
+ * They keep their trace entry, so the answer still shows what the planner did.
+ * They simply are not executions.
+ *
+ * What this carries is the shape of the call and nothing about its subject:
+ * which tool, whether it worked, the failure code from the closed set, how long
+ * it took and which round it was.
+ *
+ * **The signature never goes in.** `trace.call` reads `history(TSLA 1D)` — it
+ * is what the chip under an answer says, and it names the instrument somebody
+ * asked about. A latency metric is not worth telling the telemetry table what a
+ * person is interested in, and the shortest way to be sure is for the value to
+ * have no path into this function at all.
+ *
+ * Fire-and-forget, like every other tracker: a telemetry write that could delay
+ * or fail a tool call would be a worse bug than the one it was measuring.
+ */
+function reportExecution(input: {
+  tool: string;
+  ok: boolean;
+  code?: string;
+  /** Measured across the call itself, on a monotonic clock. */
+  durationMs: number;
+  step: number;
+}): void {
+  trackServerEvent({
+    name: 'voyager_tool_completed',
+    properties: {
+      tool: input.tool,
+      outcome: input.ok ? 'success' : 'failure',
+      /* A token rather than an empty string: the registry declares this
+         property as required and refuses a blank one, so every successful row
+         would have been dropped after integration. `ok` is metadata about the
+         call, not anything a person or a model wrote. */
+      code: input.code ?? 'ok',
+      durationMs: input.durationMs,
+      step: input.step,
+    },
+    surface: 'voyager',
+  });
+}
+
 export async function runToolCalls(
   calls: ToolCall[],
   context: VoyagerToolContext,
-  seen: Map<string, VoyagerToolResult>
+  seen: Map<string, VoyagerToolResult>,
+  /* Which round of the agent loop this is, for the operational event. Optional
+     so the signature stays usable from a test that does not care. */
+  step = 0
 ): Promise<ExecutedCall[]> {
   return Promise.all(
     calls.slice(0, MAX_CALLS_PER_STEP).map(async (call): Promise<ExecutedCall> => {
@@ -683,6 +738,7 @@ export async function runToolCalls(
       }
 
       let result: VoyagerToolResult;
+      const ranAt = performance.now();
       try {
         result = await tool.execute(call.input, context);
       } catch (error) {
@@ -696,6 +752,20 @@ export async function runToolCalls(
       }
 
       seen.set(key, result);
+
+      /*
+       * The one branch that reached a tool. A result that came back failed and
+       * an exception the catch above turned into a failure are both real
+       * execution attempts, and both are reported as failures here.
+       */
+      reportExecution({
+        tool: tool.id,
+        ok: result.ok,
+        code: result.ok ? undefined : result.code,
+        durationMs: Math.round(performance.now() - ranAt),
+        step,
+      });
+
       return {
         toolUseId: call.id,
         result,

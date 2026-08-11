@@ -560,7 +560,9 @@ export async function askVoyager(options: {
             input: (block.input ?? {}) as Record<string, unknown>,
           }));
 
-        const executed = await runToolCalls(calls, toolContext, seen);
+        /* `step` travels so the operational event can say which round of the
+           loop a call belonged to. Nothing else about the loop changes. */
+        const executed = await runToolCalls(calls, toolContext, seen, step);
 
         messages.push({ role: 'assistant', content: response.content });
         messages.push({
