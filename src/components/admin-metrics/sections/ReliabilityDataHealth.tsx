@@ -1,8 +1,49 @@
 import { VITAL_THRESHOLDS, formatVital } from '@/lib/admin-metrics/webVitals';
 import { ago, formatCount, humanize, titleize } from '../format';
-import { MiniCard, Panel, Scroller, Section, StateBadge, Tile } from '../primitives';
+import {
+  MiniCard,
+  Panel,
+  Scroller,
+  Section,
+  StateBadge,
+  StatusBadge,
+  Tile,
+  type Tone,
+} from '../primitives';
 import styles from '../Observatory.module.css';
 import type { ObservatoryData } from '../types';
+
+/**
+ * A Web Vital's performance rating, which is **not** a provenance state.
+ *
+ * An earlier version mapped good → `live`, needs-improvement →
+ * `insufficient_sample` and poor → `feature_disabled`, purely to reach three
+ * colours. That put two false claims on the page: a slow LCP was reported as a
+ * switched-off feature, and an INP that merely needed work was reported as a
+ * sample too small to publish — while the sample was in fact large enough,
+ * which is the only reason a rating was shown at all.
+ *
+ * The two concepts are now independent and both are rendered. Sample adequacy
+ * is the canonical `insufficient_sample`, because that is exactly what it is.
+ * The rating beside it is a tone.
+ */
+type Rating = 'good' | 'needs improvement' | 'poor';
+
+const RATING_TONE: Record<Rating, Tone> = {
+  good: 'positive',
+  'needs improvement': 'caution',
+  poor: 'negative',
+};
+
+/** Google's own boundaries, so a rating means what a reader expects. */
+function ratingOf(metric: keyof typeof VITAL_THRESHOLDS, stored: number): Rating {
+  const { good, poor, unit } = VITAL_THRESHOLDS[metric];
+  /* CLS is stored scaled by a thousand; compare in the unit the boundary uses. */
+  const raw = unit === 'score' ? stored / 1000 : stored;
+  if (raw <= good) return 'good';
+  if (raw <= poor) return 'needs improvement';
+  return 'poor';
+}
 
 /**
  * 12 — Reliability & data health.
@@ -42,7 +83,7 @@ export function ReliabilityDataHealth({ data }: { data: ObservatoryData }) {
           title="Core Web Vitals"
           lede="Nearest-rank percentiles · p75 is the headline, because an average hides the tail people actually experience"
         >
-          <Scroller minWidth={560}>
+          <Scroller minWidth={680}>
             <table className={styles.table}>
               <thead>
                 <tr>
@@ -52,23 +93,24 @@ export function ReliabilityDataHealth({ data }: { data: ObservatoryData }) {
                   <th scope="col" className={styles.right}>p90</th>
                   <th scope="col" className={styles.right}>Poor</th>
                   <th scope="col" className={styles.right}>n</th>
-                  <th scope="col">State</th>
+                  <th scope="col">Rating</th>
+                  <th scope="col">Sample</th>
                 </tr>
               </thead>
               <tbody>
                 {vitals.map((vital) => {
                   const unit = VITAL_THRESHOLDS[vital.metric].unit;
+                  /*
+                   * Two independent judgements, rendered in two columns.
+                   *
+                   * `p75 === null` is the aggregator withholding percentiles
+                   * below the minimum sample — the canonical
+                   * `insufficient_sample`, and the only canonical state this
+                   * row is entitled to. The rating is a separate question that
+                   * only has an answer once the sample is adequate.
+                   */
                   const enough = vital.p75 !== null;
-                  const good = VITAL_THRESHOLDS[vital.metric].good;
-                  const poor = VITAL_THRESHOLDS[vital.metric].poor;
-                  const raw = vital.p75 === null ? null : vital.metric === 'cls' ? vital.p75 / 1000 : vital.p75;
-                  const state = !enough
-                    ? 'insufficient_sample'
-                    : raw! <= good
-                      ? 'live'
-                      : raw! <= poor
-                        ? 'insufficient_sample'
-                        : 'feature_disabled';
+                  const rating = enough ? ratingOf(vital.metric, vital.p75!) : null;
 
                   return (
                     <tr key={vital.metric}>
@@ -78,8 +120,12 @@ export function ReliabilityDataHealth({ data }: { data: ObservatoryData }) {
                       <td className={styles.num}>
                         {vital.p50 === null ? '—' : formatVital(vital.metric, vital.p50)}
                       </td>
-                      <td className={`${styles.num} ${styles.stateText}`} data-state={state}>
-                        {vital.p75 === null ? 'low n' : formatVital(vital.metric, vital.p75)}
+                      <td
+                        className={`${styles.num} ${rating ? styles.toneText : styles.stateText}`}
+                        data-tone={rating ? RATING_TONE[rating] : undefined}
+                        data-state={rating ? undefined : 'insufficient_sample'}
+                      >
+                        {enough ? formatVital(vital.metric, vital.p75!) : 'low n'}
                       </td>
                       <td className={styles.num}>
                         {vital.p90 === null ? '—' : formatVital(vital.metric, vital.p90)}
@@ -89,7 +135,23 @@ export function ReliabilityDataHealth({ data }: { data: ObservatoryData }) {
                       </td>
                       <td className={styles.num}>{formatCount(vital.sample)}</td>
                       <td>
-                        <StateBadge state={state} small />
+                        {rating ? (
+                          <StatusBadge
+                            tone={RATING_TONE[rating]}
+                            small
+                            label={rating}
+                            title={`p75 against Google's ${vital.metric.toUpperCase()} boundaries`}
+                          />
+                        ) : (
+                          <span className={styles.rankNote}>no rating yet</span>
+                        )}
+                      </td>
+                      <td>
+                        {enough ? (
+                          <StatusBadge tone="neutral" small label="sufficient" />
+                        ) : (
+                          <StateBadge state="insufficient_sample" small />
+                        )}
                       </td>
                     </tr>
                   );
@@ -102,6 +164,12 @@ export function ReliabilityDataHealth({ data }: { data: ObservatoryData }) {
             CLS is a unitless score around 0.1 and shares one integer column with four durations; it
             is stored scaled by a thousand and divided back out in exactly one place. Thresholds are
             Google&apos;s own, so a rating means what a reader expects.
+          </p>
+          <p className={`${styles.note} ${styles.noteTop}`}>
+            <strong className={styles.strong}>Rating and sample are separate columns.</strong> A poor
+            LCP is a slow page, not a disabled feature, and a vital that needs work is not a sample
+            too small to publish — the sample column is the only one entitled to say that, and it
+            uses the canonical state because that is exactly what it means.
           </p>
         </Panel>
 
@@ -127,12 +195,18 @@ export function ReliabilityDataHealth({ data }: { data: ObservatoryData }) {
                   <span className={styles.kvLabel}>{titleize(surface.area)}</span>
                   <span className={styles.kvValue}>
                     <span className={styles.mono}>{formatCount(surface.sample)}</span>{' '}
-                    <span
-                      className={styles.stateText}
-                      data-state={surface.p75 === null ? 'insufficient_sample' : 'derived'}
-                    >
-                      {surface.p75 === null ? 'low n' : formatVital('lcp', surface.p75)}
-                    </span>
+                    {surface.p75 === null ? (
+                      <span className={styles.stateText} data-state="insufficient_sample">
+                        low n
+                      </span>
+                    ) : (
+                      <span
+                        className={styles.toneText}
+                        data-tone={RATING_TONE[ratingOf('lcp', surface.p75)]}
+                      >
+                        {formatVital('lcp', surface.p75)}
+                      </span>
+                    )}
                   </span>
                 </div>
               ))
@@ -154,19 +228,19 @@ export function ReliabilityDataHealth({ data }: { data: ObservatoryData }) {
               label="Quotes provider"
               value={market.quotesConfigured ? 'Configured' : 'Not configured'}
               sub="from runtime configuration"
-              state={market.quotesConfigured ? 'live' : 'source_not_connected'}
+              tone={market.quotesConfigured ? 'positive' : 'quiet'}
             />
             <Tile
               label="Macro provider"
               value={market.macroConfigured ? 'Configured' : 'Not configured'}
               sub="from runtime configuration"
-              state={market.macroConfigured ? 'live' : 'source_not_connected'}
+              tone={market.macroConfigured ? 'positive' : 'quiet'}
             />
             <Tile
               label="Delay policy"
               value="Delayed by design"
               sub="free tier · a delayed price is the product working"
-              state="derived"
+              tone="neutral"
             />
           </div>
 
@@ -177,7 +251,17 @@ export function ReliabilityDataHealth({ data }: { data: ObservatoryData }) {
               metric={market.successes}
               sub="may have been served from the Next data cache"
             />
-            <MiniCard label="No data" metric={market.noData} sub="the provider had nothing for the symbol" />
+            {/*
+              `no_data` is the client finishing without a usable product result.
+              It is not evidence that the symbol is unknown, that the provider
+              is down, or that the call was rate-limited — the outcome enum does
+              not carry that distinction and the copy must not invent it.
+            */}
+            <MiniCard
+              label="No usable result"
+              metric={market.noData}
+              sub="the operation completed and returned no usable data"
+            />
             <MiniCard label="Provider errors" metric={market.providerErrors} sub="the call failed" />
           </div>
 
@@ -255,11 +339,25 @@ export function ReliabilityDataHealth({ data }: { data: ObservatoryData }) {
                       </th>
                       <td className={styles.num}>{ago(source.lastSeen, data.queriedAtMs)}</td>
                       <td>
-                        <StateBadge
-                          state={source.stale ? 'stale' : source.lastSeen ? 'live' : 'insufficient_sample'}
-                          small
-                          label={source.stale ? 'Delayed' : source.lastSeen ? 'Seen' : 'Never seen'}
-                        />
+                        {/*
+                          Only `stale` is canonical here, and only where the
+                          freshness logic actually says so — a source with a
+                          cadence budget that has overrun it. "Seen" and "never
+                          seen" are operational status, not provenance: a
+                          request-driven source with no rows means nobody asked,
+                          which is a fact about traffic rather than a sample too
+                          small to publish.
+                        */}
+                        {source.stale ? (
+                          <StateBadge state="stale" small />
+                        ) : (
+                          <StatusBadge
+                            tone={source.lastSeen ? 'positive' : 'quiet'}
+                            small
+                            label={source.lastSeen ? 'Seen' : 'Never seen'}
+                            title={source.why}
+                          />
+                        )}
                       </td>
                     </tr>
                   ))}

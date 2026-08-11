@@ -1,7 +1,45 @@
 import { formatCount, humanize, share } from '../format';
-import { CellBar, EmptyRow, Panel, Scroller, Section, StateBadge, Tile } from '../primitives';
+import {
+  CellBar,
+  EmptyRow,
+  Panel,
+  Scroller,
+  Section,
+  StateBadge,
+  StatusBadge,
+  Tile,
+  type Tone,
+} from '../primitives';
 import styles from '../Observatory.module.css';
 import type { ObservatoryData } from '../types';
+
+/**
+ * The capability outcome vocabulary, from the event registry.
+ *
+ * `superchart_capability_completed.outcome` is
+ * `fulfilled | no_data | unsupported | failure`. There is no `success`, and an
+ * earlier version compared against one — so the equality never held and every
+ * outcome, `fulfilled` included, fell through to a branch that rendered it as
+ * a **disabled feature**. A chart capability that worked was being reported as
+ * a flag being off.
+ *
+ * These are visual tones now, not `MetricState`s. `no_data` is a caution and
+ * not an insufficient sample; `unsupported` is a neutral category and not a
+ * missing source; `failure` is negative and still says nothing about a flag.
+ */
+const OUTCOME_TONE: Record<string, Tone> = {
+  fulfilled: 'positive',
+  no_data: 'caution',
+  unsupported: 'quiet',
+  failure: 'negative',
+};
+
+/** What the engine did with the study. A category, carrying no judgement. */
+const PLACEMENT_TONE: Record<string, Tone> = {
+  pane: 'neutral',
+  overlay: 'neutral',
+  unknown: 'quiet',
+};
 
 /**
  * 09 — Supercharts cockpit.
@@ -51,25 +89,25 @@ export function SuperchartsCockpit({ data }: { data: ObservatoryData }) {
           label="Chart opens"
           value={formatCount(charts.opens)}
           sub="superchart_opened"
-          state={enabled ? 'instrumented_going_forward' : 'feature_disabled'}
+          tone={enabled ? 'info' : 'quiet'}
         />
         <Tile
           label="Study requests — intent"
           value={formatCount(charts.studyRequests)}
           sub="superchart_study_toggled · a click, not a render"
-          state={enabled ? 'instrumented_going_forward' : 'feature_disabled'}
+          tone={enabled ? 'info' : 'quiet'}
         />
         <Tile
           label="Sessions rendering a study"
           value={formatCount(charts.sessionsWithStudy)}
           sub="superchart_study_applied only"
-          state={enabled ? 'instrumented_going_forward' : 'feature_disabled'}
+          tone={enabled ? 'info' : 'quiet'}
         />
         <Tile
           label="Sessions with a separate pane"
           value={formatCount(charts.sessionsWithPaneStudy)}
           sub="the engine gave the study its own axis"
-          state={enabled ? 'instrumented_going_forward' : 'feature_disabled'}
+          tone={enabled ? 'info' : 'quiet'}
         />
       </div>
 
@@ -109,10 +147,23 @@ export function SuperchartsCockpit({ data }: { data: ObservatoryData }) {
                       <tr key={study}>
                         <th scope="row"><code className={styles.mono}>{study}</code></th>
                         <td>
-                          <StateBadge
-                            state={placement === 'pane' ? 'derived' : placement === 'overlay' ? 'live' : 'not_measurable'}
+                          {/*
+                            A category, not a provenance state. An overlay is
+                            not "live" and a pane is not "derived" — both are
+                            simply what the engine drew, and the previous
+                            mapping existed only to reach two different colours.
+                          */}
+                          <StatusBadge
+                            tone={PLACEMENT_TONE[placement] ?? 'quiet'}
                             small
                             label={placement}
+                            title={
+                              placement === 'pane'
+                                ? 'The engine gave the study its own pane and scale'
+                                : placement === 'overlay'
+                                  ? 'The engine drew the study on the price axis'
+                                  : 'The engine did not report a placement and the study is not in the catalogue'
+                            }
                           />
                         </td>
                         <td className={styles.num}>{formatCount(requested?.requests ?? 0)}</td>
@@ -144,13 +195,13 @@ export function SuperchartsCockpit({ data }: { data: ObservatoryData }) {
               label="Overlay renders"
               value={formatCount(charts.overlayActivations)}
               sub="drawn on the price axis"
-              state="derived"
+              tone="info"
             />
             <Tile
               label="Separate-pane renders"
               value={formatCount(charts.paneActivations)}
               sub="the engine gave it its own scale"
-              state="derived"
+              tone="info"
             />
           </div>
 
@@ -185,17 +236,27 @@ export function SuperchartsCockpit({ data }: { data: ObservatoryData }) {
               </p>
             ) : (
               <div>
-                {charts.capability.map((row) => (
-                  <div key={row.outcome} className={styles.kv}>
-                    <span className={styles.kvLabel}>{humanize(row.outcome)}</span>
-                    <span
-                      className={`${styles.kvValue} ${styles.stateText}`}
-                      data-state={row.outcome === 'success' ? 'live' : 'feature_disabled'}
-                    >
-                      {formatCount(row.count)}
-                    </span>
-                  </div>
-                ))}
+                {charts.capability.map((row) => {
+                  const tone = OUTCOME_TONE[row.outcome] ?? 'quiet';
+                  return (
+                    <div key={row.outcome} className={styles.kv}>
+                      <span className={styles.kvLabel}>
+                        <StatusBadge tone={tone} small label={humanize(row.outcome)} />
+                      </span>
+                      <span className={`${styles.kvValue} ${styles.toneText}`} data-tone={tone}>
+                        {formatCount(row.count)}
+                      </span>
+                    </div>
+                  );
+                })}
+                <p className={`${styles.note} ${styles.noteTop}`}>
+                  <strong className={styles.strong}>Fulfilled</strong> is the capability working.{' '}
+                  <strong className={styles.strong}>No data</strong> is the engine finishing with
+                  nothing to draw, <strong className={styles.strong}>unsupported</strong> is a
+                  capability the chart does not offer for that input, and{' '}
+                  <strong className={styles.strong}>failure</strong> is it going wrong. None of the
+                  four says anything about a feature flag.
+                </p>
               </div>
             )}
           </Panel>
@@ -208,7 +269,7 @@ export function SuperchartsCockpit({ data }: { data: ObservatoryData }) {
                   label={row.study.toUpperCase()}
                   value={formatCount(row.activations)}
                   sub="renders"
-                  state={row.activations > 0 ? 'derived' : 'instrumented_going_forward'}
+                  tone={row.activations > 0 ? 'info' : 'quiet'}
                 />
               ))}
             </div>
