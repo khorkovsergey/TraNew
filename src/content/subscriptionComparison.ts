@@ -1,14 +1,18 @@
 import type { SubscriptionPlanId } from './subscriptions';
 
 /**
- * The comparison matrix — 52 rows across nine groups.
+ * The capability matrix — nine groups, grouped by what Voyager does rather than
+ * by technical quotas.
  *
- * Lifted from the design handoff rather than retyped, so the shipped table and
- * the reference cannot drift apart on a value nobody would notice.
+ * Lifted from the approved handoff rather than retyped from memory, so the
+ * shipped table and the reference cannot drift apart on a value nobody would
+ * notice. The previous matrix compared platform limits — charts per tab,
+ * alerts, historical bars — and is gone with the five-plan lineup it belonged
+ * to; this screen sells intelligence, so the rows are intelligence.
  *
- * Values are a tuple in plan order rather than an object keyed by plan id. A
- * row with a missing key would render as a blank cell that reads as "no" — a
- * tuple of the wrong length is a type error instead.
+ * Values are a tuple in `PLAN_ORDER` rather than an object keyed by plan id. A
+ * missing key would render as a blank cell that reads as "no"; a tuple of the
+ * wrong length is a type error instead.
  *
  * A cell is one of three things and never anything else: a literal string,
  * `true` for included, or `null` for not available. `null` renders as a dash,
@@ -19,150 +23,245 @@ import type { SubscriptionPlanId } from './subscriptions';
 
 export type ComparisonValue = string | true | null;
 
-/** Five values, in the order of `PLAN_ORDER`. */
+/** Four values, in the order of `PLAN_ORDER`: Free, Plus, Pro, Private. */
 export type ComparisonValues = [
   ComparisonValue,
   ComparisonValue,
   ComparisonValue,
   ComparisonValue,
-  ComparisonValue,
 ];
 
-export type ComparisonFeature = {
+export type ComparisonRow = {
   id: string;
   label: string;
-  /** Shown under the name where the label alone is not enough. */
-  description?: string;
+  /**
+   * A `statement` is true of the whole product and has no per-plan value — the
+   * trades line, and the one about Pine not being executed locally. It renders
+   * as dashes like any empty row, but a screen reader must not hear "not
+   * included in Free" for a sentence that was never a feature.
+   */
+  kind?: 'statement';
   values: ComparisonValues;
 };
 
-export type ComparisonCategory = {
+export type ComparisonGroup = {
   id: string;
-  label: string;
-  /** Voyager AI and Private intelligence open on arrival; the rest are folded. */
-  openByDefault?: boolean;
-  rows: ComparisonFeature[];
+  title: string;
+  rows: ComparisonRow[];
 };
 
-export const COMPARISON_CATEGORIES: ComparisonCategory[] = [
+export const COMPARISON_GROUPS: ComparisonGroup[] = [
   {
-    id: 'voyager',
-    openByDefault: true,
-    label: 'Voyager AI',
+    id: 'core',
+    title: 'Core AI & page context',
     rows: [
-      { id: 'ai_level', label: 'AI level', values: ['Lite', 'Analyst', 'Research', 'Advanced', 'Private Intelligence'] },
-      { id: 'ai_usage', label: 'AI usage', values: ['Limited', 'Extended', 'High', 'Very high', 'Unlimited under fair use'], description: 'Fair use covers normal individual usage.' },
-      { id: 'contextual_chart_explanation', label: 'Contextual chart explanation', values: [true, true, true, true, true] },
-      { id: 'symbol_and_market_page_questions', label: 'Symbol and market-page questions', values: [true, true, true, true, true] },
-      { id: 'asset_comparison', label: 'Asset comparison', values: ['Basic', 'Up to 5 assets', 'Advanced', 'Cross-market', 'Private-context analysis'] },
-      { id: 'watchlist_summaries', label: 'Watchlist summaries', values: [null, true, true, true, true] },
-      { id: 'structured_research_reports', label: 'Structured research reports', values: [null, null, true, 'Advanced', 'Autonomous'] },
-      { id: 'deep_research', label: 'Deep Research', values: [null, null, 'Single asset', 'Multi-asset and cross-market', 'Autonomous and unlimited under fair use'] },
-      { id: 'pine_script_assistance', label: 'Pine Script assistance', values: ['Explain', 'Explain and debug', 'Create indicators', 'Create advanced strategies', 'Personalized development'] },
-      { id: 'portfolio_analysis', label: 'Portfolio analysis', values: [null, null, 'Basic', 'Advanced', 'Full private wealth context'] },
-      { id: 'context_retention', label: 'Context retention', values: ['Current conversation', 'Up to 7 days', 'Up to 30 days', 'Up to 90 days', 'Active subscription period'] },
-      { id: 'ai_alerts', label: 'AI alerts', values: [null, null, 'Basic', 'Advanced', 'Proactive private intelligence'] },
+      { id: 'qa', label: 'Market and financial Q&A', values: [true, true, true, true] },
+      {
+        id: 'page_aware',
+        label: 'Page-aware assistance across TradingNew',
+        values: [true, true, true, true],
+      },
+      {
+        id: 'portal_knowledge',
+        label: 'Portal knowledge and navigation',
+        values: [true, true, true, true],
+      },
+      {
+        id: 'asset_resolution',
+        label: 'Asset resolution and explanation',
+        values: [true, true, true, true],
+      },
+      {
+        id: 'conversation_context',
+        label: 'Conversation context',
+        values: ['Current chat', 'History', 'Extended', 'Cross-session'],
+      },
+      {
+        id: 'usage_allowance',
+        label: 'Usage allowance',
+        values: ['Daily allowance', 'Standard', 'High', 'Highest'],
+      },
+    ],
+  },
+  {
+    id: 'market_data',
+    title: 'Market data',
+    rows: [
+      { id: 'quotes', label: 'Current quotes', values: [true, true, true, true] },
+      {
+        id: 'historical',
+        label: 'Historical market data',
+        values: ['Basic lookup', true, true, true],
+      },
+      {
+        id: 'flexible_ranges',
+        label: 'Flexible historical date ranges',
+        values: [null, true, true, true],
+      },
+      { id: 'deterministic', label: 'Deterministic metrics', values: [null, true, true, true] },
     ],
   },
   {
     id: 'charts',
-    label: 'Charts and analysis',
+    title: 'Charts & studies',
     rows: [
-      { id: 'charts_per_tab', label: 'Charts per tab', values: ['2', '4', '8', '16', '16'] },
-      { id: 'indicators_per_chart', label: 'Indicators per chart', values: ['5', '10', '25', '50', '50'] },
-      { id: 'historical_bars', label: 'Historical bars', values: ['10,000', '10,000', '20,000', '40,000', '40,000'] },
-      { id: 'parallel_chart_connections', label: 'Parallel chart connections', values: ['10', '20', '50', '200', '200'] },
-      { id: 'second_based_intervals', label: 'Second-based intervals', values: [null, null, true, true, true] },
-      { id: 'tick_based_intervals', label: 'Tick-based intervals', values: [null, null, null, true, true] },
-      { id: 'advanced_volume_tools', label: 'Advanced volume tools', values: [null, null, true, true, true] },
+      { id: 'line_area', label: 'Line and area charts', values: [true, true, true, true] },
+      {
+        id: 'candles',
+        label: 'Candle, performance and drawdown charts',
+        values: [null, true, true, true],
+      },
+      {
+        id: 'studies',
+        label: 'Moving averages, Bollinger Bands, RSI, MACD, volume',
+        values: [null, true, true, true],
+      },
+      {
+        id: 'follow_up_edits',
+        label: 'Follow-up edits on a retained chart',
+        values: [null, true, true, true],
+      },
     ],
   },
   {
-    id: 'alerts',
-    label: 'Alerts and monitoring',
+    id: 'comparison',
+    title: 'Comparison & metrics',
     rows: [
-      { id: 'price_alerts', label: 'Price alerts', values: ['20', '100', '400', '1,000', '1,000'] },
-      { id: 'technical_alerts', label: 'Technical alerts', values: ['20', '100', '400', '1,000', '1,000'] },
-      { id: 'watchlist_alerts', label: 'Watchlist alerts', values: [null, null, '2', '15', '15'] },
-      { id: 'multi_condition_alerts', label: 'Multi-condition alerts', values: [null, true, true, true, true] },
+      {
+        id: 'normalized',
+        label: 'Normalized multi-asset comparison',
+        values: [null, true, true, true],
+      },
+      { id: 'assets_per_comparison', label: 'Assets per comparison', values: [null, '2–3', '2–5', '2–5'] },
+      {
+        id: 'metrics',
+        label: 'Return, volatility, drawdown, correlation',
+        values: [null, true, true, true],
+      },
     ],
   },
   {
-    id: 'data',
-    label: 'Data and exports',
+    id: 'research',
+    title: 'Research',
     rows: [
-      { id: 'chart_data_export', label: 'Chart data export', values: [null, true, true, true, true] },
-      { id: 'custom_formulas', label: 'Custom formulas', values: [null, true, true, true, true] },
-      { id: 'professional_market_data', label: 'Professional market data', values: [null, null, null, 'Available separately', 'Available separately'] },
-      { id: 'ad_free_experience', label: 'Ad-free experience', values: [true, true, true, true, true] },
+      {
+        id: 'web_research',
+        label: 'Current-event / web research',
+        values: [null, 'Standard', 'Large', 'Largest'],
+      },
+      { id: 'multi_source', label: 'Multi-source synthesis', values: [null, null, true, true] },
+      {
+        id: 'provenance',
+        label: 'Data, external sources and inference kept apart',
+        values: [null, null, true, true],
+      },
+    ],
+  },
+  {
+    id: 'agent',
+    title: 'Agent workflows',
+    rows: [
+      {
+        id: 'bounded_tools',
+        label: 'Bounded multi-step tool use',
+        values: [null, 'Short runs', true, true],
+      },
+      {
+        id: 'one_request',
+        label: 'Data, metrics, charts and research in one request',
+        values: [null, null, true, true],
+      },
+      { id: 'long_runs', label: 'Longer research runs', values: [null, null, null, true] },
+    ],
+  },
+  {
+    id: 'investment',
+    title: 'Investment analysis',
+    rows: [
+      {
+        id: 'structured',
+        label: 'Structured, evidence-based assessment',
+        values: [null, null, true, true],
+      },
+      { id: 'bull_bear', label: 'Risks and bull / bear framing', values: [null, null, true, true] },
+      {
+        id: 'fundamental',
+        label: 'Grounded fundamental analysis where data exists',
+        values: [null, null, true, true],
+      },
+      {
+        id: 'no_execution',
+        label: 'Voyager supports decisions — it never executes trades',
+        kind: 'statement',
+        values: [null, null, null, null],
+      },
     ],
   },
   {
     id: 'pine',
-    label: 'Pine Script and strategies',
+    title: 'Pine & TradingView',
     rows: [
-      { id: 'explain_existing_scripts', label: 'Explain existing scripts', values: [true, true, true, true, true] },
-      { id: 'debug_scripts', label: 'Debug scripts', values: [null, true, true, true, true] },
-      { id: 'create_indicators', label: 'Create indicators', values: [null, null, true, true, true] },
-      { id: 'advanced_strategies', label: 'Advanced strategies', values: [null, null, null, true, true] },
-      { id: 'personalized_development', label: 'Personalized development', values: [null, null, null, null, true] },
-    ],
-  },
-  {
-    id: 'portfolio',
-    label: 'Portfolio and Wealth',
-    rows: [
-      { id: 'portfolio_analysis_depth', label: 'Portfolio analysis depth', values: [null, null, 'Basic', 'Advanced', 'Full private context'] },
-      { id: 'portfolio_stress_testing', label: 'Portfolio stress testing', values: [null, null, null, true, true] },
-      { id: 'macroeconomic_scenario_analysis', label: 'Macroeconomic scenario analysis', values: [null, null, null, true, true] },
-      { id: 'wealth_hub_context', label: 'Wealth Hub context', values: [null, null, null, null, 'Full'] },
-    ],
-  },
-  {
-    id: 'memory',
-    label: 'Memory and personalization',
-    rows: [
-      { id: 'working_context_window', label: 'Working context window', values: ['Current conversation', '7 days', '30 days', '90 days', 'Active subscription'] },
-      { id: 'daily_and_weekly_briefings', label: 'Daily and weekly briefings', values: [null, null, null, true, true] },
-      { id: 'cross_session_personalization', label: 'Cross-session personalization', values: [null, null, 'Partial', 'Extended', 'Full private context'] },
+      {
+        id: 'pine_generate',
+        label: 'Generate and explain Pine Script',
+        values: [null, null, true, true],
+      },
+      {
+        id: 'pine_debug',
+        label: 'Modify, review and debug supported Pine issues',
+        values: [null, null, true, true],
+      },
+      {
+        id: 'tv_continue',
+        label: 'Continue a professional workflow in TradingView',
+        values: [true, true, true, true],
+      },
+      {
+        id: 'tv_addon',
+        label: 'Add a paid TradingView plan, chosen separately',
+        values: [true, true, true, true],
+      },
+      {
+        id: 'pine_not_executed',
+        label: 'Pine is not executed or backtested inside Voyager',
+        kind: 'statement',
+        values: [null, null, null, null],
+      },
     ],
   },
   {
     id: 'private',
-    openByDefault: true,
-    label: 'Private intelligence',
+    title: 'Private intelligence',
     rows: [
-      { id: 'persistent_private_context', label: 'Persistent private context', values: [null, null, null, null, true] },
-      { id: 'private_financial_vault', label: 'Private Financial Vault', values: [null, null, null, null, true], description: 'Approved documents used as private Voyager context.' },
-      { id: 'personal_knowledge_graph', label: 'Personal Knowledge Graph', values: [null, null, null, null, true] },
-      { id: 'obsidian_style_connected_notes', label: 'Obsidian-style connected notes', values: [null, null, null, null, true] },
-      { id: 'portfolio_digital_twin', label: 'Portfolio Digital Twin', values: [null, null, null, null, true] },
-      { id: 'autonomous_deep_research', label: 'Autonomous Deep Research', values: [null, null, null, 'Advanced workflows', 'Full autonomous research'] },
-      { id: 'proactive_personal_intelligence', label: 'Proactive personal intelligence', values: [null, null, null, null, true] },
-      { id: 'full_wealth_hub_context', label: 'Full Wealth Hub context', values: [null, null, null, null, true] },
-      { id: 'advanced_memory_controls', label: 'Advanced memory controls', values: [null, null, null, null, true] },
-    ],
-  },
-  {
-    id: 'support',
-    label: 'Support',
-    rows: [
-      { id: 'support_level', label: 'Support level', values: ['Standard', 'Standard', 'Standard', 'Priority', 'Private priority'] },
+      {
+        id: 'persistent_context',
+        label: 'Persistent private research context',
+        values: [null, null, null, true],
+      },
+      {
+        id: 'private_documents',
+        label: 'User-controlled private knowledge and documents',
+        values: [null, null, null, true],
+      },
+      {
+        id: 'retained_artifacts',
+        label: 'Retained research artifacts across sessions',
+        values: [null, null, null, true],
+      },
+      {
+        id: 'memory_controls',
+        label: 'Review, disable and delete what is remembered',
+        values: [null, null, null, true],
+      },
     ],
   },
 ];
 
-/** Rows where every plan says the same thing, for "show differences only". */
-export function isSameEverywhere(row: ComparisonFeature): boolean {
-  const [first] = row.values;
-  return row.values.every((value) => value === first);
-}
-
 /** What a screen reader hears in place of a tick or a dash. */
-export function cellLabel(
-  value: ComparisonValue,
-  planName: string
-): string {
+export function cellLabel(row: ComparisonRow, index: number, planName: string): string {
+  if (row.kind === 'statement') return 'Applies to every plan';
+
+  const value = row.values[index];
   if (value === true) return `Included in ${planName}`;
   if (value === null) return `Not included in ${planName}`;
   return `${value} in ${planName}`;
