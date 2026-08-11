@@ -406,6 +406,9 @@ const VOYAGER_TELEMETRY_START =
 const REAL_VS_SIMULATED =
   'A simulated fallback is the scripted layer standing in when no model is configured or a model call failed. It is valuable graceful degradation and it is NOT a success, a real AI response or a model answer. The two are never merged, because merging them turns a provider outage into a healthy engagement number.';
 
+const VOYAGER_SERVER_SCOPE =
+  'Scope: `serverRequests` counts questions that reach POST /api/voyager. The /voyager/research workspace answers some scripted scenarios locally, and those never reach the route — so this is not a count of every Voyager interaction, and it must not be read as one. Closing the gap would need instrumentation inside the workspace, which belongs to the Voyager section.';
+
 const VOYAGER_QUOTA =
   'The product charges one unit before the model runs and gives it back in the two cases where nothing was bought: a refusal over the daily limit, and an attempt that produced no answer. A tool loop of six calls costs the same as none.';
 
@@ -424,7 +427,8 @@ const VOYAGER_METRICS: readonly MetricDefinition[] = [
     sourceEvents: ['voyager_request_completed'],
     timeSemantics: 'Server clock. A client cannot observe whether a model answered.',
     minimumSample: MARKETPLACE_MIN_SAMPLE,
-    limitations: [VOYAGER_TELEMETRY_START, REAL_VS_SIMULATED],
+    limitations: [
+      VOYAGER_SERVER_SCOPE,VOYAGER_TELEMETRY_START, REAL_VS_SIMULATED],
     owner: 'voyager',
   },
   {
@@ -441,6 +445,7 @@ const VOYAGER_METRICS: readonly MetricDefinition[] = [
     timeSemantics: 'Server clock.',
     minimumSample: MARKETPLACE_MIN_SAMPLE,
     limitations: [
+      VOYAGER_SERVER_SCOPE,
       VOYAGER_TELEMETRY_START,
       REAL_VS_SIMULATED,
       'Reported beside `fallbacksDespiteConfiguredModel`, which separates "no model was configured" from "a model was configured and still did not answer". The server knows the first; it does not know why the second happened and does not guess.',
@@ -460,7 +465,8 @@ const VOYAGER_METRICS: readonly MetricDefinition[] = [
     sourceEvents: ['voyager_request_completed'],
     timeSemantics: 'Server clock.',
     minimumSample: MARKETPLACE_MIN_SAMPLE,
-    limitations: [VOYAGER_TELEMETRY_START, VOYAGER_QUOTA],
+    limitations: [
+      VOYAGER_SERVER_SCOPE,VOYAGER_TELEMETRY_START, VOYAGER_QUOTA],
     owner: 'voyager',
   },
   {
@@ -496,7 +502,8 @@ const VOYAGER_METRICS: readonly MetricDefinition[] = [
     timeSemantics:
       'Server elapsed time measured on the server. A client timestamp cannot measure model latency — it includes the network and the browser, and it is a clock we do not control.',
     minimumSample: MARKETPLACE_MIN_SAMPLE,
-    limitations: [VOYAGER_TELEMETRY_START],
+    limitations: [
+      VOYAGER_SERVER_SCOPE,VOYAGER_TELEMETRY_START],
     owner: 'voyager',
   },
   {
