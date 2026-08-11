@@ -86,10 +86,11 @@ export default async function ObservatoryPage({ params, searchParams }: Props) {
     return (
       <div className={styles.root}>
         <div className={styles.backdrop} aria-hidden="true" />
-        <div className={styles.gate}>
+        {/* The route's one main landmark. `PortalChrome` renders none here. */}
+        <main id="main" className={styles.gate}>
           <p>Not available.</p>
           <AccessBootstrap enabled={directLinkEnabled()} />
-        </div>
+        </main>
       </div>
     );
   }

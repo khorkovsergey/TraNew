@@ -63,12 +63,20 @@ export function PortalChrome({
 
   if (isBareChromeRoute(pathname)) {
     /*
-     * No `.tn-app` wrapper either: it carries the portal's page background and
-     * column constraints, and the Observatory paints its own ground edge to
-     * edge. `<main>` keeps its id so the skip target still resolves for anybody
-     * who lands here from a keyboard.
+     * No wrapper at all.
+     *
+     * No `.tn-app`, because it carries the portal's page background and column
+     * constraints and the Observatory paints its own ground edge to edge. And
+     * no `<main>`: the Observatory renders its own, around the content column
+     * only. Wrapping here as well produced two main landmarks nested inside
+     * each other, which is invalid and leaves a screen reader's landmark list
+     * ambiguous about which one is the page.
+     *
+     * Putting it on the inner column is also the more accurate of the two — it
+     * excludes the sticky header and the section rail, which are navigation
+     * rather than content.
      */
-    return <main id="main">{children}</main>;
+    return <>{children}</>;
   }
 
   return (

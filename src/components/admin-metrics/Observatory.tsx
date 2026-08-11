@@ -283,7 +283,13 @@ export function Observatory({ data }: { data: ObservatoryData }) {
           </div>
         </nav>
 
-        <main className={styles.main} id="observatory-main">
+        {/*
+          The one main landmark on this route. It wraps the content column
+          only: the header above and the rail beside it are chrome and
+          navigation, and `PortalChrome` deliberately renders no `<main>` of
+          its own for the bare route so these two cannot nest.
+        */}
+        <main className={styles.main} id="main">
           <ExecutiveOverview data={data} onOpen={open} />
           <StrategyObservability data={data} />
           <LifecycleFunnel data={data} onOpen={open} />
