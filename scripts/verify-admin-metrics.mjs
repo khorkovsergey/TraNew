@@ -119,6 +119,8 @@ const PURE_MODULES = [
   'admin-metrics/journeys',
   'admin-metrics/dictionary',
   'admin-metrics/range',
+  'admin-metrics/families/startFunnel',
+  'admin-metrics/families/semantics',
 ];
 
 const repo = process.cwd();
@@ -201,6 +203,8 @@ const sessionsLib = await load('admin-metrics/sessions');
 const retentionLib = await load('admin-metrics/retention');
 const journeysLib = await load('admin-metrics/journeys');
 const dictionary = await load('admin-metrics/dictionary');
+const startLib = await load('admin-metrics/families/startFunnel');
+const semantics = await load('admin-metrics/families/semantics');
 
 const NOW = new Date('2026-08-10T12:00:00.000Z');
 const at = { source: 'test', metricId: 'test', queriedAt: NOW.toISOString() };
@@ -1297,6 +1301,307 @@ try {
     }
   });
 
+  /* ============================================ Phase 3 — product families */
+
+  group('The Start funnel is sequential, not a division of totals');
+
+  const S0 = Date.parse('2026-08-11T09:00:00.000Z');
+  const step = (sessionId, eventName, seconds, properties = {}) => ({
+    sessionId,
+    eventName,
+    occurredAt: S0 + seconds * 1000,
+    properties,
+  });
+
+  const fullPath = (id, offset = 0) => [
+    step(id, 'next_step_opened', offset + 0),
+    step(id, 'next_step_level_selected', offset + 5),
+    step(id, 'next_step_intent_selected', offset + 10),
+    step(id, 'next_step_recommendation_shown', offset + 15, { destination: 'markets' }),
+    step(id, 'next_step_destination_clicked', offset + 20, { destination: 'markets', external: false }),
+  ];
+
+  const stageOf = (funnel, name) => funnel.stages.find((stage) => stage.stage === name);
+
+  check('a complete path reaches every stage', () => {
+    const funnel = startLib.startFunnel(fullPath('a'), 1);
+    for (const stage of funnel.stages) assert.equal(stage.sessions, 1, stage.stage);
+    assert.equal(stageOf(funnel, 'destination_clicked').ofPrevious, 1);
+  });
+
+  check('an optional clarification does not become a required stage', () => {
+    const withClarification = [
+      ...fullPath('a').slice(0, 3),
+      step('a', 'next_step_clarification_selected', 12),
+      ...fullPath('a').slice(3),
+    ];
+    const funnel = startLib.startFunnel([...withClarification, ...fullPath('b')], 1);
+
+    assert.equal(stageOf(funnel, 'destination_clicked').sessions, 2, 'the unclarified path was dropped');
+    assert.equal(funnel.clarifiedSessions, 1);
+    assert.equal(funnel.clarificationShare, 0.5);
+    assert.equal(
+      funnel.stages.some((stage) => stage.stage.includes('clarification')),
+      false,
+      'clarification became a mandatory stage'
+    );
+  });
+
+  check('a recommendation nobody clicked stops at the recommendation', () => {
+    const funnel = startLib.startFunnel(fullPath('a').slice(0, 4), 1);
+    assert.equal(stageOf(funnel, 'recommendation_shown').sessions, 1);
+    assert.equal(stageOf(funnel, 'destination_clicked').sessions, 0);
+    assert.equal(stageOf(funnel, 'destination_clicked').ofPrevious, 0);
+  });
+
+  check('early steps alone cannot fake a completion', () => {
+    /*
+     * The failure a totals-based funnel produces: the click exists in the data
+     * but the steps before it do not, and dividing one total by another would
+     * report a completed journey that never happened.
+     */
+    const funnel = startLib.startFunnel(
+      [step('a', 'next_step_opened', 0), step('a', 'next_step_destination_clicked', 5, { destination: 'markets', external: false })],
+      1
+    );
+    assert.equal(stageOf(funnel, 'level_selected').sessions, 0);
+    assert.equal(stageOf(funnel, 'destination_clicked').sessions, 0, 'a click without its funnel counted as a completion');
+  });
+
+  check('out-of-order events break the chain rather than being reordered into it', () => {
+    // The intent arrives before the level. Nothing further is claimed, because
+    // nothing further is evidenced.
+    const funnel = startLib.startFunnel(
+      [
+        step('a', 'next_step_opened', 0),
+        step('a', 'next_step_intent_selected', 5),
+        step('a', 'next_step_level_selected', 10),
+        step('a', 'next_step_recommendation_shown', 15, {}),
+      ],
+      1
+    );
+    assert.equal(stageOf(funnel, 'level_selected').sessions, 1);
+    assert.equal(stageOf(funnel, 'intent_selected').sessions, 0, 'an out-of-order step was silently accepted');
+  });
+
+  check('arrival order in the array does not matter', () => {
+    const shuffled = [...fullPath('a')].reverse();
+    const funnel = startLib.startFunnel(shuffled, 1);
+    assert.equal(stageOf(funnel, 'destination_clicked').sessions, 1);
+  });
+
+  check('a duplicate step is still one step', () => {
+    const funnel = startLib.startFunnel([...fullPath('a'), ...fullPath('a')], 1);
+    for (const stage of funnel.stages) assert.equal(stage.sessions, 1, `${stage.stage} was double counted`);
+  });
+
+  check('a restart is counted and does not inflate starts', () => {
+    const funnel = startLib.startFunnel(
+      [...fullPath('a'), step('a', 'next_step_restarted', 30), step('a', 'next_step_opened', 31)],
+      1
+    );
+    assert.equal(stageOf(funnel, 'opened').sessions, 1, 'reopening counted as a second start');
+    assert.equal(funnel.restartedSessions, 1);
+    assert.equal(funnel.restartShare, 1);
+  });
+
+  check('destinations are counted once per session and split by direction', () => {
+    const funnel = startLib.startFunnel(
+      [
+        ...fullPath('a'),
+        step('a', 'next_step_destination_clicked', 25, { destination: 'markets', external: false }),
+        step('a', 'next_step_destination_clicked', 26, { destination: 'community', external: true }),
+      ],
+      1
+    );
+    const markets = funnel.destinations.find((row) => row.destination === 'markets');
+    assert.equal(markets.sessions, 1, 'the same destination counted twice for one session');
+    assert.equal(funnel.internalClicks, 2);
+    assert.equal(funnel.externalClicks, 1);
+  });
+
+  check('a rate is withheld below the minimum but the count is not', () => {
+    const funnel = startLib.startFunnel(fullPath('a'), 25);
+    assert.equal(stageOf(funnel, 'level_selected').sessions, 1);
+    assert.equal(stageOf(funnel, 'level_selected').ofPrevious, null);
+  });
+
+  check('the generic funnel enforces the same order rule', () => {
+    const chain = ['events_discovery_viewed', 'event_viewed', 'event_registration_started'];
+    const ordered = startLib.sequentialFunnel(
+      [
+        step('a', 'events_discovery_viewed', 0),
+        step('a', 'event_viewed', 5),
+        step('a', 'event_registration_started', 10),
+      ],
+      chain,
+      1
+    );
+    assert.equal(ordered.stages[2].sessions, 1);
+
+    const backwards = startLib.sequentialFunnel(
+      [step('b', 'event_viewed', 0), step('b', 'events_discovery_viewed', 5)],
+      chain,
+      1
+    );
+    assert.equal(backwards.stages[1].sessions, 0, 'a later first step still satisfied the chain');
+  });
+
+  group('Durable status semantics');
+
+  check('a waitlisted person never held a seat', () => {
+    const counts = { registered: 10, waitlisted: 40, cancelled: 5, attended: 6, no_show: 4 };
+    assert.equal(semantics.attendanceDenominator(counts), 20, 'the denominator counted seats nobody had');
+    assert.equal(semantics.SEAT_STATUSES.includes('waitlisted'), false);
+    assert.equal(semantics.SEAT_STATUSES.includes('cancelled'), false);
+  });
+
+  check('the open pipeline is work outstanding, not a conversion stage', () => {
+    const counts = { draft: 3, slot_held: 2, payment_pending: 1, confirmed: 4, completed: 9, cancelled: 2, refunded: 1 };
+    assert.equal(semantics.openPipeline(counts), 10);
+    assert.equal(semantics.OPEN_BOOKING_STATUSES.includes('completed'), false, 'a finished booking counted as open');
+  });
+
+  check('every declared booking status is known to the semantics', () => {
+    for (const status of ['draft', 'slot_held', 'payment_pending', 'confirmed', 'completed', 'cancelled', 'refunded', 'no_show', 'disputed']) {
+      assert.equal(semantics.BOOKING_STATUSES.includes(status), true, status);
+    }
+  });
+
+  check('a demo purchase can never be revenue-bearing', () => {
+    assert.equal(semantics.isRevenueBearing('demo'), false);
+    assert.equal(semantics.isRevenueBearing('pending'), false);
+    assert.equal(semantics.isRevenueBearing('failed'), false);
+    assert.equal(semantics.isRevenueBearing('refunded'), false);
+    assert.equal(semantics.isRevenueBearing('paid'), true);
+    assert.equal(semantics.POTENTIALLY_MONETARY_STATUSES.includes('demo'), false);
+  });
+
+  check('revenue is not confirmable while nothing has been reconciled', () => {
+    assert.equal(semantics.revenueIsConfirmable(0), false);
+    assert.equal(semantics.revenueIsConfirmable(1), true);
+  });
+
+  group('Durable adapters cannot quietly widen');
+
+  const ADAPTERS = [
+    'src/lib/admin-metrics/families/events.ts',
+    'src/lib/admin-metrics/families/academy.ts',
+    'src/lib/admin-metrics/families/experts.ts',
+    'src/lib/admin-metrics/families/commerce.ts',
+    'src/lib/admin-metrics/families/saves.ts',
+    'src/lib/admin-metrics/families/wealth.ts',
+    'src/lib/admin-metrics/families/accounts.ts',
+  ];
+
+  check('no adapter selects a whole row', () => {
+    /*
+     * `select()` with no argument is Drizzle's `select *`. Several of these
+     * tables hold an email, a name, an encrypted brief or a monetary value a
+     * column away from what we want, and a widened select is how one reaches a
+     * JSON response without anybody deciding it should.
+     */
+    for (const path of ADAPTERS) {
+      const source = readFileSync(path, 'utf8');
+      assert.equal(/\.select\(\s*\)/.test(source), false, `${path} selects whole rows`);
+    }
+  });
+
+  /*
+   * Checked as *column references*, not as mentions. These files deliberately
+   * name the fields they refuse to read — that prose is the point, and a test
+   * that banned the words would have forced the documentation out to protect a
+   * grep. What must never appear is `schema.<table>.<column>`, which is the
+   * only form that can actually put a value in a query.
+   */
+  const FORBIDDEN_COLUMNS = [
+    'nameEnc', 'valueEnc', 'detailsEnc', 'balanceEnc', 'termsEnc', 'targetEnc', 'metaEnc',
+    'briefEnc', 'summaryEnc', 'noteEnc', 'sharedContext', 'diagnostic',
+    'email', 'name', 'company', 'role', 'experienceLevel', 'dataKeyEnc', 'image',
+    'description', 'title', 'subtitle', 'ref',
+  ];
+
+  for (const path of ADAPTERS) {
+    check(`${path.split('/').pop()} references no sensitive column`, () => {
+      const source = readFileSync(path, 'utf8');
+      for (const column of FORBIDDEN_COLUMNS) {
+        const reference = new RegExp(`schema\.\w+\.${column}\b`);
+        assert.equal(reference.test(source), false, `${path} reads schema.*.${column}`);
+      }
+    });
+  }
+
+  check('the Wealth family reads no encrypted column', () => {
+    // The strictest boundary. Nothing here selects a value, so nothing here can
+    // decrypt one — the prose above the code names them precisely so a reader
+    // can confirm that at a glance.
+    const source = readFileSync('src/lib/admin-metrics/families/wealth.ts', 'utf8');
+    for (const column of ['nameEnc', 'valueEnc', 'balanceEnc', 'targetEnc', 'detailsEnc', 'metaEnc', 'termsEnc']) {
+      assert.equal(
+        new RegExp(`schema\.\w+\.${column}\b`).test(source),
+        false,
+        `wealth.ts reads ${column}`
+      );
+    }
+  });
+
+  check('current wealth assets exclude superseded revisions', () => {
+    const source = readFileSync('src/lib/admin-metrics/families/wealth.ts', 'utf8');
+    assert.match(source, /isNull\(schema\.wealthAsset\.supersededAt\)/);
+    assert.match(source, /supersededAt\} is not null/);
+  });
+
+  check('commerce never sums a demo amount into a paid figure', () => {
+    const source = readFileSync('src/lib/admin-metrics/families/commerce.ts', 'utf8');
+    assert.match(source, /filter \(where \$\{schema\.purchase\.status\} = 'paid'\)/);
+    assert.match(source, /filter \(where \$\{schema\.purchase\.status\} = 'demo'\)/);
+    assert.equal(source.includes('recordedPaidGrossCents'), true, 'the paid sum lost its honest name');
+    assert.equal(/revenue:\s*durableCount/.test(source), false, 'a durable count was named revenue');
+  });
+
+  check('commerce reads the plan lineup rather than listing it', () => {
+    const source = readFileSync('src/lib/admin-metrics/families/commerce.ts', 'utf8');
+    assert.match(source, /PLAN_RANK/);
+    for (const stale of ["'plus'", "'pro'", "'private'", "'essential'", "'ultimate'"]) {
+      assert.equal(source.includes(stale), false, `commerce.ts hardcodes ${stale}`);
+    }
+  });
+
+  group('Phase 3 definitions say which kind of source they are');
+
+  check('every dictionary entry declares a source type', () => {
+    for (const entry of dictionary.METRIC_DICTIONARY_ALL) {
+      assert.ok(entry.sourceType, `${entry.id} has no source type`);
+      assert.equal(states.SOURCE_TYPES.includes(entry.sourceType), true, `${entry.id}: ${entry.sourceType}`);
+    }
+  });
+
+  check('the durable families are declared as facts, not as behaviour', () => {
+    for (const id of ['events_attendance_rate', 'academy_completion_rate', 'experts_pipeline', 'wealth_adoption']) {
+      assert.equal(dictionary.DICTIONARY_BY_ID.get(id).sourceType, 'durable_fact', id);
+    }
+    assert.equal(dictionary.DICTIONARY_BY_ID.get('start_funnel').sourceType, 'telemetry');
+    assert.equal(dictionary.DICTIONARY_BY_ID.get('confirmed_revenue').sourceType, 'source_not_connected');
+  });
+
+  check('a current-state family says it is not a historical funnel', () => {
+    for (const id of ['academy_completion_rate', 'experts_pipeline']) {
+      const entry = dictionary.DICTIONARY_BY_ID.get(id);
+      assert.match(entry.timeSemantics, /[Cc]urrent state/, `${id} does not say it is current state`);
+    }
+    assert.match(
+      dictionary.DICTIONARY_BY_ID.get('experts_pipeline').limitations.join(' '),
+      /No conversion rate is published/
+    );
+  });
+
+  check('the seven retired plan events are absent from every Phase 3 definition', () => {
+    const serialised = JSON.stringify(dictionary.METRIC_DICTIONARY_ALL);
+    for (const legacy of registry.LEGACY_EVENT_NAMES) {
+      assert.equal(serialised.includes(legacy), false, `${legacy} is cited by a live metric`);
+    }
+  });
+
   /* ------------------------------------ The checker cannot be self-defeated */
 
   group('The caller checker survives the registry that names every event');
@@ -1578,6 +1883,147 @@ try {
         }
       });
 
+      await checkAsync('the product families endpoint keeps behaviour and facts apart', async () => {
+        const token = await mintToken();
+        const response = await fetch(`${BASE}/api/admin-metrics/products`, {
+          headers: { cookie: `tn_metrics_access=${token}` },
+        });
+        const body = await response.json();
+
+        assert.equal(response.status, 200);
+
+        // Behaviour is a funnel; facts are tables. Both present, neither merged.
+        assert.equal(body.start.sourceType, 'telemetry');
+        assert.ok(Array.isArray(body.start.funnel.stages));
+        assert.deepEqual(body.events.sources, ['event_registration', 'event', 'event_metric']);
+        assert.ok(body.events.funnel, 'the Events family lost its behavioural funnel');
+
+        // Every durable metric names its own table, never "the database".
+        for (const family of ['events', 'academy', 'experts', 'saves', 'commerce', 'accounts']) {
+          for (const [key, metric] of Object.entries(body[family].metrics)) {
+            assert.ok(metric.source, `${family}.${key} has no source`);
+            assert.notEqual(metric.source, 'database', `${family}.${key} is vague about its source`);
+          }
+        }
+
+        assert.equal(body.commerce.metrics.confirmedRevenue.state, 'source_not_connected');
+        assert.equal('value' in body.commerce.metrics.confirmedRevenue, false);
+      });
+
+      await checkAsync('no serialized product payload carries a private field', async () => {
+        /*
+         * The check that matters, and the reason it is here rather than in the
+         * unit half: a TypeScript declaration says what a function intends to
+         * return, and this says what actually crossed the wire. Every one of
+         * these lives a column away from something the Observatory does read.
+         */
+        const token = await mintToken();
+        const bodies = await Promise.all(
+          ['products', 'journeys', 'retention', 'overview', 'coverage'].map((endpoint) =>
+            fetch(`${BASE}/api/admin-metrics/${endpoint}`, {
+              headers: { cookie: `tn_metrics_access=${token}` },
+            }).then((response) => response.json())
+          )
+        );
+
+        /*
+         * Field names and data values, not documentation.
+         *
+         * These payloads deliberately carry prose that *names* the fields they
+         * refuse to read — "name, email, company … are never selected" — and a
+         * naive substring scan over the raw text flags exactly the sentence
+         * that proves the rule is being kept. So the walk skips the explanatory
+         * keys and checks everything else: a private value or a private field
+         * name is still caught, an honest limitation is not.
+         */
+        const DOCUMENTATION_KEYS = new Set([
+          'limitations',
+          'note',
+          'timeSemantics',
+          'eligiblePopulation',
+          'exclusions',
+          'formula',
+          'numerator',
+          'denominator',
+          'reason',
+          'wouldRequire',
+          'missingSource',
+        ]);
+
+        const keys = [];
+        const values = [];
+        const walk = (node) => {
+          if (node === null || node === undefined) return;
+          if (Array.isArray(node)) return node.forEach(walk);
+          if (typeof node === 'object') {
+            for (const [key, value] of Object.entries(node)) {
+              keys.push(key);
+              if (!DOCUMENTATION_KEYS.has(key)) walk(value);
+            }
+            return;
+          }
+          if (typeof node === 'string') values.push(node);
+        };
+
+        bodies.forEach(walk);
+
+        /*
+         * A few words are only dangerous as a field name. `diagnostic` is an
+         * Academy *stage* — `landing | diagnostic | path | …` — so it is a
+         * legitimate distribution value, while a key called `diagnostic` would
+         * be the answers themselves.
+         */
+        const exactKeys = new Set(keys.map((key) => key.toLowerCase()));
+
+        for (const forbidden of [
+          'diagnostic', 'answers', 'ref', 'title', 'subtitle', 'description', 'name', 'email',
+        ]) {
+          /*
+           * Exact, not substring. `refunded` and `subscriptionsWithProviderRef`
+           * are legitimate and would both trip a `includes('ref')` test — and a
+           * privacy check that cries wolf is one somebody eventually loosens
+           * until it stops catching anything.
+           */
+          assert.equal(exactKeys.has(forbidden), false, `a response exposed a "${forbidden}" field`);
+        }
+
+        const payload = [...keys, ...values].join('\n');
+
+        for (const forbidden of [
+          'email', 'attendee', 'company', 'experienceLevel', 'briefEnc', 'brief_enc',
+          'summaryEnc', 'summary_enc', 'noteEnc', 'note_enc', 'nameEnc', 'name_enc',
+          'valueEnc', 'value_enc', 'balanceEnc', 'balance_enc', 'targetEnc', 'target_enc',
+          'detailsEnc', 'metaEnc', 'termsEnc', 'dataKeyEnc', 'ipAddress', 'ip_address',
+          'userAgent', 'user_agent', 'meetingUrl', 'joinUrl',
+          'netWorth', 'portfolioValue', 'sharedContext',
+        ]) {
+          assert.equal(payload.includes(forbidden), false, `a response carried "${forbidden}"`);
+        }
+
+        // No raw identifier of any kind: not a user id, not a session id.
+        assert.equal(/"userId"/.test(payload), false, 'a response carried a user id');
+        assert.equal(/s_[0-9a-f]{32}/.test(payload), false, 'a response carried a session id');
+        assert.equal(/u_[0-9a-f]{32}/.test(payload), false, 'a response carried a user key');
+      });
+
+      await checkAsync('coverage separates behaviour from durable facts per family', async () => {
+        const token = await mintToken();
+        const response = await fetch(`${BASE}/api/admin-metrics/coverage`, {
+          headers: { cookie: `tn_metrics_access=${token}` },
+        });
+        const body = await response.json();
+
+        assert.ok(body.families.length >= 8);
+
+        const wealth = body.families.find((family) => family.family === 'wealth');
+        assert.ok(wealth.durableSources.includes('wealth_asset'));
+
+        // A durable source is not evidence that the funnel is instrumented.
+        const saves = body.families.find((family) => family.family === 'saves');
+        assert.equal(saves.telemetryEvents, 0);
+        assert.equal(saves.verdict, 'facts_only');
+      });
+
       await checkAsync('the dictionary is served rather than restated in the page', async () => {
         const token = await mintToken();
         const response = await fetch(`${BASE}/api/admin-metrics/dictionary`, {
@@ -1586,7 +2032,7 @@ try {
         const body = await response.json();
 
         assert.equal(response.status, 200);
-        assert.ok(body.metrics.length >= 9);
+        assert.ok(body.metrics.length >= 15);
         assert.ok(body.metrics.every((entry) => entry.formula && entry.limitations.length));
       });
 
