@@ -9,14 +9,26 @@
 /* ------------------------------------------------------------------ Events */
 
 /**
- * The statuses that mean a seat was taken.
+ * The statuses that mean a seat is held.
  *
  * `cancelled` is not one: the seat was given back. `waitlisted` is not one
- * either — a waitlisted person never had a seat to attend, and counting them in
- * the denominator would make a popular event look badly attended precisely
- * because it was popular.
+ * either — a waitlisted person never had a seat, and counting them would make a
+ * popular event look badly attended precisely because it was popular.
  */
 export const SEAT_STATUSES: readonly string[] = ['registered', 'attended', 'no_show'];
+
+/**
+ * The statuses where somebody has decided what happened.
+ *
+ * `registered` is deliberately absent, and this is the correction that matters.
+ * A `registered` row means "holds a seat", which covers a talk next month and a
+ * talk last week that nobody has marked up yet. Putting it in the denominator
+ * makes every future event drag the attendance rate down before attendance is
+ * knowable, so a healthy pipeline of upcoming events reads as an attendance
+ * problem — and the rate would climb as organisers did their paperwork rather
+ * than as more people turned up.
+ */
+export const ATTENDANCE_RESOLVED_STATUSES: readonly string[] = ['attended', 'no_show'];
 
 export const REGISTRATION_STATUSES: readonly string[] = [
   'registered',
@@ -26,8 +38,29 @@ export const REGISTRATION_STATUSES: readonly string[] = [
   'no_show',
 ];
 
-export function attendanceDenominator(counts: Readonly<Record<string, number>>): number {
-  return SEAT_STATUSES.reduce((sum, status) => sum + (counts[status] ?? 0), 0);
+function total(counts: Readonly<Record<string, number>>, statuses: readonly string[]): number {
+  return statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0);
+}
+
+/** Seats whose outcome is known. The denominator of the attendance rate. */
+export function attendanceResolvedSeats(counts: Readonly<Record<string, number>>): number {
+  return total(counts, ATTENDANCE_RESOLVED_STATUSES);
+}
+
+/**
+ * Seats still waiting for an outcome.
+ *
+ * Reported beside the rate rather than folded into it. A rate over four
+ * resolved seats out of nine hundred held is technically correct and useless,
+ * and the only way a reader can tell is if both numbers are on the page.
+ */
+export function attendanceUnresolvedSeats(counts: Readonly<Record<string, number>>): number {
+  return counts.registered ?? 0;
+}
+
+/** All seats held, resolved or not. The denominator of marking coverage. */
+export function heldSeats(counts: Readonly<Record<string, number>>): number {
+  return total(counts, SEAT_STATUSES);
 }
 
 /* ----------------------------------------------------------------- Experts */

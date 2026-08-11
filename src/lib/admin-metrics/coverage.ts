@@ -119,7 +119,7 @@ export type CoverageReport = {
  */
 const FAMILY_SOURCES: ReadonlyArray<{ family: string; surfaces: string[]; durable: string[] }> = [
   { family: 'start', surfaces: ['start'], durable: [] },
-  { family: 'events', surfaces: ['events'], durable: ['event_registration', 'event', 'event_metric'] },
+  { family: 'events', surfaces: ['events'], durable: ['event_registration', 'event'] },
   { family: 'academy', surfaces: ['academy'], durable: ['academy_progress'] },
   { family: 'experts', surfaces: ['experts'], durable: ['expert_booking'] },
   { family: 'saves', surfaces: [], durable: ['saved_object', 'collection', 'collection_item'] },
