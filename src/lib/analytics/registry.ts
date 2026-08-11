@@ -237,6 +237,132 @@ export const EVENT_REGISTRY: readonly EventDefinition[] = [
       'A TradingView handoff is a product boundary, not a failure — so it is meaningful continuation and counts in PMCR. It is decomposed out beside the internal rate rather than hidden inside it, because a session that left is not a session that stayed.',
   },
 
+  /* --------------------------------------------------- Reliability (Phase 5)
+   *
+   * Emitted by this section's own client instrumentation, so they arrive
+   * without waiting on anybody.
+   */
+  {
+    name: 'web_vital_measured',
+    schemaVersion: 1,
+    kind: 'client',
+    surface: 'portal',
+    lifecycle: 'current',
+    privacy: 'shape',
+    properties: {
+      metric: oneOf('lcp', 'inp', 'cls', 'fcp', 'ttfb'),
+      rating: oneOf('good', 'needs_improvement', 'poor'),
+      /*
+       * One integer field for five metrics with two different units, so the
+       * scaling has to live somewhere findable rather than in whichever
+       * component last formatted it: **milliseconds for the four time metrics,
+       * and CLS multiplied by 1000.** CLS is a unitless ratio around 0.1, and
+       * an integer column would otherwise round every real score to zero.
+       * `lib/admin-metrics/webVitals.ts` is the only place that converts back.
+       */
+      value: { kind: 'integer', min: 0, max: 3_600_000 },
+      area: id(48),
+      navigationType: oneOf('navigate', 'reload', 'back_forward', 'prerender', 'restore', 'unknown'),
+      device: oneOf('mobile', 'tablet', 'desktop', 'unknown'),
+    },
+    note: 'Reported by the browser through Next\'s own Web Vitals hook. No URL, no user agent, no timing origin.',
+  },
+  {
+    name: 'client_runtime_failure',
+    schemaVersion: 1,
+    kind: 'client',
+    surface: 'portal',
+    lifecycle: 'current',
+    privacy: 'shape',
+    properties: {
+      /*
+       * A class, never a message. A thrown error's text is written by whoever
+       * threw it and routinely contains a URL, a ticker, an id or a fragment of
+       * somebody's input — there is no reliable way to sanitise arbitrary error
+       * text, so none is collected. The count of a class is the part that is
+       * actionable anyway.
+       */
+      class: oneOf('unhandled_error', 'unhandled_rejection', 'resource'),
+      phase: oneOf('bootstrap', 'runtime', 'navigation', 'unknown'),
+      area: id(48),
+    },
+    note: 'Counts by class and surface. No message, no stack, no URL — see the class comment.',
+  },
+
+  /* --------------------------------- Market data health — awaiting Markets
+   *
+   * Declared here so the Observatory has a contract to query and a coverage row
+   * to report against; the emitters belong to the `markets` section. See
+   * `docs/admin-metrics/market-data-instrumentation-request.md`.
+   */
+  {
+    name: 'market_data_request_completed',
+    schemaVersion: 1,
+    kind: 'server',
+    surface: 'markets',
+    lifecycle: 'current',
+    privacy: 'shape',
+    properties: {
+      source: oneOf('twelve_data', 'fred'),
+      kind: oneOf('quote', 'quotes_batch', 'series', 'bars', 'macro'),
+      outcome: oneOf('success', 'not_configured', 'no_data', 'provider_error'),
+      /** The free tier is always delayed; this records the policy, not a fault. */
+      delayed: bool,
+      durationMs: { kind: 'integer', min: 0, max: 600_000 },
+      hasVolume: bool,
+      /*
+       * Coarse, and judged against the cadence of the data rather than the wall
+       * clock. A monthly macro series is months old by design and a Friday
+       * close is not stale on a Saturday.
+       */
+      freshnessBucket: oneOf('current', 'delayed_expected', 'stale_1d', 'stale_3d', 'stale_7d_plus', 'not_applicable', 'unknown'),
+    },
+    note:
+      'One completed invocation of a market-data client operation, reporting the result the product saw. NOT proof that a request reached the provider: the client fetches through the Next data cache, which is transparent at that layer, so a success may have been served from cache. Never the symbol, the query or the provider URL.',
+  },
+
+  /* --------------------------- Supercharts capability — awaiting Superchart
+   *
+   * The existing Supercharts events record intent — `superchart_study_toggled`
+   * fires as the toggle is pressed. These record what the engine did with it.
+   * See `docs/admin-metrics/supercharts-instrumentation-request.md`.
+   */
+  {
+    name: 'superchart_study_applied',
+    schemaVersion: 1,
+    kind: 'client',
+    surface: 'supercharts',
+    lifecycle: 'current',
+    privacy: 'shape',
+    properties: {
+      study: id(32),
+      placement: oneOf('overlay', 'pane'),
+      paneCount: { kind: 'integer', min: 1, max: 12 },
+    },
+    note: 'The study rendered, as opposed to the toggle being pressed. Placement is the engine\'s, not the catalogue\'s.',
+  },
+  {
+    name: 'superchart_capability_completed',
+    schemaVersion: 1,
+    kind: 'client',
+    surface: 'supercharts',
+    lifecycle: 'current',
+    privacy: 'shape',
+    properties: {
+      capability: id(48),
+      /*
+       * No `handoff` value, deliberately. Supercharts has no TradingView
+       * handoff — an audit of the current section found none, and declaring an
+       * outcome nothing can emit would put a permanent zero on the dashboard
+       * that reads as a product decision.
+       */
+      outcome: oneOf('fulfilled', 'no_data', 'unsupported', 'failure'),
+      hasVolume: bool,
+      paneCount: { kind: 'integer', min: 1, max: 12 },
+    },
+    note: 'Why a chart capability did or did not happen. Never the symbol.',
+  },
+
   /* ------------------------------------------------------------ Operational */
   {
     name: 'telemetry_ingest_rejected',

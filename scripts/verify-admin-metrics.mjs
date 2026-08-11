@@ -138,6 +138,9 @@ const PURE_MODULES = [
   'admin-metrics/families/startFunnel',
   'admin-metrics/families/semantics',
   'admin-metrics/families/voyagerMetrics',
+  'admin-metrics/families/supercharts',
+  'admin-metrics/freshness',
+  'admin-metrics/webVitals',
 ];
 
 const repo = process.cwd();
@@ -223,6 +226,9 @@ const dictionary = await load('admin-metrics/dictionary');
 const startLib = await load('admin-metrics/families/startFunnel');
 const semantics = await load('admin-metrics/families/semantics');
 const voyagerLib = await load('admin-metrics/families/voyagerMetrics');
+const charts = await load('admin-metrics/families/supercharts');
+const fresh = await load('admin-metrics/freshness');
+const vitals = await load('admin-metrics/webVitals');
 
 const NOW = new Date('2026-08-10T12:00:00.000Z');
 const at = { source: 'test', metricId: 'test', queriedAt: NOW.toISOString() };
@@ -1978,6 +1984,381 @@ try {
     const source = readFileSync('src/lib/admin-metrics/families/voyager.ts', 'utf8');
     assert.match(source, /awaitingEmitter/);
     assert.match(source, /this is not an absence of usage/);
+  });
+
+  /* ================================ Phase 5 — reliability, data health, charts */
+
+  group('Web Vitals carry two units in one column');
+
+  check('CLS survives the round trip and the others stay milliseconds', () => {
+    /*
+     * The mistake this guards: CLS is a unitless ratio around 0.1, and storing
+     * it raw in an integer column rounds every real score to zero. It is scaled
+     * by 1000 on the way in and divided on the way out, in one place.
+     */
+    assert.equal(vitals.toStoredValue('cls', 0.083), 83);
+    assert.equal(vitals.fromStoredValue('cls', 83), 0.083);
+    assert.equal(vitals.toStoredValue('lcp', 2410.7), 2411);
+    assert.equal(vitals.fromStoredValue('lcp', 2411), 2411);
+  });
+
+  check('a real CLS score does not round to zero', () => {
+    assert.notEqual(vitals.toStoredValue('cls', 0.04), 0);
+  });
+
+  check('formatting reads the stored value back in its own unit', () => {
+    assert.equal(vitals.formatVital('cls', 83), '0.083');
+    assert.equal(vitals.formatVital('lcp', 2400), '2.40 s');
+    assert.equal(vitals.formatVital('ttfb', 420), '420 ms');
+  });
+
+  check('only the five declared vitals are accepted', () => {
+    for (const name of ['lcp', 'inp', 'cls', 'fcp', 'ttfb']) assert.equal(vitals.isWebVital(name), true);
+    for (const name of ['fid', 'tbt', 'anything']) assert.equal(vitals.isWebVital(name), false);
+  });
+
+  check('ratings use the published thresholds', () => {
+    assert.equal(vitals.rate('lcp', 2000), 'good');
+    assert.equal(vitals.rate('lcp', 3000), 'needs_improvement');
+    assert.equal(vitals.rate('lcp', 5000), 'poor');
+    assert.equal(vitals.rate('cls', 0.05), 'good');
+    assert.equal(vitals.rate('cls', 0.3), 'poor');
+  });
+
+  check('p75 is nearest-rank and is the headline', () => {
+    const samples = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].map((value) => ({
+      metric: 'lcp',
+      value,
+      rating: 'good',
+      area: 'home',
+    }));
+    const lcp = vitals.summariseVitals(samples, 1).find((row) => row.metric === 'lcp');
+    assert.equal(lcp.p50, 500);
+    assert.equal(lcp.p75, 800);
+    assert.equal(lcp.p90, 900);
+    assert.equal(lcp.sample, 10);
+  });
+
+  check('a small sample withholds every percentile rather than looking healthy', () => {
+    const lcp = vitals
+      .summariseVitals([{ metric: 'lcp', value: 100, rating: 'good', area: 'home' }], 50)
+      .find((row) => row.metric === 'lcp');
+    assert.equal(lcp.p75, null, 'a p75 over one page load was published');
+    assert.equal(lcp.poorShare, null);
+    assert.equal(lcp.sample, 1, 'the count is still reported');
+  });
+
+  group('Runtime failures are classes, never messages');
+
+  check('the failure contract admits only closed classes', () => {
+    const definition = registry.EVENT_BY_NAME.get('client_runtime_failure');
+    assert.deepEqual(Object.keys(definition.properties).sort(), ['area', 'class', 'phase']);
+    assert.deepEqual(definition.properties.class.values, ['unhandled_error', 'unhandled_rejection', 'resource']);
+  });
+
+  for (const forbidden of ['message', 'stack', 'url', 'useragent', 'query', 'props', 'reason']) {
+    check(`a runtime failure cannot carry "${forbidden}"`, () => {
+      const keys = Object.keys(registry.EVENT_BY_NAME.get('client_runtime_failure').properties).map((key) =>
+        key.toLowerCase()
+      );
+      assert.equal(keys.includes(forbidden), false);
+    });
+  }
+
+  check('an error message is refused by the validator', () => {
+    const result = validate.validateEvent(
+      {
+        name: 'client_runtime_failure',
+        occurredAt: NOW.toISOString(),
+        properties: { class: 'unhandled_error', phase: 'runtime', area: 'home', message: 'TypeError: x' },
+      },
+      NOW
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'unknown_property');
+  });
+
+  check('nothing in the client instrumentation monkeypatches the browser', () => {
+    const source = readFileSync('src/instrumentation-client.ts', 'utf8');
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    for (const forbidden of ['window.fetch =', 'console.error =', 'XMLHttpRequest.prototype']) {
+      assert.equal(code.includes(forbidden), false, `instrumentation patches ${forbidden}`);
+    }
+    assert.match(code, /addEventListener\(\s*'unhandledrejection'/);
+  });
+
+  group('Freshness is judged against the cadence of the data');
+
+  const MONDAY = new Date('2026-08-10T15:00:00.000Z');
+
+  check('a quote inside the delay is current, and just past it is expected', () => {
+    assert.equal(fresh.freshnessOf('quote', new Date('2026-08-10T14:52:00.000Z'), MONDAY), 'current');
+    assert.equal(fresh.freshnessOf('quote', new Date('2026-08-10T14:30:00.000Z'), MONDAY), 'delayed_expected');
+  });
+
+  check("Friday's close is not stale on a Sunday", () => {
+    /*
+     * The failure a wall-clock rule produces: 48 hours have passed and the
+     * market has produced nothing newer, so the product would have reported
+     * itself broken every weekend.
+     */
+    const sunday = new Date('2026-08-16T12:00:00.000Z');
+    const fridayClose = new Date('2026-08-14T20:00:00.000Z');
+    assert.equal(fresh.tradingDaysBetween(fridayClose, sunday), 0);
+    assert.equal(fresh.freshnessOf('quote', fridayClose, sunday), 'current');
+    assert.equal(fresh.freshnessOf('series', fridayClose, sunday), 'current');
+  });
+
+  check('a genuinely old quote is bucketed by trading days', () => {
+    const later = new Date('2026-08-20T15:00:00.000Z');
+    assert.equal(fresh.freshnessOf('quote', new Date('2026-08-19T15:00:00.000Z'), later), 'stale_1d');
+    assert.equal(fresh.freshnessOf('quote', new Date('2026-08-17T15:00:00.000Z'), later), 'stale_3d');
+    assert.equal(fresh.freshnessOf('series', new Date('2026-08-03T15:00:00.000Z'), later), 'stale_7d_plus');
+  });
+
+  check('macro is never judged by a quote threshold', () => {
+    // Monthly data is months old by design, and this product has no cadence
+    // metadata to judge it against — so it claims nothing rather than guessing.
+    const old = new Date('2026-05-01T00:00:00.000Z');
+    assert.equal(fresh.freshnessOf('macro', old, MONDAY), 'not_applicable');
+    assert.notEqual(fresh.freshnessOf('quote', old, MONDAY), 'not_applicable');
+  });
+
+  check('an absent observation is unknown, not fresh', () => {
+    assert.equal(fresh.freshnessOf('quote', null, MONDAY), 'unknown');
+  });
+
+  check('a source with no expected cadence is never called stale', () => {
+    /*
+     * "Last seen three days ago" and "stale" are different claims. Web Vitals
+     * only exist when a page loads; silence means nobody visited.
+     */
+    const webVitals = fresh.SOURCE_CADENCE.find((row) => row.source === 'web vitals');
+    const portal = fresh.SOURCE_CADENCE.find((row) => row.source === 'portal telemetry');
+    const longAgo = new Date('2026-08-01T00:00:00.000Z');
+
+    assert.equal(webVitals.budgetHours, null);
+    assert.equal(fresh.sourceIsStale(webVitals, longAgo, MONDAY), false);
+    assert.equal(fresh.sourceIsStale(portal, longAgo, MONDAY), true);
+  });
+
+  group('Supercharts: overlay, pane, and no handoff that does not exist');
+
+  check('placement comes from the canonical registry', () => {
+    assert.equal(charts.placementOf('sma'), 'overlay');
+    assert.equal(charts.placementOf('ema'), 'overlay');
+    assert.equal(charts.placementOf('rsi'), 'pane');
+    assert.equal(charts.placementOf('macd'), 'pane');
+    assert.equal(charts.placementOf('volume'), 'pane');
+    assert.equal(charts.placementOf('nonsense'), 'unknown');
+  });
+
+  check('RSI, MACD and Volume are native panes, not handoffs', () => {
+    for (const study of charts.NATIVE_PANE_STUDIES) {
+      assert.equal(charts.placementOf(study), 'pane', `${study} is not classified native`);
+    }
+  });
+
+  check('the capability contract declares no handoff outcome', () => {
+    /*
+     * Supercharts has none — the audit found the handoff belongs to Voyager.
+     * Declaring an outcome nothing can emit would leave a permanent zero that
+     * reads as a product decision.
+     */
+    const outcomes = registry.EVENT_BY_NAME.get('superchart_capability_completed').properties.outcome.values;
+    assert.equal(outcomes.includes('handoff'), false);
+    assert.deepEqual([...outcomes].sort(), ['failure', 'fulfilled', 'no_data', 'unsupported']);
+  });
+
+  check('missing data and unsupported are separate outcomes', () => {
+    const summary = charts.summariseSupercharts([
+      { sessionId: 'a', eventName: 'superchart_capability_completed', properties: { outcome: 'no_data' } },
+      { sessionId: 'a', eventName: 'superchart_capability_completed', properties: { outcome: 'unsupported' } },
+      { sessionId: 'a', eventName: 'superchart_capability_completed', properties: { outcome: 'unsupported' } },
+    ]);
+    const byOutcome = Object.fromEntries(summary.capability.map((row) => [row.outcome, row.count]));
+    assert.equal(byOutcome.no_data, 1);
+    assert.equal(byOutcome.unsupported, 2);
+  });
+
+  check('activations count switching a study on, not off', () => {
+    const summary = charts.summariseSupercharts([
+      { sessionId: 'a', eventName: 'superchart_study_toggled', properties: { studyId: 'rsi', on: true } },
+      { sessionId: 'a', eventName: 'superchart_study_toggled', properties: { studyId: 'rsi', on: false } },
+      { sessionId: 'a', eventName: 'superchart_study_toggled', properties: { studyId: 'sma', on: true } },
+    ]);
+    assert.equal(summary.paneActivations, 1, 'a toggle-off counted as use');
+    assert.equal(summary.overlayActivations, 1);
+    assert.equal(summary.sessionsWithPaneStudy, 1);
+  });
+
+  check('Pine is generated, exported and previewed — never executed', () => {
+    const source = readFileSync('src/components/admin-metrics/ReliabilityPanel.tsx', 'utf8');
+    assert.match(source, /never executed or backtested/);
+    for (const forbidden of ['scriptsRun', 'backtested:', 'scriptsExecuted']) {
+      assert.equal(source.includes(forbidden), false, `the panel claims Pine is ${forbidden}`);
+    }
+  });
+
+  group('Provenance, and the Voyager scope limitation');
+
+  check('a missing cross-section emitter is not zero', () => {
+    for (const [path, marker] of [
+      ['src/lib/admin-metrics/families/reliability.ts', /this is not an absence of failures/],
+      ['src/lib/admin-metrics/families/voyager.ts', /this is not an absence of usage/],
+    ]) {
+      assert.match(readFileSync(path, 'utf8'), marker, `${path} lost its awaiting-emitter wording`);
+    }
+  });
+
+  check('the Voyager dictionary states what serverRequests does not count', () => {
+    for (const id of ['voyager_real_answer_rate', 'voyager_fallback_rate', 'voyager_refusal_rate']) {
+      const entry = dictionary.DICTIONARY_BY_ID.get(id);
+      assert.match(
+        entry.limitations.join(' '),
+        /voyager\/research workspace answers some scripted scenarios locally/,
+        `${id} does not state the server-request scope`
+      );
+    }
+  });
+
+  check('the Voyager panel says it on the page, not only in the dictionary', () => {
+    const source = readFileSync('src/components/admin-metrics/VoyagerPanel.tsx', 'utf8');
+    assert.match(source, /voyager\/research/);
+    assert.match(source, /not a count of every/);
+  });
+
+  check('the new Phase 5 events declare no free-text property', () => {
+    for (const name of [
+      'web_vital_measured',
+      'client_runtime_failure',
+      'market_data_request_completed',
+      'superchart_study_applied',
+      'superchart_capability_completed',
+    ]) {
+      const definition = registry.EVENT_BY_NAME.get(name);
+      assert.ok(definition, `${name} is not registered`);
+      for (const [key, spec] of Object.entries(definition.properties)) {
+        assert.ok(['enum', 'token', 'integer', 'boolean'].includes(spec.kind), `${name}.${key} is ${spec.kind}`);
+      }
+    }
+  });
+
+  for (const forbidden of ['symbol', 'ticker', 'instrument', 'url', 'query', 'body', 'message']) {
+    check(`no Phase 5 event declares "${forbidden}"`, () => {
+      for (const name of ['market_data_request_completed', 'superchart_study_applied', 'superchart_capability_completed', 'web_vital_measured']) {
+        const keys = Object.keys(registry.EVENT_BY_NAME.get(name).properties).map((key) => key.toLowerCase());
+        assert.equal(keys.includes(forbidden), false, `${name} declares ${forbidden}`);
+      }
+    });
+  }
+
+  group('The two cross-section contracts are complete and honest');
+
+  check('both Supercharts outcome events are in the shared typed union', () => {
+    /*
+     * A track() call cannot be written type-safely against a union member that
+     * does not exist, so these are declared before their emitters — which is
+     * why check:analytics reports them as callerless until the Superchart
+     * branch lands.
+     */
+    const union = readFileSync('src/lib/events/analytics.ts', 'utf8');
+    for (const name of ['superchart_study_applied', 'superchart_capability_completed']) {
+      assert.match(union, new RegExp(`name: '${name}'`), `${name} is missing from AnalyticsEvent`);
+    }
+  });
+
+  check('the checker can see them, rather than missing them on formatting', () => {
+    /*
+     * The regex matches `| { name: '…'` on one line, so a multi-line union
+     * member is invisible to it — both of these were, until they were written
+     * on one line like the other fifty-nine. Benefiting from that blind spot
+     * would have been the same failure as the registry one, in a new place.
+     */
+    let output = '';
+    try {
+      output = execFileSync('node', ['scripts/check-analytics.mjs'], { encoding: 'utf8', shell: process.platform === 'win32' });
+    } catch (error) {
+      output = `${error.stdout ?? ''}${error.stderr ?? ''}`;
+    }
+    assert.match(output, /61 events declared/, 'the checker is not seeing the two new declarations');
+    assert.match(output, /superchart_study_applied/, 'the checker does not report the awaiting emitter');
+    assert.match(output, /superchart_capability_completed/);
+  });
+
+  check('the reading layer is not counted as an emitter', () => {
+    // The Observatory aggregates by name — `case 'superchart_study_applied':` —
+    // and those case labels were satisfying the caller check.
+    const script = readFileSync('scripts/check-analytics.mjs', 'utf8');
+    assert.match(script, /admin-metrics/, 'the reading layer is still counted as a caller');
+  });
+
+  check('the union payload and the registry shape agree', () => {
+    for (const [name, expected] of [
+      ['superchart_study_applied', ['paneCount', 'placement', 'study']],
+      ['superchart_capability_completed', ['capability', 'hasVolume', 'outcome', 'paneCount']],
+    ]) {
+      const definition = registry.EVENT_BY_NAME.get(name);
+      assert.ok(definition, `${name} is not registered`);
+      assert.deepEqual(Object.keys(definition.properties).sort(), expected, name);
+    }
+
+    const union = readFileSync('src/lib/events/analytics.ts', 'utf8');
+    assert.match(union, /'fulfilled' \| 'no_data' \| 'unsupported' \| 'failure'/);
+    assert.equal(union.includes("'handoff'"), false, 'a handoff outcome reappeared in the union');
+  });
+
+  check('market copy claims a resolution, never an upstream request count', () => {
+    /*
+     * The client fetches through Next's data cache and cache resolution is
+     * transparent at that layer, so it cannot know whether anything left the
+     * machine. An earlier draft told Markets not to emit on a cache hit, which
+     * was impossible to implement.
+     */
+    const panel = readFileSync('src/components/admin-metrics/ReliabilityPanel.tsx', 'utf8');
+    assert.match(panel, /Market data resolutions/);
+    assert.match(panel, /Successful resolutions/);
+    assert.equal(/label="Provider requests"/.test(panel), false, 'the panel still claims provider requests');
+
+    const definition = registry.EVENT_BY_NAME.get('market_data_request_completed');
+    assert.match(definition.note, /NOT proof that a request reached the provider/);
+  });
+
+  check('the Markets request documents the transparent cache and withdraws the old rule', () => {
+    const request = readFileSync('docs/admin-metrics/market-data-instrumentation-request.md', 'utf8');
+    assert.match(request, /Emit once per invocation, always/);
+    assert.match(request, /cache resolution is\s*\n?transparent/);
+    assert.equal(
+      request.includes('If a cached value is returned without a provider call, **do not emit**'),
+      false,
+      'the impossible cache requirement is still in the document'
+    );
+    assert.match(request, /client resolution latency at this call site/);
+  });
+
+  check('the Markets request follows the code rather than an idealised parser', () => {
+    const request = readFileSync('docs/admin-metrics/market-data-instrumentation-request.md', 'utf8');
+    // asOf has a fallback, so a missing datetime was never a no-data condition.
+    assert.match(request, /`asOf` is never missing/);
+    assert.match(request, /data\?\.status === 'error'/);
+    assert.equal(request.includes('a missing `datetime`, a response the parser rejects'), false);
+    assert.match(request, /Do not invent `rate_limited`/);
+  });
+
+  check('both requests state the sequencing rather than creating a branch dependency', () => {
+    for (const path of [
+      'docs/admin-metrics/market-data-instrumentation-request.md',
+      'docs/admin-metrics/supercharts-instrumentation-request.md',
+    ]) {
+      const request = readFileSync(path, 'utf8');
+      assert.match(request, /only after Metrics Phase 5 is on `main`/, `${path} has no sequencing`);
+      assert.match(request, /Do not merge `feat\/metrics` into your branch/, `${path} invites a cross-branch merge`);
+    }
+    assert.match(
+      readFileSync('docs/admin-metrics/supercharts-instrumentation-request.md', 'utf8'),
+      /do not edit either\s*\n?file/,
+      'the Supercharts request does not say to leave the Metrics files alone'
+    );
   });
 
   /* ------------------------------------ The checker cannot be self-defeated */

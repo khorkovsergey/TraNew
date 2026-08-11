@@ -32,6 +32,13 @@ export function VoyagerPanel({ report }: { report: VoyagerReport }) {
         </p>
       ) : null}
 
+      <p className={styles.subtitle}>
+        <strong>Scope.</strong> Server requests counts questions that reach{' '}
+        <code>POST /api/voyager</code>. The <code>/voyager/research</code> workspace answers some
+        scripted scenarios locally and those never reach the route, so this is not a count of every
+        Voyager interaction and must not be read as one.
+      </p>
+
       <div className={styles.grid}>
         <MetricCard label="Server requests" metric={report.headline.serverRequests} />
         <MetricCard label="Real AI answer rate" metric={report.headline.realAnswerRate} format="percent" />

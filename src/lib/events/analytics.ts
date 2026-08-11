@@ -55,6 +55,27 @@ export type AnalyticsEvent =
   | { name: 'superchart_script_exported' }
   | { name: 'superchart_preview_run'; outcome: 'ok' | 'failed' | 'unavailable'; plots: number }
   /*
+   * The two outcome events, appended for the Superchart section to emit.
+   *
+   * `superchart_study_toggled` above fires as the toggle is pressed, so it
+   * records intent. These record what the engine did with it — whether the
+   * study rendered, on which pane, and why a capability did not happen. A
+   * fulfilment rate built on the toggle would be a rate of clicks.
+   *
+   * Declared here before they have callers, on purpose: the Superchart worker
+   * cannot write a type-safe `track()` call against a union member that does
+   * not exist, and Metrics does not add emitters to another section's
+   * components. `check:analytics` will report both as declared-and-unemitted
+   * until that branch lands, which is the expected sequencing rather than a
+   * regression — see `docs/admin-metrics/supercharts-instrumentation-request.md`.
+   *
+   * There is deliberately no `handoff` outcome: Supercharts has no TradingView
+   * handoff, and an outcome nothing can emit would leave a permanent zero that
+   * reads as a product decision.
+   */
+  | { name: 'superchart_study_applied'; study: string; placement: 'overlay' | 'pane'; paneCount: number }
+  | { name: 'superchart_capability_completed'; capability: string; outcome: 'fulfilled' | 'no_data' | 'unsupported' | 'failure'; hasVolume: boolean; paneCount: number }
+  /*
    * The starting-plan funnel. Counts and shapes only: which goal somebody chose
    * is a fact about their money, and the product's questions of this data —
    * where people stop, whether a personalised route gets further than a generic

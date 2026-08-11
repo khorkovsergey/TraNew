@@ -5,6 +5,7 @@ import { Breakdown } from '@/components/admin-metrics/Breakdown';
 import { MetricCard } from '@/components/admin-metrics/MetricCard';
 import { ProductArea } from '@/components/admin-metrics/ProductArea';
 import { StageTable } from '@/components/admin-metrics/StageTable';
+import { ReliabilityPanel } from '@/components/admin-metrics/ReliabilityPanel';
 import { VoyagerPanel } from '@/components/admin-metrics/VoyagerPanel';
 import styles from '@/components/admin-metrics/Observatory.module.css';
 import type { Locale } from '@/i18n/routing';
@@ -12,6 +13,7 @@ import { authorizeMetrics, directLinkEnabled } from '@/lib/admin-metrics/access'
 import { instrumentationCoverage } from '@/lib/admin-metrics/coverage';
 import { MARKETPLACE_MIN_SAMPLE } from '@/lib/admin-metrics/dictionary';
 import { productFamilies } from '@/lib/admin-metrics/families';
+import { reliabilityReport } from '@/lib/admin-metrics/families/reliability';
 import { voyagerReport } from '@/lib/admin-metrics/families/voyager';
 import { overview } from '@/lib/admin-metrics/overview';
 import { portalMetrics } from '@/lib/admin-metrics/portal';
@@ -79,13 +81,14 @@ export default async function ObservatoryPage({ params, searchParams }: Props) {
   const window = rangeFrom(range ?? null) ?? rangeFrom(null)!;
   const now = new Date();
 
-  const [numbers, portal, coverage, userDays, families, voyager] = await Promise.all([
+  const [numbers, portal, coverage, userDays, families, voyager, reliability] = await Promise.all([
     overview(window.since),
     portalMetrics(window.since),
     instrumentationCoverage(window.since),
     readUserDays(window.since),
     productFamilies(window.since),
     voyagerReport(window.since),
+    reliabilityReport(window.since),
   ]);
 
   const retention = cohortRetention(userDays, {
@@ -203,6 +206,8 @@ export default async function ObservatoryPage({ params, searchParams }: Props) {
       </section>
 
       <VoyagerPanel report={voyager} />
+
+      <ReliabilityPanel report={reliability} />
 
       <section>
         <h2 className={styles.sectionTitle}>Voyager instrumentation, by layer</h2>

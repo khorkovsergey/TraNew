@@ -34,7 +34,19 @@ function walk(directory) {
  * applies to anything else that layer grows: a validator, a coverage report and
  * a metric dictionary all mention event names for a living.
  */
-const DESCRIBES_RATHER_THAN_EMITS = ['src\\lib\\analytics', 'src/lib/analytics'];
+const DESCRIBES_RATHER_THAN_EMITS = [
+  'src\\lib\\analytics',
+  'src/lib/analytics',
+  /*
+   * The reading side, added once it started costing something. The Observatory
+   * aggregates events by name — `case 'superchart_study_applied':` and the like
+   * — and those `case` labels were being counted as emitters, so two events
+   * declared for another section to emit looked satisfied by the code that
+   * merely reads them. Same failure as the registry, one directory over.
+   */
+  'src\\lib\\admin-metrics',
+  'src/lib/admin-metrics',
+];
 
 /**
  * Orphans that were already on `main` before this check learned to be strict.
