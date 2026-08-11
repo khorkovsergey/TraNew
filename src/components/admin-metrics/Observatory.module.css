@@ -224,3 +224,32 @@
   gap: 24px;
   margin-bottom: 24px;
 }
+
+/*
+ * A product family. The border groups everything that came from one set of
+ * tables, so a durable count and a behavioural funnel cannot be read as one
+ * list of numbers.
+ */
+.family {
+  border: 1px solid var(--tn-border-card);
+  border-radius: var(--tn-radius-card);
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--tn-surface);
+}
+
+.familyHead {
+  margin-bottom: 12px;
+}
+
+.limitations {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tn-text-muted);
+}
+
+.funnel {
+  margin-top: 12px;
+}

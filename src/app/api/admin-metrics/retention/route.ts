@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     const provenance = (metricId: string): MetricProvenance => ({
       metricId,
       source: 'product_telemetry_event',
+      sourceType: 'derived',
       queriedAt: queriedAt.toISOString(),
     });
 

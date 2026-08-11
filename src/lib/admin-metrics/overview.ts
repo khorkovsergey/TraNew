@@ -9,6 +9,7 @@ import {
   sourceNotConnected,
   type MetricProvenance,
   type MetricValue,
+  type SourceType,
 } from '@/lib/analytics/states';
 import { portalMetrics } from './portal';
 
@@ -52,9 +53,10 @@ export type Overview = {
 
 export async function overview(since: Date): Promise<Overview> {
   const queriedAt = new Date();
-  const at = (metricId: string, source: string): MetricProvenance => ({
+  const at = (metricId: string, source: string, sourceType: SourceType = 'durable_fact'): MetricProvenance => ({
     metricId,
     source,
+    sourceType,
     queriedAt: queriedAt.toISOString(),
   });
 
@@ -94,7 +96,7 @@ export async function overview(since: Date): Promise<Overview> {
 
     telemetryEvents: countMetric(
       telemetry?.total ?? 0,
-      at('telemetry_events', 'product_telemetry_event'),
+      at('telemetry_events', 'product_telemetry_event', 'telemetry'),
       telemetryState
     ),
 
@@ -119,7 +121,7 @@ export async function overview(since: Date): Promise<Overview> {
      * place. Returning 0 here would be the single most misleading number the
      * dashboard could show.
      */
-    confirmedRevenue: sourceNotConnected('payment provider', at('confirmed_revenue', 'purchase')),
+    confirmedRevenue: sourceNotConnected('payment provider', at('confirmed_revenue', 'purchase', 'source_not_connected')),
 
     alertAdoption: FEATURE_FLAGS.alertsEnabled
       ? countMetric(0, at('alert_adoption', 'alert'), 'instrumented_going_forward')
@@ -128,7 +130,7 @@ export async function overview(since: Date): Promise<Overview> {
     anonymousReturn: notMeasurable(
       'the portal has no cross-session anonymous identity, and the only anonymous key that exists is a day-scoped HMAC of an IP address used to rate-limit Voyager',
       'a consent surface, a first-party analytics cookie with a stated lifetime, and a privacy review',
-      at('anonymous_d7', '—')
+      at('anonymous_d7', '—', 'source_not_connected')
     ),
 
     collectingSince: collectingSince ? collectingSince.toISOString() : null,

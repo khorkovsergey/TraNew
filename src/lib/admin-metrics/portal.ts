@@ -50,9 +50,15 @@ export async function portalMetrics(since: Date): Promise<PortalMetrics> {
   const queriedAt = new Date();
   const read = await readSessions(since);
 
+  /*
+   * `derived`, not `telemetry`: these are rates and percentiles computed over
+   * the event stream rather than counts read from it, and the distinction is
+   * what tells a reader whether a number can be checked by counting rows.
+   */
   const at = (metricId: string): MetricProvenance => ({
     metricId,
     source: 'product_telemetry_event',
+    sourceType: 'derived',
     queriedAt: queriedAt.toISOString(),
     freshestAt: read.freshest ? read.freshest.toISOString() : undefined,
   });

@@ -17,6 +17,7 @@
  * have a card.
  */
 
+import type { SourceType } from '@/lib/analytics/states';
 import { ENGAGEMENT_THRESHOLD_SECONDS, EXCLUSION_REASONS } from './eligibility';
 import { MIN_BREAKDOWN_COHORT } from './journeys';
 import { RETENTION_HORIZONS } from './retention';
@@ -29,6 +30,14 @@ export const MARKETPLACE_MIN_SAMPLE = 50;
 export type MetricDefinition = {
   id: string;
   label: string;
+  /**
+   * Behaviour, business fact, or neither.
+   *
+   * Required rather than optional, because the mistake it prevents is the
+   * central one of this phase: reading a durable count as behavioural evidence,
+   * or a funnel event as proof that an outcome happened.
+   */
+  sourceType: SourceType;
   formula: string;
   numerator: string;
   denominator: string;
@@ -81,6 +90,7 @@ export const METRIC_DICTIONARY: readonly MetricDefinition[] = [
   {
     id: 'pmcr',
     label: 'Portal Meaningful Continuation Rate',
+    sourceType: 'derived',
     formula: 'eligible sessions with ≥1 meaningful action ÷ eligible sessions',
     numerator: 'Eligible sessions containing at least one meaningful action, deduplicated by action identity.',
     denominator: 'Eligible portal sessions.',
@@ -100,6 +110,7 @@ export const METRIC_DICTIONARY: readonly MetricDefinition[] = [
   {
     id: 'pmcr_internal',
     label: 'Internal continuation',
+    sourceType: 'derived',
     formula: 'eligible sessions with ≥1 in-portal meaningful action ÷ eligible sessions',
     numerator: 'Eligible sessions whose meaningful actions kept the person in the portal.',
     denominator: 'Eligible portal sessions — the same denominator as PMCR.',
@@ -115,6 +126,7 @@ export const METRIC_DICTIONARY: readonly MetricDefinition[] = [
   {
     id: 'pmcr_external',
     label: 'External continuation',
+    sourceType: 'derived',
     formula: 'eligible sessions with ≥1 external continuation ÷ eligible sessions',
     numerator: 'Eligible sessions that continued to a destination outside the portal.',
     denominator: 'Eligible portal sessions.',
@@ -133,6 +145,7 @@ export const METRIC_DICTIONARY: readonly MetricDefinition[] = [
   {
     id: 'ttfa_median',
     label: 'Time to first meaningful action (median)',
+    sourceType: 'derived',
     formula: 'median over eligible sessions that acted of (first meaningful action − session start), in seconds',
     numerator: '—',
     denominator: '—',
@@ -151,6 +164,7 @@ export const METRIC_DICTIONARY: readonly MetricDefinition[] = [
   {
     id: 'second_action_rate',
     label: 'Second meaningful action rate',
+    sourceType: 'derived',
     formula: 'eligible sessions with ≥2 meaningful actions ÷ eligible sessions with ≥1',
     numerator: 'Eligible sessions with at least two distinct meaningful actions.',
     denominator: 'Eligible sessions with at least one.',
@@ -169,6 +183,7 @@ export const METRIC_DICTIONARY: readonly MetricDefinition[] = [
   ...RETENTION_HORIZONS.map((horizon) => ({
     id: `retention_d${horizon}`,
     label: `Authenticated D${horizon} return`,
+    sourceType: 'derived' as const,
     formula: `cohort members with ≥1 eligible portal day in [1, ${horizon}] days after their first eligible portal day ÷ mature cohort members`,
     numerator: `Signed-in people who had another eligible portal day within ${horizon} day(s) of their first one.`,
     denominator: `Signed-in people whose first eligible portal day is at least ${horizon} days ago and falls after telemetry began.`,
@@ -196,6 +211,7 @@ export const METRIC_DICTIONARY: readonly MetricDefinition[] = [
   {
     id: 'retention_anonymous',
     label: 'Anonymous D1/D7/D30 return',
+    sourceType: 'source_not_connected',
     formula: '—',
     numerator: '—',
     denominator: '—',
@@ -214,6 +230,7 @@ export const METRIC_DICTIONARY: readonly MetricDefinition[] = [
   {
     id: 'journey_breakdown',
     label: 'Journey breakdowns',
+    sourceType: 'derived',
     formula: 'continuation rate within each category',
     numerator: 'Eligible sessions in the category that continued.',
     denominator: 'Eligible sessions in the category.',
@@ -232,6 +249,160 @@ export const METRIC_DICTIONARY: readonly MetricDefinition[] = [
   },
 ];
 
+/* ------------------------------------------- Phase 3 — the product families */
+
+/**
+ * Only the family metrics that are genuinely *derived* get an entry here.
+ *
+ * A durable count needs no formula: "rows in `event_registration` with status
+ * `registered`" is its own definition, and its source, source type and caveats
+ * travel with it in the provenance and the family's `limitations`. Writing sixty
+ * near-identical entries would bury the four that state something a reader
+ * could get wrong.
+ */
+const DURABLE_NOT_HISTORY =
+  'A current-state table, not a transition log. The distribution says where things are now, and reading it as a conversion funnel would attribute drop-off to stages nobody was observed leaving.';
+
+const FAMILY_METRICS: readonly MetricDefinition[] = [
+  {
+    id: 'start_funnel',
+    label: 'Find my next step — funnel',
+    sourceType: 'telemetry',
+    formula: 'sessions reaching each stage, where every earlier stage happened in the same session and no later',
+    numerator: 'Sessions that reached the stage in order.',
+    denominator: 'Sessions that reached the previous stage.',
+    eligiblePopulation: 'Sessions that emitted `next_step_opened`.',
+    exclusions: ['the seven retired plan-funnel events, which have no emitter and whose screen is now a redirect'],
+    grain: 'session',
+    sourceEvents: [
+      'next_step_opened',
+      'next_step_level_selected',
+      'next_step_intent_selected',
+      'next_step_recommendation_shown',
+      'next_step_destination_clicked',
+    ],
+    timeSemantics: INTRA_SESSION_TIME,
+    minimumSample: MIN_BREAKDOWN_COHORT,
+    limitations: [
+      NO_HISTORY,
+      'Sequential within a session. Dividing one event total by another would assume an order the events do not carry, and a restarted session emits `next_step_opened` twice.',
+      '`next_step_clarification_selected` is optional and is never a denominator: not every route asks, so treating it as mandatory would report every unambiguous path as a drop-off.',
+      'Behavioural only. There is no durable "next step" record, so nothing here is a business outcome.',
+    ],
+    owner: 'start',
+  },
+  {
+    id: 'events_attendance_rate',
+    label: 'Event attendance rate',
+    sourceType: 'durable_fact',
+    formula: 'attended ÷ (attended + no_show)',
+    numerator: 'Seats marked attended.',
+    denominator: 'Seats whose outcome is known — attended plus no-show. A `registered` seat has not been resolved: it may be a future event or a past one nobody has marked up.',
+    eligiblePopulation: 'Rows in `event_registration`.',
+    exclusions: [
+      'cancelled registrations, where the seat was given back',
+      'waitlisted registrations, which never held a seat',
+      'unresolved `registered` seats, which are reported separately rather than counted as non-attendance',
+    ],
+    grain: 'event',
+    sourceEvents: [],
+    timeSemantics: 'Current state. `event_registration.status` is overwritten as a registration moves.',
+    minimumSample: MARKETPLACE_MIN_SAMPLE,
+    limitations: [
+      'Attendance and no-show only exist where an organiser marked them, so this describes the events that were marked rather than all events. Marking coverage is published beside it, because a high rate over a low coverage is a different claim.',
+      'Including unresolved seats would report attendance as falling whenever more events were scheduled, and rising as organisers did their paperwork rather than as more people turned up.',
+      'A durable registration and an `event_registration_completed` event are different evidence about the same flow and are never added.',
+      DURABLE_NOT_HISTORY,
+    ],
+    owner: 'events',
+  },
+  {
+    id: 'academy_completion_rate',
+    label: 'Academy completion rate',
+    sourceType: 'durable_fact',
+    formula: 'learners with `completed` ÷ learners with an `academy_progress` row',
+    numerator: 'Users whose progress row is marked completed.',
+    denominator: 'Users with a progress row, which is the documented definition of having started.',
+    eligiblePopulation: 'Rows in `academy_progress`, one per user.',
+    exclusions: [],
+    grain: 'user',
+    sourceEvents: [],
+    timeSemantics: 'Current state. One row per user, overwritten in place.',
+    minimumSample: MARKETPLACE_MIN_SAMPLE,
+    limitations: [
+      'How many of today\'s learners have finished, not how many of a cohort did. It is not a cohort completion rate and must not be read as one.',
+      DURABLE_NOT_HISTORY,
+      'Diagnostic answers are never read; only the length of `lessons_done` is used.',
+    ],
+    owner: 'academy',
+  },
+  {
+    id: 'experts_pipeline',
+    label: 'Expert booking pipeline',
+    sourceType: 'durable_fact',
+    formula: 'count of bookings in each current status',
+    numerator: '—',
+    denominator: '—',
+    eligiblePopulation: 'Rows in `expert_booking`.',
+    exclusions: [],
+    grain: 'user',
+    sourceEvents: [],
+    timeSemantics: 'Current state. `status` is overwritten as a booking moves; there is no transition history.',
+    minimumSample: MARKETPLACE_MIN_SAMPLE,
+    limitations: [
+      'No conversion rate is published. Dividing completed by draft would compare finished bookings against unstarted ones and would move whenever somebody opens a new draft.',
+      'A booking is not money. Only a linked purchase could be, and see confirmed revenue for why even that is not.',
+      'The brief, summary and shared financial context are encrypted and never selected.',
+    ],
+    owner: 'experts',
+  },
+  {
+    id: 'confirmed_revenue',
+    label: 'Confirmed revenue',
+    sourceType: 'source_not_connected',
+    formula: '—',
+    numerator: '—',
+    denominator: '—',
+    eligiblePopulation: 'None. No provider-confirmed transaction exists to aggregate.',
+    exclusions: ['`demo` purchases, which are entitlements granted without money'],
+    grain: 'user',
+    sourceEvents: [],
+    timeSemantics: '—',
+    minimumSample: 0,
+    limitations: [
+      'A `paid` row is an application record, not a provider-confirmed transaction. `externalRef` is the reconciliation hook and nothing populates it.',
+      'The sum of paid rows is reported separately as a recorded gross amount, under that name, and is not revenue.',
+      'Connecting this needs a payment provider and a reconciliation path — a product decision, not an implementation detail.',
+    ],
+    owner: 'commerce',
+  },
+  {
+    id: 'wealth_adoption',
+    label: 'Wealth Hub adoption',
+    sourceType: 'durable_fact',
+    formula: 'distinct users with at least one current record, per record type',
+    numerator: 'Users with a current asset, liability or goal.',
+    denominator: '—',
+    eligiblePopulation: 'Rows in the Wealth tables, excluding superseded assets.',
+    exclusions: ['superseded asset revisions, which would count one revised holding several times'],
+    grain: 'user',
+    sourceEvents: [],
+    timeSemantics: 'Current state, with asset versions resolved by `supersededAt is null`.',
+    minimumSample: MARKETPLACE_MIN_SAMPLE,
+    limitations: [
+      'Adoption only. No monetary column is selected anywhere in this family, so no portfolio value, net worth or liability total exists to report.',
+      'Country and currency are readable in the clear and are still not used: with a small cohort they narrow a person down.',
+      'When the feature flag is off, adoption reports feature-disabled rather than zero.',
+    ],
+    owner: 'wealth',
+  },
+];
+
+export const METRIC_DICTIONARY_ALL: readonly MetricDefinition[] = [
+  ...METRIC_DICTIONARY,
+  ...FAMILY_METRICS,
+];
+
 export const DICTIONARY_BY_ID: ReadonlyMap<string, MetricDefinition> = new Map(
-  METRIC_DICTIONARY.map((entry) => [entry.id, entry])
+  METRIC_DICTIONARY_ALL.map((entry) => [entry.id, entry])
 );
