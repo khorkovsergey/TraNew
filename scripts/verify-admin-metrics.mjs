@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Product Observatory verification.
@@ -45,7 +46,22 @@ import assert from 'node:assert/strict';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3414';
 const LIVE = process.argv.includes('--live');
-const SENTINEL_SESSION = `s_${'deadbeef'.repeat(4)}`;
+/*
+ * A recognisable prefix and a per-run suffix.
+ *
+ * The prefix is what makes cleanup safe to express and safe to read. The suffix
+ * is why runs no longer interfere: the ingest route keeps an in-memory flood
+ * guard per session for a minute, so two runs close together under one fixed id
+ * exhausted the second one's budget and the route returned before recording
+ * anything — a test failing on a rerun for a reason that had nothing to do with
+ * what it was testing.
+ *
+ * A real session id is 32 random hex characters, so the chance of one beginning
+ * `deadbeef` is about one in four billion, and even then the delete only ever
+ * touches telemetry rows.
+ */
+const SENTINEL_PREFIX = 's_deadbeef';
+const SENTINEL_SESSION = `${SENTINEL_PREFIX}${randomUUID().replace(/-/g, '').slice(0, 24)}`;
 
 /** Kept in step with QUEUE_LIMITS.flushIntervalMs, which the browser test waits out. */
 const QUEUE_INTERVAL_MS = 10_000;
@@ -1420,6 +1436,69 @@ try {
     assert.equal(funnel.externalClicks, 1);
   });
 
+  check('one session reaching a recommendation does not qualify another', () => {
+    /*
+     * The bug this guards, and it was subtle: the clarification test asked
+     * `reached.recommendation_shown > 0`, which is the count across *every*
+     * session. Once one session had legitimately got there, any other session
+     * that emitted a clarification counted too — a funnel described as
+     * sequential within a session consulting a global.
+     *
+     * Session `a` walks the whole chain. Session `b` emits a clarification and
+     * a recommendation with no level selection behind them.
+     */
+    const funnel = startLib.startFunnel(
+      [
+        ...fullPath('a'),
+        step('b', 'next_step_opened', 0),
+        step('b', 'next_step_intent_selected', 5),
+        step('b', 'next_step_clarification_selected', 8),
+        step('b', 'next_step_recommendation_shown', 10),
+      ],
+      1
+    );
+    assert.equal(funnel.clarifiedSessions, 0, "another session's progress qualified an incomplete one");
+    assert.equal(stageOf(funnel, 'recommendation_shown').sessions, 1);
+  });
+
+  check('a clarification before the intent it clarifies does not count', () => {
+    const path = [
+      step('a', 'next_step_opened', 0),
+      step('a', 'next_step_level_selected', 5),
+      step('a', 'next_step_clarification_selected', 7),
+      step('a', 'next_step_intent_selected', 10),
+      step('a', 'next_step_recommendation_shown', 15),
+    ];
+    const funnel = startLib.startFunnel(path, 1);
+    assert.equal(stageOf(funnel, 'recommendation_shown').sessions, 1, 'the chain itself broke');
+    assert.equal(funnel.clarifiedSessions, 0, 'a clarification that preceded its intent counted');
+  });
+
+  check('a clarification after the recommendation it should have shaped does not count', () => {
+    const path = [...fullPath('a').slice(0, 4), step('a', 'next_step_clarification_selected', 18)];
+    assert.equal(startLib.startFunnel(path, 1).clarifiedSessions, 0);
+  });
+
+  check('a valid optional clarification counts exactly once', () => {
+    const path = [
+      ...fullPath('a').slice(0, 3),
+      step('a', 'next_step_clarification_selected', 12),
+      ...fullPath('a').slice(3),
+    ];
+    assert.equal(startLib.startFunnel(path, 1).clarifiedSessions, 1);
+  });
+
+  check('a session that clarified three times clarified once', () => {
+    const path = [
+      ...fullPath('a').slice(0, 3),
+      step('a', 'next_step_clarification_selected', 11),
+      step('a', 'next_step_clarification_selected', 12),
+      step('a', 'next_step_clarification_selected', 13),
+      ...fullPath('a').slice(3),
+    ];
+    assert.equal(startLib.startFunnel(path, 1).clarifiedSessions, 1, 'repeats inflated the count');
+  });
+
   check('a rate is withheld below the minimum but the count is not', () => {
     const funnel = startLib.startFunnel(fullPath('a'), 25);
     assert.equal(stageOf(funnel, 'level_selected').sessions, 1);
@@ -1449,11 +1528,44 @@ try {
 
   group('Durable status semantics');
 
-  check('a waitlisted person never held a seat', () => {
-    const counts = { registered: 10, waitlisted: 40, cancelled: 5, attended: 6, no_show: 4 };
-    assert.equal(semantics.attendanceDenominator(counts), 20, 'the denominator counted seats nobody had');
+  const SEATS = { registered: 10, waitlisted: 40, cancelled: 5, attended: 6, no_show: 4 };
+
+  check('a waitlisted or cancelled person never held a seat', () => {
+    assert.equal(semantics.heldSeats(SEATS), 20, 'seats nobody held were counted');
     assert.equal(semantics.SEAT_STATUSES.includes('waitlisted'), false);
     assert.equal(semantics.SEAT_STATUSES.includes('cancelled'), false);
+  });
+
+  check('attendance is measured over resolved seats only', () => {
+    /*
+     * The correction. `registered` means "holds a seat", which covers a talk
+     * next month as much as one last week nobody marked up. In the denominator
+     * it made every future event drag the rate down before attendance was
+     * knowable.
+     */
+    assert.equal(semantics.attendanceResolvedSeats(SEATS), 10, 'unresolved seats reached the denominator');
+    assert.equal(semantics.ATTENDANCE_RESOLVED_STATUSES.includes('registered'), false);
+    assert.equal(semantics.attendanceUnresolvedSeats(SEATS), 10);
+  });
+
+  check('scheduling more events cannot lower the attendance rate', () => {
+    const before = semantics.attendanceResolvedSeats(SEATS);
+    const afterScheduling = semantics.attendanceResolvedSeats({ ...SEATS, registered: SEATS.registered + 500 });
+    assert.equal(afterScheduling, before, 'future seats changed the denominator');
+  });
+
+  check('an unresolved seat is not a non-attendance', () => {
+    const allUnresolved = { registered: 100, attended: 0, no_show: 0 };
+    assert.equal(semantics.attendanceResolvedSeats(allUnresolved), 0, 'unmarked seats were treated as outcomes');
+    assert.equal(semantics.heldSeats(allUnresolved), 100);
+  });
+
+  check('marking coverage and the rate answer different questions', () => {
+    // Perfect attendance over 3% coverage is a different claim from perfect
+    // attendance over 90%, and only both numbers together say which.
+    const thin = { registered: 970, attended: 30, no_show: 0 };
+    assert.equal(semantics.attendanceResolvedSeats(thin), 30);
+    assert.equal(semantics.heldSeats(thin), 1000);
   });
 
   check('the open pipeline is work outstanding, not a conversion stage', () => {
@@ -1480,6 +1592,69 @@ try {
   check('revenue is not confirmable while nothing has been reconciled', () => {
     assert.equal(semantics.revenueIsConfirmable(0), false);
     assert.equal(semantics.revenueIsConfirmable(1), true);
+  });
+
+  group('A signed difference is not a count');
+
+  const deltaAt = {
+    metricId: 'events_seat_counter_delta',
+    source: 'event.registration_count vs event_registration',
+    sourceType: 'derived',
+    queriedAt: NOW.toISOString(),
+  };
+
+  check('a positive delta carries its comparable population as evidence', () => {
+    const metric = states.delta(5, 200, deltaAt);
+    assert.equal(metric.value, 5);
+    assert.equal(metric.sample, 200, 'the sample became the difference');
+  });
+
+  check('a zero delta is still a measurement, not an absence', () => {
+    const metric = states.delta(0, 200, deltaAt);
+    assert.equal(metric.state, 'derived');
+    assert.equal(metric.value, 0);
+    assert.equal(metric.sample, 200);
+  });
+
+  check('a negative delta never produces a negative sample', () => {
+    /*
+     * The defect. Passing a signed delta through `count` gave
+     * `{ value: -5, sample: -5 }` — a claim that minus five observations were
+     * made. A count's sample is its value; a difference's is the population the
+     * two sides were computed over.
+     */
+    const metric = states.delta(-5, 200, deltaAt);
+    assert.equal(metric.value, -5);
+    assert.equal(metric.sample, 200);
+    assert.ok(metric.sample >= 0);
+  });
+
+  check('a nonsensical evidence count is floored rather than published', () => {
+    assert.equal(states.delta(-5, -200, deltaAt).sample, 0);
+  });
+
+  check('a delta declares itself derived from both sides', () => {
+    const metric = states.delta(-5, 200, deltaAt);
+    assert.equal(metric.sourceType, 'derived');
+    assert.match(metric.source, /event\.registration_count/);
+    assert.match(metric.source, /event_registration/);
+  });
+
+  check('the events family compares the counter that is actually maintained', () => {
+    /*
+     * `event_metric` looked like a second opinion on registrations and is not
+     * one: only `external_click` is ever written to it. Subtracting a durable
+     * total from a metric that does not exist reported minus every registration
+     * in the product and called it a discrepancy.
+     */
+    const source = readFileSync('src/lib/admin-metrics/families/events.ts', 'utf8');
+    assert.match(source, /schema\.event\.registrationCount/, 'the comparable counter is not read');
+    assert.equal(
+      /eventMetric/.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/'[^']*'/g, '')),
+      false,
+      'event_metric is still being queried'
+    );
+    assert.match(source, /seatCounterDelta: delta\(/);
   });
 
   group('Durable adapters cannot quietly widen');
@@ -1753,11 +1928,17 @@ try {
          */
         await postBatch([{ name: 'definitely_not_registered', occurredAt: new Date().toISOString(), properties: {} }]);
 
-        // The tracker is fire-and-forget, so the write trails the response.
-        await new Promise((resolve) => setTimeout(resolve, 1_500));
-
-        const rows = await readSentinel();
-        const written = rows.find((row) => row.event_name === 'telemetry_ingest_rejected');
+        /*
+         * Polled, not slept. The tracker is fire-and-forget, so the write trails
+         * the response by an unknown amount — and a fixed wait made this fail
+         * once and pass on a rerun, which teaches people to rerun rather than to
+         * read. Waiting for the row is both faster in the common case and
+         * honest in the slow one.
+         */
+        const written = await until(
+          async () => (await readSentinel()).find((row) => row.event_name === 'telemetry_ingest_rejected'),
+          10_000
+        );
 
         assert.ok(written, 'the server tracker persisted nothing');
         assert.equal(written.event_kind, 'operational');
@@ -1895,7 +2076,7 @@ try {
         // Behaviour is a funnel; facts are tables. Both present, neither merged.
         assert.equal(body.start.sourceType, 'telemetry');
         assert.ok(Array.isArray(body.start.funnel.stages));
-        assert.deepEqual(body.events.sources, ['event_registration', 'event', 'event_metric']);
+        assert.deepEqual(body.events.sources, ['event_registration', 'event']);
         assert.ok(body.events.funnel, 'the Events family lost its behavioural funnel');
 
         // Every durable metric names its own table, never "the database".
@@ -1908,6 +2089,44 @@ try {
 
         assert.equal(body.commerce.metrics.confirmedRevenue.state, 'source_not_connected');
         assert.equal('value' in body.commerce.metrics.confirmedRevenue, false);
+      });
+
+      await checkAsync('every serialized metric says what kind of evidence produced it', async () => {
+        /*
+         * The type now requires `sourceType`, but a required field only proves
+         * the code compiles. This proves it survived serialization on every
+         * endpoint — a metric reaching the Observatory without saying whether it
+         * is behaviour, a business fact or a calculation is the thing the
+         * contract exists to prevent.
+         */
+        const token = await mintToken();
+        const bodies = await Promise.all(
+          ['products', 'journeys', 'retention', 'overview'].map((endpoint) =>
+            fetch(`${BASE}/api/admin-metrics/${endpoint}`, {
+              headers: { cookie: `tn_metrics_access=${token}` },
+            }).then((response) => response.json())
+          )
+        );
+
+        const offenders = [];
+        const walk = (node, path) => {
+          if (!node || typeof node !== 'object') return;
+          if (Array.isArray(node)) return node.forEach((item, index) => walk(item, `${path}[${index}]`));
+
+          /* A MetricValue is recognisable: a state, a source and a metric id. */
+          const looksLikeMetric =
+            typeof node.state === 'string' &&
+            typeof node.source === 'string' &&
+            typeof node.metricId === 'string';
+
+          if (looksLikeMetric && !node.sourceType) offenders.push(`${path} (${node.metricId})`);
+
+          for (const [key, value] of Object.entries(node)) walk(value, `${path}.${key}`);
+        };
+
+        bodies.forEach((body, index) => walk(body, ['products', 'journeys', 'retention', 'overview'][index]));
+
+        assert.deepEqual(offenders, [], `metrics without a source type: ${offenders.join(', ')}`);
       });
 
       await checkAsync('no serialized product payload carries a private field', async () => {
@@ -2174,6 +2393,23 @@ try {
 
 /* ------------------------------------------------------------- Live helpers */
 
+/**
+ * Waits for something to become true, rather than guessing how long it takes.
+ *
+ * Returns the first truthy result, or undefined once the budget is spent — the
+ * caller asserts on it, so a genuine failure still fails and a slow write does
+ * not.
+ */
+async function until(probe, budgetMs, everyMs = 250) {
+  const deadline = Date.now() + budgetMs;
+  for (;;) {
+    const result = await probe();
+    if (result) return result;
+    if (Date.now() >= deadline) return undefined;
+    await new Promise((resolve) => setTimeout(resolve, everyMs));
+  }
+}
+
 async function withSql(fn) {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
   const { default: postgres } = await import('postgres');
@@ -2201,13 +2437,16 @@ async function readSentinel() {
  */
 async function cleanupSentinel() {
   try {
+    // By prefix, not by this run's id: an interrupted earlier run may have left
+    // rows behind, and leaving them would corrupt the numbers this dashboard
+    // exists to prove.
     const removed = await withSql(
-      (sql) => sql`delete from product_telemetry_event where session_id = ${SENTINEL_SESSION} returning id`
+      (sql) => sql`delete from product_telemetry_event where session_id like ${`${SENTINEL_PREFIX}%`} returning id`
     );
     if (removed.length) console.log(`\n  cleaned up ${removed.length} verification rows`);
   } catch (error) {
     console.log(`\n  WARNING could not clean up verification rows: ${String(error.message ?? error).split('\n')[0]}`);
-    console.log(`          remove them with: delete from product_telemetry_event where session_id = '${SENTINEL_SESSION}';`);
+    console.log(`          remove them with: delete from product_telemetry_event where session_id like '${SENTINEL_PREFIX}%';`);
   }
 }
 
