@@ -107,16 +107,23 @@ schema as an entitlement granted without money precisely so nothing counting
 revenue picks it up. That is necessary and **not sufficient**.
 
 A `paid` row is an *application record*, not a provider-confirmed transaction.
-`externalRef` is the reconciliation hook and nothing populates it; no
-reconciliation runs anywhere in this repository. Summing `amount_cents` where
+No reconciliation runs anywhere in this repository. Summing `amount_cents` where
 status is `paid` would produce a number that looks like revenue, would be quoted
 as revenue, and would be whatever the application happened to write.
 
 So the sum is published as **`recordedPaidGrossCents`** — under a name that says
 what it is — and `confirmedRevenue` stays `source_not_connected` with the
-missing source named. `providerReconciledRecords` reports how many rows have ever
-been reconciled, which is currently the evidence that the first number is not the
-second.
+missing source named.
+
+> **Corrected after Phase 3.** This section originally described `externalRef`
+> as an unpopulated reconciliation hook and published its count as evidence that
+> rows had been settled with a provider. Both halves were wrong. Production
+> holds **16 purchase rows with an `external_ref` and zero with `paid`**: the
+> Academy enrolment path writes the course slug into it and the Chart Market
+> grant path writes the script product id, both on `demo` rows. The column is a
+> free-form application reference, its presence proves only that a reference
+> exists, and the metric is now **`purchaseRecordsWithExternalRef`**. See
+> [`internal-traffic.md`](internal-traffic.md) §2b.
 
 Plan names are read from `PLAN_RANK` at runtime. A plan the entitlement model
 does not recognise is labelled `(unrecognised)` rather than charted beside the

@@ -89,7 +89,7 @@ that hangs off `user`:
 | Wealth | `wealth_liability` | `user_id` | holders, records |
 | Wealth | `wealth_goal` | `user_id` | holders, records |
 | Wealth | `consent` | `user_id` | Voyager-context grants and revocations |
-| Commerce | `purchase` | `user_id` | records, people, status and kind mixes, recorded paid gross, demo gross, provider-reconciled records, the window |
+| Commerce | `purchase` | `user_id` | records, people, status and kind mixes, recorded paid gross, demo gross, records with an external reference, the window |
 | Commerce | `subscription` | `user_id` | records, people, active, cancelled, status and plan mixes |
 
 `collection_item` is the one that needed a decision. It carries no `user_id` —
@@ -139,10 +139,48 @@ Both operational keys carry `operational` in the name, because the Observatory
 renders a family's metric keys as its labels — so the word has to be in the key
 to reach a reader. Their provenance string says `all accounts, operational` too.
 
-The same rule governs commerce: `providerReconciledRecords` counts `externalRef`
+The same rule governs commerce: `purchaseRecordsWithExternalRef` counts a column
 *within the customer population*, and there is no all-account provider total
 anywhere to subtract it from. If one ever arrives, it must be compared against
 an all-account count, exactly as the seat counter is.
+
+### 2b. `externalRef` is a reference, not a reconciliation
+
+Production held the counter-example the whole time: **16 purchase rows carry an
+`external_ref` and none of them is `paid`.**
+
+The schema calls the column a "provider reference for reconciliation" and the
+Observatory believed it — the metric was named for a process, the Monetization
+card was labelled *reconciled against a provider*, and the conclusion sentence
+said sixteen records had been settled with a payment provider. All of it was
+false, and it was false in the most quotable place on the page.
+
+What actually writes the column:
+
+| Writer | Value | Purchase status |
+| --- | --- | --- |
+| `src/lib/academy/enrolment.ts` | the **course slug** | `demo` |
+| `src/lib/chartMarket/purchases.ts` | the **script product id** | `demo` |
+
+Both are internal catalogue identifiers on an entitlement granted without money.
+No payment provider has ever seen one.
+
+So the presence of `externalRef` proves exactly one thing — **a reference
+exists** — and the names now say only that:
+
+| Was | Is | Metric id |
+| --- | --- | --- |
+| `providerReconciledRecords` | `purchaseRecordsWithExternalRef` | `commerce_purchase_external_ref_records` |
+| `subscriptionsWithProviderRef` | `subscriptionsWithExternalRef` | `commerce_subscription_external_ref_records` |
+
+Unchanged, and deliberately: `confirmedRevenue` stays `source_not_connected`,
+and `recordedPaidGrossCents` stays the sum of rows the *application* marked
+paid, under that name and separate from revenue. `revenueIsConfirmable` takes
+**provider-confirmed** records, a number that is structurally zero — passing it
+a reference count is precisely the mistake, and a test asserts the difference.
+
+The schema comment on `external_ref` still calls it a reconciliation reference.
+That file is `orchestratorOnly`, so it is reported rather than edited.
 
 ---
 

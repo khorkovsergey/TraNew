@@ -93,8 +93,9 @@ export function MonetizationSection({
             Source not connected
           </button>
           <span className={styles.miniSub}>
-            no payment provider is connected and <code className={styles.mono}>externalRef</code> is
-            never populated, so there is nothing to reconcile against
+            no payment provider is connected and no reconciliation runs, so there is nothing to
+            confirm a transaction against. <code className={styles.mono}>externalRef</code> is not
+            that evidence — it is a reference the application writes for itself
           </span>
         </div>
       </div>
@@ -182,16 +183,23 @@ export function MonetizationSection({
 
       <div className={`${styles.fourGrid} ${styles.gapTop}`}>
         <MiniCard label="Demo entitlements" metric={metrics.demoEntitlements} sub="granted without money — never revenue" />
+        {/*
+          Both cards used to name a settlement process rather than the column
+          they count. Production has sixteen rows with an `externalRef` and none
+          with `paid` — they are demo enrolments holding a course slug and
+          script grants holding a product id. The labels now name the column,
+          and a test asserts the old wording cannot come back.
+        */}
         <MiniCard
-          label="Reconciled against a provider"
-          metric={metrics.providerReconciledRecords}
-          sub="purchase rows carrying an external reference"
+          label="Purchase rows with an external reference"
+          metric={metrics.purchaseRecordsWithExternalRef}
+          sub="a reference the application wrote — not a provider confirmation"
         />
         <MiniCard label="Active subscriptions" metric={metrics.activeSubscriptions} sub="current state, not a renewal outcome" />
         <MiniCard
-          label="Subscriptions with a provider ref"
-          metric={metrics.subscriptionsWithProviderRef}
-          sub="the reconciliation hook, unpopulated"
+          label="Subscriptions with an external reference"
+          metric={metrics.subscriptionsWithExternalRef}
+          sub="a reference the application wrote — not a provider confirmation"
         />
       </div>
 

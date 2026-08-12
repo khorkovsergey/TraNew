@@ -107,7 +107,10 @@ export const PURCHASE_STATUSES: readonly string[] = ['paid', 'pending', 'refunde
  * nothing counting revenue picks it up by accident.
  *
  * `paid` being here does **not** make it revenue. It makes it the only status a
- * future reconciliation would have anything to reconcile.
+ * future reconciliation would have anything to reconcile — and note which way
+ * round that is: production holds sixteen rows with an `external_ref` and zero
+ * with `paid`, so a reference is not even correlated with the status a
+ * reconciliation would examine.
  */
 export const POTENTIALLY_MONETARY_STATUSES: readonly string[] = ['paid'];
 
@@ -118,11 +121,17 @@ export function isRevenueBearing(status: string): boolean {
 /**
  * Whether the application can claim confirmed revenue at all.
  *
- * One reconciled record is not enough on its own to call a total confirmed, but
- * zero is enough to be certain it is not: nothing has ever been checked against
- * a provider. Kept as a function so the answer comes from the data rather than
- * from a constant somebody has to remember to change.
+ * The argument is a count of records a **payment provider has confirmed**, and
+ * that number is structurally zero: no provider is connected and no
+ * reconciliation runs anywhere in this repository.
+ *
+ * It is emphatically **not** `count(external_ref)`. That column is a free-form
+ * reference the application writes for its own purposes — in production every
+ * purchase carrying one is a `demo` entitlement holding a course slug or a
+ * script product id — and passing it here would turn sixteen enrolments into
+ * confirmed revenue. The parameter is named for what it must be, and nothing
+ * in this repository has anything to pass to it.
  */
-export function revenueIsConfirmable(reconciledRecords: number): boolean {
-  return reconciledRecords > 0;
+export function revenueIsConfirmable(providerConfirmedRecords: number): boolean {
+  return providerConfirmedRecords > 0;
 }

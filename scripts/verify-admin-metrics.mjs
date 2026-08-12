@@ -1699,9 +1699,145 @@ try {
     assert.equal(semantics.POTENTIALLY_MONETARY_STATUSES.includes('demo'), false);
   });
 
-  check('revenue is not confirmable while nothing has been reconciled', () => {
+  check('revenue is not confirmable while no provider has confirmed anything', () => {
     assert.equal(semantics.revenueIsConfirmable(0), false);
     assert.equal(semantics.revenueIsConfirmable(1), true);
+  });
+
+  /**
+   * Every source file in the Metrics query layer.
+   *
+   * Declared here because two later groups sweep it: this one for a claim about
+   * reconciliation, and the customer-boundary group for an identity.
+   */
+  const METRICS_SOURCES = readdirSync('src/lib/admin-metrics', { withFileTypes: true }).flatMap(
+    (entry) =>
+      entry.isDirectory()
+        ? readdirSync(join('src/lib/admin-metrics', entry.name)).map((file) =>
+            join('src/lib/admin-metrics', entry.name, file)
+          )
+        : [join('src/lib/admin-metrics', entry.name)]
+  );
+
+  group('An external reference is a reference, and nothing else');
+
+  check('a demo purchase carrying an external reference is still not paid', () => {
+    /*
+     * The production shape that exposed the error: sixteen purchase rows with
+     * an `external_ref` and zero with `paid`. They are Academy enrolments and
+     * Chart Market script grants, and the reference is a course slug or a
+     * product id — an internal catalogue identifier on an entitlement granted
+     * without money.
+     */
+    const purchases = [
+      { status: 'demo', externalRef: 'options-basics', amountCents: 9900 },
+      { status: 'demo', externalRef: 'script_rsi_pro', amountCents: 4900 },
+      { status: 'demo', externalRef: null, amountCents: 0 },
+    ];
+
+    const withReference = purchases.filter((row) => row.externalRef !== null);
+    assert.equal(withReference.length, 2, 'the reference count');
+
+    /* It counts as a record with a reference — and as nothing else. */
+    assert.equal(purchases.filter((row) => row.status === 'paid').length, 0, 'a referenced row became paid');
+    assert.equal(
+      withReference.every((row) => !semantics.isRevenueBearing(row.status)),
+      true,
+      'a referenced demo row became revenue-bearing'
+    );
+    assert.equal(
+      purchases
+        .filter((row) => semantics.isRevenueBearing(row.status))
+        .reduce((sum, row) => sum + row.amountCents, 0),
+      0,
+      'a referenced demo amount reached the recorded paid gross'
+    );
+
+    /*
+     * And the load-bearing one: a reference count must never be what makes
+     * revenue confirmable. `revenueIsConfirmable` takes provider-confirmed
+     * records, of which there are structurally none.
+     */
+    const providerConfirmedRecords = 0;
+    assert.equal(semantics.revenueIsConfirmable(providerConfirmedRecords), false);
+    assert.equal(
+      semantics.revenueIsConfirmable(withReference.length),
+      true,
+      'sanity: this is exactly the mistake, and it is why the argument is named for the provider'
+    );
+  });
+
+  check('the commerce family names the column, never a process', () => {
+    const source = readFileSync('src/lib/admin-metrics/families/commerce.ts', 'utf8');
+
+    assert.match(source, /purchaseRecordsWithExternalRef: durableCount\(/);
+    assert.match(source, /commerce_purchase_external_ref_records/);
+    assert.match(source, /subscriptionsWithExternalRef: durableCount\(/);
+    assert.match(source, /commerce_subscription_external_ref_records/);
+    assert.match(source, /withExternalRef: sql<number>`count\(\$\{schema\.purchase\.externalRef\}\)::int`/);
+
+    for (const gone of ['providerReconciledRecords', 'subscriptionsWithProviderRef', 'commerce_reconciled', 'commerce_subscription_reconciled']) {
+      assert.equal(source.includes(gone), false, `${gone} survived the rename`);
+    }
+
+    /* Confirmed revenue is untouched, and the paid sum keeps its honest name. */
+    assert.match(source, /confirmedRevenue: MetricValue = sourceNotConnected\(/);
+    assert.match(source, /recordedPaidGrossCents: durableCount\(purchaseTotals\?\.paidCents/);
+  });
+
+  check('nothing in the Metrics layer calls a non-null column a reconciliation', () => {
+    /*
+     * A phrase sweep, not a spot check. `externalRef` is a free-form reference
+     * the application writes for its own purposes, so no label, sentence,
+     * dictionary entry or metric name may present its presence as
+     * reconciliation, provider confirmation, payment or revenue.
+     *
+     * Prose that *denies* the claim is the point of this change, so a line is
+     * only a failure when it makes the claim: each pattern here is an
+     * assertion, and the denials read "is NOT", "never" or "not a".
+     */
+    const CLAIMS = [
+      /Reconciled against a provider/,
+      /reconciled against a payment provider\./,
+      /the reconciliation hook/,
+      /providerReconciled/,
+      /WithProviderRef/,
+    ];
+
+    const files = [
+      ...METRICS_SOURCES,
+      'src/components/admin-metrics/drawers.tsx',
+      'src/components/admin-metrics/sections/MonetizationSection.tsx',
+    ];
+
+    for (const path of files) {
+      const source = readFileSync(path, 'utf8');
+      for (const claim of CLAIMS) {
+        assert.equal(claim.test(source), false, `${path} still claims ${claim}`);
+      }
+    }
+  });
+
+  check('the Observatory labels the two counts for what they count', () => {
+    const section = readFileSync('src/components/admin-metrics/sections/MonetizationSection.tsx', 'utf8');
+    assert.match(section, /label="Purchase rows with an external reference"/);
+    assert.match(section, /metric=\{metrics\.purchaseRecordsWithExternalRef\}/);
+    assert.match(section, /label="Subscriptions with an external reference"/);
+    assert.match(section, /metric=\{metrics\.subscriptionsWithExternalRef\}/);
+    assert.equal((section.match(/not a provider confirmation/g) ?? []).length, 2);
+
+    /* The fourth headline card still says the source is not connected. */
+    assert.match(section, /4 · Provider-confirmed transaction/);
+    assert.match(section, /Source not connected/);
+  });
+
+  check('the dictionary does not offer externalRef as evidence of revenue', () => {
+    const entry = dictionary.DICTIONARY_BY_ID.get('confirmed_revenue');
+    const limitations = entry.limitations.join(' ');
+
+    assert.equal(/reconciliation hook/.test(limitations), false);
+    assert.match(limitations, /`externalRef` is NOT evidence of one/);
+    assert.equal(entry.sourceType, 'source_not_connected');
   });
 
   group('A signed difference is not a count');
@@ -1986,15 +2122,6 @@ try {
   });
 
   /* ------------------------------------------------- Nobody is named anywhere */
-
-  const METRICS_SOURCES = readdirSync('src/lib/admin-metrics', { withFileTypes: true }).flatMap(
-    (entry) =>
-      entry.isDirectory()
-        ? readdirSync(join('src/lib/admin-metrics', entry.name)).map((file) =>
-            join('src/lib/admin-metrics', entry.name, file)
-          )
-        : [join('src/lib/admin-metrics', entry.name)]
-  );
 
   check('no metrics query names a person', () => {
     /*
@@ -3605,28 +3732,51 @@ try {
     const many = conclusions.monetizationConclusion({
       paidRecords: { state: 'live', value: 20, sample: 20 },
       demoRecords: { state: 'live', value: 4, sample: 4 },
-      reconciled: { state: 'live', value: 16, sample: 16 },
+      withExternalRef: { state: 'live', value: 16, sample: 16 },
     });
     assert.equal(many.includes('a providers'), false, `ungrammatical: ${many}`);
-    assert.match(many, /16 records reconciled against a payment provider/);
+    assert.match(many, /16 records carry an external reference/);
 
     const one = conclusions.monetizationConclusion({
       paidRecords: { state: 'live', value: 1, sample: 1 },
       demoRecords: { state: 'live', value: 1, sample: 1 },
-      reconciled: { state: 'live', value: 1, sample: 1 },
+      withExternalRef: { state: 'live', value: 1, sample: 1 },
     });
-    assert.match(one, /1 record reconciled against a payment provider/);
+    assert.match(one, /1 record carries an external reference/);
     assert.equal(one.includes('1 records'), false);
+    assert.equal(one.includes('records carries'), false, `ungrammatical: ${one}`);
+  });
+
+  check('the monetization line never calls an external reference a reconciliation', () => {
+    /*
+     * The sentence that was wrong in production. Sixteen rows carried an
+     * `external_ref` and the conclusion read "16 records reconciled against a
+     * payment provider" — while `paidStatusRecords` was zero and every one of
+     * those sixteen was a demo enrolment holding a course slug.
+     */
+    const line = conclusions.monetizationConclusion({
+      paidRecords: { state: 'live', value: 0, sample: 0 },
+      demoRecords: { state: 'live', value: 16, sample: 16 },
+      withExternalRef: { state: 'live', value: 16, sample: 16 },
+    });
+
+    for (const claim of [/reconcil/i, /provider.confirmed/i, /confirmed transaction/i]) {
+      assert.equal(claim.test(line), false, `the conclusion still claims ${claim}: ${line}`);
+    }
+    assert.match(line, /an identifier the application wrote, not a provider confirmation/);
+    assert.match(line, /confirmed revenue has no source/);
+    assert.match(line, /0 paid-status records/);
   });
 
   check('monetization never calls a paid row revenue', () => {
     const line = conclusions.monetizationConclusion({
       paidRecords: { state: 'live', value: 7, sample: 7 },
       demoRecords: { state: 'live', value: 21, sample: 21 },
-      reconciled: { state: 'live', value: 0, sample: 0 },
+      withExternalRef: { state: 'live', value: 0, sample: 0 },
     });
     assert.match(line, /confirmed revenue has no source/);
     assert.match(line, /7 paid-status records/);
+    assert.equal(/revenue is|confirmed revenue of/.test(line), false);
   });
 
   check('the coverage line distinguishes a bad number from no measurement', () => {
