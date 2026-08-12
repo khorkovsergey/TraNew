@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -107,6 +107,8 @@ const out = mkdtempSync(join(tmpdir(), 'tn-metrics-'));
 process.on('uncaughtException', (error) => {
   console.error('\nThe verification build failed:\n', error);
   rmSync(out, { recursive: true, force: true });
+  // `process.cwd()` rather than `repo`, which is declared below this handler.
+  rmSync(join(process.cwd(), 'node_modules', '.tn-verify-query'), { recursive: true, force: true });
   process.exit(1);
 });
 
@@ -231,6 +233,104 @@ const charts = await load('admin-metrics/families/supercharts');
 const fresh = await load('admin-metrics/freshness');
 const vitals = await load('admin-metrics/webVitals');
 const conclusions = await load('admin-metrics/conclusions');
+
+/* ------------------------------------------ The query layer, without a server */
+
+/**
+ * `internalTraffic.ts`, compiled with a stub database.
+ *
+ * It is not dependency-free — it holds real Drizzle predicates — so it cannot
+ * join `PURE_MODULES`. But the claim it makes is about SQL, and SQL is
+ * checkable without a server: `postgres-js` does not connect when it is
+ * constructed and `.toSQL()` never issues a statement, so every predicate can
+ * be rendered and read. That is the difference between asserting that a file
+ * mentions a role and asserting that the database is asked for one.
+ *
+ * A second `tsc` pass rather than a wider first one, because this needs
+ * `rootDir` at `src` to reach `src/db`, and moving the first pass's root would
+ * relocate every module the harness already loads.
+ *
+ * The output lives under `node_modules/` rather than in the system temp
+ * directory, and that is not a matter of taste: these modules import
+ * `drizzle-orm` and `postgres` by bare specifier, and Node resolves those by
+ * walking up from the importing file. From `/tmp` there is nothing to find.
+ */
+const queryOut = join(repo, 'node_modules', '.tn-verify-query');
+rmSync(queryOut, { recursive: true, force: true });
+mkdirSync(queryOut, { recursive: true });
+
+const queryConfig = join(queryOut, 'tsconfig.query.json');
+
+writeFileSync(
+  queryConfig,
+  JSON.stringify({
+    compilerOptions: {
+      target: 'es2022',
+      module: 'esnext',
+      moduleResolution: 'bundler',
+      strict: true,
+      skipLibCheck: true,
+      /* The config lives outside the repo root, so the type roots are named. */
+      types: ['node'],
+      typeRoots: [join(repo, 'node_modules/@types')],
+      outDir: queryOut,
+      rootDir: join(repo, 'src'),
+      baseUrl: repo,
+      paths: { '@/*': ['src/*'] },
+    },
+    files: [join(repo, 'src/lib/admin-metrics/internalTraffic.ts')],
+  })
+);
+
+execFileSync('npx', ['tsc', '-p', queryConfig], {
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+});
+
+writeFileSync(join(queryOut, 'package.json'), '{"type":"module"}');
+
+/*
+ * The one substitution. `@/db` opens a pool from `DATABASE_URL` on first use,
+ * and a verification that connected to production in order to render a `WHERE`
+ * clause would be a worse idea than anything it could catch. This is a real
+ * Drizzle instance over a real postgres-js client pointed at nothing:
+ * constructing it does not connect, and `.toSQL()` does not query.
+ */
+writeFileSync(
+  join(queryOut, 'db/index.js'),
+  [
+    "import { drizzle } from 'drizzle-orm/postgres-js';",
+    "import postgres from 'postgres';",
+    "import * as schema from './schema.js';",
+    "export const db = drizzle(postgres('postgres://verify:verify@127.0.0.1:1/none', { max: 1 }));",
+    'export { schema };',
+    '',
+  ].join('\n')
+);
+
+for (const relative of emitted(queryOut)) {
+  const path = join(queryOut, relative);
+  const depth = relative.split('/').length - 1;
+  const upToRoot = depth === 0 ? './' : '../'.repeat(depth);
+
+  const source = readFileSync(path, 'utf8')
+    /* A marker package for the bundler. There is no client bundle here. */
+    .replace(/^import 'server-only';\r?\n/m, '')
+    .replace(/from '@\/db'/g, `from '${upToRoot}db/index.js'`)
+    .replace(/from '@\/([^']+)'/g, (_match, rest) => `from '${upToRoot}${rest}.js'`)
+    .replace(/from '(\.\.?\/[^']+)'/g, (match, specifier) =>
+      specifier.endsWith('.js') ? match : `from '${specifier}.js'`
+    );
+
+  writeFileSync(path, source);
+}
+
+const internal = await import(pathToFileURL(join(queryOut, 'lib/admin-metrics/internalTraffic.js')).href);
+const serverIdentity = await import(
+  pathToFileURL(join(queryOut, 'lib/analytics/serverIdentity.js')).href
+);
+const stub = await import(pathToFileURL(join(queryOut, 'db/index.js')).href);
+const drizzleSql = (await import('drizzle-orm')).sql;
 
 const NOW = new Date('2026-08-10T12:00:00.000Z');
 const at = { source: 'test', metricId: 'test', queriedAt: NOW.toISOString() };
@@ -1710,7 +1810,15 @@ try {
     check(`${path.split('/').pop()} references no sensitive column`, () => {
       const source = readFileSync(path, 'utf8');
       for (const column of FORBIDDEN_COLUMNS) {
-        const reference = new RegExp(`schema\.\w+\.${column}\b`);
+        /*
+         * Escaped for a `RegExp` constructor, which takes a *string*: the
+         * template literal here is not a regex literal, so `\.` collapsed to a
+         * dot that matched anything, `\w` collapsed to the letter w, and `\b`
+         * became a backspace character. The pattern could not match a real
+         * reference, so this loop asserted nothing at all until it was written
+         * as `\\.` — the whole guard was passing vacuously.
+         */
+        const reference = new RegExp(`schema\\.\\w+\\.${column}\\b`);
         assert.equal(reference.test(source), false, `${path} reads schema.*.${column}`);
       }
     });
@@ -1723,7 +1831,7 @@ try {
     const source = readFileSync('src/lib/admin-metrics/families/wealth.ts', 'utf8');
     for (const column of ['nameEnc', 'valueEnc', 'balanceEnc', 'targetEnc', 'detailsEnc', 'metaEnc', 'termsEnc']) {
       assert.equal(
-        new RegExp(`schema\.\w+\.${column}\b`).test(source),
+        new RegExp(`schema\\.\\w+\\.${column}\\b`).test(source),
         false,
         `wealth.ts reads ${column}`
       );
@@ -1750,6 +1858,328 @@ try {
     for (const stale of ["'plus'", "'pro'", "'private'", "'essential'", "'ultimate'"]) {
       assert.equal(source.includes(stale), false, `commerce.ts hardcodes ${stale}`);
     }
+  });
+
+  /* ================================ A customer is a role, and only a role */
+
+  group('Only role = user is a customer');
+
+  /**
+   * Every read of `user` in a file, paired with the clause that follows it.
+   *
+   * Structural rather than a search for one hand-written line: a query added
+   * next month with no predicate is caught by the same assertion, and the
+   * assertion does not care how the call was wrapped or indented.
+   */
+  const userQueriesIn = (path) =>
+    readFileSync(path, 'utf8')
+      .split('.from(schema.user)')
+      .slice(1)
+      .map((rest) => rest.split(';')[0]);
+
+  const CUSTOMER_QUERY_FILES = [
+    'src/lib/admin-metrics/overview.ts',
+    'src/lib/admin-metrics/families/accounts.ts',
+    'src/lib/admin-metrics/families/commerce.ts',
+  ];
+
+  check('the rule is a role, and every other role is internal', () => {
+    assert.equal(internal.CUSTOMER_ROLE, 'user');
+    assert.equal(internal.isCustomerRole('user'), true);
+    assert.equal(internal.isCustomerRole('admin'), false);
+    assert.equal(internal.isCustomerRole('moderator'), false);
+    assert.equal(internal.isCustomerRole(null), false);
+    // A role nobody has invented yet is internal until somebody decides it is not.
+    assert.equal(internal.isCustomerRole('support'), false);
+    assert.deepEqual([...internal.STAFF_ROLES].sort(), ['admin', 'moderator']);
+  });
+
+  check('the database is asked the same question the rule asks', () => {
+    /*
+     * The half that a source assertion cannot make. This renders the predicate
+     * the queries actually run, so "admin does not count" is a fact about the
+     * SQL rather than about a comment above it.
+     */
+    const { sql: text, params } = stub.db
+      .select({ n: drizzleSql`1` })
+      .from(stub.schema.user)
+      .where(internal.customerAccounts())
+      .toSQL();
+
+    assert.match(text, /"user"\."role" = \$1/);
+    assert.deepEqual(params, [internal.CUSTOMER_ROLE]);
+
+    const staff = stub.db
+      .select({ id: stub.schema.user.id })
+      .from(stub.schema.user)
+      .where(internal.staffAccounts())
+      .toSQL();
+
+    assert.match(staff.sql, /"user"\."role" <> \$1/);
+    assert.deepEqual(staff.params, [internal.CUSTOMER_ROLE]);
+  });
+
+  check('no read of `user` in the Observatory counts staff', () => {
+    for (const path of CUSTOMER_QUERY_FILES) {
+      const tails = userQueriesIn(path);
+      assert.ok(tails.length > 0, `${path} no longer reads user at all`);
+
+      for (const tail of tails) {
+        assert.match(tail, /customerAccounts\(\)/, `${path}: a user query with no customer predicate`);
+      }
+    }
+  });
+
+  check('registered users and verified users are one customer-scoped read', () => {
+    const source = readFileSync('src/lib/admin-metrics/families/accounts.ts', 'utf8');
+    // `verified` is a filtered aggregate inside the same query, so it inherits
+    // the predicate rather than needing its own — and must stay that way.
+    assert.match(source, /verified: sql<number>`count\(\*\) filter \(where \$\{schema\.user\.emailVerified\}\)::int`/);
+    assert.match(source, /users: sql<number>`count\(\*\)::int`,[\s\S]{0,400}?\.where\(customerAccounts\(\)\)/);
+  });
+
+  check('new registrations and the daily trend are both scoped and both windowed', () => {
+    const windowed = /and\(customerAccounts\(\), gte\(schema\.user\.createdAt, since\)\)/g;
+
+    const overview = readFileSync('src/lib/admin-metrics/overview.ts', 'utf8');
+    assert.equal((overview.match(windowed) ?? []).length, 1, 'the headline new-registrations query');
+
+    const accounts = readFileSync('src/lib/admin-metrics/families/accounts.ts', 'utf8');
+    assert.equal(
+      (accounts.match(windowed) ?? []).length,
+      2,
+      'the window count and the registrations-per-day trend must both be scoped'
+    );
+  });
+
+  check('the entitlement distribution is customers, and entitledUsers is its sum', () => {
+    const source = readFileSync('src/lib/admin-metrics/families/commerce.ts', 'utf8');
+
+    assert.match(
+      source,
+      /entitlementRows = await db[\s\S]{0,300}?\.where\(customerAccounts\(\)\)/,
+      'the entitlement distribution is not scoped to customers'
+    );
+
+    /*
+     * The reason a staff plan cannot inflate the headline: `entitledUsers` is
+     * the sum of the distribution rather than a second count. One predicate
+     * covers both, and they cannot disagree.
+     */
+    assert.match(source, /entitledUsers: durableCount\(\s*\n?\s*entitlement\.reduce\(/);
+  });
+
+  check('purchases and subscriptions keep their whole population', () => {
+    /*
+     * Deliberately unfiltered — money records, not a population. One occurrence
+     * of the predicate in this file, and it is the entitlement query above.
+     */
+    const source = readFileSync('src/lib/admin-metrics/families/commerce.ts', 'utf8');
+    assert.equal((source.match(/customerAccounts\(\)/g) ?? []).length, 1);
+    assert.match(source, /\.from\(schema\.purchase\)\s*;/);
+    assert.match(source, /\.from\(schema\.subscription\)\s*;/);
+  });
+
+  /* ------------------------------------------------- Nobody is named anywhere */
+
+  const METRICS_SOURCES = readdirSync('src/lib/admin-metrics', { withFileTypes: true }).flatMap(
+    (entry) =>
+      entry.isDirectory()
+        ? readdirSync(join('src/lib/admin-metrics', entry.name)).map((file) =>
+            join('src/lib/admin-metrics', entry.name, file)
+          )
+        : [join('src/lib/admin-metrics', entry.name)]
+  );
+
+  check('no metrics query names a person', () => {
+    /*
+     * The contract that makes this reset repeatable. An address, a name or a
+     * particular account would be wrong the first time somebody else joined the
+     * team, and it would put an identity into a layer built to hold none.
+     */
+    const email = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+
+    for (const path of METRICS_SOURCES) {
+      const source = readFileSync(path, 'utf8');
+      assert.equal(email.test(source), false, `${path} contains an email address`);
+      assert.equal(/schema\.user\.email\b/.test(source), false, `${path} reads user.email`);
+      assert.equal(/schema\.user\.name\b/.test(source), false, `${path} reads user.name`);
+      assert.equal(
+        /eq\(schema\.user\.id,/.test(source),
+        false,
+        `${path} singles out one account by id`
+      );
+    }
+  });
+
+  check('the staff key list is derived from the role and from nothing else', () => {
+    const source = readFileSync('src/lib/admin-metrics/internalTraffic.ts', 'utf8');
+    assert.match(source, /ne\(schema\.user\.role, CUSTOMER_ROLE\)/);
+    assert.match(source, /eq\(schema\.user\.role, CUSTOMER_ROLE\)/);
+    // Only the id is read, and it is hashed before it leaves the function.
+    assert.match(source, /\.select\(\{ id: schema\.user\.id \}\)/);
+    assert.match(source, /rows\.map\(\(row\) => pseudonymousUserKey\(row\.id\)\)/);
+    assert.equal(/return rows\.map\(\(row\) => row\.id\)/.test(source), false);
+  });
+
+  /* ============================== Internal telemetry, excluded on the read side */
+
+  group('Authenticated staff telemetry is excluded, customers are not');
+
+  check('a staff key is a hash, and the id is not recoverable from it', () => {
+    const key = serverIdentity.pseudonymousUserKey('usr_0123456789abcdef');
+    assert.match(key, /^u_[0-9a-f]{32}$/);
+    assert.equal(key.includes('0123456789'), false);
+    // The same function the ingest route uses, so read and write agree.
+    assert.equal(serverIdentity.pseudonymousUserKey('usr_0123456789abcdef'), key);
+    assert.notEqual(serverIdentity.pseudonymousUserKey('usr_other'), key);
+  });
+
+  check('a session that was ever staff is internal; a customer session is not', () => {
+    const rows = [
+      /* One session, signed in half way through it. */
+      { sessionId: 's_admin', userKeyHash: null },
+      { sessionId: 's_admin', userKeyHash: 'u_staff' },
+      { sessionId: 's_customer', userKeyHash: 'u_person' },
+      { sessionId: 's_anon', userKeyHash: null },
+    ];
+
+    const excluded = internal.staffSessionIds(rows, ['u_staff']);
+
+    assert.equal(excluded.has('s_admin'), true, 'a staff session survived');
+    assert.equal(excluded.has('s_customer'), false, 'a customer session was excluded');
+    assert.equal(excluded.has('s_anon'), false, 'an anonymous session was excluded');
+    assert.equal(excluded.size, 1);
+  });
+
+  check('the session exclusion drops the session, not the staff rows inside it', () => {
+    const { sql: text, params } = stub.db
+      .select({ id: stub.schema.productTelemetryEvent.sessionId })
+      .from(stub.schema.productTelemetryEvent)
+      .where(internal.notStaffSession(['u_staff', 'u_mod']))
+      .toSQL();
+
+    assert.match(text, /not exists/);
+    assert.match(text, /"staff_event"\."session_id" = "product_telemetry_event"\."session_id"/);
+    assert.match(text, /"staff_event"\."user_key_hash" in \(\$1, \$2\)/);
+    assert.deepEqual(params, ['u_staff', 'u_mod']);
+  });
+
+  check('an unattributed event is kept, never dropped', () => {
+    const { sql: text, params } = stub.db
+      .select({ id: stub.schema.productTelemetryEvent.id })
+      .from(stub.schema.productTelemetryEvent)
+      .where(internal.notStaffEvent(['u_staff']))
+      .toSQL();
+
+    /*
+     * The null branch is the whole point. An event with no key is anonymous or
+     * operational, and dropping it would shrink every denominator it belongs to
+     * — a worse error than counting traffic that might be ours.
+     */
+    assert.match(text, /"user_key_hash" is null or "product_telemetry_event"\."user_key_hash" not in/);
+    assert.deepEqual(params, ['u_staff']);
+  });
+
+  check('a read that already requires a key excludes only staff keys', () => {
+    const { sql: text, params } = stub.db
+      .select({ id: stub.schema.productTelemetryEvent.id })
+      .from(stub.schema.productTelemetryEvent)
+      .where(internal.customerKeyOnly(['u_staff']))
+      .toSQL();
+
+    assert.match(text, /"user_key_hash" not in \(\$1\)/);
+    assert.equal(/is null/.test(text), false, 'retention must not start counting unattributed rows');
+    assert.deepEqual(params, ['u_staff']);
+  });
+
+  check('with no staff accounts every query is byte-identical to before', () => {
+    assert.equal(internal.notStaffSession([]), undefined);
+    assert.equal(internal.notStaffEvent([]), undefined);
+    assert.equal(internal.customerKeyOnly([]), undefined);
+    assert.equal(internal.staffSessionIds([{ sessionId: 's', userKeyHash: 'u_a' }], []).size, 0);
+  });
+
+  check('every customer telemetry reader applies an exclusion', () => {
+    const telemetry = readFileSync('src/lib/admin-metrics/telemetryQuery.ts', 'utf8');
+
+    // Sessions and funnels: whole sessions. Retention: keys.
+    assert.equal((telemetry.match(/notStaffSession\(staffKeys\)/g) ?? []).length, 2);
+    assert.match(telemetry, /customerKeyOnly\(staffKeys\)/);
+    assert.equal((telemetry.match(/await staffAnalyticsKeys\(\)/g) ?? []).length, 3);
+
+    const voyager = readFileSync('src/lib/admin-metrics/families/voyager.ts', 'utf8');
+    assert.match(voyager, /notStaffEvent\(staffKeys\)/);
+
+    const reliability = readFileSync('src/lib/admin-metrics/families/reliability.ts', 'utf8');
+    assert.match(reliability, /internalSessions\.has\(row\.sessionId\)/);
+  });
+
+  check('the Voyager emitter probe still counts a staff request', () => {
+    /*
+     * "Has this ever run" is an instrumentation question, not a usage one.
+     * Filtering it would report a missing emitter that is in fact running, the
+     * moment the only requests on record were ours.
+     */
+    const source = readFileSync('src/lib/admin-metrics/families/voyager.ts', 'utf8');
+    const probe = source.split('const [ever] = await db')[1].split(';')[0];
+    assert.equal(/notStaffEvent|staffKeys/.test(probe), false, 'the emitter probe was filtered');
+  });
+
+  check('no fingerprinting was introduced to tell internal traffic apart', () => {
+    /*
+     * Anonymous cross-session identity stays unavailable. A signed-out
+     * administrator is indistinguishable from a customer, and that is the
+     * stated limitation rather than a problem to solve with a cookie.
+     */
+    for (const path of METRICS_SOURCES) {
+      const source = readFileSync(path, 'utf8');
+      for (const pattern of [
+        /document\.cookie/,
+        /localStorage/,
+        /navigator\.userAgent/,
+        /schema\.session\.ipAddress/,
+        /fingerprint/i,
+      ]) {
+        assert.equal(pattern.test(source), false, `${path} matches ${pattern}`);
+      }
+    }
+  });
+
+  check('anonymous retention semantics are untouched', () => {
+    const overview = readFileSync('src/lib/admin-metrics/overview.ts', 'utf8');
+    assert.match(overview, /anonymousReturn: notMeasurable\(/);
+    assert.match(overview, /the portal has no cross-session anonymous identity/);
+
+    const telemetry = readFileSync('src/lib/admin-metrics/telemetryQuery.ts', 'utf8');
+    assert.match(telemetry, /userKeyHash\} is not null/, 'retention still reads authenticated days only');
+  });
+
+  check('product and system inventory was not narrowed', () => {
+    /*
+     * The other half of a clean baseline. Published events, instrumentation
+     * coverage and portal health describe the product, not its adoption, and a
+     * reset that zeroed them would be a broken dashboard rather than an empty
+     * one.
+     */
+    const events = readFileSync('src/lib/admin-metrics/families/events.ts', 'utf8');
+    assert.equal(events.includes('customerAccounts'), false, 'the event supply was filtered by role');
+    assert.match(events, /published: sql<number>`count\(\*\) filter \(where \$\{schema\.event\.status\} = 'published'\)::int`/);
+
+    const coverage = readFileSync('src/lib/admin-metrics/coverage.ts', 'utf8');
+    assert.equal(
+      /staffAnalyticsKeys|notStaffEvent|notStaffSession|customerKeyOnly/.test(coverage),
+      false,
+      'instrumentation coverage must count every emitter, ours included'
+    );
+
+    const reliability = readFileSync('src/lib/admin-metrics/families/reliability.ts', 'utf8');
+    assert.match(reliability, /vitals: summariseVitals\(vitalSamples/);
+    assert.equal(
+      /vitalSamples[\s\S]{0,200}internalSessions/.test(reliability),
+      false,
+      'Web Vitals were filtered — a crash on a staff machine is the same defect'
+    );
   });
 
   group('Phase 3 definitions say which kind of source they are');
@@ -3745,10 +4175,12 @@ try {
   // Only the live mode can have written anything, so only it cleans up.
   if (LIVE) await cleanupSentinel();
 
-  try {
-    rmSync(out, { recursive: true, force: true });
-  } catch {
-    /* Windows keeps an ESM handle on the temp files; it is not a test result. */
+  for (const directory of [out, queryOut]) {
+    try {
+      rmSync(directory, { recursive: true, force: true });
+    } catch {
+      /* Windows keeps an ESM handle on the temp files; it is not a test result. */
+    }
   }
 
   if (failures.length) console.log(`\nfailed: ${failures.join(', ')}`);
