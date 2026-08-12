@@ -1,6 +1,6 @@
 import 'server-only';
-import { and, eq, inArray, isNull, ne, notExists, notInArray, or, sql, type SQL } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
+import { and, eq, exists, inArray, isNull, ne, notExists, notInArray, or, sql, type SQL } from 'drizzle-orm';
+import { alias, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { db, schema } from '@/db';
 import { pseudonymousUserKey } from '@/lib/analytics/serverIdentity';
 
@@ -78,6 +78,40 @@ export function customerAccounts(): SQL {
 /** The complement: staff accounts, for the reads that are about staff. */
 export function staffAccounts(): SQL {
   return ne(schema.user.role, CUSTOMER_ROLE);
+}
+
+/**
+ * Rows a customer owns, for every durable table that hangs off `user`.
+ *
+ * The second half of the same rule. `customerAccounts()` scopes a read *of*
+ * `user`; this scopes a read of the things a person did — a registration, a
+ * booking, a save, a purchase, an asset. Without it the owner's own demo
+ * activity is customer adoption, and it would go on being customer adoption
+ * after the reset, because he is going to keep demonstrating the portal.
+ *
+ * A semi-join rather than a fetched id list: the predicate composes into the
+ * query the aggregate already runs, so nothing is loaded, nothing is held in
+ * memory and the planner sees one statement. `user.id` is the primary key, so
+ * the inner side is a lookup.
+ *
+ * Written as "owned by a customer" rather than "not owned by staff" on purpose.
+ * The two differ for a row whose owner has gone, and although every one of
+ * these columns is `NOT NULL` with a cascade — so an orphan cannot exist today
+ * — a customer metric that silently adopted orphans if that ever changed would
+ * be the wrong way round.
+ *
+ * Pass the owning column: `ownedByCustomer(schema.expertBooking.userId)`. For a
+ * table that owns nothing itself — `collection_item` belongs to a collection,
+ * not to a person — resolve the owner through the table that has one rather
+ * than inventing a column.
+ */
+export function ownedByCustomer(userId: AnyPgColumn): SQL {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(schema.user)
+      .where(and(eq(schema.user.id, userId), customerAccounts()))
+  );
 }
 
 /**

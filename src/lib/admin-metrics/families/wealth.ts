@@ -1,8 +1,9 @@
 import 'server-only';
-import { isNull, sql } from 'drizzle-orm';
+import { and, isNull, sql } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { featureDisabled } from '@/lib/analytics/states';
+import { ownedByCustomer } from '../internalTraffic';
 import { durableAt, durableCount, newest, type FamilyFacts } from './durable';
 
 /**
@@ -37,12 +38,23 @@ import { durableAt, durableCount, newest, type FamilyFacts } from './durable';
  *
  * Adoption reports `feature_disabled`, never zero. Rows can exist while the
  * surface is unreachable, and a zero would say nobody wanted it.
+ *
+ * ## Whose record
+ *
+ * Every count is scoped to rows owned by `role = 'user'`. The product owner
+ * keeps a demo portfolio in the Wealth Hub, and without this the Observatory
+ * reports one Wealth Hub user who is us. Ownership is the only thing consulted:
+ * the filter is a semi-join on `user.role` and touches no column of the wealth
+ * tables beyond `user_id`, so nothing here comes any closer to a financial
+ * value than it did before.
  */
 export async function wealthFacts(): Promise<FamilyFacts> {
   const generatedAt = new Date().toISOString();
   const assets = durableAt('wealth_asset', generatedAt);
   const liabilities = durableAt('wealth_liability', generatedAt);
   const goals = durableAt('wealth_goal', generatedAt);
+
+  const customerAsset = ownedByCustomer(schema.wealthAsset.userId);
 
   const [assetTotals] = await db
     .select({
@@ -51,12 +63,12 @@ export async function wealthFacts(): Promise<FamilyFacts> {
       newest: sql<Date | null>`max(${schema.wealthAsset.updatedAt})`,
     })
     .from(schema.wealthAsset)
-    .where(isNull(schema.wealthAsset.supersededAt));
+    .where(and(customerAsset, isNull(schema.wealthAsset.supersededAt)));
 
   const [supersededTotals] = await db
     .select({ superseded: sql<number>`count(*)::int` })
     .from(schema.wealthAsset)
-    .where(sql`${schema.wealthAsset.supersededAt} is not null`);
+    .where(and(customerAsset, sql`${schema.wealthAsset.supersededAt} is not null`));
 
   const [liabilityTotals] = await db
     .select({
@@ -64,7 +76,8 @@ export async function wealthFacts(): Promise<FamilyFacts> {
       holders: sql<number>`count(distinct ${schema.wealthLiability.userId})::int`,
       newest: sql<Date | null>`max(${schema.wealthLiability.updatedAt})`,
     })
-    .from(schema.wealthLiability);
+    .from(schema.wealthLiability)
+    .where(ownedByCustomer(schema.wealthLiability.userId));
 
   const [goalTotals] = await db
     .select({
@@ -72,15 +85,23 @@ export async function wealthFacts(): Promise<FamilyFacts> {
       holders: sql<number>`count(distinct ${schema.wealthGoal.userId})::int`,
       newest: sql<Date | null>`max(${schema.wealthGoal.updatedAt})`,
     })
-    .from(schema.wealthGoal);
+    .from(schema.wealthGoal)
+    .where(ownedByCustomer(schema.wealthGoal.userId));
 
+  /*
+   * Consent adoption is a customer question too — how many *customers* were
+   * willing to let Voyager read the record — so a staff grant made while
+   * demonstrating the flow is excluded like everything else here.
+   */
   const [consentTotals] = await db
     .select({
       granted: sql<number>`count(*) filter (where ${schema.consent.revokedAt} is null)::int`,
       revoked: sql<number>`count(*) filter (where ${schema.consent.revokedAt} is not null)::int`,
     })
     .from(schema.consent)
-    .where(sql`${schema.consent.kind} = 'voyager_context'`);
+    .where(
+      and(ownedByCustomer(schema.consent.userId), sql`${schema.consent.kind} = 'voyager_context'`)
+    );
 
   const enabled = FEATURE_FLAGS.wealthHubEnabled;
   const off = (metricId: string) =>
@@ -137,6 +158,7 @@ export async function wealthFacts(): Promise<FamilyFacts> {
     },
     distributions: {},
     limitations: [
+      'Customer records only. Assets, liabilities, goals and the Voyager-context consent are scoped to owners whose role is `user`, so the product owner\'s demo portfolio is not a Wealth Hub customer. Ownership is all that is consulted — the filter reads `user_id` and `user.role`, and no column of these tables beyond the owner.',
       'Adoption counts only. No monetary column is selected anywhere in this family, so no portfolio value, net worth, average holding or liability total exists to be reported.',
       'Country and currency are in the clear on the asset table and are still not read: combined with a small cohort they narrow a person down.',
       'Current assets exclude superseded rows. A person who revised one holding five times is one holder with one asset, and the revisions are counted separately.',

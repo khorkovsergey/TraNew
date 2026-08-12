@@ -1,8 +1,8 @@
 import 'server-only';
-import { gte, sql } from 'drizzle-orm';
+import { and, gte, sql } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { PLAN_RANK } from '@/lib/session';
-import { customerAccounts } from '../internalTraffic';
+import { customerAccounts, ownedByCustomer } from '../internalTraffic';
 import { sourceNotConnected, type MetricValue } from '@/lib/analytics/states';
 import { distribution, durableAt, durableCount, newest, pick, type FamilyFacts } from './durable';
 
@@ -33,21 +33,30 @@ import { distribution, durableAt, durableCount, newest, pick, type FamilyFacts }
  * plan names here would be a second source of truth about what the product
  * sells, and this file would be the last place anybody thought to update.
  *
- * ## Whose entitlements
+ * ## Whose commerce
  *
- * The distribution and `entitledUsers` are `role = 'user'` — customers. Staff
- * accounts carry a `plan` like everybody else, because the entitlement check
- * does not have a special case for them, and an administrator on Free or on
- * Private was appearing in the adoption chart as though somebody had chosen it.
- * One internal account is a visible fraction of a small customer base, which is
- * exactly the size of population where that error is most convincing.
+ * Everything in this family is **customer** commercial activity: entitlements,
+ * purchases and subscriptions alike are scoped to `role = 'user'`.
  *
- * The purchase and subscription figures are **not** filtered, deliberately.
- * They are money records rather than a population: a row exists because
- * something was recorded against an account, and quietly dropping some of them
- * would make the counts stop reconciling with the tables they name. If a staff
- * purchase is ever recorded, it is a `demo` row and the status distribution
- * already says so.
+ * Entitlements were the obvious case — staff accounts carry a `plan` like
+ * everybody else, because the entitlement check has no special case for them,
+ * and an administrator on Free or Private appeared in the adoption chart as
+ * though somebody had chosen it.
+ *
+ * Purchases and subscriptions were left whole in the first pass, on the
+ * argument that a money record is not a population. That was the wrong call for
+ * this dashboard. The Observatory's monetization section is read as *what
+ * customers bought*, and the owner is going to keep granting himself demo
+ * entitlements to show the flow working — so an admin's test purchase would
+ * have been monetization, permanently, whatever the reset did. They are scoped
+ * now, and the limitation says so rather than leaving a reader to guess which
+ * population a figure describes.
+ *
+ * Nothing is reconciled across the boundary. `providerReconciledRecords` counts
+ * `externalRef` **within the customer population**, and there is no
+ * all-account provider total anywhere to subtract it from — if one ever
+ * arrives, it must be compared against an all-account count, exactly as the
+ * Events seat counter is.
  */
 export async function commerceFacts(since: Date): Promise<FamilyFacts> {
   const generatedAt = new Date().toISOString();
@@ -55,14 +64,19 @@ export async function commerceFacts(since: Date): Promise<FamilyFacts> {
   const subscriptions = durableAt('subscription', generatedAt);
   const users = durableAt('user', generatedAt);
 
+  const customerPurchase = ownedByCustomer(schema.purchase.userId);
+  const customerSubscription = ownedByCustomer(schema.subscription.userId);
+
   const statusRows = await db
     .select({ key: schema.purchase.status, count: sql<number>`count(*)::int` })
     .from(schema.purchase)
+    .where(customerPurchase)
     .groupBy(schema.purchase.status);
 
   const kindRows = await db
     .select({ key: schema.purchase.kind, count: sql<number>`count(*)::int` })
     .from(schema.purchase)
+    .where(customerPurchase)
     .groupBy(schema.purchase.kind);
 
   const [purchaseTotals] = await db
@@ -76,21 +90,24 @@ export async function commerceFacts(since: Date): Promise<FamilyFacts> {
       reconciled: sql<number>`count(${schema.purchase.externalRef})::int`,
       newest: sql<Date | null>`max(${schema.purchase.purchasedAt})`,
     })
-    .from(schema.purchase);
+    .from(schema.purchase)
+    .where(customerPurchase);
 
   const [purchasesInWindow] = await db
     .select({ records: sql<number>`count(*)::int` })
     .from(schema.purchase)
-    .where(gte(schema.purchase.purchasedAt, since));
+    .where(and(customerPurchase, gte(schema.purchase.purchasedAt, since)));
 
   const subscriptionStatusRows = await db
     .select({ key: schema.subscription.status, count: sql<number>`count(*)::int` })
     .from(schema.subscription)
+    .where(customerSubscription)
     .groupBy(schema.subscription.status);
 
   const subscriptionPlanRows = await db
     .select({ key: schema.subscription.plan, count: sql<number>`count(*)::int` })
     .from(schema.subscription)
+    .where(customerSubscription)
     .groupBy(schema.subscription.plan);
 
   const [subscriptionTotals] = await db
@@ -100,7 +117,8 @@ export async function commerceFacts(since: Date): Promise<FamilyFacts> {
       reconciled: sql<number>`count(${schema.subscription.externalRef})::int`,
       newest: sql<Date | null>`max(${schema.subscription.startedAt})`,
     })
-    .from(schema.subscription);
+    .from(schema.subscription)
+    .where(customerSubscription);
 
   const entitlementRows = await db
     .select({ key: schema.user.plan, count: sql<number>`count(*)::int` })
@@ -174,8 +192,8 @@ export async function commerceFacts(since: Date): Promise<FamilyFacts> {
       'A `paid` row is an application record, not a provider-confirmed transaction. `externalRef` is the reconciliation hook and nothing populates it, so the paid sum is reported as a recorded gross amount and confirmed revenue stays absent.',
       '`demo` means an entitlement was granted without money. Demo rows and their amounts are reported separately and never contribute to any money figure.',
       'Entitlement counts come from `user.plan` and prove nothing about payment. A plan the server model does not recognise is labelled rather than charted beside the real ones.',
-      'The entitlement distribution and `entitledUsers` are customers only — `role = \'user\'`. Staff accounts hold a plan like anybody else and their tier is not evidence of customer adoption.',
-      'Purchases and subscriptions are NOT filtered by role. They are money records rather than a population, and dropping rows from them would stop the counts reconciling with the tables they name.',
+      'Customers only, throughout — `role = \'user\'`. Entitlements, purchase records and their status and kind mixes, the recorded gross amounts, provider-reconciled records, subscriptions and their status and plan mixes all exclude rows owned by an `admin` or `moderator` account. An administrator granting himself a demo entitlement to show the flow is not customer monetization.',
+      'Every figure here therefore describes the customer population, and none of them is a count of all rows in `purchase` or `subscription`. Nothing is reconciled across that boundary: `providerReconciledRecords` counts `externalRef` within the same customer population, and a future all-account provider total would have to be compared against an all-account count rather than against this one.',
       '`renewsAt` is an intention, not an outcome. Nothing here infers a successful renewal from it.',
       'Plan names are read from the entitlement model at runtime; no lineup is written down in this file.',
     ],
