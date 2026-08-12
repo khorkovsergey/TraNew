@@ -31,8 +31,14 @@ specifically so nothing counting revenue can pick it up by accident. The
 design's separate demo/test line is the right shape.
 
 **Section 03 — Awareness and Monetization deliberately "no source".** Correct on
-both counts. No Search Console integration exists; no payment provider is
-connected, and `subscription.externalRef` is an empty hook.
+both counts. No Search Console integration exists and no payment provider is
+connected.
+
+> **Corrected.** This line originally called `subscription.externalRef` an empty
+> hook. It is not a hook at all: `external_ref` is a free-form application
+> reference, and on `purchase` it holds course slugs and script product ids
+> written by the enrolment paths — 16 rows in production, none of them `paid`.
+> A non-null value proves a reference exists and nothing else.
 
 **Section 05 — the retired diagnostic/plan journey is a separate Legacy card.**
 Correct, with one correction below (`intent_selected`).

@@ -167,23 +167,42 @@ export function reliabilityConclusion(input: {
 
 /* --------------------------------------------------------- Monetization */
 
+/**
+ * The monetization sentence.
+ *
+ * `withExternalRef` used to be called `reconciled`, and the sentence repeated
+ * the claim: sixteen records, settled against a payment provider. Every one of
+ * those sixteen was a `demo` entitlement whose `external_ref` is a course slug
+ * or a script product id, and no payment provider has ever seen one. It was the
+ * most quotable false claim on the dashboard — a conclusion is what a reader
+ * repeats out loud.
+ *
+ * A non-null column now says what it is, and the sentence still ends with the
+ * only thing that is settled: there is no source for confirmed revenue, and
+ * counting references does not create one.
+ */
 export function monetizationConclusion(input: {
   paidRecords: StateLike;
   demoRecords: StateLike;
-  reconciled: StateLike;
+  withExternalRef: StateLike;
 }): string {
   const paid = isNumeric(input.paidRecords) ? input.paidRecords.value : 0;
   const demo = isNumeric(input.demoRecords) ? input.demoRecords.value : 0;
-  const reconciled = isNumeric(input.reconciled) ? input.reconciled.value : 0;
+  const referenced = isNumeric(input.withExternalRef) ? input.withExternalRef.value : 0;
+
+  const head = `${plural(paid, 'paid-status record')} and ${plural(demo, 'demo entitlement')}`;
 
   /*
-   * `plural` appends an "s" to the noun it is given, so the second clause has to
-   * pluralise a noun rather than a phrase: `plural(16, 'reconciled against a
-   * provider')` produced "16 reconciled against a providers".
+   * `plural` appends an "s" to the noun it is given, so a clause has to
+   * pluralise a noun rather than a phrase — `plural(16, 'reconciled against a
+   * provider')` once produced "16 reconciled against a providers". The verb
+   * agrees separately for the same reason.
    */
-  return reconciled === 0
-    ? `${plural(paid, 'paid-status record')} and ${plural(demo, 'demo entitlement')}. Nothing has been reconciled against a payment provider, so confirmed revenue has no source.`
-    : `${plural(paid, 'paid-status record')} and ${plural(demo, 'demo entitlement')}, of which ${plural(reconciled, 'record')} reconciled against a payment provider.`;
+  const carries = referenced === 1 ? 'carries' : 'carry';
+
+  return referenced === 0
+    ? `${head}. No payment provider is connected, so confirmed revenue has no source.`
+    : `${head}, of which ${plural(referenced, 'record')} ${carries} an external reference — an identifier the application wrote, not a provider confirmation. No payment provider is connected, so confirmed revenue has no source.`;
 }
 
 /* ------------------------------------------------------- Measurement gaps */

@@ -346,7 +346,9 @@ export function SourceDrawer({ data, onClose }: { data: ObservatoryData; onClose
           <li>
             <strong className={styles.strong}>Payment provider.</strong> No provider-confirmed
             transaction exists, so confirmed revenue has no source. A `paid` row is an application
-            record and `externalRef` — the reconciliation hook — is never populated.
+            record, and `externalRef` is not evidence of a transaction either — it is a free-form
+            reference the application writes for itself, and every purchase row carrying one today
+            is a demo entitlement holding a course slug or a script product id.
           </li>
           <li>
             <strong className={styles.strong}>Search Console.</strong> No organic impression, click

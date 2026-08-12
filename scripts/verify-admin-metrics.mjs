@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -107,6 +107,8 @@ const out = mkdtempSync(join(tmpdir(), 'tn-metrics-'));
 process.on('uncaughtException', (error) => {
   console.error('\nThe verification build failed:\n', error);
   rmSync(out, { recursive: true, force: true });
+  // `process.cwd()` rather than `repo`, which is declared below this handler.
+  rmSync(join(process.cwd(), 'node_modules', '.tn-verify-query'), { recursive: true, force: true });
   process.exit(1);
 });
 
@@ -231,6 +233,104 @@ const charts = await load('admin-metrics/families/supercharts');
 const fresh = await load('admin-metrics/freshness');
 const vitals = await load('admin-metrics/webVitals');
 const conclusions = await load('admin-metrics/conclusions');
+
+/* ------------------------------------------ The query layer, without a server */
+
+/**
+ * `internalTraffic.ts`, compiled with a stub database.
+ *
+ * It is not dependency-free — it holds real Drizzle predicates — so it cannot
+ * join `PURE_MODULES`. But the claim it makes is about SQL, and SQL is
+ * checkable without a server: `postgres-js` does not connect when it is
+ * constructed and `.toSQL()` never issues a statement, so every predicate can
+ * be rendered and read. That is the difference between asserting that a file
+ * mentions a role and asserting that the database is asked for one.
+ *
+ * A second `tsc` pass rather than a wider first one, because this needs
+ * `rootDir` at `src` to reach `src/db`, and moving the first pass's root would
+ * relocate every module the harness already loads.
+ *
+ * The output lives under `node_modules/` rather than in the system temp
+ * directory, and that is not a matter of taste: these modules import
+ * `drizzle-orm` and `postgres` by bare specifier, and Node resolves those by
+ * walking up from the importing file. From `/tmp` there is nothing to find.
+ */
+const queryOut = join(repo, 'node_modules', '.tn-verify-query');
+rmSync(queryOut, { recursive: true, force: true });
+mkdirSync(queryOut, { recursive: true });
+
+const queryConfig = join(queryOut, 'tsconfig.query.json');
+
+writeFileSync(
+  queryConfig,
+  JSON.stringify({
+    compilerOptions: {
+      target: 'es2022',
+      module: 'esnext',
+      moduleResolution: 'bundler',
+      strict: true,
+      skipLibCheck: true,
+      /* The config lives outside the repo root, so the type roots are named. */
+      types: ['node'],
+      typeRoots: [join(repo, 'node_modules/@types')],
+      outDir: queryOut,
+      rootDir: join(repo, 'src'),
+      baseUrl: repo,
+      paths: { '@/*': ['src/*'] },
+    },
+    files: [join(repo, 'src/lib/admin-metrics/internalTraffic.ts')],
+  })
+);
+
+execFileSync('npx', ['tsc', '-p', queryConfig], {
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+});
+
+writeFileSync(join(queryOut, 'package.json'), '{"type":"module"}');
+
+/*
+ * The one substitution. `@/db` opens a pool from `DATABASE_URL` on first use,
+ * and a verification that connected to production in order to render a `WHERE`
+ * clause would be a worse idea than anything it could catch. This is a real
+ * Drizzle instance over a real postgres-js client pointed at nothing:
+ * constructing it does not connect, and `.toSQL()` does not query.
+ */
+writeFileSync(
+  join(queryOut, 'db/index.js'),
+  [
+    "import { drizzle } from 'drizzle-orm/postgres-js';",
+    "import postgres from 'postgres';",
+    "import * as schema from './schema.js';",
+    "export const db = drizzle(postgres('postgres://verify:verify@127.0.0.1:1/none', { max: 1 }));",
+    'export { schema };',
+    '',
+  ].join('\n')
+);
+
+for (const relative of emitted(queryOut)) {
+  const path = join(queryOut, relative);
+  const depth = relative.split('/').length - 1;
+  const upToRoot = depth === 0 ? './' : '../'.repeat(depth);
+
+  const source = readFileSync(path, 'utf8')
+    /* A marker package for the bundler. There is no client bundle here. */
+    .replace(/^import 'server-only';\r?\n/m, '')
+    .replace(/from '@\/db'/g, `from '${upToRoot}db/index.js'`)
+    .replace(/from '@\/([^']+)'/g, (_match, rest) => `from '${upToRoot}${rest}.js'`)
+    .replace(/from '(\.\.?\/[^']+)'/g, (match, specifier) =>
+      specifier.endsWith('.js') ? match : `from '${specifier}.js'`
+    );
+
+  writeFileSync(path, source);
+}
+
+const internal = await import(pathToFileURL(join(queryOut, 'lib/admin-metrics/internalTraffic.js')).href);
+const serverIdentity = await import(
+  pathToFileURL(join(queryOut, 'lib/analytics/serverIdentity.js')).href
+);
+const stub = await import(pathToFileURL(join(queryOut, 'db/index.js')).href);
+const drizzleSql = (await import('drizzle-orm')).sql;
 
 const NOW = new Date('2026-08-10T12:00:00.000Z');
 const at = { source: 'test', metricId: 'test', queriedAt: NOW.toISOString() };
@@ -1599,9 +1699,145 @@ try {
     assert.equal(semantics.POTENTIALLY_MONETARY_STATUSES.includes('demo'), false);
   });
 
-  check('revenue is not confirmable while nothing has been reconciled', () => {
+  check('revenue is not confirmable while no provider has confirmed anything', () => {
     assert.equal(semantics.revenueIsConfirmable(0), false);
     assert.equal(semantics.revenueIsConfirmable(1), true);
+  });
+
+  /**
+   * Every source file in the Metrics query layer.
+   *
+   * Declared here because two later groups sweep it: this one for a claim about
+   * reconciliation, and the customer-boundary group for an identity.
+   */
+  const METRICS_SOURCES = readdirSync('src/lib/admin-metrics', { withFileTypes: true }).flatMap(
+    (entry) =>
+      entry.isDirectory()
+        ? readdirSync(join('src/lib/admin-metrics', entry.name)).map((file) =>
+            join('src/lib/admin-metrics', entry.name, file)
+          )
+        : [join('src/lib/admin-metrics', entry.name)]
+  );
+
+  group('An external reference is a reference, and nothing else');
+
+  check('a demo purchase carrying an external reference is still not paid', () => {
+    /*
+     * The production shape that exposed the error: sixteen purchase rows with
+     * an `external_ref` and zero with `paid`. They are Academy enrolments and
+     * Chart Market script grants, and the reference is a course slug or a
+     * product id — an internal catalogue identifier on an entitlement granted
+     * without money.
+     */
+    const purchases = [
+      { status: 'demo', externalRef: 'options-basics', amountCents: 9900 },
+      { status: 'demo', externalRef: 'script_rsi_pro', amountCents: 4900 },
+      { status: 'demo', externalRef: null, amountCents: 0 },
+    ];
+
+    const withReference = purchases.filter((row) => row.externalRef !== null);
+    assert.equal(withReference.length, 2, 'the reference count');
+
+    /* It counts as a record with a reference — and as nothing else. */
+    assert.equal(purchases.filter((row) => row.status === 'paid').length, 0, 'a referenced row became paid');
+    assert.equal(
+      withReference.every((row) => !semantics.isRevenueBearing(row.status)),
+      true,
+      'a referenced demo row became revenue-bearing'
+    );
+    assert.equal(
+      purchases
+        .filter((row) => semantics.isRevenueBearing(row.status))
+        .reduce((sum, row) => sum + row.amountCents, 0),
+      0,
+      'a referenced demo amount reached the recorded paid gross'
+    );
+
+    /*
+     * And the load-bearing one: a reference count must never be what makes
+     * revenue confirmable. `revenueIsConfirmable` takes provider-confirmed
+     * records, of which there are structurally none.
+     */
+    const providerConfirmedRecords = 0;
+    assert.equal(semantics.revenueIsConfirmable(providerConfirmedRecords), false);
+    assert.equal(
+      semantics.revenueIsConfirmable(withReference.length),
+      true,
+      'sanity: this is exactly the mistake, and it is why the argument is named for the provider'
+    );
+  });
+
+  check('the commerce family names the column, never a process', () => {
+    const source = readFileSync('src/lib/admin-metrics/families/commerce.ts', 'utf8');
+
+    assert.match(source, /purchaseRecordsWithExternalRef: durableCount\(/);
+    assert.match(source, /commerce_purchase_external_ref_records/);
+    assert.match(source, /subscriptionsWithExternalRef: durableCount\(/);
+    assert.match(source, /commerce_subscription_external_ref_records/);
+    assert.match(source, /withExternalRef: sql<number>`count\(\$\{schema\.purchase\.externalRef\}\)::int`/);
+
+    for (const gone of ['providerReconciledRecords', 'subscriptionsWithProviderRef', 'commerce_reconciled', 'commerce_subscription_reconciled']) {
+      assert.equal(source.includes(gone), false, `${gone} survived the rename`);
+    }
+
+    /* Confirmed revenue is untouched, and the paid sum keeps its honest name. */
+    assert.match(source, /confirmedRevenue: MetricValue = sourceNotConnected\(/);
+    assert.match(source, /recordedPaidGrossCents: durableCount\(purchaseTotals\?\.paidCents/);
+  });
+
+  check('nothing in the Metrics layer calls a non-null column a reconciliation', () => {
+    /*
+     * A phrase sweep, not a spot check. `externalRef` is a free-form reference
+     * the application writes for its own purposes, so no label, sentence,
+     * dictionary entry or metric name may present its presence as
+     * reconciliation, provider confirmation, payment or revenue.
+     *
+     * Prose that *denies* the claim is the point of this change, so a line is
+     * only a failure when it makes the claim: each pattern here is an
+     * assertion, and the denials read "is NOT", "never" or "not a".
+     */
+    const CLAIMS = [
+      /Reconciled against a provider/,
+      /reconciled against a payment provider\./,
+      /the reconciliation hook/,
+      /providerReconciled/,
+      /WithProviderRef/,
+    ];
+
+    const files = [
+      ...METRICS_SOURCES,
+      'src/components/admin-metrics/drawers.tsx',
+      'src/components/admin-metrics/sections/MonetizationSection.tsx',
+    ];
+
+    for (const path of files) {
+      const source = readFileSync(path, 'utf8');
+      for (const claim of CLAIMS) {
+        assert.equal(claim.test(source), false, `${path} still claims ${claim}`);
+      }
+    }
+  });
+
+  check('the Observatory labels the two counts for what they count', () => {
+    const section = readFileSync('src/components/admin-metrics/sections/MonetizationSection.tsx', 'utf8');
+    assert.match(section, /label="Purchase rows with an external reference"/);
+    assert.match(section, /metric=\{metrics\.purchaseRecordsWithExternalRef\}/);
+    assert.match(section, /label="Subscriptions with an external reference"/);
+    assert.match(section, /metric=\{metrics\.subscriptionsWithExternalRef\}/);
+    assert.equal((section.match(/not a provider confirmation/g) ?? []).length, 2);
+
+    /* The fourth headline card still says the source is not connected. */
+    assert.match(section, /4 · Provider-confirmed transaction/);
+    assert.match(section, /Source not connected/);
+  });
+
+  check('the dictionary does not offer externalRef as evidence of revenue', () => {
+    const entry = dictionary.DICTIONARY_BY_ID.get('confirmed_revenue');
+    const limitations = entry.limitations.join(' ');
+
+    assert.equal(/reconciliation hook/.test(limitations), false);
+    assert.match(limitations, /`externalRef` is NOT evidence of one/);
+    assert.equal(entry.sourceType, 'source_not_connected');
   });
 
   group('A signed difference is not a count');
@@ -1664,7 +1900,7 @@ try {
       false,
       'event_metric is still being queried'
     );
-    assert.match(source, /seatCounterDelta: delta\(/);
+    assert.match(source, /operationalSeatCounterDelta: delta\(/);
   });
 
   group('Durable adapters cannot quietly widen');
@@ -1710,7 +1946,15 @@ try {
     check(`${path.split('/').pop()} references no sensitive column`, () => {
       const source = readFileSync(path, 'utf8');
       for (const column of FORBIDDEN_COLUMNS) {
-        const reference = new RegExp(`schema\.\w+\.${column}\b`);
+        /*
+         * Escaped for a `RegExp` constructor, which takes a *string*: the
+         * template literal here is not a regex literal, so `\.` collapsed to a
+         * dot that matched anything, `\w` collapsed to the letter w, and `\b`
+         * became a backspace character. The pattern could not match a real
+         * reference, so this loop asserted nothing at all until it was written
+         * as `\\.` — the whole guard was passing vacuously.
+         */
+        const reference = new RegExp(`schema\\.\\w+\\.${column}\\b`);
         assert.equal(reference.test(source), false, `${path} reads schema.*.${column}`);
       }
     });
@@ -1723,7 +1967,7 @@ try {
     const source = readFileSync('src/lib/admin-metrics/families/wealth.ts', 'utf8');
     for (const column of ['nameEnc', 'valueEnc', 'balanceEnc', 'targetEnc', 'detailsEnc', 'metaEnc', 'termsEnc']) {
       assert.equal(
-        new RegExp(`schema\.\w+\.${column}\b`).test(source),
+        new RegExp(`schema\\.\\w+\\.${column}\\b`).test(source),
         false,
         `wealth.ts reads ${column}`
       );
@@ -1750,6 +1994,657 @@ try {
     for (const stale of ["'plus'", "'pro'", "'private'", "'essential'", "'ultimate'"]) {
       assert.equal(source.includes(stale), false, `commerce.ts hardcodes ${stale}`);
     }
+  });
+
+  /* ================================ A customer is a role, and only a role */
+
+  group('Only role = user is a customer');
+
+  /**
+   * Every read of `user` in a file, paired with the clause that follows it.
+   *
+   * Structural rather than a search for one hand-written line: a query added
+   * next month with no predicate is caught by the same assertion, and the
+   * assertion does not care how the call was wrapped or indented.
+   */
+  const userQueriesIn = (path) =>
+    readFileSync(path, 'utf8')
+      .split('.from(schema.user)')
+      .slice(1)
+      .map((rest) => rest.split(';')[0]);
+
+  const CUSTOMER_QUERY_FILES = [
+    'src/lib/admin-metrics/overview.ts',
+    'src/lib/admin-metrics/families/accounts.ts',
+    'src/lib/admin-metrics/families/commerce.ts',
+  ];
+
+  check('the rule is a role, and every other role is internal', () => {
+    assert.equal(internal.CUSTOMER_ROLE, 'user');
+    assert.equal(internal.isCustomerRole('user'), true);
+    assert.equal(internal.isCustomerRole('admin'), false);
+    assert.equal(internal.isCustomerRole('moderator'), false);
+    assert.equal(internal.isCustomerRole(null), false);
+    // A role nobody has invented yet is internal until somebody decides it is not.
+    assert.equal(internal.isCustomerRole('support'), false);
+    assert.deepEqual([...internal.STAFF_ROLES].sort(), ['admin', 'moderator']);
+  });
+
+  check('the database is asked the same question the rule asks', () => {
+    /*
+     * The half that a source assertion cannot make. This renders the predicate
+     * the queries actually run, so "admin does not count" is a fact about the
+     * SQL rather than about a comment above it.
+     */
+    const { sql: text, params } = stub.db
+      .select({ n: drizzleSql`1` })
+      .from(stub.schema.user)
+      .where(internal.customerAccounts())
+      .toSQL();
+
+    assert.match(text, /"user"\."role" = \$1/);
+    assert.deepEqual(params, [internal.CUSTOMER_ROLE]);
+
+    const staff = stub.db
+      .select({ id: stub.schema.user.id })
+      .from(stub.schema.user)
+      .where(internal.staffAccounts())
+      .toSQL();
+
+    assert.match(staff.sql, /"user"\."role" <> \$1/);
+    assert.deepEqual(staff.params, [internal.CUSTOMER_ROLE]);
+  });
+
+  check('no read of `user` in the Observatory counts staff', () => {
+    for (const path of CUSTOMER_QUERY_FILES) {
+      const tails = userQueriesIn(path);
+      assert.ok(tails.length > 0, `${path} no longer reads user at all`);
+
+      for (const tail of tails) {
+        assert.match(tail, /customerAccounts\(\)/, `${path}: a user query with no customer predicate`);
+      }
+    }
+  });
+
+  check('registered users and verified users are one customer-scoped read', () => {
+    const source = readFileSync('src/lib/admin-metrics/families/accounts.ts', 'utf8');
+    // `verified` is a filtered aggregate inside the same query, so it inherits
+    // the predicate rather than needing its own — and must stay that way.
+    assert.match(source, /verified: sql<number>`count\(\*\) filter \(where \$\{schema\.user\.emailVerified\}\)::int`/);
+    assert.match(source, /users: sql<number>`count\(\*\)::int`,[\s\S]{0,400}?\.where\(customerAccounts\(\)\)/);
+  });
+
+  check('new registrations and the daily trend are both scoped and both windowed', () => {
+    const windowed = /and\(customerAccounts\(\), gte\(schema\.user\.createdAt, since\)\)/g;
+
+    const overview = readFileSync('src/lib/admin-metrics/overview.ts', 'utf8');
+    assert.equal((overview.match(windowed) ?? []).length, 1, 'the headline new-registrations query');
+
+    const accounts = readFileSync('src/lib/admin-metrics/families/accounts.ts', 'utf8');
+    assert.equal(
+      (accounts.match(windowed) ?? []).length,
+      2,
+      'the window count and the registrations-per-day trend must both be scoped'
+    );
+  });
+
+  check('the entitlement distribution is customers, and entitledUsers is its sum', () => {
+    const source = readFileSync('src/lib/admin-metrics/families/commerce.ts', 'utf8');
+
+    assert.match(
+      source,
+      /entitlementRows = await db[\s\S]{0,300}?\.where\(customerAccounts\(\)\)/,
+      'the entitlement distribution is not scoped to customers'
+    );
+
+    /*
+     * The reason a staff plan cannot inflate the headline: `entitledUsers` is
+     * the sum of the distribution rather than a second count. One predicate
+     * covers both, and they cannot disagree.
+     */
+    assert.match(source, /entitledUsers: durableCount\(\s*\n?\s*entitlement\.reduce\(/);
+  });
+
+  check('monetization describes customers, and revenue stays absent', () => {
+    /*
+     * The first pass left purchases and subscriptions whole, on the argument
+     * that a money record is not a population. That was the wrong call for this
+     * dashboard: the monetization section is read as what *customers* bought,
+     * and the owner will keep granting himself demo entitlements to show the
+     * flow. They are scoped now — and confirmed revenue is untouched, because
+     * there is still no provider to confirm anything.
+     */
+    const source = readFileSync('src/lib/admin-metrics/families/commerce.ts', 'utf8');
+    assert.match(source, /customerPurchase = ownedByCustomer\(schema\.purchase\.userId\)/);
+    assert.match(source, /customerSubscription = ownedByCustomer\(schema\.subscription\.userId\)/);
+    assert.match(source, /confirmedRevenue: MetricValue = sourceNotConnected\(/);
+    assert.equal(/revenue:\s*durableCount/.test(source), false, 'a durable count was named revenue');
+  });
+
+  /* ------------------------------------------------- Nobody is named anywhere */
+
+  check('no metrics query names a person', () => {
+    /*
+     * The contract that makes this reset repeatable. An address, a name or a
+     * particular account would be wrong the first time somebody else joined the
+     * team, and it would put an identity into a layer built to hold none.
+     */
+    const email = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+
+    for (const path of METRICS_SOURCES) {
+      const source = readFileSync(path, 'utf8');
+      assert.equal(email.test(source), false, `${path} contains an email address`);
+      assert.equal(/schema\.user\.email\b/.test(source), false, `${path} reads user.email`);
+      assert.equal(/schema\.user\.name\b/.test(source), false, `${path} reads user.name`);
+      /*
+       * A *literal* on the right-hand side is what would single somebody out.
+       * `eq(schema.user.id, someColumn)` is the ownership join and is the whole
+       * mechanism; `eq(schema.user.id, 'usr_…')` would be the thing this
+       * document says must never exist.
+       */
+      assert.equal(
+        /eq\(schema\.user\.id,\s*['"`]/.test(source),
+        false,
+        `${path} singles out one account by a literal id`
+      );
+    }
+  });
+
+  check('the staff key list is derived from the role and from nothing else', () => {
+    const source = readFileSync('src/lib/admin-metrics/internalTraffic.ts', 'utf8');
+    assert.match(source, /ne\(schema\.user\.role, CUSTOMER_ROLE\)/);
+    assert.match(source, /eq\(schema\.user\.role, CUSTOMER_ROLE\)/);
+    // Only the id is read, and it is hashed before it leaves the function.
+    assert.match(source, /\.select\(\{ id: schema\.user\.id \}\)/);
+    assert.match(source, /rows\.map\(\(row\) => pseudonymousUserKey\(row\.id\)\)/);
+    assert.equal(/return rows\.map\(\(row\) => row\.id\)/.test(source), false);
+  });
+
+  /* ============================== Internal telemetry, excluded on the read side */
+
+  group('Authenticated staff telemetry is excluded, customers are not');
+
+  check('a staff key is a hash, and the id is not recoverable from it', () => {
+    const key = serverIdentity.pseudonymousUserKey('usr_0123456789abcdef');
+    assert.match(key, /^u_[0-9a-f]{32}$/);
+    assert.equal(key.includes('0123456789'), false);
+    // The same function the ingest route uses, so read and write agree.
+    assert.equal(serverIdentity.pseudonymousUserKey('usr_0123456789abcdef'), key);
+    assert.notEqual(serverIdentity.pseudonymousUserKey('usr_other'), key);
+  });
+
+  check('a session that was ever staff is internal; a customer session is not', () => {
+    const rows = [
+      /* One session, signed in half way through it. */
+      { sessionId: 's_admin', userKeyHash: null },
+      { sessionId: 's_admin', userKeyHash: 'u_staff' },
+      { sessionId: 's_customer', userKeyHash: 'u_person' },
+      { sessionId: 's_anon', userKeyHash: null },
+    ];
+
+    const excluded = internal.staffSessionIds(rows, ['u_staff']);
+
+    assert.equal(excluded.has('s_admin'), true, 'a staff session survived');
+    assert.equal(excluded.has('s_customer'), false, 'a customer session was excluded');
+    assert.equal(excluded.has('s_anon'), false, 'an anonymous session was excluded');
+    assert.equal(excluded.size, 1);
+  });
+
+  check('the session exclusion drops the session, not the staff rows inside it', () => {
+    const { sql: text, params } = stub.db
+      .select({ id: stub.schema.productTelemetryEvent.sessionId })
+      .from(stub.schema.productTelemetryEvent)
+      .where(internal.notStaffSession(['u_staff', 'u_mod']))
+      .toSQL();
+
+    assert.match(text, /not exists/);
+    assert.match(text, /"staff_event"\."session_id" = "product_telemetry_event"\."session_id"/);
+    assert.match(text, /"staff_event"\."user_key_hash" in \(\$1, \$2\)/);
+    assert.deepEqual(params, ['u_staff', 'u_mod']);
+  });
+
+  check('an unattributed event is kept, never dropped', () => {
+    const { sql: text, params } = stub.db
+      .select({ id: stub.schema.productTelemetryEvent.id })
+      .from(stub.schema.productTelemetryEvent)
+      .where(internal.notStaffEvent(['u_staff']))
+      .toSQL();
+
+    /*
+     * The null branch is the whole point. An event with no key is anonymous or
+     * operational, and dropping it would shrink every denominator it belongs to
+     * — a worse error than counting traffic that might be ours.
+     */
+    assert.match(text, /"user_key_hash" is null or "product_telemetry_event"\."user_key_hash" not in/);
+    assert.deepEqual(params, ['u_staff']);
+  });
+
+  check('a read that already requires a key excludes only staff keys', () => {
+    const { sql: text, params } = stub.db
+      .select({ id: stub.schema.productTelemetryEvent.id })
+      .from(stub.schema.productTelemetryEvent)
+      .where(internal.customerKeyOnly(['u_staff']))
+      .toSQL();
+
+    assert.match(text, /"user_key_hash" not in \(\$1\)/);
+    assert.equal(/is null/.test(text), false, 'retention must not start counting unattributed rows');
+    assert.deepEqual(params, ['u_staff']);
+  });
+
+  check('with no staff accounts every query is byte-identical to before', () => {
+    assert.equal(internal.notStaffSession([]), undefined);
+    assert.equal(internal.notStaffEvent([]), undefined);
+    assert.equal(internal.customerKeyOnly([]), undefined);
+    assert.equal(internal.staffSessionIds([{ sessionId: 's', userKeyHash: 'u_a' }], []).size, 0);
+  });
+
+  check('every customer telemetry reader applies an exclusion', () => {
+    const telemetry = readFileSync('src/lib/admin-metrics/telemetryQuery.ts', 'utf8');
+
+    // Sessions and funnels: whole sessions. Retention: keys.
+    assert.equal((telemetry.match(/notStaffSession\(staffKeys\)/g) ?? []).length, 2);
+    assert.match(telemetry, /customerKeyOnly\(staffKeys\)/);
+    assert.equal((telemetry.match(/await staffAnalyticsKeys\(\)/g) ?? []).length, 3);
+
+    const voyager = readFileSync('src/lib/admin-metrics/families/voyager.ts', 'utf8');
+    assert.match(voyager, /notStaffEvent\(staffKeys\)/);
+
+    const reliability = readFileSync('src/lib/admin-metrics/families/reliability.ts', 'utf8');
+    assert.match(reliability, /internalSessions\.has\(row\.sessionId\)/);
+  });
+
+  check('the Voyager emitter probe still counts a staff request', () => {
+    /*
+     * "Has this ever run" is an instrumentation question, not a usage one.
+     * Filtering it would report a missing emitter that is in fact running, the
+     * moment the only requests on record were ours.
+     */
+    const source = readFileSync('src/lib/admin-metrics/families/voyager.ts', 'utf8');
+    const probe = source.split('const [ever] = await db')[1].split(';')[0];
+    assert.equal(/notStaffEvent|staffKeys/.test(probe), false, 'the emitter probe was filtered');
+  });
+
+  check('no fingerprinting was introduced to tell internal traffic apart', () => {
+    /*
+     * Anonymous cross-session identity stays unavailable. A signed-out
+     * administrator is indistinguishable from a customer, and that is the
+     * stated limitation rather than a problem to solve with a cookie.
+     */
+    for (const path of METRICS_SOURCES) {
+      const source = readFileSync(path, 'utf8');
+      for (const pattern of [
+        /document\.cookie/,
+        /localStorage/,
+        /navigator\.userAgent/,
+        /schema\.session\.ipAddress/,
+        /fingerprint/i,
+      ]) {
+        assert.equal(pattern.test(source), false, `${path} matches ${pattern}`);
+      }
+    }
+  });
+
+  check('anonymous retention semantics are untouched', () => {
+    const overview = readFileSync('src/lib/admin-metrics/overview.ts', 'utf8');
+    assert.match(overview, /anonymousReturn: notMeasurable\(/);
+    assert.match(overview, /the portal has no cross-session anonymous identity/);
+
+    const telemetry = readFileSync('src/lib/admin-metrics/telemetryQuery.ts', 'utf8');
+    assert.match(telemetry, /userKeyHash\} is not null/, 'retention still reads authenticated days only');
+  });
+
+  /* ============== Durable customer facts, and the demo that must not count */
+
+  group('A durable customer fact is one a customer performed');
+
+  check('ownership is a semi-join on the role, and nothing else', () => {
+    const { sql: text, params } = stub.db
+      .select({ n: drizzleSql`1` })
+      .from(stub.schema.expertBooking)
+      .where(internal.ownedByCustomer(stub.schema.expertBooking.userId))
+      .toSQL();
+
+    assert.match(text, /exists \(select 1 from "user" where \(/);
+    assert.match(text, /"user"\."id" = "expert_booking"\."user_id"/);
+    assert.match(text, /"user"\."role" = \$1/);
+    assert.deepEqual(params, [internal.CUSTOMER_ROLE]);
+
+    /* No name, no email, no id list, no second definition of "customer". */
+    assert.equal(/"user"\."email"|"user"\."name"/.test(text), false);
+  });
+
+  check('the same predicate serves every owning column', () => {
+    for (const [table, column] of [
+      [stub.schema.eventRegistration, stub.schema.eventRegistration.userId],
+      [stub.schema.academyProgress, stub.schema.academyProgress.userId],
+      [stub.schema.savedObject, stub.schema.savedObject.userId],
+      [stub.schema.collection, stub.schema.collection.userId],
+      [stub.schema.wealthAsset, stub.schema.wealthAsset.userId],
+      [stub.schema.purchase, stub.schema.purchase.userId],
+      [stub.schema.subscription, stub.schema.subscription.userId],
+      [stub.schema.consent, stub.schema.consent.userId],
+    ]) {
+      const { params } = stub.db
+        .select({ n: drizzleSql`1` })
+        .from(table)
+        .where(internal.ownedByCustomer(column))
+        .toSQL();
+
+      assert.deepEqual(params, [internal.CUSTOMER_ROLE]);
+    }
+  });
+
+  /**
+   * Which reads of an owned table are deliberately NOT scoped, and why.
+   *
+   * Structural rather than a list of expected lines: a query added next month
+   * with no predicate lands in the unfiltered count and fails here, whatever
+   * shape it was written in.
+   */
+  const OWNERSHIP_AUDIT = [
+    { file: 'families/events.ts', table: 'schema.eventRegistration', predicate: 'customerSeat', unfiltered: 1,
+      why: 'the all-account row population the physical seat counter is checked against' },
+    { file: 'families/events.ts', table: 'schema.event', predicate: 'customerSeat', unfiltered: 2,
+      why: 'the event catalogue is product inventory, and its seat counter is operational' },
+    { file: 'families/academy.ts', table: 'schema.academyProgress', predicate: 'customerLearner', unfiltered: 0, why: '' },
+    { file: 'families/experts.ts', table: 'schema.expertBooking', predicate: 'customerBooking', unfiltered: 0, why: '' },
+    { file: 'families/saves.ts', table: 'schema.savedObject', predicate: 'customerSave', unfiltered: 0, why: '' },
+    { file: 'families/saves.ts', table: 'schema.collection', predicate: 'customerCollection', unfiltered: 0, why: '' },
+    { file: 'families/saves.ts', table: 'schema.collectionItem', predicate: 'customerCollection', unfiltered: 0, why: '' },
+    { file: 'families/wealth.ts', table: 'schema.wealthAsset', predicate: 'customerAsset', unfiltered: 0, why: '' },
+    { file: 'families/wealth.ts', table: 'schema.wealthLiability', predicate: 'ownedByCustomer', unfiltered: 0, why: '' },
+    { file: 'families/wealth.ts', table: 'schema.wealthGoal', predicate: 'ownedByCustomer', unfiltered: 0, why: '' },
+    { file: 'families/wealth.ts', table: 'schema.consent', predicate: 'ownedByCustomer', unfiltered: 0, why: '' },
+    { file: 'families/commerce.ts', table: 'schema.purchase', predicate: 'customerPurchase', unfiltered: 0, why: '' },
+    { file: 'families/commerce.ts', table: 'schema.subscription', predicate: 'customerSubscription', unfiltered: 0, why: '' },
+    { file: 'families/commerce.ts', table: 'schema.user', predicate: 'customerAccounts()', unfiltered: 0, why: '' },
+  ];
+
+  for (const entry of OWNERSHIP_AUDIT) {
+    check(`${entry.file.split('/').pop()} · ${entry.table.replace('schema.', '')} is scoped to its owner`, () => {
+      const source = readFileSync(`src/lib/admin-metrics/${entry.file}`, 'utf8');
+      const reads = source.split(`.from(${entry.table})`).slice(1).map((rest) => rest.split(';')[0]);
+
+      assert.ok(reads.length > 0, `${entry.file} no longer reads ${entry.table}`);
+
+      const unfiltered = reads.filter((tail) => !tail.includes(entry.predicate));
+      assert.equal(
+        unfiltered.length,
+        entry.unfiltered,
+        `${entry.file}: ${unfiltered.length} unscoped read(s) of ${entry.table}, expected ${entry.unfiltered}${entry.why ? ` — ${entry.why}` : ''}`
+      );
+    });
+  }
+
+  check('the Events seat check compares two all-account populations', () => {
+    /*
+     * The complication this family had to solve. `event.registration_count` is
+     * physical: a staff seat occupies capacity like anybody else's. Comparing
+     * it against a customer-only row count would report a permanent gap of
+     * exactly the number of staff registrations — an integrity alarm that fires
+     * because the filter is working.
+     */
+    const source = readFileSync('src/lib/admin-metrics/families/events.ts', 'utf8');
+
+    assert.match(source, /operationalSeatCounterDelta: delta\(\s*\n?\s*counterSeats - allAccountHeld,\s*\n?\s*allAccountHeld,/);
+    assert.equal(
+      /counterSeats - held\b/.test(source),
+      false,
+      'the physical counter is compared against the customer population'
+    );
+    /* Named so the page cannot render it as adoption — labels come from keys. */
+    assert.match(source, /operationalSeatsAllAccounts: durableCount\(\s*\n?\s*allAccountHeld,/);
+    assert.match(source, /all accounts, operational/);
+  });
+
+  check('the customer attendance numbers come from the customer status mix', () => {
+    const source = readFileSync('src/lib/admin-metrics/families/events.ts', 'utf8');
+    assert.match(source, /const counts = Object\.fromEntries\(status\.map/);
+    assert.match(source, /const allAccountCounts = Object\.fromEntries\(\s*\n?\s*distribution\(allAccountStatusRows\)/);
+    for (const derived of ['resolved = attendanceResolvedSeats(counts)', 'unresolved = attendanceUnresolvedSeats(counts)', 'held = heldSeats(counts)']) {
+      assert.ok(source.includes(derived), `${derived} no longer reads the customer mix`);
+    }
+  });
+
+  /* ------------------------------------------------- The future-demo invariant */
+
+  group('An administrator can demonstrate the product without becoming a customer');
+
+  /**
+   * The predicate, evaluated in JavaScript.
+   *
+   * Its SQL is asserted exactly, above: `exists (select 1 from "user" where
+   * "user"."id" = <owner> and "user"."role" = $1)` with `$1` bound to
+   * `CUSTOMER_ROLE`. This is that sentence in JavaScript, reading the same
+   * exported rule the bound parameter comes from — so what the fixtures below
+   * exercise is the semantics the database is handed, not a second opinion
+   * about it. There is no local Postgres in this repository and the live half
+   * runs against production, so a fixture may not create an account; this is
+   * how far an executable check can honestly go.
+   */
+  const FIXTURE_ROLES = new Map([
+    ['owner', 'admin'],
+    ['mod', 'moderator'],
+    ['cust-a', 'user'],
+    ['cust-b', 'user'],
+  ]);
+
+  const customerOwned = (rows) => rows.filter((row) => internal.isCustomerRole(FIXTURE_ROLES.get(row.userId)));
+  const tally = (rows) =>
+    rows.reduce((counts, row) => ({ ...counts, [row.status]: (counts[row.status] ?? 0) + 1 }), {});
+
+  check('an admin event registration is not a customer registration', () => {
+    const registrations = [
+      { userId: 'cust-a', eventId: 'evt-1', status: 'attended' },
+      { userId: 'cust-b', eventId: 'evt-1', status: 'no_show' },
+      { userId: 'owner', eventId: 'evt-1', status: 'attended' },
+      { userId: 'owner', eventId: 'evt-2', status: 'registered' },
+      { userId: 'mod', eventId: 'evt-2', status: 'attended' },
+    ];
+
+    const customers = customerOwned(registrations);
+
+    assert.equal(customers.length, 2, 'staff seats reached the registration count');
+    assert.equal(new Set(customers.map((row) => row.userId)).size, 2, 'people registered');
+    assert.equal(new Set(customers.map((row) => row.eventId)).size, 1, 'evt-2 has only staff seats');
+
+    /* The derived numbers, through the real semantics module. */
+    const counts = tally(customers);
+    assert.equal(semantics.attendanceResolvedSeats(counts), 2);
+    assert.equal(semantics.attendanceUnresolvedSeats(counts), 0);
+    assert.equal(semantics.heldSeats(counts), 2);
+    assert.equal(counts.attended, 1, 'the admin attendance inflated the numerator');
+
+    /* And the operational side, which must still see every seat. */
+    const allCounts = tally(registrations);
+    assert.equal(semantics.heldSeats(allCounts), 5);
+    const physicalCounter = 5;
+    assert.equal(physicalCounter - semantics.heldSeats(allCounts), 0, 'the integrity check went red');
+    assert.equal(
+      physicalCounter - semantics.heldSeats(counts),
+      3,
+      'this is the false discrepancy the split exists to avoid'
+    );
+  });
+
+  check('admin Academy progress is not a learner', () => {
+    const progress = [
+      { userId: 'cust-a', stage: 'lesson', completed: false },
+      { userId: 'owner', stage: 'done', completed: true },
+      { userId: 'mod', stage: 'diagnostic', completed: false },
+    ];
+
+    const customers = customerOwned(progress);
+    assert.equal(customers.length, 1);
+    assert.equal(customers.filter((row) => row.completed).length, 0, 'a staff completion became a completion rate');
+  });
+
+  check('an admin expert booking is not customer demand', () => {
+    const bookings = [
+      { userId: 'cust-a', status: 'confirmed' },
+      { userId: 'owner', status: 'confirmed' },
+      { userId: 'owner', status: 'completed' },
+    ];
+
+    const customers = customerOwned(bookings);
+    assert.equal(customers.length, 1);
+    assert.equal(semantics.openPipeline(tally(customers)), 1);
+    assert.equal(semantics.openPipeline(tally(bookings)), 2, 'the fixture would not have caught anything');
+  });
+
+  check('an admin save is not a customer save', () => {
+    const saved = [
+      { userId: 'cust-a', kind: 'symbol' },
+      { userId: 'cust-a', kind: 'lesson' },
+      { userId: 'owner', kind: 'symbol' },
+    ];
+
+    const customers = customerOwned(saved);
+    assert.equal(customers.length, 2);
+    assert.equal(new Set(customers.map((row) => row.userId)).size, 1, 'savers');
+    assert.equal(customers.filter((row) => row.kind === 'symbol').length, 1, 'the kind mix counted a staff save');
+  });
+
+  check('a collection item takes its owner from the collection, not the saved object', () => {
+    const collections = [
+      { id: 'col-1', userId: 'cust-a' },
+      { id: 'col-2', userId: 'owner' },
+    ];
+    const customerCollections = new Set(customerOwned(collections).map((row) => row.id));
+
+    const items = [
+      { collectionId: 'col-1', savedObjectId: 'so-1' },
+      /* An admin collection holding a customer's public save. Still internal. */
+      { collectionId: 'col-2', savedObjectId: 'so-1' },
+    ];
+
+    const counted = items.filter((item) => customerCollections.has(item.collectionId));
+    assert.equal(counted.length, 1);
+    assert.equal(new Set(counted.map((item) => item.collectionId)).size, 1, 'collections with items');
+  });
+
+  check('an admin Wealth row is not a Wealth Hub customer', () => {
+    const assets = [
+      { userId: 'owner', supersededAt: null },
+      { userId: 'owner', supersededAt: '2026-08-01' },
+      { userId: 'cust-a', supersededAt: null },
+    ];
+
+    const current = customerOwned(assets).filter((row) => row.supersededAt === null);
+    assert.equal(current.length, 1);
+    assert.equal(new Set(current.map((row) => row.userId)).size, 1, 'holders');
+    assert.equal(
+      customerOwned(assets).filter((row) => row.supersededAt !== null).length,
+      0,
+      'a staff revision counted as revision activity'
+    );
+  });
+
+  check('an admin demo purchase is not customer monetization', () => {
+    const purchases = [
+      { userId: 'owner', status: 'demo', amountCents: 9900 },
+      { userId: 'owner', status: 'paid', amountCents: 4900 },
+      { userId: 'cust-a', status: 'demo', amountCents: 9900 },
+    ];
+
+    const customers = customerOwned(purchases);
+    assert.equal(customers.length, 1, 'purchase records');
+    assert.equal(new Set(customers.map((row) => row.userId)).size, 1, 'people with a purchase');
+    assert.equal(
+      customers.filter((row) => row.status === 'paid').reduce((sum, row) => sum + row.amountCents, 0),
+      0,
+      'a staff paid row reached the recorded gross'
+    );
+    /* Confirmed revenue is untouched by any of this: there is no provider. */
+    assert.equal(semantics.revenueIsConfirmable(0), false);
+
+    const entitlements = [
+      { userId: 'owner', plan: 'private' },
+      { userId: 'cust-a', plan: 'free' },
+    ];
+    const customerPlans = customerOwned(entitlements);
+    assert.equal(customerPlans.length, 1);
+    assert.equal(customerPlans.filter((row) => row.plan === 'private').length, 0);
+  });
+
+  check('an admin subscription is not a customer subscription', () => {
+    const subscriptions = [
+      { userId: 'owner', status: 'active', plan: 'private' },
+      { userId: 'cust-a', status: 'cancelled', plan: 'plus' },
+    ];
+
+    const customers = customerOwned(subscriptions);
+    assert.equal(customers.length, 1);
+    assert.equal(customers.filter((row) => row.status === 'active').length, 0, 'a staff subscription was active demand');
+  });
+
+  check('the identical row owned by a customer does count', () => {
+    /*
+     * The other half of every assertion above. One row, one field different,
+     * and the difference is exactly one — so these fixtures are measuring the
+     * role rather than accidentally counting nothing.
+     */
+    for (const table of ['registration', 'progress', 'booking', 'save', 'asset', 'purchase', 'subscription']) {
+      const asStaff = customerOwned([{ userId: 'owner', table }]);
+      const asCustomer = customerOwned([{ userId: 'cust-a', table }]);
+      assert.equal(asStaff.length, 0, `${table} counted a staff owner`);
+      assert.equal(asCustomer.length, 1, `${table} dropped a customer owner`);
+    }
+
+    assert.equal(customerOwned([{ userId: 'mod' }]).length, 0, 'moderator counted');
+    assert.equal(customerOwned([{ userId: 'cust-b' }]).length, 1);
+  });
+
+  check('product and system inventory stays visible through all of it', () => {
+    /*
+     * A reset that zeroed the catalogue would be a broken dashboard rather than
+     * an empty one, and so would a filter that reached the wrong tables.
+     */
+    const events = readFileSync('src/lib/admin-metrics/families/events.ts', 'utf8');
+    const supply = events.split('.from(schema.event)')[1].split(';')[0];
+    assert.equal(supply.includes('customerSeat'), false, 'the event catalogue was filtered by ownership');
+    assert.match(events, /publishedEvents: durableCount\(supply\?\.published/);
+    assert.match(events, /totalEvents: durableCount\(supply\?\.total/);
+
+    /*
+     * The Academy and Experts catalogues live in `src/content` and are never
+     * queried, so scoping those two families to customers cannot have touched
+     * what the product offers. Comments and strings are stripped first: both
+     * files name the catalogue in prose, and that prose is the point.
+     */
+    for (const path of ['src/lib/admin-metrics/families/academy.ts', 'src/lib/admin-metrics/families/experts.ts']) {
+      const code = readFileSync(path, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/'[^']*'/g, '');
+      assert.equal(/schema\.event\b/.test(code), false, `${path} reads the event catalogue`);
+    }
+  });
+
+  check('product and system inventory was not narrowed', () => {
+    /*
+     * The other half of a clean baseline. Published events, instrumentation
+     * coverage and portal health describe the product, not its adoption, and a
+     * reset that zeroed them would be a broken dashboard rather than an empty
+     * one.
+     */
+    const events = readFileSync('src/lib/admin-metrics/families/events.ts', 'utf8');
+    assert.equal(events.includes('customerAccounts'), false, 'the event supply was filtered by role');
+    assert.match(events, /published: sql<number>`count\(\*\) filter \(where \$\{schema\.event\.status\} = 'published'\)::int`/);
+
+    const coverage = readFileSync('src/lib/admin-metrics/coverage.ts', 'utf8');
+    assert.equal(
+      /staffAnalyticsKeys|notStaffEvent|notStaffSession|customerKeyOnly/.test(coverage),
+      false,
+      'instrumentation coverage must count every emitter, ours included'
+    );
+
+    const reliability = readFileSync('src/lib/admin-metrics/families/reliability.ts', 'utf8');
+    assert.match(reliability, /vitals: summariseVitals\(vitalSamples/);
+    assert.equal(
+      /vitalSamples[\s\S]{0,200}internalSessions/.test(reliability),
+      false,
+      'Web Vitals were filtered — a crash on a staff machine is the same defect'
+    );
   });
 
   group('Phase 3 definitions say which kind of source they are');
@@ -2837,28 +3732,51 @@ try {
     const many = conclusions.monetizationConclusion({
       paidRecords: { state: 'live', value: 20, sample: 20 },
       demoRecords: { state: 'live', value: 4, sample: 4 },
-      reconciled: { state: 'live', value: 16, sample: 16 },
+      withExternalRef: { state: 'live', value: 16, sample: 16 },
     });
     assert.equal(many.includes('a providers'), false, `ungrammatical: ${many}`);
-    assert.match(many, /16 records reconciled against a payment provider/);
+    assert.match(many, /16 records carry an external reference/);
 
     const one = conclusions.monetizationConclusion({
       paidRecords: { state: 'live', value: 1, sample: 1 },
       demoRecords: { state: 'live', value: 1, sample: 1 },
-      reconciled: { state: 'live', value: 1, sample: 1 },
+      withExternalRef: { state: 'live', value: 1, sample: 1 },
     });
-    assert.match(one, /1 record reconciled against a payment provider/);
+    assert.match(one, /1 record carries an external reference/);
     assert.equal(one.includes('1 records'), false);
+    assert.equal(one.includes('records carries'), false, `ungrammatical: ${one}`);
+  });
+
+  check('the monetization line never calls an external reference a reconciliation', () => {
+    /*
+     * The sentence that was wrong in production. Sixteen rows carried an
+     * `external_ref` and the conclusion read "16 records reconciled against a
+     * payment provider" — while `paidStatusRecords` was zero and every one of
+     * those sixteen was a demo enrolment holding a course slug.
+     */
+    const line = conclusions.monetizationConclusion({
+      paidRecords: { state: 'live', value: 0, sample: 0 },
+      demoRecords: { state: 'live', value: 16, sample: 16 },
+      withExternalRef: { state: 'live', value: 16, sample: 16 },
+    });
+
+    for (const claim of [/reconcil/i, /provider.confirmed/i, /confirmed transaction/i]) {
+      assert.equal(claim.test(line), false, `the conclusion still claims ${claim}: ${line}`);
+    }
+    assert.match(line, /an identifier the application wrote, not a provider confirmation/);
+    assert.match(line, /confirmed revenue has no source/);
+    assert.match(line, /0 paid-status records/);
   });
 
   check('monetization never calls a paid row revenue', () => {
     const line = conclusions.monetizationConclusion({
       paidRecords: { state: 'live', value: 7, sample: 7 },
       demoRecords: { state: 'live', value: 21, sample: 21 },
-      reconciled: { state: 'live', value: 0, sample: 0 },
+      withExternalRef: { state: 'live', value: 0, sample: 0 },
     });
     assert.match(line, /confirmed revenue has no source/);
     assert.match(line, /7 paid-status records/);
+    assert.equal(/revenue is|confirmed revenue of/.test(line), false);
   });
 
   check('the coverage line distinguishes a bad number from no measurement', () => {
@@ -3745,10 +4663,12 @@ try {
   // Only the live mode can have written anything, so only it cleans up.
   if (LIVE) await cleanupSentinel();
 
-  try {
-    rmSync(out, { recursive: true, force: true });
-  } catch {
-    /* Windows keeps an ESM handle on the temp files; it is not a test result. */
+  for (const directory of [out, queryOut]) {
+    try {
+      rmSync(directory, { recursive: true, force: true });
+    } catch {
+      /* Windows keeps an ESM handle on the temp files; it is not a test result. */
+    }
   }
 
   if (failures.length) console.log(`\nfailed: ${failures.join(', ')}`);

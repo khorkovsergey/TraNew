@@ -370,7 +370,8 @@ const FAMILY_METRICS: readonly MetricDefinition[] = [
     timeSemantics: '—',
     minimumSample: 0,
     limitations: [
-      'A `paid` row is an application record, not a provider-confirmed transaction. `externalRef` is the reconciliation hook and nothing populates it.',
+      'A `paid` row is an application record, not a provider-confirmed transaction. No reconciliation runs anywhere in this repository.',
+      '`externalRef` is NOT evidence of one. It is a free-form reference the application writes for its own purposes — every purchase row carrying one today is a `demo` entitlement holding a course slug or a script product id — so counting non-null values proves a reference exists and nothing more.',
       'The sum of paid rows is reported separately as a recorded gross amount, under that name, and is not revenue.',
       'Connecting this needs a payment provider and a reconciliation path — a product decision, not an implementation detail.',
     ],

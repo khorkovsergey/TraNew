@@ -1,7 +1,8 @@
 import 'server-only';
-import { gte, sql } from 'drizzle-orm';
+import { and, gte, sql } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
+import { customerAccounts } from './internalTraffic';
 import {
   count as countMetric,
   featureDisabled,
@@ -60,14 +61,24 @@ export async function overview(since: Date): Promise<Overview> {
     queriedAt: queriedAt.toISOString(),
   });
 
+  /*
+   * Customers, not accounts. `customerAccounts()` is `role = 'user'`, and both
+   * of these counted every row until it was applied — so an administrator was
+   * presented on the headline card as a registered customer, and the first
+   * staff account created inside a window appeared as a new registration. The
+   * predicate is in the query rather than subtracted afterwards: a dashboard
+   * that showed a real number and then adjusted it would be lying about a
+   * different thing.
+   */
   const [users] = await db
     .select({ total: sql<number>`count(*)::int` })
-    .from(schema.user);
+    .from(schema.user)
+    .where(customerAccounts());
 
   const [signups] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(schema.user)
-    .where(gte(schema.user.createdAt, since));
+    .where(and(customerAccounts(), gte(schema.user.createdAt, since)));
 
   const [telemetry] = await db
     .select({

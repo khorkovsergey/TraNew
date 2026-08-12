@@ -2,6 +2,7 @@ import 'server-only';
 import { and, gte, inArray, sql } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { MARKETPLACE_MIN_SAMPLE } from '../dictionary';
+import { notStaffEvent, staffAnalyticsKeys } from '../internalTraffic';
 import {
   count as countMetric,
   notMeasurable,
@@ -41,6 +42,23 @@ import {
  *
  * The switch is automatic: the moment a first row arrives the same queries
  * produce real numbers, and the sample thresholds take over from there.
+ *
+ * ## Customer usage, and the one query that is not
+ *
+ * The windowed read excludes events attributed to staff, so an administrator
+ * demonstrating the assistant does not appear as customer demand — per event
+ * rather than per session, because a Voyager request is a whole interaction on
+ * its own and the server emits it with the asking user's key.
+ *
+ * The "has the emitter ever run" probe is deliberately **not** filtered. It
+ * asks whether the instrumentation exists, not whether anybody used it, and a
+ * staff request is perfectly good evidence that the wiring works. Filtering it
+ * would put the dashboard back into `not_measurable` the moment the only
+ * requests on record were ours — reporting a missing emitter that is in fact
+ * running.
+ *
+ * A signed-out Voyager question carries no key and is counted. That is the
+ * documented limit of attribution, not an oversight.
  */
 
 const REQUEST_EVENT = 'voyager_request_completed';
@@ -71,6 +89,8 @@ export async function voyagerReport(since: Date): Promise<VoyagerReport> {
     queriedAt: queriedAt.toISOString(),
   });
 
+  const staffKeys = await staffAnalyticsKeys();
+
   const rows = await db
     .select({
       eventName: schema.productTelemetryEvent.eventName,
@@ -81,12 +101,16 @@ export async function voyagerReport(since: Date): Promise<VoyagerReport> {
     .where(
       and(
         gte(schema.productTelemetryEvent.occurredAt, since),
-        inArray(schema.productTelemetryEvent.eventName, [REQUEST_EVENT, TOOL_EVENT])
+        inArray(schema.productTelemetryEvent.eventName, [REQUEST_EVENT, TOOL_EVENT]),
+        notStaffEvent(staffKeys)
       )
     )
     .orderBy(schema.productTelemetryEvent.occurredAt);
 
-  /* Has the emitter ever run, at any time? Not just inside this window. */
+  /*
+   * Has the emitter ever run, at any time? Not just inside this window, and not
+   * only for customers — see the header: this is an instrumentation question.
+   */
   const [ever] = await db
     .select({ seen: sql<number>`count(*)::int` })
     .from(schema.productTelemetryEvent)

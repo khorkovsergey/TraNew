@@ -11,6 +11,7 @@ import {
   type MetricValue,
 } from '@/lib/analytics/states';
 import { MARKETPLACE_MIN_SAMPLE } from '../dictionary';
+import { staffAnalyticsKeys, staffSessionIds } from '../internalTraffic';
 import { SOURCE_CADENCE, sourceIsStale } from '../freshness';
 import { summariseVitals, worstSurfaces, type VitalSample, type VitalSummary } from '../webVitals';
 import { summariseSupercharts, type SuperchartEvent, type SuperchartsSummary } from './supercharts';
@@ -28,6 +29,23 @@ import { summariseSupercharts, type SuperchartEvent, type SuperchartsSummary } f
  * report `not_measurable` until it lands — but the **configuration** state is
  * knowable right now, from the market client's own status function, without
  * this dashboard ever becoming a second customer of the provider.
+ *
+ * ## Where internal traffic is excluded here, and where it is not
+ *
+ * **Supercharts is excluded**, by session: it is a customer-usage question, and
+ * an administrator opening a chart to check a deploy is not adoption.
+ *
+ * **Web Vitals, runtime failures and their page-view denominator are not.**
+ * They ask whether the portal works, and it either rendered slowly or it did
+ * not — a crash on a staff machine is the same defect as a crash on anybody
+ * else's, and dropping those samples would make the product look healthier the
+ * more of it we used ourselves. The two are kept in one query and separated in
+ * memory rather than filtered apart in SQL, so the failure rate and its
+ * denominator can never come from different populations.
+ *
+ * **Market data is not excludable at all.** `market_data_request_completed` is
+ * an operational server event with no session and no user attribution by
+ * design, and nothing here pretends otherwise.
  */
 
 const VITAL_EVENT = 'web_vital_measured';
@@ -85,10 +103,14 @@ export async function reliabilityReport(since: Date): Promise<ReliabilityReport>
     queriedAt: queriedAt.toISOString(),
   });
 
+  const staffKeys = await staffAnalyticsKeys();
+
   const rows = await db
     .select({
       eventName: schema.productTelemetryEvent.eventName,
       sessionId: schema.productTelemetryEvent.sessionId,
+      /* Read to classify the session, never returned. */
+      userKeyHash: schema.productTelemetryEvent.userKeyHash,
       properties: schema.productTelemetryEvent.properties,
       receivedAt: schema.productTelemetryEvent.receivedAt,
     })
@@ -117,6 +139,9 @@ export async function reliabilityReport(since: Date): Promise<ReliabilityReport>
     .groupBy(schema.productTelemetryEvent.eventName);
 
   const seen = new Map(everSeen.map((row) => [row.eventName, row.lastSeen]));
+
+  /* Every session in this window that was ever attributed to a staff account. */
+  const internalSessions = staffSessionIds(rows, staffKeys);
 
   const vitalSamples: VitalSample[] = rows
     .filter((row) => row.eventName === VITAL_EVENT)
@@ -207,7 +232,9 @@ export async function reliabilityReport(since: Date): Promise<ReliabilityReport>
     supercharts: {
       ...summariseSupercharts(
         rows
-          .filter((row) => SUPERCHART_EVENTS.includes(row.eventName))
+          .filter(
+            (row) => SUPERCHART_EVENTS.includes(row.eventName) && !internalSessions.has(row.sessionId)
+          )
           .map(
             (row): SuperchartEvent => ({
               sessionId: row.sessionId,

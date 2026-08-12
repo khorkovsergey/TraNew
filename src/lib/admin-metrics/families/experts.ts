@@ -1,11 +1,20 @@
 import 'server-only';
-import { gte, sql } from 'drizzle-orm';
+import { and, gte, sql } from 'drizzle-orm';
 import { db, schema } from '@/db';
+import { ownedByCustomer } from '../internalTraffic';
 import { distribution, durableAt, durableCount, newest, pick, type FamilyFacts } from './durable';
 import { openPipeline } from './semantics';
 
 /**
  * Expert services, from `expert_booking`.
+ *
+ * ## Customer bookings only
+ *
+ * A booking owned by an `admin` or `moderator` account is a walkthrough of the
+ * intake flow, not consultation demand, and it would otherwise land in the
+ * pipeline, in the mean rating and in bookings-with-purchase. The Experts
+ * catalogue is untouched: it lives in `src/content/experts.ts` and is inventory
+ * — how many experts are offered says nothing about who booked one.
  *
  * ## A pipeline, not a conversion funnel
  *
@@ -33,9 +42,12 @@ export async function expertsFacts(since: Date): Promise<FamilyFacts> {
   const generatedAt = new Date().toISOString();
   const at = durableAt('expert_booking', generatedAt);
 
+  const customerBooking = ownedByCustomer(schema.expertBooking.userId);
+
   const statusRows = await db
     .select({ key: schema.expertBooking.status, count: sql<number>`count(*)::int` })
     .from(schema.expertBooking)
+    .where(customerBooking)
     .groupBy(schema.expertBooking.status);
 
   const [totals] = await db
@@ -49,12 +61,13 @@ export async function expertsFacts(since: Date): Promise<FamilyFacts> {
       withPurchase: sql<number>`count(${schema.expertBooking.purchaseId})::int`,
       newest: sql<Date | null>`max(${schema.expertBooking.updatedAt})`,
     })
-    .from(schema.expertBooking);
+    .from(schema.expertBooking)
+    .where(customerBooking);
 
   const [inWindow] = await db
     .select({ created: sql<number>`count(*)::int` })
     .from(schema.expertBooking)
-    .where(gte(schema.expertBooking.createdAt, since));
+    .where(and(customerBooking, gte(schema.expertBooking.createdAt, since)));
 
   const status = distribution(statusRows);
   const open = openPipeline(Object.fromEntries(status.map((row) => [row.key, row.count])));
@@ -81,6 +94,7 @@ export async function expertsFacts(since: Date): Promise<FamilyFacts> {
     },
     distributions: { status },
     limitations: [
+      'Customer bookings only. Rows owned by an `admin` or `moderator` account are excluded from the pipeline, the counts, the ratings and bookings-with-purchase. The Experts catalogue is inventory and is not read here at all.',
       'Status is overwritten in place, so this is the current pipeline and not a conversion funnel. A booking that completed appears only under `completed`.',
       'No conversion rate is published. Dividing completed by draft would compare finished bookings against unstarted ones and would move when somebody opens a new draft.',
       'A booking existing is not money. Only a linked `purchase` row can be that, and even then see the commerce family for why a paid row is not confirmed revenue.',

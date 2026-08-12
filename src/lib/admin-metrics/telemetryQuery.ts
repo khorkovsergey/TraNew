@@ -6,6 +6,7 @@ import { featureStateFor, SURFACE_BY_KEY } from '@/lib/analytics/surfaces';
 import { MEANINGFUL_EVENTS } from './meaningful';
 import { sessionFactsFrom, type SessionFacts, type TelemetryPoint } from './sessions';
 import { NON_CUSTOMER_AREAS, type SurfaceEligibility } from './eligibility';
+import { customerKeyOnly, notStaffSession, staffAnalyticsKeys } from './internalTraffic';
 import type { UserDay } from './retention';
 
 /**
@@ -20,6 +21,15 @@ import type { UserDay } from './retention';
  * Neither is `select *`. The projection names its columns because the row width
  * is what makes the difference between a query that scales for a while and one
  * that does not, and because `properties` is the only wide column here.
+ *
+ * ## Internal traffic
+ *
+ * All three reads exclude authenticated staff — see `internalTraffic.ts` for
+ * how, and for what that cannot reach. Session reads exclude the whole session
+ * rather than the staff rows inside it, because a session stripped of its
+ * authenticated events is not a smaller session, it is a fictional one: it
+ * would keep its landing surface, lose the action that followed sign-in, and
+ * take a place in the PMCR denominator as a visit that went nowhere.
  */
 
 /**
@@ -68,6 +78,8 @@ export type SessionRead = {
 };
 
 export async function readSessions(since: Date): Promise<SessionRead> {
+  const staffKeys = await staffAnalyticsKeys();
+
   const rows = await db
     .select({
       sessionId: schema.productTelemetryEvent.sessionId,
@@ -87,7 +99,8 @@ export async function readSessions(since: Date): Promise<SessionRead> {
     .where(
       and(
         gte(schema.productTelemetryEvent.occurredAt, since),
-        inArray(schema.productTelemetryEvent.eventName, [...SESSION_EVENTS])
+        inArray(schema.productTelemetryEvent.eventName, [...SESSION_EVENTS]),
+        notStaffSession(staffKeys)
       )
     )
     /*
@@ -147,6 +160,8 @@ export async function readFunnelEvents(
 ): Promise<Array<{ sessionId: string; eventName: string; occurredAt: number; properties: Record<string, unknown> }>> {
   if (eventNames.length === 0) return [];
 
+  const staffKeys = await staffAnalyticsKeys();
+
   const rows = await db
     .select({
       sessionId: schema.productTelemetryEvent.sessionId,
@@ -158,7 +173,13 @@ export async function readFunnelEvents(
     .where(
       and(
         gte(schema.productTelemetryEvent.occurredAt, since),
-        inArray(schema.productTelemetryEvent.eventName, [...eventNames])
+        inArray(schema.productTelemetryEvent.eventName, [...eventNames]),
+        /*
+         * The same session rule as `readSessions`. A funnel is sequential
+         * within a session, so an excluded event in the middle of one would
+         * report a drop-off rather than an absence.
+         */
+        notStaffSession(staffKeys)
       )
     )
     .orderBy(schema.productTelemetryEvent.occurredAt)
@@ -205,6 +226,7 @@ export async function readFunnelEvents(
  */
 export async function readUserDays(since: Date): Promise<UserDay[]> {
   const area = sql`coalesce(${schema.productTelemetryEvent.properties} ->> 'area', '')`;
+  const staffKeys = await staffAnalyticsKeys();
 
   const rows = await db
     .select({
@@ -217,7 +239,14 @@ export async function readUserDays(since: Date): Promise<UserDay[]> {
     .where(
       and(
         gte(schema.productTelemetryEvent.receivedAt, since),
-        sql`${schema.productTelemetryEvent.userKeyHash} is not null`
+        sql`${schema.productTelemetryEvent.userKeyHash} is not null`,
+        /*
+         * Per event, not per session: this read already requires a key, so an
+         * unattributed row is out of scope before the exclusion is reached, and
+         * a staff key must not become a cohort. Anonymous retention is
+         * unaffected — it is `not_measurable` and stays that way.
+         */
+        customerKeyOnly(staffKeys)
       )
     )
     .groupBy(schema.productTelemetryEvent.userKeyHash, sql`2`);
