@@ -1764,7 +1764,7 @@ try {
       false,
       'event_metric is still being queried'
     );
-    assert.match(source, /seatCounterDelta: delta\(/);
+    assert.match(source, /operationalSeatCounterDelta: delta\(/);
   });
 
   group('Durable adapters cannot quietly widen');
@@ -1969,15 +1969,20 @@ try {
     assert.match(source, /entitledUsers: durableCount\(\s*\n?\s*entitlement\.reduce\(/);
   });
 
-  check('purchases and subscriptions keep their whole population', () => {
+  check('monetization describes customers, and revenue stays absent', () => {
     /*
-     * Deliberately unfiltered — money records, not a population. One occurrence
-     * of the predicate in this file, and it is the entitlement query above.
+     * The first pass left purchases and subscriptions whole, on the argument
+     * that a money record is not a population. That was the wrong call for this
+     * dashboard: the monetization section is read as what *customers* bought,
+     * and the owner will keep granting himself demo entitlements to show the
+     * flow. They are scoped now — and confirmed revenue is untouched, because
+     * there is still no provider to confirm anything.
      */
     const source = readFileSync('src/lib/admin-metrics/families/commerce.ts', 'utf8');
-    assert.equal((source.match(/customerAccounts\(\)/g) ?? []).length, 1);
-    assert.match(source, /\.from\(schema\.purchase\)\s*;/);
-    assert.match(source, /\.from\(schema\.subscription\)\s*;/);
+    assert.match(source, /customerPurchase = ownedByCustomer\(schema\.purchase\.userId\)/);
+    assert.match(source, /customerSubscription = ownedByCustomer\(schema\.subscription\.userId\)/);
+    assert.match(source, /confirmedRevenue: MetricValue = sourceNotConnected\(/);
+    assert.equal(/revenue:\s*durableCount/.test(source), false, 'a durable count was named revenue');
   });
 
   /* ------------------------------------------------- Nobody is named anywhere */
@@ -2004,10 +2009,16 @@ try {
       assert.equal(email.test(source), false, `${path} contains an email address`);
       assert.equal(/schema\.user\.email\b/.test(source), false, `${path} reads user.email`);
       assert.equal(/schema\.user\.name\b/.test(source), false, `${path} reads user.name`);
+      /*
+       * A *literal* on the right-hand side is what would single somebody out.
+       * `eq(schema.user.id, someColumn)` is the ownership join and is the whole
+       * mechanism; `eq(schema.user.id, 'usr_…')` would be the thing this
+       * document says must never exist.
+       */
       assert.equal(
-        /eq\(schema\.user\.id,/.test(source),
+        /eq\(schema\.user\.id,\s*['"`]/.test(source),
         false,
-        `${path} singles out one account by id`
+        `${path} singles out one account by a literal id`
       );
     }
   });
@@ -2153,6 +2164,333 @@ try {
 
     const telemetry = readFileSync('src/lib/admin-metrics/telemetryQuery.ts', 'utf8');
     assert.match(telemetry, /userKeyHash\} is not null/, 'retention still reads authenticated days only');
+  });
+
+  /* ============== Durable customer facts, and the demo that must not count */
+
+  group('A durable customer fact is one a customer performed');
+
+  check('ownership is a semi-join on the role, and nothing else', () => {
+    const { sql: text, params } = stub.db
+      .select({ n: drizzleSql`1` })
+      .from(stub.schema.expertBooking)
+      .where(internal.ownedByCustomer(stub.schema.expertBooking.userId))
+      .toSQL();
+
+    assert.match(text, /exists \(select 1 from "user" where \(/);
+    assert.match(text, /"user"\."id" = "expert_booking"\."user_id"/);
+    assert.match(text, /"user"\."role" = \$1/);
+    assert.deepEqual(params, [internal.CUSTOMER_ROLE]);
+
+    /* No name, no email, no id list, no second definition of "customer". */
+    assert.equal(/"user"\."email"|"user"\."name"/.test(text), false);
+  });
+
+  check('the same predicate serves every owning column', () => {
+    for (const [table, column] of [
+      [stub.schema.eventRegistration, stub.schema.eventRegistration.userId],
+      [stub.schema.academyProgress, stub.schema.academyProgress.userId],
+      [stub.schema.savedObject, stub.schema.savedObject.userId],
+      [stub.schema.collection, stub.schema.collection.userId],
+      [stub.schema.wealthAsset, stub.schema.wealthAsset.userId],
+      [stub.schema.purchase, stub.schema.purchase.userId],
+      [stub.schema.subscription, stub.schema.subscription.userId],
+      [stub.schema.consent, stub.schema.consent.userId],
+    ]) {
+      const { params } = stub.db
+        .select({ n: drizzleSql`1` })
+        .from(table)
+        .where(internal.ownedByCustomer(column))
+        .toSQL();
+
+      assert.deepEqual(params, [internal.CUSTOMER_ROLE]);
+    }
+  });
+
+  /**
+   * Which reads of an owned table are deliberately NOT scoped, and why.
+   *
+   * Structural rather than a list of expected lines: a query added next month
+   * with no predicate lands in the unfiltered count and fails here, whatever
+   * shape it was written in.
+   */
+  const OWNERSHIP_AUDIT = [
+    { file: 'families/events.ts', table: 'schema.eventRegistration', predicate: 'customerSeat', unfiltered: 1,
+      why: 'the all-account row population the physical seat counter is checked against' },
+    { file: 'families/events.ts', table: 'schema.event', predicate: 'customerSeat', unfiltered: 2,
+      why: 'the event catalogue is product inventory, and its seat counter is operational' },
+    { file: 'families/academy.ts', table: 'schema.academyProgress', predicate: 'customerLearner', unfiltered: 0, why: '' },
+    { file: 'families/experts.ts', table: 'schema.expertBooking', predicate: 'customerBooking', unfiltered: 0, why: '' },
+    { file: 'families/saves.ts', table: 'schema.savedObject', predicate: 'customerSave', unfiltered: 0, why: '' },
+    { file: 'families/saves.ts', table: 'schema.collection', predicate: 'customerCollection', unfiltered: 0, why: '' },
+    { file: 'families/saves.ts', table: 'schema.collectionItem', predicate: 'customerCollection', unfiltered: 0, why: '' },
+    { file: 'families/wealth.ts', table: 'schema.wealthAsset', predicate: 'customerAsset', unfiltered: 0, why: '' },
+    { file: 'families/wealth.ts', table: 'schema.wealthLiability', predicate: 'ownedByCustomer', unfiltered: 0, why: '' },
+    { file: 'families/wealth.ts', table: 'schema.wealthGoal', predicate: 'ownedByCustomer', unfiltered: 0, why: '' },
+    { file: 'families/wealth.ts', table: 'schema.consent', predicate: 'ownedByCustomer', unfiltered: 0, why: '' },
+    { file: 'families/commerce.ts', table: 'schema.purchase', predicate: 'customerPurchase', unfiltered: 0, why: '' },
+    { file: 'families/commerce.ts', table: 'schema.subscription', predicate: 'customerSubscription', unfiltered: 0, why: '' },
+    { file: 'families/commerce.ts', table: 'schema.user', predicate: 'customerAccounts()', unfiltered: 0, why: '' },
+  ];
+
+  for (const entry of OWNERSHIP_AUDIT) {
+    check(`${entry.file.split('/').pop()} · ${entry.table.replace('schema.', '')} is scoped to its owner`, () => {
+      const source = readFileSync(`src/lib/admin-metrics/${entry.file}`, 'utf8');
+      const reads = source.split(`.from(${entry.table})`).slice(1).map((rest) => rest.split(';')[0]);
+
+      assert.ok(reads.length > 0, `${entry.file} no longer reads ${entry.table}`);
+
+      const unfiltered = reads.filter((tail) => !tail.includes(entry.predicate));
+      assert.equal(
+        unfiltered.length,
+        entry.unfiltered,
+        `${entry.file}: ${unfiltered.length} unscoped read(s) of ${entry.table}, expected ${entry.unfiltered}${entry.why ? ` — ${entry.why}` : ''}`
+      );
+    });
+  }
+
+  check('the Events seat check compares two all-account populations', () => {
+    /*
+     * The complication this family had to solve. `event.registration_count` is
+     * physical: a staff seat occupies capacity like anybody else's. Comparing
+     * it against a customer-only row count would report a permanent gap of
+     * exactly the number of staff registrations — an integrity alarm that fires
+     * because the filter is working.
+     */
+    const source = readFileSync('src/lib/admin-metrics/families/events.ts', 'utf8');
+
+    assert.match(source, /operationalSeatCounterDelta: delta\(\s*\n?\s*counterSeats - allAccountHeld,\s*\n?\s*allAccountHeld,/);
+    assert.equal(
+      /counterSeats - held\b/.test(source),
+      false,
+      'the physical counter is compared against the customer population'
+    );
+    /* Named so the page cannot render it as adoption — labels come from keys. */
+    assert.match(source, /operationalSeatsAllAccounts: durableCount\(\s*\n?\s*allAccountHeld,/);
+    assert.match(source, /all accounts, operational/);
+  });
+
+  check('the customer attendance numbers come from the customer status mix', () => {
+    const source = readFileSync('src/lib/admin-metrics/families/events.ts', 'utf8');
+    assert.match(source, /const counts = Object\.fromEntries\(status\.map/);
+    assert.match(source, /const allAccountCounts = Object\.fromEntries\(\s*\n?\s*distribution\(allAccountStatusRows\)/);
+    for (const derived of ['resolved = attendanceResolvedSeats(counts)', 'unresolved = attendanceUnresolvedSeats(counts)', 'held = heldSeats(counts)']) {
+      assert.ok(source.includes(derived), `${derived} no longer reads the customer mix`);
+    }
+  });
+
+  /* ------------------------------------------------- The future-demo invariant */
+
+  group('An administrator can demonstrate the product without becoming a customer');
+
+  /**
+   * The predicate, evaluated in JavaScript.
+   *
+   * Its SQL is asserted exactly, above: `exists (select 1 from "user" where
+   * "user"."id" = <owner> and "user"."role" = $1)` with `$1` bound to
+   * `CUSTOMER_ROLE`. This is that sentence in JavaScript, reading the same
+   * exported rule the bound parameter comes from — so what the fixtures below
+   * exercise is the semantics the database is handed, not a second opinion
+   * about it. There is no local Postgres in this repository and the live half
+   * runs against production, so a fixture may not create an account; this is
+   * how far an executable check can honestly go.
+   */
+  const FIXTURE_ROLES = new Map([
+    ['owner', 'admin'],
+    ['mod', 'moderator'],
+    ['cust-a', 'user'],
+    ['cust-b', 'user'],
+  ]);
+
+  const customerOwned = (rows) => rows.filter((row) => internal.isCustomerRole(FIXTURE_ROLES.get(row.userId)));
+  const tally = (rows) =>
+    rows.reduce((counts, row) => ({ ...counts, [row.status]: (counts[row.status] ?? 0) + 1 }), {});
+
+  check('an admin event registration is not a customer registration', () => {
+    const registrations = [
+      { userId: 'cust-a', eventId: 'evt-1', status: 'attended' },
+      { userId: 'cust-b', eventId: 'evt-1', status: 'no_show' },
+      { userId: 'owner', eventId: 'evt-1', status: 'attended' },
+      { userId: 'owner', eventId: 'evt-2', status: 'registered' },
+      { userId: 'mod', eventId: 'evt-2', status: 'attended' },
+    ];
+
+    const customers = customerOwned(registrations);
+
+    assert.equal(customers.length, 2, 'staff seats reached the registration count');
+    assert.equal(new Set(customers.map((row) => row.userId)).size, 2, 'people registered');
+    assert.equal(new Set(customers.map((row) => row.eventId)).size, 1, 'evt-2 has only staff seats');
+
+    /* The derived numbers, through the real semantics module. */
+    const counts = tally(customers);
+    assert.equal(semantics.attendanceResolvedSeats(counts), 2);
+    assert.equal(semantics.attendanceUnresolvedSeats(counts), 0);
+    assert.equal(semantics.heldSeats(counts), 2);
+    assert.equal(counts.attended, 1, 'the admin attendance inflated the numerator');
+
+    /* And the operational side, which must still see every seat. */
+    const allCounts = tally(registrations);
+    assert.equal(semantics.heldSeats(allCounts), 5);
+    const physicalCounter = 5;
+    assert.equal(physicalCounter - semantics.heldSeats(allCounts), 0, 'the integrity check went red');
+    assert.equal(
+      physicalCounter - semantics.heldSeats(counts),
+      3,
+      'this is the false discrepancy the split exists to avoid'
+    );
+  });
+
+  check('admin Academy progress is not a learner', () => {
+    const progress = [
+      { userId: 'cust-a', stage: 'lesson', completed: false },
+      { userId: 'owner', stage: 'done', completed: true },
+      { userId: 'mod', stage: 'diagnostic', completed: false },
+    ];
+
+    const customers = customerOwned(progress);
+    assert.equal(customers.length, 1);
+    assert.equal(customers.filter((row) => row.completed).length, 0, 'a staff completion became a completion rate');
+  });
+
+  check('an admin expert booking is not customer demand', () => {
+    const bookings = [
+      { userId: 'cust-a', status: 'confirmed' },
+      { userId: 'owner', status: 'confirmed' },
+      { userId: 'owner', status: 'completed' },
+    ];
+
+    const customers = customerOwned(bookings);
+    assert.equal(customers.length, 1);
+    assert.equal(semantics.openPipeline(tally(customers)), 1);
+    assert.equal(semantics.openPipeline(tally(bookings)), 2, 'the fixture would not have caught anything');
+  });
+
+  check('an admin save is not a customer save', () => {
+    const saved = [
+      { userId: 'cust-a', kind: 'symbol' },
+      { userId: 'cust-a', kind: 'lesson' },
+      { userId: 'owner', kind: 'symbol' },
+    ];
+
+    const customers = customerOwned(saved);
+    assert.equal(customers.length, 2);
+    assert.equal(new Set(customers.map((row) => row.userId)).size, 1, 'savers');
+    assert.equal(customers.filter((row) => row.kind === 'symbol').length, 1, 'the kind mix counted a staff save');
+  });
+
+  check('a collection item takes its owner from the collection, not the saved object', () => {
+    const collections = [
+      { id: 'col-1', userId: 'cust-a' },
+      { id: 'col-2', userId: 'owner' },
+    ];
+    const customerCollections = new Set(customerOwned(collections).map((row) => row.id));
+
+    const items = [
+      { collectionId: 'col-1', savedObjectId: 'so-1' },
+      /* An admin collection holding a customer's public save. Still internal. */
+      { collectionId: 'col-2', savedObjectId: 'so-1' },
+    ];
+
+    const counted = items.filter((item) => customerCollections.has(item.collectionId));
+    assert.equal(counted.length, 1);
+    assert.equal(new Set(counted.map((item) => item.collectionId)).size, 1, 'collections with items');
+  });
+
+  check('an admin Wealth row is not a Wealth Hub customer', () => {
+    const assets = [
+      { userId: 'owner', supersededAt: null },
+      { userId: 'owner', supersededAt: '2026-08-01' },
+      { userId: 'cust-a', supersededAt: null },
+    ];
+
+    const current = customerOwned(assets).filter((row) => row.supersededAt === null);
+    assert.equal(current.length, 1);
+    assert.equal(new Set(current.map((row) => row.userId)).size, 1, 'holders');
+    assert.equal(
+      customerOwned(assets).filter((row) => row.supersededAt !== null).length,
+      0,
+      'a staff revision counted as revision activity'
+    );
+  });
+
+  check('an admin demo purchase is not customer monetization', () => {
+    const purchases = [
+      { userId: 'owner', status: 'demo', amountCents: 9900 },
+      { userId: 'owner', status: 'paid', amountCents: 4900 },
+      { userId: 'cust-a', status: 'demo', amountCents: 9900 },
+    ];
+
+    const customers = customerOwned(purchases);
+    assert.equal(customers.length, 1, 'purchase records');
+    assert.equal(new Set(customers.map((row) => row.userId)).size, 1, 'people with a purchase');
+    assert.equal(
+      customers.filter((row) => row.status === 'paid').reduce((sum, row) => sum + row.amountCents, 0),
+      0,
+      'a staff paid row reached the recorded gross'
+    );
+    /* Confirmed revenue is untouched by any of this: there is no provider. */
+    assert.equal(semantics.revenueIsConfirmable(0), false);
+
+    const entitlements = [
+      { userId: 'owner', plan: 'private' },
+      { userId: 'cust-a', plan: 'free' },
+    ];
+    const customerPlans = customerOwned(entitlements);
+    assert.equal(customerPlans.length, 1);
+    assert.equal(customerPlans.filter((row) => row.plan === 'private').length, 0);
+  });
+
+  check('an admin subscription is not a customer subscription', () => {
+    const subscriptions = [
+      { userId: 'owner', status: 'active', plan: 'private' },
+      { userId: 'cust-a', status: 'cancelled', plan: 'plus' },
+    ];
+
+    const customers = customerOwned(subscriptions);
+    assert.equal(customers.length, 1);
+    assert.equal(customers.filter((row) => row.status === 'active').length, 0, 'a staff subscription was active demand');
+  });
+
+  check('the identical row owned by a customer does count', () => {
+    /*
+     * The other half of every assertion above. One row, one field different,
+     * and the difference is exactly one — so these fixtures are measuring the
+     * role rather than accidentally counting nothing.
+     */
+    for (const table of ['registration', 'progress', 'booking', 'save', 'asset', 'purchase', 'subscription']) {
+      const asStaff = customerOwned([{ userId: 'owner', table }]);
+      const asCustomer = customerOwned([{ userId: 'cust-a', table }]);
+      assert.equal(asStaff.length, 0, `${table} counted a staff owner`);
+      assert.equal(asCustomer.length, 1, `${table} dropped a customer owner`);
+    }
+
+    assert.equal(customerOwned([{ userId: 'mod' }]).length, 0, 'moderator counted');
+    assert.equal(customerOwned([{ userId: 'cust-b' }]).length, 1);
+  });
+
+  check('product and system inventory stays visible through all of it', () => {
+    /*
+     * A reset that zeroed the catalogue would be a broken dashboard rather than
+     * an empty one, and so would a filter that reached the wrong tables.
+     */
+    const events = readFileSync('src/lib/admin-metrics/families/events.ts', 'utf8');
+    const supply = events.split('.from(schema.event)')[1].split(';')[0];
+    assert.equal(supply.includes('customerSeat'), false, 'the event catalogue was filtered by ownership');
+    assert.match(events, /publishedEvents: durableCount\(supply\?\.published/);
+    assert.match(events, /totalEvents: durableCount\(supply\?\.total/);
+
+    /*
+     * The Academy and Experts catalogues live in `src/content` and are never
+     * queried, so scoping those two families to customers cannot have touched
+     * what the product offers. Comments and strings are stripped first: both
+     * files name the catalogue in prose, and that prose is the point.
+     */
+    for (const path of ['src/lib/admin-metrics/families/academy.ts', 'src/lib/admin-metrics/families/experts.ts']) {
+      const code = readFileSync(path, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/'[^']*'/g, '');
+      assert.equal(/schema\.event\b/.test(code), false, `${path} reads the event catalogue`);
+    }
   });
 
   check('product and system inventory was not narrowed', () => {

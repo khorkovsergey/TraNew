@@ -32,8 +32,30 @@ is the only place that defines who a customer is, and it says `role`.
 
 ## 2. Customer accounts — the durable side
 
-`customerAccounts()` is `eq(user.role, 'user')`. It is applied to every query
-that counts people:
+Two predicates, one rule.
+
+- **`customerAccounts()`** — `eq(user.role, 'user')`. Scopes a read *of* `user`.
+- **`ownedByCustomer(userIdColumn)`** — a semi-join, `exists (select 1 from
+  "user" where "user"."id" = <owner> and "user"."role" = 'user')`. Scopes a read
+  of the things a person *did*: a registration, a booking, a save, a purchase,
+  an asset.
+
+The second exists because the first is not enough. The owner is going to keep
+demonstrating the portal while signed in as an administrator, and every
+demonstration writes durable rows — a seat, an `academy_progress` row, a demo
+purchase. Without the ownership predicate those rows are customer adoption
+forever, and the reset would only postpone the problem by one day.
+
+`ownedByCustomer` is a semi-join rather than a fetched id list: it composes into
+the aggregate the query already runs, nothing is loaded, and `user.id` is the
+primary key so the inner side is a lookup. It is written as *owned by a
+customer* rather than *not owned by staff* deliberately — the two differ for a
+row whose owner has gone, and a customer metric that silently adopted orphans
+would be the wrong way round.
+
+### Reads of `user`
+
+`customerAccounts()` is applied to every query that counts people:
 
 | Query | File | Was | Is |
 | --- | --- | --- | --- |
@@ -50,31 +72,77 @@ that counts people:
 The predicate is in the query, not subtracted afterwards. A card that showed a
 real number and then adjusted it would be misrepresenting a different thing.
 
-### What was deliberately left measuring everything
+### Reads of what a person did
 
-| Query | Why it is not filtered |
-| --- | --- |
-| `commerce` purchases — records, people, status/kind mix, amounts, reconciliation | Money records, not a population. A row exists because something was recorded against an account; dropping some would stop these counts reconciling with the table they name. A staff entitlement is a `demo` row and the status distribution already says so. |
-| `commerce` subscriptions — records, people, status/plan mix | Same. Billing history is an audit surface. |
-| `access.ts` role read | Access control. It is *supposed* to single out `admin`. |
-| `overview.telemetryEvents` | Instrumentation volume — a system fact about collection, not customer behaviour. |
-| `coverage.ts` declared-vs-observed | Instrumentation coverage. A staff event still proves an emitter runs, which is the only thing this asks. |
-| `reliability` Web Vitals, runtime failures, and their page-view denominator | "Does the portal work". A crash on a staff machine is the same defect as anybody else's, and excluding those samples would make the product look healthier the more of it we used ourselves. |
-| `retention` route bounds (`min(received_at)`) | When collection started. A date, not a person. |
+`ownedByCustomer()` is applied to every durable table `productFamilies()` reads
+that hangs off `user`:
 
-Nothing was blanket-filtered. Each of the above is a query that is deliberately
-about all traffic or about the system rather than about customers.
+| Family | Table | Owning column | Covers |
+| --- | --- | --- | --- |
+| Events | `event_registration` | `user_id` | registrations, the status mix, people, events-with-registrations, the window, attendance rate, marked and unresolved seats, marking coverage |
+| Academy | `academy_progress` | `user_id` | learners, new learners, path-ready, completed, with-a-lesson, asked, median lessons, completion rate, stage and mode mixes |
+| Experts | `expert_booking` | `user_id` | bookings, people, the window, open pipeline, every status count, rated bookings, mean rating, bookings-with-purchase |
+| Saves | `saved_object` | `user_id` | saved objects, savers, repeat savers, the window, the kind mix |
+| Saves | `collection` | `user_id` | collections, owners |
+| Saves | `collection_item` | *through* `collection.user_id` | items, collections with items, mean items |
+| Wealth | `wealth_asset` | `user_id` | holders, current assets, superseded revisions |
+| Wealth | `wealth_liability` | `user_id` | holders, records |
+| Wealth | `wealth_goal` | `user_id` | holders, records |
+| Wealth | `consent` | `user_id` | Voyager-context grants and revocations |
+| Commerce | `purchase` | `user_id` | records, people, status and kind mixes, recorded paid gross, demo gross, provider-reconciled records, the window |
+| Commerce | `subscription` | `user_id` | records, people, active, cancelled, status and plan mixes |
 
-### Not filtered, and why it does not need to be
+`collection_item` is the one that needed a decision. It carries no `user_id` —
+it joins a collection to a saved object — so its owner is resolved **through the
+collection**, not through the saved object. The two need not be the same person,
+and the honest owner of an item is whoever owns the collection it sits in.
 
-`events`, `academy`, `experts`, `saves` and `wealth` read tables that hang off
-`user` by foreign key and never join `user` itself, so a staff row is
-indistinguishable there today. They are not filtered, because the reset plan
-clears those tables **entirely** — they are customer/demo behavioural facts, and
-after the reset the only rows in them would be the owner's own demo activity,
-which is exactly what the reset removes. See the inventory document. If that
-decision changes and staff-owned rows are kept, these five families need the
-same treatment as `accounts`, and the handoff says so.
+### What is deliberately left measuring everything
+
+| Query | Classification | Why |
+| --- | --- | --- |
+| `event` — published and total | **product inventory** | How many events exist is a fact about the catalogue. A staff-created event is still an event somebody can attend. |
+| `event.registration_count` and its all-account row population | **operational integrity** | The counter is physical — a staff seat occupies capacity like any other. See §2a. |
+| `access.ts` role read | operational | Access control. It is *supposed* to single out `admin`. |
+| `overview.telemetryEvents` | system | Instrumentation volume, not customer behaviour. |
+| `coverage.ts` declared-vs-observed | system | A staff event still proves an emitter runs, which is the only thing this asks. |
+| `reliability` Web Vitals, runtime failures, and their page-view denominator | system health | Does the portal work. A crash on a staff machine is the same defect as anybody else's, and excluding those samples would make the product look healthier the more of it we used ourselves. |
+| `reliability` market data, provider configuration, source freshness | system | Operational, and unattributable anyway. |
+| `retention` route bounds (`min(received_at)`) | system | When collection started. A date, not a person. |
+| `voyager` "has the emitter ever run" probe | system | An instrumentation question. Filtering it would report a missing emitter that is in fact running. |
+| `overview.alertAdoption` | not a query | Alerts are behind a flag and no `alert` table read exists; the card is `feature_disabled` or a declared zero. If an alert query is ever written it is customer adoption and needs `ownedByCustomer(alert.userId)`. |
+
+Nothing was blanket-filtered, and nothing that is genuinely about the system or
+the catalogue was narrowed.
+
+### 2a. Events: two populations that must not be subtracted
+
+`event.registration_count` is a denormalised counter the Events section
+maintains in step with the rows — +1 on registration, −1 on cancellation, +1 on
+promotion from the waitlist. It counts **every** seat, and it should: capacity is
+physical, and a staff member holding a seat occupies it exactly as anybody else
+does.
+
+Once staff registrations leave the customer metrics, comparing that counter
+against the customer row population would report a discrepancy of precisely the
+number of staff registrations — every day, forever. An integrity alarm firing
+because the filter works is worse than no alarm at all.
+
+So the family reads `event_registration` twice and keeps the two apart:
+
+| | Population | Presented as |
+| --- | --- | --- |
+| `registrations`, the status mix, `peopleRegistered`, `eventsWithRegistrations`, `registrationsInWindow`, `attendanceRate`, `attendanceMarkedSeats`, `attendanceUnresolvedSeats`, `attendanceMarkingCoverage` | customer-owned rows | customer adoption |
+| `operationalSeatCounterDelta`, `operationalSeatsAllAccounts` | **all** rows | operational integrity |
+
+Both operational keys carry `operational` in the name, because the Observatory
+renders a family's metric keys as its labels — so the word has to be in the key
+to reach a reader. Their provenance string says `all accounts, operational` too.
+
+The same rule governs commerce: `providerReconciledRecords` counts `externalRef`
+*within the customer population*, and there is no all-account provider total
+anywhere to subtract it from. If one ever arrives, it must be compared against
+an all-account count, exactly as the seat counter is.
 
 ---
 
@@ -155,6 +223,12 @@ Per Observatory family: can internal traffic be excluded from it?
 | Registered users, new registrations | `role = 'user'` on `user` |
 | Verified users, registrations-per-day trend | `role = 'user'` on `user` |
 | Customer entitlement distribution, `entitledUsers` | `role = 'user'` on `user` |
+| Every durable Events figure (registrations, status mix, people, events, window, attendance) | `ownedByCustomer(event_registration.user_id)` |
+| Every durable Academy figure (learners, stages, modes, completion) | `ownedByCustomer(academy_progress.user_id)` |
+| Every durable Experts figure (bookings, pipeline, ratings) | `ownedByCustomer(expert_booking.user_id)` |
+| Saves, savers, repeat savers, kind mix, collections, collection items | `ownedByCustomer` on `saved_object` / `collection`, and through the collection for items |
+| Wealth holders and records, Voyager-context consent | `ownedByCustomer` on each wealth table and `consent` |
+| Purchases, subscriptions and every distribution over them | `ownedByCustomer` on `purchase` / `subscription` |
 | Authenticated cohort retention (D1/D7/D30), cohort grid | staff keys excluded per event |
 
 **B — partially excludable.** Some events carry attribution, some do not, and
@@ -179,6 +253,8 @@ design, and no filter can be honestly claimed.
 
 | Family / metric | Why |
 | --- | --- |
+| Published events, total events | Product inventory. Not traffic at all. |
+| `operationalSeatCounterDelta`, `operationalSeatsAllAccounts` | Operational integrity, all accounts by design — see §2a. |
 | Market data resolutions — requests, successes, no-data, provider errors, freshness buckets, volume | `market_data_request_completed` is an operational server event. It has no session and no user, and it should not gain one. |
 | Market provider configuration, delayed-data policy | Runtime configuration. Nobody's traffic. |
 | Web Vitals, runtime failure counts and their page-view denominator | Attributable in principle; deliberately **not** excluded — see §2. Included here so the distinction is on the record. |
