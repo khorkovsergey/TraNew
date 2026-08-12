@@ -346,7 +346,14 @@ export const subscription = pgTable(
     renewsAt: timestamp('renews_at'),
     cancelledAt: timestamp('cancelled_at'),
 
-    /** Reference at the payment provider. Never a card number. */
+    /**
+     * External or application reference. Presence alone does not prove
+     * payment, provider confirmation, or reconciliation. Never a card number.
+     *
+     * Same correction as `purchase.external_ref`: nothing constrains this to a
+     * provider identifier, so a metric that counted a populated value as a
+     * confirmed transaction would be counting bookkeeping.
+     */
     externalRef: text('external_ref'),
   },
   (table) => [index('subscription_user_idx').on(table.userId, table.startedAt)]
