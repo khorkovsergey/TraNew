@@ -644,7 +644,16 @@ export const purchase = pgTable(
      */
     status: text('status').notNull(),
 
-    /** Provider reference for reconciliation. Never card details. */
+    /**
+     * Free-form application reference. Presence does not prove payment,
+     * provider confirmation, or reconciliation. Never card details.
+     *
+     * It was described as a provider reconciliation reference, and it is not:
+     * the writers put internal identifiers in here — a `course.slug`, a
+     * `product.id` — on rows whose status is `demo`. A metric that read a
+     * populated `external_ref` as evidence of a confirmed transaction would
+     * report catalogue bookkeeping as revenue.
+     */
     externalRef: text('external_ref'),
     invoiceUrl: text('invoice_url'),
 
