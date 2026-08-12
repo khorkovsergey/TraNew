@@ -2,6 +2,7 @@ import 'server-only';
 import { gte, sql } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { PLAN_RANK } from '@/lib/session';
+import { customerAccounts } from '../internalTraffic';
 import { sourceNotConnected, type MetricValue } from '@/lib/analytics/states';
 import { distribution, durableAt, durableCount, newest, pick, type FamilyFacts } from './durable';
 
@@ -31,6 +32,22 @@ import { distribution, durableAt, durableCount, newest, pick, type FamilyFacts }
  * The entitlement vocabulary comes from `PLAN_RANK` at runtime. Writing the
  * plan names here would be a second source of truth about what the product
  * sells, and this file would be the last place anybody thought to update.
+ *
+ * ## Whose entitlements
+ *
+ * The distribution and `entitledUsers` are `role = 'user'` — customers. Staff
+ * accounts carry a `plan` like everybody else, because the entitlement check
+ * does not have a special case for them, and an administrator on Free or on
+ * Private was appearing in the adoption chart as though somebody had chosen it.
+ * One internal account is a visible fraction of a small customer base, which is
+ * exactly the size of population where that error is most convincing.
+ *
+ * The purchase and subscription figures are **not** filtered, deliberately.
+ * They are money records rather than a population: a row exists because
+ * something was recorded against an account, and quietly dropping some of them
+ * would make the counts stop reconciling with the tables they name. If a staff
+ * purchase is ever recorded, it is a `demo` row and the status distribution
+ * already says so.
  */
 export async function commerceFacts(since: Date): Promise<FamilyFacts> {
   const generatedAt = new Date().toISOString();
@@ -88,6 +105,7 @@ export async function commerceFacts(since: Date): Promise<FamilyFacts> {
   const entitlementRows = await db
     .select({ key: schema.user.plan, count: sql<number>`count(*)::int` })
     .from(schema.user)
+    .where(customerAccounts())
     .groupBy(schema.user.plan);
 
   const status = distribution(statusRows);
@@ -156,6 +174,8 @@ export async function commerceFacts(since: Date): Promise<FamilyFacts> {
       'A `paid` row is an application record, not a provider-confirmed transaction. `externalRef` is the reconciliation hook and nothing populates it, so the paid sum is reported as a recorded gross amount and confirmed revenue stays absent.',
       '`demo` means an entitlement was granted without money. Demo rows and their amounts are reported separately and never contribute to any money figure.',
       'Entitlement counts come from `user.plan` and prove nothing about payment. A plan the server model does not recognise is labelled rather than charted beside the real ones.',
+      'The entitlement distribution and `entitledUsers` are customers only — `role = \'user\'`. Staff accounts hold a plan like anybody else and their tier is not evidence of customer adoption.',
+      'Purchases and subscriptions are NOT filtered by role. They are money records rather than a population, and dropping rows from them would stop the counts reconciling with the tables they name.',
       '`renewsAt` is an intention, not an outcome. Nothing here infers a successful renewal from it.',
       'Plan names are read from the entitlement model at runtime; no lineup is written down in this file.',
     ],
